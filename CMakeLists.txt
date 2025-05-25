@@ -12,6 +12,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 # Set output dir
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
+# Set export compile commands for clang-tidy
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Gather source files
 file(GLOB_RECURSE SRC_FILES
         "src/*.cpp"
