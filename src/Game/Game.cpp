@@ -2,16 +2,14 @@
 
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_image.h>
-#include <imgui/imgui.h>
-#include <imgui/imgui_impl_sdl2.h>
-#include <imgui/imgui_impl_sdlrenderer2.h>
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdlrenderer2.h"
 
 #include <glm/glm.hpp>
-#include <iostream>
 #include <memory>
 #include <sol/sol.hpp>
 #include <string>
-#include <vector>
 
 #include "../ECS/ECS.h"
 #include "../Events/KeyInputEvent.h"
