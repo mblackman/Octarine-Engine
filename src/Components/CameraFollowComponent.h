@@ -3,5 +3,5 @@
 #include <glm/glm.hpp>
 
 struct CameraFollowComponent {
-    CameraFollowComponent() = default;
+  CameraFollowComponent() = default;
 };
