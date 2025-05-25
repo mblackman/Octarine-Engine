@@ -1,33 +1,24 @@
-# Octarine-Engine
+# Octarine-Engine #
 
 Octarine Engine colors imagination as a lightweight 2D game engine that is present where magic happens. It has its own ECS, supports Lua scripting, and is a yellowish-purple color.
 
 This engine utilizes:
 
-- GLM: <https://github.com/g-truc/glm>
-- ImGui: <https://github.com/ocornut/imgui>
-- Lua5.3: <https://www.lua.org/>
-- SDL2: <https://www.libsdl.org/>
-- spdlog: <https://github.com/gabime/spdlog>
+-   GLM: <https://github.com/g-truc/glm>
+-   ImGui: <https://github.com/ocornut/imgui> (version 1.91.8#2)
+-   Lua: <https://www.lua.org/> (version 5.4.x)
+-   SDL2: <https://www.libsdl.org/>
+-   spdlog: <https://github.com/gabime/spdlog>
+-   sol2: <https://github.com/ThePhD/sol2>
 
-## Ubuntu Setup
+All dependencies are managed via [vcpkg](https://github.com/microsoft/vcpkg).
 
-Run this command to install the necessary library and tools:
+## Prerequisites
 
-```sh
-sudo apt install build-essential libsdl2-dev libsdl2-image-dev libsdl2-ttf-dev libsdl2-mixer-dev liblua5.3-dev lua5.3 libspdlog-dev
-```
+Before you begin, ensure you have the following installed:
 
-## Run Instructions
-
-Build the engine and the game with:
-
-```sh
-make
-```
-
-Start the game with:
-
-```sh
-make run
-```
+1.  **Git:** For cloning the project and vcpkg.
+2.  **CMake:** Version 3.10 or higher. ([Download CMake](https://cmake.org/download/))
+3.  **C++ Compiler:** A C++17 compliant compiler (e.g., GCC, Clang, MSVC).
+    * On Ubuntu, you can install `build-essential` which includes GCC: `sudo apt update && sudo apt install build-essential g++`
+4.  **CLion IDE:** (Recommended for development) [JetBrains CLion](https://www.jetbrains.com/clion/).
