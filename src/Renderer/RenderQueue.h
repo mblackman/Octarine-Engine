@@ -11,7 +11,7 @@ class RenderQueue {
   using value_type = RenderKey;
   using const_iterator = typename std::vector<RenderKey>::const_iterator;
 
-  RenderQueue(size_t initial_capacity = 1024) {
+  explicit RenderQueue(size_t initial_capacity = 1024) {
     render_keys_.reserve(initial_capacity);
   }
 
@@ -31,17 +31,17 @@ class RenderQueue {
 
   void Sort() { std::sort(render_keys_.begin(), render_keys_.end()); }
 
-  const_iterator begin() const noexcept { return render_keys_.cbegin(); }
+  [[nodiscard]] const_iterator begin() const noexcept { return render_keys_.cbegin(); }
 
-  const_iterator end() const noexcept { return render_keys_.cend(); }
+  [[nodiscard]] const_iterator end() const noexcept { return render_keys_.cend(); }
 
-  const_iterator cbegin() const noexcept { return render_keys_.cbegin(); }
+  [[nodiscard]] const_iterator cbegin() const noexcept { return render_keys_.cbegin(); }
 
-  const_iterator cend() const noexcept { return render_keys_.cend(); }
+  [[nodiscard]] const_iterator cend() const noexcept { return render_keys_.cend(); }
 
-  bool IsEmpty() const noexcept { return render_keys_.empty(); }
+  [[nodiscard]] bool IsEmpty() const noexcept { return render_keys_.empty(); }
 
-  size_t Size() const noexcept { return render_keys_.size(); }
+  [[nodiscard]] size_t Size() const noexcept { return render_keys_.size(); }
 
  private:
   std::vector<RenderKey> render_keys_;

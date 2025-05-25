@@ -56,7 +56,7 @@ Entity Registry::CreateEntity() {
     free_ids_.pop_front();
   }
 
-  Entity entity(entityId, this);
+  const Entity entity(entityId, this);
 
   entities_to_add_.insert(entity);
 
@@ -74,11 +74,11 @@ void Registry::AddEntityToSystems(Entity entity) {
 
   const auto& entityComponentSignature = entity_component_signatures_[entityId];
 
-  for (auto& system : systems_) {
+  for (const auto& system : systems_) {
     const auto& systemComponentSignature =
         system.second->GetComponentSignature();
 
-    bool isInterested = (entityComponentSignature & systemComponentSignature) ==
+    const bool isInterested = (entityComponentSignature & systemComponentSignature) ==
                         systemComponentSignature;
 
     if (isInterested) {
@@ -88,7 +88,7 @@ void Registry::AddEntityToSystems(Entity entity) {
 }
 
 void Registry::RemoveEntityFromSystems(const Entity entity) {
-  for (auto& system : systems_) {
+  for (const auto& system : systems_) {
     system.second->RemoveEntity(entity);
   }
 }
@@ -106,7 +106,7 @@ void Registry::Update() {
     free_ids_.push_front(entity.GetId());
     entity_component_signatures_[entity.GetId()].reset();
 
-    for (auto pool : component_pools_) {
+    for (const auto& pool : component_pools_) {
       if (pool) {
         pool->Remove(entity.GetId());
       }
@@ -122,7 +122,7 @@ void Registry::Update() {
 }
 
 void Registry::TagEntity(Entity entity, const std::string& tag) {
-  auto existingTag = entity_by_tag_.find(tag);
+  const auto existingTag = entity_by_tag_.find(tag);
   if (existingTag != entity_by_tag_.end()) {
     if (existingTag->second != entity) {
       throw std::runtime_error("Entity with tag: " + tag + " already exists.");
@@ -162,7 +162,7 @@ void Registry::GroupEntity(Entity entity, const std::string& group) {
 }
 
 bool Registry::EntityInGroup(Entity entity, const std::string& group) const {
-  auto groups = groups_by_entity_.find(entity.GetId());
+  const auto groups = groups_by_entity_.find(entity.GetId());
   if (groups == groups_by_entity_.end()) {
     return false;
   }
@@ -172,17 +172,17 @@ bool Registry::EntityInGroup(Entity entity, const std::string& group) const {
 
 std::vector<Entity> Registry::GetEntitiesByGroup(
     const std::string& group) const {
-  auto entities = entities_by_groups_.find(group);
+  const auto entities = entities_by_groups_.find(group);
 
   if (entities == entities_by_groups_.end()) {
-    return std::vector<Entity>();
+    return {};
   }
 
   return std::vector(entities->second.begin(), entities->second.end());
 }
 
 void Registry::RemoveEntityGroup(Entity entity, const std::string& group) {
-  auto groups = groups_by_entity_.find(entity.GetId());
+  const auto groups = groups_by_entity_.find(entity.GetId());
   if (groups != groups_by_entity_.end()) {
     groups->second.erase(group);
     if (groups->second.empty()) {
@@ -192,7 +192,7 @@ void Registry::RemoveEntityGroup(Entity entity, const std::string& group) {
     return;
   }
 
-  auto entities = entities_by_groups_.find(group);
+  const auto entities = entities_by_groups_.find(group);
   if (entities != entities_by_groups_.end()) {
     entities->second.erase(entity);
     if (entities->second.empty()) {
@@ -202,9 +202,9 @@ void Registry::RemoveEntityGroup(Entity entity, const std::string& group) {
 }
 
 void Registry::RemoveEntityGroups(Entity entity) {
-  auto groups = groups_by_entity_.find(entity.GetId());
+  const auto groups = groups_by_entity_.find(entity.GetId());
   if (groups != groups_by_entity_.end()) {
-    for (auto group : groups->second) {
+    for (const auto& group : groups->second) {
       auto entities = entities_by_groups_.find(group);
       if (entities != entities_by_groups_.end()) {
         entities->second.erase(entity);

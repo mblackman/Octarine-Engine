@@ -22,8 +22,8 @@ class RenderSpriteSystem : public System {
     auto entities = GetEntities();
 
     for (auto entity : GetEntities()) {
-      auto transform = entity.GetComponent<TransformComponent>();
-      auto sprite = entity.GetComponent<SpriteComponent>();
+      const auto transform = entity.GetComponent<TransformComponent>();
+      const auto sprite = entity.GetComponent<SpriteComponent>();
 
       bool isOutsideCamera = false;
 

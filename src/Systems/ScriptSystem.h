@@ -20,7 +20,7 @@ int GetEntityPosition(Entity entity) {
     return 0;
   }
 
-  auto transform = entity.GetComponent<TransformComponent>();
+  const auto transform = entity.GetComponent<TransformComponent>();
   return transform.position.x;
 }
 
@@ -81,9 +81,9 @@ class ScriptSystem : public System {
     if (key.empty()) {
       return false;
     }
-    std::string lowerKey = makeKey(key);
+    const std::string lowerKey = makeKey(key);
 
-    auto it = keyMap_.find(lowerKey);
+    const auto it = keyMap_.find(lowerKey);
 
     if (it != keyMap_.end()) {
       for (const auto& key : pressedKeys_) {
@@ -99,9 +99,9 @@ class ScriptSystem : public System {
     if (key.empty()) {
       return false;
     }
-    std::string lowerKey = makeKey(key);
+    const std::string lowerKey = makeKey(key);
 
-    auto it = keyMap_.find(lowerKey);
+    const auto it = keyMap_.find(lowerKey);
 
     if (it != keyMap_.end()) {
       for (const auto& key : heldKeys_) {
@@ -119,7 +119,7 @@ class ScriptSystem : public System {
   }
 
   void OnKeyInput(KeyInputEvent& event) {
-    std::string key = makeKey(SDL_GetKeyName(event.inputKey));
+    const std::string key = makeKey(SDL_GetKeyName(event.inputKey));
     if (event.isPressed) {
       if (heldKeys_.find(key) == heldKeys_.end()) {
         pressedKeys_.insert(key);
@@ -131,7 +131,7 @@ class ScriptSystem : public System {
     }
   }
 
-  std::string makeKey(const std::string& key) {
+  static std::string makeKey(const std::string& key) {
     std::string lowerKey = key;
     std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(),
                    ::tolower);

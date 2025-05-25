@@ -6,15 +6,15 @@
 
 #include "../General/Logger.h"
 
-AssetManager::AssetManager() {}
+AssetManager::AssetManager() = default;
 
 AssetManager::~AssetManager() { ClearAssets(); }
 
 void AssetManager::ClearAssets() {
-  for (auto texture : textures_) {
+  for (const auto& texture : textures_) {
     SDL_DestroyTexture(texture.second);
   }
-  for (auto font : fonts_) {
+  for (const auto& font : fonts_) {
     TTF_CloseFont(font.second);
   }
 

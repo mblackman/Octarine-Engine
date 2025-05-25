@@ -18,8 +18,8 @@ class DamageSystem : public System {
   }
 
   void OnCollision(CollisionEvent& event) {
-    auto a = event.entityA;
-    auto b = event.entityB;
+    const auto a = event.entityA;
+    const auto b = event.entityB;
     auto aId = std::to_string(event.entityA.GetId());
     auto bId = std::to_string(event.entityB.GetId());
 
@@ -34,9 +34,9 @@ class DamageSystem : public System {
     }
   }
 
-  void OnProjectileHit(Entity projectile, Entity target) {
-    auto projectileComponent = projectile.GetComponent<ProjectileComponent>();
-    bool isHit = (target.HasTag("player") && !projectileComponent.isFriendly) ||
+  static void OnProjectileHit(Entity projectile, Entity target) {
+    const auto projectileComponent = projectile.GetComponent<ProjectileComponent>();
+    const bool isHit = (target.HasTag("player") && !projectileComponent.isFriendly) ||
                  (target.InGroup("enemies") && projectileComponent.isFriendly);
 
     if (isHit) {
@@ -50,6 +50,4 @@ class DamageSystem : public System {
       projectile.Blam();
     }
   }
-
-  void Update() {}
 };

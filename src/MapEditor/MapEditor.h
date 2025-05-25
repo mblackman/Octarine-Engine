@@ -12,7 +12,7 @@ class MapEditor {
   MapEditor() = default;
   ~MapEditor() = default;
 
-  void Load(sol::state& lua, const std::unique_ptr<Registry>& registry,
+  static void Load(sol::state& lua, const std::unique_ptr<Registry>& registry,
             const std::unique_ptr<AssetManager>& assetManager,
             SDL_Renderer* renderer);
 };

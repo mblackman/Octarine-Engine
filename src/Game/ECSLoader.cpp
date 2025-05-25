@@ -187,12 +187,12 @@ void ECSLoader::LoadEntity(sol::table entityTable,
 void ECSLoader::LoadAsset(sol::table assetTable,
                           const std::unique_ptr<AssetManager>& assetManager,
                           SDL_Renderer* renderer) {
-  std::string assetType = assetTable["type"];
+  const std::string assetType = assetTable["type"];
 
   if (assetType == "texture") {
     assetManager->AddTexture(renderer, assetTable["id"], assetTable["file"]);
   } else if (assetType == "font") {
-    int fontSize = assetTable["font_size"];
+    const int fontSize = assetTable["font_size"];
     assetManager->AddFont(assetTable["id"], assetTable["file"], fontSize);
   } else {
     Logger::Error("Unknown asset type: " + assetType);

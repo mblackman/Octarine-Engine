@@ -45,7 +45,7 @@ void LevelLoader::LoadLevel(sol::state& lua,
     }
 
     sol::table asset = assets[i];
-    ecsLoader.LoadAsset(asset, assetManager, renderer);
+    ECSLoader::LoadAsset(asset, assetManager, renderer);
     i++;
   }
 
@@ -109,7 +109,7 @@ void LevelLoader::LoadLevel(sol::state& lua,
     }
 
     sol::table entity = entities[i];
-    ecsLoader.LoadEntity(entity, registry);
+    ECSLoader::LoadEntity(entity, registry);
     i++;
   }
 }

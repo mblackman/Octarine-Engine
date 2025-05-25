@@ -59,21 +59,21 @@ class ProjectileEmitSystem : public System {
  private:
   bool spawnFriendlyProjectiles_;
 
-  void SpawnProjectile(TransformComponent& transform, Entity& entity,
+  static void SpawnProjectile(TransformComponent& transform, Entity& entity,
                        std::unique_ptr<Registry>& registry,
                        ProjectileEmitterComponent& emitter) {
     auto projectilePosition = transform.position;
     auto velocity = emitter.velocity;
 
     if (entity.HasComponent<SpriteComponent>()) {
-      auto sprite = entity.GetComponent<SpriteComponent>();
+      const auto sprite = entity.GetComponent<SpriteComponent>();
       projectilePosition.x += (transform.scale.x * sprite.width / 2);
       projectilePosition.y += (transform.scale.y * sprite.height / 2);
     }
 
     if (emitter.isFriendly && entity.HasComponent<RigidBodyComponent>()) {
-      auto rigidBody = entity.GetComponent<RigidBodyComponent>();
-      auto direction = glm::normalize(rigidBody.velocity);
+      const auto rigidBody = entity.GetComponent<RigidBodyComponent>();
+      const auto direction = glm::normalize(rigidBody.velocity);
       velocity = direction * emitter.velocity;
     }
 

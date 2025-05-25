@@ -138,7 +138,6 @@ readability-magic-numbers, # If not too noisy for your literals
 readability-simplify-boolean-expr,
 readability-const-return-type,
 readability-container-size-empty,
-readability-convert-member-functions-to-static,
 readability-delete-null-pointer,
 readability-deleted-default,
 readability-inconsistent-declaration-parameter-name,

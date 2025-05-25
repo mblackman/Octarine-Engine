@@ -12,7 +12,7 @@ class ProjectileLifecycleSystem : public System {
 
   void Update() {
     for (auto entity : GetEntities()) {
-      auto projectile = entity.GetComponent<ProjectileComponent>();
+      const auto projectile = entity.GetComponent<ProjectileComponent>();
 
       if (static_cast<int>(SDL_GetTicks()) - projectile.spawnTime >
           projectile.duration) {

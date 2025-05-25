@@ -5,11 +5,11 @@
 void MapEditor::Load(sol::state& lua, const std::unique_ptr<Registry>& registry,
                      const std::unique_ptr<AssetManager>& assetManager,
                      SDL_Renderer* renderer) {
-  std::string filePath = "./assets/scripts/map-editor.lua";
-  sol::load_result script = lua.load_file(filePath);
+  const std::string filePath = "./assets/scripts/map-editor.lua";
+  const sol::load_result script = lua.load_file(filePath);
 
   if (!script.valid()) {
-    sol::error error = script;
+    const sol::error error = script;
     Logger::Error("Level script is not valid: " + std::string(error.what()));
     return;
   }
@@ -27,12 +27,12 @@ void MapEditor::Load(sol::state& lua, const std::unique_ptr<Registry>& registry,
   int i = 0;
 
   while (true) {
-    sol::optional<sol::table> hasAsset = assets[i];
+    const sol::optional<sol::table> hasAsset = assets[i];
     if (!hasAsset) {
       break;
     }
 
-    sol::table asset = assets[i];
+    const sol::table asset = assets[i];
     loader.LoadAsset(asset, assetManager, renderer);
     i++;
   }
@@ -47,7 +47,7 @@ void MapEditor::Load(sol::state& lua, const std::unique_ptr<Registry>& registry,
       break;
     }
 
-    sol::table entity = entities[i];
+    const sol::table entity = entities[i];
     loader.LoadEntity(entity, registry);
     i++;
   }

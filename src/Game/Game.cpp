@@ -57,7 +57,7 @@ Game::Game()
 Game::~Game() { Logger::Info("Game Destructor called."); }
 
 void Game::Initialize() {
-  auto result = SDL_Init(SDL_INIT_EVERYTHING);
+  const auto result = SDL_Init(SDL_INIT_EVERYTHING);
 
   if (result != 0) {
     Logger::Error("SDL_Init Error: " + std::string(SDL_GetError()));
@@ -150,11 +150,9 @@ void Game::Setup(bool isMapEditor) {
   registry_->GetSystem<ScriptSystem>().CreateLuaBindings(lua);
 
   if (isMapEditor) {
-    MapEditor editor;
-    editor.Load(lua, registry_, asset_manager_, sdl_renderer_);
+    MapEditor::Load(lua, registry_, asset_manager_, sdl_renderer_);
   } else {
-    LevelLoader loader;
-    loader.LoadLevel(lua, registry_, asset_manager_, sdl_renderer_, 1);
+    LevelLoader::LoadLevel(lua, registry_, asset_manager_, sdl_renderer_, 1);
   }
 }
 
@@ -196,7 +194,7 @@ void Game::ProcessInput() {
 
 void Game::Update() {
   // If we are too fast, waste some time until we reach the frame time
-  int timeToWait =
+  const int timeToWait =
       kMillisecondsPerFrame - (SDL_GetTicks() - milliseconds_previous_frame_);
   if (timeToWait > 0 && timeToWait <= kMillisecondsPerFrame) {
     SDL_Delay(timeToWait);
@@ -213,14 +211,13 @@ void Game::Update() {
   SubscribeToEvents(event_bus_);
 
   // Calculate delta time
-  double deltaTime = (SDL_GetTicks() - milliseconds_previous_frame_) / 1000.0;
+  const double deltaTime = (SDL_GetTicks() - milliseconds_previous_frame_) / 1000.0;
 
   milliseconds_previous_frame_ = SDL_GetTicks();
 
   registry_->GetSystem<MovementSystem>().Update(deltaTime);
   registry_->GetSystem<AnimationSystem>().Update();
   registry_->GetSystem<CollisionSystem>().Update(event_bus_);
-  registry_->GetSystem<DamageSystem>().Update();
   registry_->GetSystem<KeyboardControlSystem>().Update();
   registry_->GetSystem<CameraFollowSystem>().Update(camera_);
   registry_->GetSystem<ProjectileEmitSystem>().Update(registry_);
@@ -274,6 +271,6 @@ void Game::OnKeyInputEvent(KeyInputEvent& event) {
 
 KeyInputEvent Game::GetKeyInputEvent(SDL_KeyboardEvent* event) {
   bool isPressed = event->state == SDL_PRESSED;
-  return KeyInputEvent(event->keysym.sym,
-                       static_cast<SDL_Keymod>(event->keysym.mod), isPressed);
+  return {event->keysym.sym,
+                       static_cast<SDL_Keymod>(event->keysym.mod), isPressed};
 }

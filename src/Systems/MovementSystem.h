@@ -21,8 +21,8 @@ class MovementSystem : public System {
   }
 
   void OnCollision(CollisionEvent& event) {
-    auto a = event.entityA;
-    auto b = event.entityB;
+    const auto a = event.entityA;
+    const auto b = event.entityB;
     auto aId = std::to_string(event.entityA.GetId());
     auto bId = std::to_string(event.entityB.GetId());
 
@@ -39,7 +39,7 @@ class MovementSystem : public System {
     for (auto entity : GetEntities()) {
       auto& transform = entity.GetComponent<TransformComponent>();
       const auto rigidBody = entity.GetComponent<RigidBodyComponent>();
-      bool isPlayer = entity.HasTag("player");
+      const bool isPlayer = entity.HasTag("player");
 
       if (!isPlayer && IsEntityOutsideMap(entity)) {
         Logger::Info("Entity went outside map " +
@@ -50,7 +50,7 @@ class MovementSystem : public System {
         transform.position.y += rigidBody.velocity.y * deltaTime;
 
         if (isPlayer) {
-          auto spriteComponent = entity.GetComponent<SpriteComponent>();
+          const auto spriteComponent = entity.GetComponent<SpriteComponent>();
           if (transform.position.x < 0) {
             transform.position.x = 0;
           }
@@ -77,7 +77,7 @@ class MovementSystem : public System {
   }
 
  private:
-  void OnObstacleCollision(Entity enemy) {
+  static void OnObstacleCollision(Entity enemy) {
     auto& rigidBody = enemy.GetComponent<RigidBodyComponent>();
 
     rigidBody.velocity = rigidBody.velocity * -1.0f;
@@ -89,14 +89,14 @@ class MovementSystem : public System {
     }
   }
 
-  bool IsEntityOutsideMap(Entity entity) {
-    auto transform = entity.GetComponent<TransformComponent>();
+  static bool IsEntityOutsideMap(Entity entity) {
+    const auto transform = entity.GetComponent<TransformComponent>();
     bool isEntityOutsideMap = (transform.position.x > Game::windowWidth ||
                                transform.position.y > Game::windowHeight);
 
     if (!isEntityOutsideMap) {
       if (entity.HasComponent<SpriteComponent>()) {
-        auto sprite = entity.GetComponent<SpriteComponent>();
+        const auto sprite = entity.GetComponent<SpriteComponent>();
         isEntityOutsideMap =
             (transform.position.x + sprite.width * transform.scale.x < 0 ||
              transform.position.y + sprite.height * transform.scale.y < 0);

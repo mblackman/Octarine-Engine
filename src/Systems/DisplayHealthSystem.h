@@ -38,16 +38,16 @@ class DisplayHealthSystem : public System {
         CreateHealthTracker(registry, entity.GetId());
       }
 
-      auto transform = entity.GetComponent<TransformComponent>();
-      auto health = entity.GetComponent<HealthComponent>();
+      const auto transform = entity.GetComponent<TransformComponent>();
+      const auto health = entity.GetComponent<HealthComponent>();
       auto& textLabel =
           health_trackers_[entity.GetId()]->GetComponent<TextLabelComponent>();
       auto& square = health_trackers_[entity.GetId()]
                          ->GetComponent<SquarePrimitiveComponent>();
 
-      float healthPercentage =
+      const float healthPercentage =
           static_cast<float>(health.currentHealth) / health.maxHealth;
-      int healthAmount = static_cast<int>(healthPercentage * 100);
+      const int healthAmount = static_cast<int>(healthPercentage * 100);
       textLabel.text = std::to_string(healthAmount) + "%";
       textLabel.position =
           glm::vec2(transform.position.x, transform.position.y - 25);
@@ -56,7 +56,7 @@ class DisplayHealthSystem : public System {
       int healthWidth = healthAmount;
 
       if (entity.HasComponent<SpriteComponent>()) {
-        auto sprite = entity.GetComponent<SpriteComponent>();
+        const auto sprite = entity.GetComponent<SpriteComponent>();
         healthWidth = static_cast<int>(sprite.width * healthPercentage *
                                        transform.scale.x);
       }
@@ -67,7 +67,7 @@ class DisplayHealthSystem : public System {
       square.color = GetHealthColor(healthPercentage);
     }
 
-    for (auto healthTracker : health_trackers_) {
+    for (const auto& healthTracker : health_trackers_) {
       if (living_entities_.find(healthTracker.first) ==
           living_entities_.end()) {
         healthTracker.second->Blam();

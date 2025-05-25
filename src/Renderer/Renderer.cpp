@@ -51,12 +51,12 @@ void Renderer::RenderSprite(const Entity& entity, SDL_Renderer* renderer,
   const auto sprite = entity.GetComponent<SpriteComponent>();
 
   const auto texture = assetManager->GetTexture(sprite.assetId);
-  float x =
+  const float x =
       sprite.isFixed ? transform.position.x : transform.position.x - camera.x;
-  float y =
+  const float y =
       sprite.isFixed ? transform.position.y : transform.position.y - camera.y;
 
-  SDL_Rect destRect = {static_cast<int>(x), static_cast<int>(y),
+  const SDL_Rect destRect = {static_cast<int>(x), static_cast<int>(y),
                        static_cast<int>(sprite.width * transform.scale.x),
                        static_cast<int>(sprite.height * transform.scale.y)};
 
@@ -66,11 +66,11 @@ void Renderer::RenderSprite(const Entity& entity, SDL_Renderer* renderer,
 
 void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer,
                             SDL_Rect& camera) {
-  auto square = entity.GetComponent<SquarePrimitiveComponent>();
-  float x = square.isFixed ? square.position.x : square.position.x - camera.x;
-  float y = square.isFixed ? square.position.y : square.position.y - camera.y;
+  const auto square = entity.GetComponent<SquarePrimitiveComponent>();
+  const float x = square.isFixed ? square.position.x : square.position.x - camera.x;
+  const float y = square.isFixed ? square.position.y : square.position.y - camera.y;
 
-  SDL_Rect rect = {static_cast<int>(x), static_cast<int>(y), square.width,
+  const SDL_Rect rect = {static_cast<int>(x), static_cast<int>(y), square.width,
                    square.height};
 
   SDL_SetRenderDrawColor(renderer, square.color.r, square.color.g,
@@ -93,7 +93,7 @@ void Renderer::RenderText(const Entity& entity, SDL_Renderer* renderer,
 
   SDL_QueryTexture(texture, nullptr, nullptr, &labelWidth, &labelHeight);
 
-  SDL_Rect destRect = {static_cast<int>(textLabel.position.x -
+  const SDL_Rect destRect = {static_cast<int>(textLabel.position.x -
                                         (textLabel.isFixed ? 0 : camera.x)),
                        static_cast<int>(textLabel.position.y -
                                         (textLabel.isFixed ? 0 : camera.y)),
