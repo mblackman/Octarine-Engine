@@ -8,11 +8,12 @@
 
 class AssetManager {
  private:
+  std::string base_path_;
   std::map<std::string, SDL_Texture*> textures_;
   std::map<std::string, TTF_Font*> fonts_;
 
  public:
-  AssetManager();
+  explicit AssetManager(std::string basePath);
   ~AssetManager();
 
   void ClearAssets();
@@ -22,4 +23,6 @@ class AssetManager {
   void AddFont(const std::string& assetId, const std::string& path,
                int fontSize);
   [[nodiscard]] TTF_Font* GetFont(const std::string& assetId) const;
+  [[nodiscard]] std::string GetBasePath() const;
+  [[nodiscard]] std::string GetFullPath(const std::string& relativePath) const;
 };

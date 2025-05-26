@@ -5,17 +5,31 @@
 
 int main(int argc, char* argv[]) {
   Logger::Init();
-  bool isMapEditor = false;
 
-  if (argc > 1 && strcmp(argv[1], "-m") == 0) {
-    Logger::Info("Map Editor mode enabled.");
-    isMapEditor = true;
+  std::string gamePath;
+
+  // Parse command-line arguments
+  for (int i = 1; i < argc; ++i) {
+    std::string currentArg = argv[i];
+
+    if (currentArg == "-p" || currentArg == "--path") {
+      if (i + 1 < argc) {
+        gamePath = argv[++i];
+        Logger::Info("Game path set to: " + gamePath);
+      } else {
+        Logger::Error(
+            "Error: " + currentArg + " flag requires a path argument.");
+        return 1;
+      }
+    } else {
+      Logger::Warn("Unknown command-line argument: " + currentArg);
+    }
   }
 
-  Game game;
+  Game game(gamePath);
 
   game.Initialize();
-  game.Run(isMapEditor);
+  game.Run();
   game.Destroy();
 
   return 0;

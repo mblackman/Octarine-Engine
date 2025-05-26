@@ -17,12 +17,11 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # Gather source files
 file(GLOB_RECURSE SRC_FILES
-        "src/*.cpp"
+        "src/Main.cpp"
         "src/Game/*.cpp"
         "src/General/*.cpp"
         "src/ECS/*.cpp"
         "src/AssetManager/*.cpp"
-        "src/MapEditor/*.cpp"
         "src/Renderer/*.cpp"
 )
 

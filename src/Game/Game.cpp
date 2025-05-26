@@ -11,7 +11,6 @@
 #include "../ECS/ECS.h"
 #include "../Events/KeyInputEvent.h"
 #include "../General/Logger.h"
-#include "../MapEditor/MapEditor.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 #include "../Systems/AnimationSystem.h"
@@ -30,25 +29,36 @@
 #include "../Systems/RenderTextSystem.h"
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UIButtonSystem.h"
-#include "./LevelLoader.h"
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
 
 int Game::windowWidth;
 int Game::windowHeight;
-int Game::mapWidth;
-int Game::mapHeight;
+float Game::mapWidth;
+float Game::mapHeight;
 
-Game::Game()
-    : window_(nullptr),
-      sdl_renderer_(nullptr),
-      camera_(),
-      show_colliders_(false),
-      milliseconds_previous_frame_(),
-      render_queue_() {
+inline void LoadGame(sol::state& lua, const std::string& assetPath) {
+  const auto filePath = assetPath + "/game.lua";
+
+  if (const sol::load_result script = lua.load_file(filePath); !script.
+    valid()) {
+    const sol::error error = script;
+    Logger::Error("Level script is not valid: " + std::string(error.what()));
+    return;
+  }
+
+  lua.script_file(filePath);
+  Logger::Info("Just opened game.lua");
+}
+
+Game::Game(const std::string& assetPath)
+  : window_(nullptr),
+    sdl_renderer_(nullptr),
+    camera_(),
+    show_colliders_(false) {
   registry_ = std::make_unique<Registry>();
-  asset_manager_ = std::make_unique<AssetManager>();
+  asset_manager_ = std::make_unique<AssetManager>(assetPath);
   event_bus_ = std::make_unique<EventBus>();
   renderer_ = std::make_unique<Renderer>();
   Logger::Info("Game Constructor called.");
@@ -115,8 +125,8 @@ void Game::Destroy() {
   SDL_Quit();
 }
 
-void Game::Run(bool isMapEditor) {
-  Setup(isMapEditor);
+void Game::Run() {
+  Setup();
 
   while (s_is_running_) {
     ProcessInput();
@@ -125,7 +135,7 @@ void Game::Run(bool isMapEditor) {
   }
 }
 
-void Game::Setup(bool isMapEditor) {
+void Game::Setup() {
   registry_->AddSystem<CameraFollowSystem>();
   registry_->AddSystem<ProjectileEmitSystem>();
   registry_->AddSystem<ProjectileLifecycleSystem>();
@@ -144,16 +154,13 @@ void Game::Setup(bool isMapEditor) {
   registry_->AddSystem<ScriptSystem>();
   registry_->AddSystem<UIButtonSystem>();
 
-  lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io);
+  lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io,
+                     sol::lib::string, sol::lib::table);
+  registry_->GetSystem<ScriptSystem>().CreateLuaBindings(lua, *this);
   lua["game_window_width"] = windowWidth;
   lua["game_window_height"] = windowHeight;
-  registry_->GetSystem<ScriptSystem>().CreateLuaBindings(lua);
 
-  if (isMapEditor) {
-    MapEditor::Load(lua, registry_, asset_manager_, sdl_renderer_);
-  } else {
-    LevelLoader::LoadLevel(lua, registry_, asset_manager_, sdl_renderer_, 1);
-  }
+  LoadGame(lua, asset_manager_->GetBasePath());
 }
 
 void Game::ProcessInput() {
