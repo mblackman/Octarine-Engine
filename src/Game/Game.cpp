@@ -1,7 +1,7 @@
 #include "Game.h"
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
+#include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -30,8 +30,8 @@
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UIButtonSystem.h"
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_sdlrenderer2.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_sdlrenderer3.h"
 
 int Game::windowWidth;
 int Game::windowHeight;
@@ -66,45 +66,48 @@ Game::Game(const std::string& assetPath)
 
 Game::~Game() { Logger::Info("Game Destructor called."); }
 
-void Game::Initialize() {
-  const auto result = SDL_Init(SDL_INIT_EVERYTHING);
+bool Game::Initialize() {
+  const auto SDL_INI =
+      SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD;
 
-  if (result != 0) {
+  if (!SDL_Init(SDL_INI)) {
     Logger::Error("SDL_Init Error: " + std::string(SDL_GetError()));
-    return;
+    return false;
   }
 
-  if (TTF_Init() != 0) {
-    Logger::Error("TTF_Init Error: " + std::string(TTF_GetError()));
-    return;
+  if (!TTF_Init()) {
+    Logger::Error("TTF_Init Error: " + std::string(SDL_GetError()));
+    return false;
   }
 
-  SDL_DisplayMode displayMode;
-  SDL_GetCurrentDisplayMode(0, &displayMode);
-  windowWidth = displayMode.w;
-  windowHeight = displayMode.h;
+  windowWidth = 800;
+  windowHeight = 600;
 
-  window_ = SDL_CreateWindow(
-      "Potato Face", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+  SDL_CreateWindowAndRenderer(
+      "Potato Face",
       windowWidth, windowHeight,
-      SDL_WINDOW_SHOWN | SDL_WINDOW_FULLSCREEN | SDL_WINDOW_BORDERLESS);
+      SDL_WINDOW_RESIZABLE,
+      &window_, &sdl_renderer_);
 
   if (!window_) {
     Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
-    return;
+    return false;
   }
-
-  sdl_renderer_ = SDL_CreateRenderer(window_, -1, 0);
 
   if (!sdl_renderer_) {
     Logger::Error("SDL_CreateRenderer Error: " + std::string(SDL_GetError()));
-    return;
+    return false;
   }
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
-  ImGui_ImplSDL2_InitForSDLRenderer(window_, sdl_renderer_);
-  ImGui_ImplSDLRenderer2_Init(sdl_renderer_);
+  ImGuiIO& io = ImGui::GetIO();
+  (void)io;
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+
+  ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
+  ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
 
   camera_.x = 0;
   camera_.y = 0;
@@ -114,14 +117,21 @@ void Game::Initialize() {
   SDL_SetRenderDrawColor(sdl_renderer_, 21, 21, 21, 255);
 
   s_is_running_ = true;
+  return true;
 }
 
 void Game::Destroy() {
-  ImGui_ImplSDLRenderer2_Shutdown();
-  ImGui_ImplSDL2_Shutdown();
-  ImGui::DestroyContext();
-  SDL_DestroyRenderer(sdl_renderer_);
-  SDL_DestroyWindow(window_);
+  if (sdl_renderer_) {
+    ImGui_ImplSDLRenderer3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
+    SDL_DestroyRenderer(sdl_renderer_);
+  }
+
+  if (window_) {
+    SDL_DestroyWindow(window_);
+  }
+
   SDL_Quit();
 }
 
@@ -167,28 +177,28 @@ void Game::ProcessInput() {
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
-    ImGui_ImplSDL2_ProcessEvent(&event);
+    ImGui_ImplSDL3_ProcessEvent(&event);
     auto& io = ImGui::GetIO();
-    int mouseX, mouseY;
+    float mouseX, mouseY;
     const int buttons = SDL_GetMouseState(&mouseX, &mouseY);
     io.MousePos =
         ImVec2(static_cast<float>(mouseX), static_cast<float>(mouseY));
-    io.MouseDown[0] = buttons & SDL_BUTTON(SDL_BUTTON_LEFT);
-    io.MouseDown[1] = buttons & SDL_BUTTON(SDL_BUTTON_RIGHT);
+    io.MouseDown[0] = buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT);
+    io.MouseDown[1] = buttons & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT);
 
     switch (event.type) {
-      case SDL_QUIT:
+      case SDL_EVENT_QUIT:
         s_is_running_ = false;
         break;
 
-      case SDL_KEYDOWN:
-      case SDL_KEYUP: {
+      case SDL_EVENT_KEY_DOWN:
+      case SDL_EVENT_KEY_UP: {
         KeyInputEvent keyInputEvent = GetKeyInputEvent(&event.key);
         event_bus_->EmitEvent<KeyInputEvent>(keyInputEvent);
         break;
       }
-      case SDL_MOUSEBUTTONDOWN:
-      case SDL_MOUSEBUTTONUP: {
+      case SDL_EVENT_MOUSE_BUTTON_DOWN:
+      case SDL_EVENT_MOUSE_BUTTON_UP: {
         SDL_MouseButtonEvent mouseButtonEvent = event.button;
         event_bus_->EmitEvent<MouseInputEvent>(mouseButtonEvent);
         break;
@@ -218,7 +228,8 @@ void Game::Update() {
   SubscribeToEvents(event_bus_);
 
   // Calculate delta time
-  const double deltaTime = (SDL_GetTicks() - milliseconds_previous_frame_) / 1000.0;
+  const double deltaTime = (SDL_GetTicks() - milliseconds_previous_frame_) /
+                           1000.0;
 
   milliseconds_previous_frame_ = SDL_GetTicks();
 
@@ -277,7 +288,6 @@ void Game::OnKeyInputEvent(KeyInputEvent& event) {
 }
 
 KeyInputEvent Game::GetKeyInputEvent(SDL_KeyboardEvent* event) {
-  bool isPressed = event->state == SDL_PRESSED;
-  return {event->keysym.sym,
-                       static_cast<SDL_Keymod>(event->keysym.mod), isPressed};
+  bool isPressed = event->down;
+  return {event->key, event->mod, isPressed};
 }

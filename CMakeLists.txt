@@ -42,24 +42,18 @@ endif()
 
 # Using find_package
 find_package(glm CONFIG REQUIRED)
-find_package(SDL2 CONFIG REQUIRED)
-find_package(SDL2_image CONFIG REQUIRED)
-find_package(SDL2_ttf CONFIG REQUIRED)
-find_package(SDL2_mixer CONFIG REQUIRED)
+find_package(SDL3 CONFIG REQUIRED)
+find_package(SDL3_image CONFIG REQUIRED)
+find_package(SDL3_ttf CONFIG REQUIRED)
 find_package(Lua REQUIRED)
 find_package(Sol2 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 
 target_link_libraries(OctarineEngine PRIVATE glm::glm)
-target_link_libraries(OctarineEngine
-        PRIVATE
-        $<TARGET_NAME_IF_EXISTS:SDL2::SDL2main>
-        $<IF:$<TARGET_EXISTS:SDL2::SDL2>,SDL2::SDL2,SDL2::SDL2-static>
-)
-target_link_libraries(OctarineEngine PRIVATE $<IF:$<TARGET_EXISTS:SDL2_image::SDL2_image>,SDL2_image::SDL2_image,SDL2_image::SDL2_image-static>)
-target_link_libraries(OctarineEngine PRIVATE $<IF:$<TARGET_EXISTS:SDL2_mixer::SDL2_mixer>,SDL2_mixer::SDL2_mixer,SDL2_mixer::SDL2_mixer-static>)
-target_link_libraries(OctarineEngine PRIVATE $<IF:$<TARGET_EXISTS:SDL2_ttf::SDL2_ttf>,SDL2_ttf::SDL2_ttf,SDL2_ttf::SDL2_ttf-static>)
+target_link_libraries(OctarineEngine PRIVATE SDL3::SDL3)
+target_link_libraries(OctarineEngine PRIVATE $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>)
+target_link_libraries(OctarineEngine PRIVATE SDL3_ttf::SDL3_ttf)
 target_link_libraries(OctarineEngine PRIVATE ${LUA_LIBRARIES})
 target_include_directories(OctarineEngine PRIVATE ${LUA_INCLUDE_DIR})
 target_link_libraries(OctarineEngine PRIVATE spdlog::spdlog)

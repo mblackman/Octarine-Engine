@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/TransformComponent.h"
@@ -27,7 +27,7 @@ class DrawColliderSystem : public System {
                               collider.height * transform.scale.y};
 
       SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-      SDL_RenderDrawRectF(renderer, &rect);
+      SDL_RenderRect(renderer, &rect);
     }
   }
 };

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include <sol/sol.hpp>
 
@@ -22,7 +22,7 @@ class UIButtonSystem : public System {
   }
 
   void OnMouseInput(MouseInputEvent& event) {
-    if (event.event.type != SDL_MOUSEBUTTONDOWN || event.event.button != 1) {
+    if (event.event.type != SDL_EVENT_MOUSE_BUTTON_DOWN || event.event.button != 1) {
       return;
     }
 

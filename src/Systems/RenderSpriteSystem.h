@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
