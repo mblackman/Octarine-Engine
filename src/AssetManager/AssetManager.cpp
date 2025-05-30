@@ -37,6 +37,10 @@ void AssetManager::AddTexture(SDL_Renderer* renderer,
     return;
   }
 
+  if (default_scale_mode_.has_value()) {
+    SDL_SetTextureScaleMode(texture, default_scale_mode_.value());
+  }
+
   textures_.emplace(assetId, texture);
 
   Logger::Info("Added texture: " + assetId + " from path: " + fullPath);
@@ -65,4 +69,8 @@ std::string AssetManager::GetFullPath(const std::string& relativePath) const {
   const std::filesystem::path basePath = GetBasePath();
   const std::filesystem::path assetPath = basePath / relativePath;
   return assetPath.string();
+}
+
+void AssetManager::SetDefaultScaleMode(SDL_ScaleMode scaleMode) {
+  default_scale_mode_ = scaleMode;
 }
