@@ -1,4 +1,5 @@
 #include "AssetManager.h"
+#include "../Game/GameConfig.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
@@ -8,18 +9,22 @@
 
 #include "../General/Logger.h"
 
-AssetManager::AssetManager(std::string basePath) : base_path_(
-    std::move(basePath)) {
+void AssetManager::SetGameConfig(const GameConfig& gameConfig) {
+  if (const auto scaleMode = gameConfig.GetDefaultScaleMode();
+    scaleMode.has_value()) {
+    SetDefaultScaleMode(scaleMode.value());
+  }
+  base_path_ = gameConfig.GetAssetPath();
 }
 
 AssetManager::~AssetManager() { ClearAssets(); }
 
 void AssetManager::ClearAssets() {
-  for (const auto& texture : textures_) {
-    SDL_DestroyTexture(texture.second);
+  for (const auto& [fst, snd] : textures_) {
+    SDL_DestroyTexture(snd);
   }
-  for (const auto& font : fonts_) {
-    TTF_CloseFont(font.second);
+  for (const auto& [fst, snd] : fonts_) {
+    TTF_CloseFont(snd);
   }
 
   textures_.clear();
@@ -63,14 +68,18 @@ TTF_Font* AssetManager::GetFont(const std::string& assetId) const {
   return fonts_.at(assetId);
 }
 
-std::string AssetManager::GetBasePath() const { return base_path_; }
-
 std::string AssetManager::GetFullPath(const std::string& relativePath) const {
-  const std::filesystem::path basePath = GetBasePath();
+  const std::filesystem::path basePath = base_path_;
   const std::filesystem::path assetPath = basePath / relativePath;
   return assetPath.string();
 }
 
-void AssetManager::SetDefaultScaleMode(SDL_ScaleMode scaleMode) {
-  default_scale_mode_ = scaleMode;
+void AssetManager::SetDefaultScaleMode(const std::string& scaleMode) {
+  if (scaleMode == "nearest") {
+    default_scale_mode_ = SDL_SCALEMODE_NEAREST;
+  } else if (scaleMode == "linear") {
+    default_scale_mode_ = SDL_SCALEMODE_LINEAR;
+  } else {
+    Logger::Error("Invalid scale mode: " + scaleMode);
+  }
 }

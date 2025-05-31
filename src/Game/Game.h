@@ -5,6 +5,7 @@
 #include <memory>
 #include <sol/sol.hpp>
 
+#include "GameConfig.h"
 #include "../AssetManager/AssetManager.h"
 #include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
@@ -16,18 +17,22 @@ constexpr int kFps = 60;
 constexpr int kMillisecondsPerFrame = 1000 / kFps;
 
 class Game {
- public:
-  explicit Game(const std::string& assetPath);
+public:
+  Game();
   ~Game();
 
-  bool Initialize();
-  void Destroy();
+  bool Initialize(const std::string& assetPath);
+  void Destroy() const;
   void Run();
   static void Quit() { s_is_running_ = false; }
 
-  SDL_Renderer* GetRenderer() const { return sdl_renderer_; }
-  AssetManager* GetAssetManager() const { return asset_manager_.get(); }
-  Registry* GetRegistry() const { return registry_.get(); }
+  [[nodiscard]] SDL_Renderer* GetRenderer() const { return sdl_renderer_; }
+
+  [[nodiscard]] AssetManager* GetAssetManager() const {
+    return asset_manager_.get();
+  }
+
+  [[nodiscard]] Registry* GetRegistry() const { return registry_.get(); }
 
   static int windowWidth;
   static int windowHeight;
@@ -55,5 +60,6 @@ private:
   std::unique_ptr<AssetManager> asset_manager_;
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
+  std::unique_ptr<GameConfig> game_config_;
   RenderQueue render_queue_;
 };

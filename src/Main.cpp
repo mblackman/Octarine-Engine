@@ -1,9 +1,7 @@
-#include <iostream>
-
 #include "./Game/Game.h"
 #include "./General/Logger.h"
 
-int main(int argc, char* argv[]) {
+int main(const int argc, char* argv[]) {
   Logger::Init();
 
   std::string gamePath;
@@ -26,9 +24,9 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  Game game(gamePath);
+  Game game{};
 
-  if (game.Initialize()) {
+  if (game.Initialize(gamePath)) {
     game.Run();
   }
   game.Destroy();

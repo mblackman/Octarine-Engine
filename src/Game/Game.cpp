@@ -38,8 +38,10 @@ int Game::windowHeight;
 float Game::mapWidth;
 float Game::mapHeight;
 
-inline void LoadGame(sol::state& lua, const std::string& assetPath) {
-  const auto filePath = assetPath + "/game.lua";
+inline void LoadGame(sol::state& lua, const AssetManager* assetManager,
+                     const GameConfig& gameConfig) {
+  const auto filePath = assetManager->
+      GetFullPath(gameConfig.GetStartupScript());
 
   if (const sol::load_result script = lua.load_file(filePath); !script.
     valid()) {
@@ -52,13 +54,13 @@ inline void LoadGame(sol::state& lua, const std::string& assetPath) {
   Logger::Info("Just opened game.lua");
 }
 
-Game::Game(const std::string& assetPath)
+Game::Game()
   : window_(nullptr),
     sdl_renderer_(nullptr),
     camera_(),
     show_colliders_(false) {
   registry_ = std::make_unique<Registry>();
-  asset_manager_ = std::make_unique<AssetManager>(assetPath);
+  asset_manager_ = std::make_unique<AssetManager>();
   event_bus_ = std::make_unique<EventBus>();
   renderer_ = std::make_unique<Renderer>();
   Logger::Info("Game Constructor called.");
@@ -66,7 +68,7 @@ Game::Game(const std::string& assetPath)
 
 Game::~Game() { Logger::Info("Game Destructor called."); }
 
-bool Game::Initialize() {
+bool Game::Initialize(const std::string& assetPath) {
   const auto SDL_INI =
       SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD;
 
@@ -80,11 +82,18 @@ bool Game::Initialize() {
     return false;
   }
 
+  game_config_ = std::make_unique<GameConfig>();
+
+  if (!game_config_->LoadConfigFromFile(assetPath)) {
+    Logger::Error("Failed to load game config.");
+    return false;
+  }
+
   windowWidth = 1920;
   windowHeight = 1080;
 
   SDL_CreateWindowAndRenderer(
-      "Potato Face",
+      game_config_->GetGameTitle().c_str(),
       windowWidth, windowHeight,
       SDL_WINDOW_RESIZABLE,
       &window_, &sdl_renderer_);
@@ -115,12 +124,12 @@ bool Game::Initialize() {
   camera_.h = windowHeight;
 
   SDL_SetRenderDrawColor(sdl_renderer_, 21, 21, 21, 255);
-  asset_manager_->SetDefaultScaleMode(SDL_SCALEMODE_NEAREST); // TODO make this configurable with a game config.
+  asset_manager_->SetGameConfig(*game_config_);
   s_is_running_ = true;
   return true;
 }
 
-void Game::Destroy() {
+void Game::Destroy() const {
   if (sdl_renderer_) {
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
@@ -170,7 +179,7 @@ void Game::Setup() {
   lua["game_window_width"] = windowWidth;
   lua["game_window_height"] = windowHeight;
 
-  LoadGame(lua, asset_manager_->GetBasePath());
+  LoadGame(lua, asset_manager_.get(), *game_config_);
 }
 
 void Game::ProcessInput() {
@@ -180,9 +189,8 @@ void Game::ProcessInput() {
     ImGui_ImplSDL3_ProcessEvent(&event);
     auto& io = ImGui::GetIO();
     float mouseX, mouseY;
-    const int buttons = SDL_GetMouseState(&mouseX, &mouseY);
-    io.MousePos =
-        ImVec2(static_cast<float>(mouseX), static_cast<float>(mouseY));
+    const unsigned int buttons = SDL_GetMouseState(&mouseX, &mouseY);
+    io.MousePos = ImVec2(mouseX, mouseY);
     io.MouseDown[0] = buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT);
     io.MouseDown[1] = buttons & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT);
 
@@ -260,7 +268,7 @@ void Game::Render() {
 
   if (show_colliders_) {
     registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
-    registry_->GetSystem<RenderGUISystem>().Update(sdl_renderer_, registry_);
+    RenderGUISystem::Update(sdl_renderer_, registry_);
   }
 
   SDL_RenderPresent(sdl_renderer_);
