@@ -23,7 +23,7 @@
 #include "../Systems/MovementSystem.h"
 #include "../Systems/ProjectileEmitSystem.h"
 #include "../Systems/ProjectileLifecycleSystem.h"
-#include "../Systems/RenderGUISystem.h"
+#include "../Systems/RenderDebugGUISystem.h"
 #include "../Systems/RenderPrimitiveSystem.h"
 #include "../Systems/RenderSpriteSystem.h"
 #include "../Systems/RenderTextSystem.h"
@@ -63,13 +63,14 @@ Game::Game()
   asset_manager_ = std::make_unique<AssetManager>();
   event_bus_ = std::make_unique<EventBus>();
   renderer_ = std::make_unique<Renderer>();
+  game_config_ = std::make_unique<GameConfig>();
   Logger::Info("Game Constructor called.");
 }
 
 Game::~Game() { Logger::Info("Game Destructor called."); }
 
 bool Game::Initialize(const std::string &assetPath) {
-  const auto SDL_INI =
+  constexpr auto SDL_INI =
       SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD;
 
   if (!SDL_Init(SDL_INI)) {
@@ -81,8 +82,6 @@ bool Game::Initialize(const std::string &assetPath) {
     Logger::Error("TTF_Init Error: " + std::string(SDL_GetError()));
     return false;
   }
-
-  game_config_ = std::make_unique<GameConfig>();
 
   if (!game_config_->LoadConfigFromFile(assetPath)) {
     Logger::Error("Failed to load game config.");
@@ -165,7 +164,7 @@ void Game::Setup() {
   registry_->AddSystem<RenderSpriteSystem>();
   registry_->AddSystem<RenderTextSystem>();
   registry_->AddSystem<RenderPrimitiveSystem>();
-  registry_->AddSystem<RenderGUISystem>();
+  registry_->AddSystem<RenderDebugGUISystem>();
   registry_->AddSystem<AnimationSystem>();
   registry_->AddSystem<CollisionSystem>();
   registry_->AddSystem<DrawColliderSystem>();
@@ -182,7 +181,7 @@ void Game::Setup() {
   LoadGame(lua, asset_manager_.get(), *game_config_);
 }
 
-void Game::ProcessInput() {
+void Game::ProcessInput() const {
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -268,7 +267,7 @@ void Game::Render() {
 
   if (show_colliders_) {
     registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
-    RenderGUISystem::Update(sdl_renderer_, registry_);
+    RenderDebugGUISystem::Update(sdl_renderer_, registry_);
   }
 
   SDL_RenderPresent(sdl_renderer_);

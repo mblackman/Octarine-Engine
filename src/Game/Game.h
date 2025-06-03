@@ -40,7 +40,7 @@ public:
   static float mapHeight;
 
 private:
-  void ProcessInput();
+  void ProcessInput() const;
   void Update();
   void Render();
   void Setup();
