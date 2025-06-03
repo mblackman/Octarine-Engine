@@ -50,11 +50,14 @@ find_package(Sol2 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 
-target_link_libraries(OctarineEngine PRIVATE glm::glm)
-target_link_libraries(OctarineEngine PRIVATE SDL3::SDL3)
-target_link_libraries(OctarineEngine PRIVATE $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>)
-target_link_libraries(OctarineEngine PRIVATE SDL3_ttf::SDL3_ttf)
-target_link_libraries(OctarineEngine PRIVATE ${LUA_LIBRARIES})
+target_link_libraries(OctarineEngine PRIVATE
+        glm::glm
+        SDL3::SDL3
+        SDL3_ttf::SDL3_ttf
+        $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
+        ${LUA_LIBRARIES}
+        imgui::imgui
+        spdlog::spdlog
+)
+
 target_include_directories(OctarineEngine PRIVATE ${LUA_INCLUDE_DIR})
-target_link_libraries(OctarineEngine PRIVATE spdlog::spdlog)
-target_link_libraries(OctarineEngine PRIVATE imgui::imgui)
