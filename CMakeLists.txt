@@ -38,7 +38,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(OctarineEngine PRIVATE -Wall -Wfatal-errors)
 elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
     target_compile_options(OctarineEngine PRIVATE /W4 /WX)
-endif()
+endif ()
 
 # Using find_package
 find_package(glm CONFIG REQUIRED)
