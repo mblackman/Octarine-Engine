@@ -30,6 +30,9 @@ set(SRC_FILES
         src/Renderer/Renderer.cpp
 )
 
+# Add packaged libs
+add_subdirectory(libs/sol2_ImGui_Bindings)
+
 # Create the executable target
 add_executable(${PROJECT_NAME} ${SRC_FILES})
 
@@ -38,6 +41,45 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
         CXX_STANDARD 17
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
+)
+
+# Dependencies
+find_package(glm CONFIG REQUIRED)
+find_package(SDL3 CONFIG REQUIRED)
+find_package(SDL3_image CONFIG REQUIRED)
+find_package(SDL3_ttf CONFIG REQUIRED)
+find_package(Lua REQUIRED)
+find_package(Sol2 CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
+
+# Include directories
+target_include_directories(${PROJECT_NAME}
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/sol2_ImGui_Bindings
+        ${LUA_INCLUDE_DIR}
+)
+
+# Link libraries
+target_link_libraries(${PROJECT_NAME}
+        PRIVATE
+        glm::glm
+        SDL3::SDL3
+        SDL3_ttf::SDL3_ttf
+        $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
+        ${LUA_LIBRARIES}
+        imgui::imgui
+        spdlog::spdlog
+        sol2_ImGui_Bindings
+)
+
+# Install rules (optional)
+install(TARGETS ${PROJECT_NAME}
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
 )
 
 # Compiler-specific flags - Treat warnings as errors in prod builds
@@ -60,41 +102,4 @@ else ()
     target_compile_options(${PROJECT_NAME} PUBLIC
             $<IF:$<CONFIG:Debug>,,-Werror>
     )
-
 endif ()
-
-# Dependencies
-find_package(glm CONFIG REQUIRED)
-find_package(SDL3 CONFIG REQUIRED)
-find_package(SDL3_image CONFIG REQUIRED)
-find_package(SDL3_ttf CONFIG REQUIRED)
-find_package(Lua REQUIRED)
-find_package(Sol2 CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
-
-# Include directories
-target_include_directories(${PROJECT_NAME}
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${LUA_INCLUDE_DIR}
-)
-
-# Link libraries
-target_link_libraries(${PROJECT_NAME}
-        PRIVATE
-        glm::glm
-        SDL3::SDL3
-        SDL3_ttf::SDL3_ttf
-        $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
-        ${LUA_LIBRARIES}
-        imgui::imgui
-        spdlog::spdlog
-)
-
-# Install rules (optional)
-install(TARGETS ${PROJECT_NAME}
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-)

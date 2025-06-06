@@ -11,6 +11,8 @@
 #include <unordered_set>
 #include <utility>
 
+#include "sol_ImGui.h"
+
 #include "../Components/ScriptComponent.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
@@ -90,6 +92,7 @@ public:
     CreateLuaTypes(lua);
     CreateLuaEntityBindings(lua);
     CreateLuaGameBindings(lua, game);
+    sol_ImGui::Init(lua);
   }
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {

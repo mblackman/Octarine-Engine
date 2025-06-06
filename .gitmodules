@@ -1,0 +1,4 @@
+[submodule "libs/sol2_ImGui_Bindings"]
+	path = libs/sol2_ImGui_Bindings
+	url = https://github.com/mblackman/sol2_ImGui_Bindings
+    branch = main
