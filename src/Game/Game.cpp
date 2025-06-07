@@ -38,27 +38,27 @@ int Game::windowHeight;
 float Game::mapWidth;
 float Game::mapHeight;
 
-inline void LoadGame(sol::state &lua, const AssetManager *assetManager,
-                     const GameConfig &gameConfig) {
-  const auto filePath = assetManager->
-      GetFullPath(gameConfig.GetStartupScript());
+inline void LoadGame(sol::state &lua, const AssetManager *assetManager, const GameConfig &gameConfig) {
+  const auto filePath = assetManager->GetFullPath(gameConfig.GetStartupScript());
 
-  if (const sol::load_result script = lua.load_file(filePath); !script.
-    valid()) {
-    const sol::error error = script;
-    Logger::Error("Level script is not valid: " + std::string(error.what()));
+  Logger::Info("Loading entry script: " + filePath);
+  sol::protected_function_result result;
+  try {
+    result = lua.safe_script_file(filePath);
+  } catch (const std::exception &ex) {
+    Logger::Error(ex.what());
     return;
   }
 
-  lua.script_file(filePath);
-  Logger::Info("Just opened game.lua");
+  if (!result.valid()) {
+    Logger::Error("Failed to load entry script: " + filePath);
+    return;
+  }
+
+  Logger::Info("Just opened script entry script: " + filePath);
 }
 
-Game::Game()
-  : window_(nullptr),
-    sdl_renderer_(nullptr),
-    camera_(),
-    show_colliders_(false) {
+Game::Game() : window_(nullptr), sdl_renderer_(nullptr), camera_(), show_colliders_(false) {
   registry_ = std::make_unique<Registry>();
   asset_manager_ = std::make_unique<AssetManager>();
   event_bus_ = std::make_unique<EventBus>();
@@ -70,8 +70,7 @@ Game::Game()
 Game::~Game() { Logger::Info("Game Destructor called."); }
 
 bool Game::Initialize(const std::string &assetPath) {
-  constexpr auto SDL_INI =
-      SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD;
+  constexpr auto SDL_INI = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD;
 
   if (!SDL_Init(SDL_INI)) {
     Logger::Error("SDL_Init Error: " + std::string(SDL_GetError()));
@@ -91,11 +90,8 @@ bool Game::Initialize(const std::string &assetPath) {
   windowWidth = 1920;
   windowHeight = 1080;
 
-  SDL_CreateWindowAndRenderer(
-    game_config_->GetGameTitle().c_str(),
-    windowWidth, windowHeight,
-    SDL_WINDOW_RESIZABLE,
-    &window_, &sdl_renderer_);
+  SDL_CreateWindowAndRenderer(game_config_->GetGameTitle().c_str(), windowWidth, windowHeight, SDL_WINDOW_RESIZABLE,
+                              &window_, &sdl_renderer_);
 
   if (!window_) {
     Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
@@ -110,7 +106,7 @@ bool Game::Initialize(const std::string &assetPath) {
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
-  (void) io;
+  (void)io;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
@@ -172,8 +168,7 @@ void Game::Setup() {
   registry_->AddSystem<ScriptSystem>();
   registry_->AddSystem<UIButtonSystem>();
 
-  lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io,
-                     sol::lib::string, sol::lib::table);
+  lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
   registry_->GetSystem<ScriptSystem>().CreateLuaBindings(lua, *this);
   lua["game_window_width"] = windowWidth;
   lua["game_window_height"] = windowHeight;
@@ -218,8 +213,7 @@ void Game::ProcessInput() const {
 
 void Game::Update() {
   // If we are too fast, waste some time until we reach the frame time
-  const int timeToWait =
-      kMillisecondsPerFrame - (SDL_GetTicks() - milliseconds_previous_frame_);
+  const int timeToWait = kMillisecondsPerFrame - (SDL_GetTicks() - milliseconds_previous_frame_);
   if (timeToWait > 0 && timeToWait <= kMillisecondsPerFrame) {
     SDL_Delay(timeToWait);
   }
@@ -235,8 +229,7 @@ void Game::Update() {
   SubscribeToEvents(event_bus_);
 
   // Calculate delta time
-  const double deltaTime = (SDL_GetTicks() - milliseconds_previous_frame_) /
-                           1000.0;
+  const double deltaTime = (SDL_GetTicks() - milliseconds_previous_frame_) / 1000.0;
 
   milliseconds_previous_frame_ = SDL_GetTicks();
 
@@ -267,7 +260,7 @@ void Game::Render() {
 
   if (show_colliders_) {
     registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
-    RenderDebugGUISystem::Update(sdl_renderer_, registry_);
+    registry_->GetSystem<RenderDebugGUISystem>().Update(sdl_renderer_);
   }
 
   SDL_RenderPresent(sdl_renderer_);
