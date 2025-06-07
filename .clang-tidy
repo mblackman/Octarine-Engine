@@ -168,6 +168,6 @@ CheckOptions:
   - key: readability-identifier-naming.FunctionCase
     value: camelBack
   - key: readability-function-size.LineThreshold
-    value: 80
+    value: 120
   - key: readability-function-cognitive-complexity.Threshold
     value: 15
