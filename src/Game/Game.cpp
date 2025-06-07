@@ -55,7 +55,7 @@ inline void LoadGame(sol::state &lua, const AssetManager *assetManager, const Ga
     return;
   }
 
-  Logger::Info("Just opened script entry script: " + filePath);
+  Logger::Info("Just opened entry script: " + filePath);
 }
 
 Game::Game() : window_(nullptr), sdl_renderer_(nullptr), camera_(), show_colliders_(false) {
