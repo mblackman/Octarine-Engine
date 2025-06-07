@@ -27,7 +27,7 @@ class RenderDebugGUISystem : public System {
     ImGui::ShowDemoWindow();
 
     for (auto entity : GetEntities()) {
-      if (auto &script = entity.GetComponent<ScriptComponent>(); script.onDebugGUIFunction != sol::lua_nil) {
+      if (auto& script = entity.GetComponent<ScriptComponent>(); script.onDebugGUIFunction != sol::lua_nil) {
         if (auto result = script.onDebugGUIFunction(entity); !result.valid()) {
           sol::error err = result;
           std::string what = err.what();
