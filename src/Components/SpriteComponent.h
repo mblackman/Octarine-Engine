@@ -7,8 +7,8 @@
 
 struct SpriteComponent {
   std::string assetId;
-  int width;
-  int height;
+  float width;
+  float height;
   int layer;
   bool isFixed;
   SDL_FRect srcRect{};

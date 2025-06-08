@@ -10,6 +10,12 @@ class RenderTextSystem : public System {
  public:
   RenderTextSystem() { RequireComponent<TextLabelComponent>(); }
 
+  RenderTextSystem(const RenderTextSystem&) = delete;
+  RenderTextSystem& operator=(const RenderTextSystem&) = delete;
+
+  RenderTextSystem(RenderTextSystem&&) = delete;
+  RenderTextSystem& operator=(RenderTextSystem&&) = delete;
+  
   ~RenderTextSystem() = default;
 
   void Update(RenderQueue& renderQueue) {

@@ -95,6 +95,12 @@ class ScriptSystem : public System {
     keyMap_["alt"] = {"left alt", "right alt"};
   }
 
+  ScriptSystem(const ScriptSystem&) = delete;
+  ScriptSystem& operator=(const ScriptSystem&) = delete;
+
+  ScriptSystem(ScriptSystem&&) = delete;
+  ScriptSystem& operator=(ScriptSystem&&) = delete;
+  
   ~ScriptSystem() = default;
 
   void CreateLuaBindings(sol::state &lua, const Game &game) {

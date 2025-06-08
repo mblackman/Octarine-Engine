@@ -20,6 +20,13 @@ constexpr int kMillisecondsPerFrame = kMillisecondsPerSecond / kFps;
 class Game {
 public:
   Game();
+
+  Game(const Game&) = delete;
+  Game& operator=(const Game&) = delete;
+
+  Game(Game&&) = delete;
+  Game& operator=(Game&&) = delete;
+
   ~Game();
 
   bool Initialize(const std::string& assetPath);
@@ -51,7 +58,7 @@ private:
 
   SDL_Window* window_;
   SDL_Renderer* sdl_renderer_;
-  SDL_Rect camera_;
+  SDL_FRect camera_;
   static inline bool s_is_running_{false};
   bool show_colliders_;
   int milliseconds_previous_frame_ = 0;

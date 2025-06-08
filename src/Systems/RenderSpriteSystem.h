@@ -16,9 +16,15 @@ class RenderSpriteSystem : public System {
     RequireComponent<SpriteComponent>();
   }
 
+  RenderSpriteSystem(const RenderSpriteSystem&) = delete;
+  RenderSpriteSystem& operator=(const RenderSpriteSystem&) = delete;
+
+  RenderSpriteSystem(RenderSpriteSystem&&) = delete;
+  RenderSpriteSystem& operator=(RenderSpriteSystem&&) = delete;
+
   ~RenderSpriteSystem() = default;
 
-  void Update(RenderQueue& renderQueue, const SDL_Rect& camera) {
+  void Update(RenderQueue& renderQueue, const SDL_FRect& camera) {
     auto entities = GetEntities();
 
     for (auto entity : GetEntities()) {
@@ -32,16 +38,14 @@ class RenderSpriteSystem : public System {
             transform.position.x + sprite.width * transform.scale.x < 0 || transform.position.x > Game::windowWidth ||
             transform.position.y + sprite.height * transform.scale.y < 0 || transform.position.y > Game::windowHeight;
       } else {
-        isOutsideCamera =
-            transform.position.x + sprite.width * transform.scale.x < camera.x ||
+        isOutsideCamera = transform.position.x + sprite.width * transform.scale.x < camera.x ||
                           transform.position.x > camera.x + camera.w ||
                           transform.position.y + sprite.height * transform.scale.y < camera.y ||
                           transform.position.y > camera.y + camera.h;
       }
 
       if (!isOutsideCamera) {
-        RenderKey renderKey(sprite.layer, transform.position.y,
-                            SPRITE, entity);
+        RenderKey renderKey(sprite.layer, transform.position.y, SPRITE, entity);
 
         renderQueue.AddRenderKey(renderKey);
       }

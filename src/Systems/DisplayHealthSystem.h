@@ -24,6 +24,12 @@ class DisplayHealthSystem : public System {
     RequireComponent<TransformComponent>();
   }
 
+  DisplayHealthSystem(const DisplayHealthSystem&) = delete;
+  DisplayHealthSystem& operator=(const DisplayHealthSystem&) = delete;
+
+  DisplayHealthSystem(DisplayHealthSystem&&) = delete;
+  DisplayHealthSystem& operator=(DisplayHealthSystem&&) = delete;
+  
   ~DisplayHealthSystem() = default;
 
   void Update(const std::unique_ptr<Registry>& registry) {

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <SDL3/SDL.h>
-
 #include <glm/glm.hpp>
 
 struct ProjectileEmitterComponent {
@@ -10,7 +8,7 @@ struct ProjectileEmitterComponent {
   int frequency;
   int damage;
   bool isFriendly;
-  int lastEmissionTime;
+  double countDownTimer;
 
   explicit ProjectileEmitterComponent(const glm::vec2 velocity = glm::vec2(0, 0), const int duration = 10000,
                                       const int frequency = 1000, const int damage = 10, const bool isFriendly = true)
@@ -19,5 +17,5 @@ struct ProjectileEmitterComponent {
         frequency(frequency),
         damage(damage),
         isFriendly(isFriendly),
-        lastEmissionTime(SDL_GetTicks()) {}
+        countDownTimer(static_cast<double>(frequency)) {}
 };

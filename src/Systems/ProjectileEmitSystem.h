@@ -20,11 +20,16 @@ class ProjectileEmitSystem : public System {
     RequireComponent<ProjectileEmitterComponent>();
   }
 
+  ProjectileEmitSystem(const ProjectileEmitSystem&) = delete;
+  ProjectileEmitSystem& operator=(const ProjectileEmitSystem&) = delete;
+
+  ProjectileEmitSystem(ProjectileEmitSystem&&) = delete;
+  ProjectileEmitSystem& operator=(ProjectileEmitSystem&&) = delete;
+  
   ~ProjectileEmitSystem() = default;
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
-    eventBus->SubscribeEvent<ProjectileEmitSystem, KeyInputEvent>(
-        this, &ProjectileEmitSystem::OnKeyInput);
+    eventBus->SubscribeEvent<ProjectileEmitSystem, KeyInputEvent>(this, &ProjectileEmitSystem::OnKeyInput);
   }
 
   void OnKeyInput(const KeyInputEvent& event) {
@@ -37,15 +42,18 @@ class ProjectileEmitSystem : public System {
     }
   }
 
-  void Update(const std::unique_ptr<Registry>& registry) {
+  void Update(const double deltaTime, const std::unique_ptr<Registry>& registry) {
     for (auto entity : GetEntities()) {
       auto transform = entity.GetComponent<TransformComponent>();
       auto& emitter = entity.GetComponent<ProjectileEmitterComponent>();
 
-      if (!emitter.isFriendly &&
-          static_cast<int>(SDL_GetTicks()) - emitter.lastEmissionTime >
-              emitter.frequency) {
-        SpawnProjectile(transform, entity, registry, emitter);
+      if (!emitter.isFriendly) {
+        emitter.countDownTimer -= deltaTime * kMillisecondsPerSecond;
+
+        if (emitter.countDownTimer <= 0) {
+          SpawnProjectile(transform, entity, registry, emitter);
+          emitter.countDownTimer = static_cast<double>(emitter.frequency);
+        }
       } else if (emitter.isFriendly && spawnFriendlyProjectiles_) {
         SpawnProjectile(transform, entity, registry, emitter);
         spawnFriendlyProjectiles_ = false;
@@ -62,9 +70,9 @@ class ProjectileEmitSystem : public System {
     auto velocity = emitter.velocity;
 
     if (entity.HasComponent<SpriteComponent>()) {
-      const auto sprite = entity.GetComponent<SpriteComponent>();
-      projectilePosition.x += transform.scale.x * sprite.width / 2;
-      projectilePosition.y += transform.scale.y * sprite.height / 2;
+      const auto& sprite = entity.GetComponent<SpriteComponent>();
+      projectilePosition.x += transform.scale.x * static_cast<float>(sprite.width) / 2;
+      projectilePosition.y += transform.scale.y * static_cast<float>(sprite.height) / 2;
     }
 
     if (emitter.isFriendly && entity.HasComponent<RigidBodyComponent>()) {
@@ -75,14 +83,10 @@ class ProjectileEmitSystem : public System {
 
     auto projectile = registry->CreateEntity();
     projectile.Group("projectiles");
-    projectile.AddComponent<TransformComponent>(projectilePosition,
-                                                glm::vec2(1.0, 1.0), 0.0);
+    projectile.AddComponent<TransformComponent>(projectilePosition, glm::vec2(1.0, 1.0), 0.0);
     projectile.AddComponent<RigidBodyComponent>(velocity);
     projectile.AddComponent<BoxColliderComponent>(4, 4);
     projectile.AddComponent<SpriteComponent>("bullet-texture", 4, 4, 4);
-    projectile.AddComponent<ProjectileComponent>(
-        emitter.damage, SDL_GetTicks(), emitter.duration, emitter.isFriendly);
-
-    emitter.lastEmissionTime = SDL_GetTicks();
+    projectile.AddComponent<ProjectileComponent>(emitter.damage, SDL_GetTicks(), emitter.duration, emitter.isFriendly);
   }
 };

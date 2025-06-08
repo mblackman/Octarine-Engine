@@ -10,6 +10,12 @@ class RenderPrimitiveSystem : public System {
  public:
   RenderPrimitiveSystem() = default;
 
+  RenderPrimitiveSystem(const RenderPrimitiveSystem&) = delete;
+  RenderPrimitiveSystem& operator=(const RenderPrimitiveSystem&) = delete;
+
+  RenderPrimitiveSystem(RenderPrimitiveSystem&&) = delete;
+  RenderPrimitiveSystem& operator=(RenderPrimitiveSystem&&) = delete;
+  
   ~RenderPrimitiveSystem() = default;
 
   void Update(RenderQueue& renderQueue) {

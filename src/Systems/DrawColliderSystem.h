@@ -13,9 +13,15 @@ class DrawColliderSystem : public System {
     RequireComponent<BoxColliderComponent>();
   }
 
+  DrawColliderSystem(const DrawColliderSystem&) = delete;
+  DrawColliderSystem& operator=(const DrawColliderSystem&) = delete;
+
+  DrawColliderSystem(DrawColliderSystem&&) = delete;
+  DrawColliderSystem& operator=(DrawColliderSystem&&) = delete;
+  
   ~DrawColliderSystem() = default;
 
-  void Update(SDL_Renderer* renderer, const SDL_Rect& camera) {
+  void Update(SDL_Renderer* renderer, const SDL_FRect& camera) {
     for (auto entity : GetEntities()) {
       const auto& transform = entity.GetComponent<TransformComponent>();
       const auto& collider = entity.GetComponent<BoxColliderComponent>();
