@@ -24,9 +24,9 @@ public:
 
  bool LoadConfig(const std::unordered_map<std::string, std::string>& settings);
 
-  bool LoadConfigFromFile(const std::string& assetPath);
+ bool LoadConfigFromFile(const std::string& assetPath);
 
-  [[nodiscard]] std::string GetAssetPath() const;
+ [[nodiscard]] std::string GetAssetPath() const;
   [[nodiscard]] std::string GetGameTitle() const;
   [[nodiscard]] std::string GetStartupScript() const;
   [[nodiscard]] std::optional<std::string> GetDefaultScaleMode() const;
