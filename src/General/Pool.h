@@ -27,8 +27,7 @@ class Pool final : public IPool {
   std::unordered_map<int, int> id_to_indexes_;
 
  public:
-  explicit Pool(const size_t size = 100) : size_(0) { Resize(size);
-  }
+  explicit Pool(const size_t size = 100) : size_(0) { Resize(size); }
 
   bool IsEmpty() const { return size_ == 0; }
 
