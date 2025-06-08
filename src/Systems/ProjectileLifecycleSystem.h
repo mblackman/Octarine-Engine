@@ -12,7 +12,7 @@ class ProjectileLifecycleSystem : public System {
 
   ProjectileLifecycleSystem(ProjectileLifecycleSystem&&) = delete;
   ProjectileLifecycleSystem& operator=(ProjectileLifecycleSystem&&) = delete;
-  
+
   ~ProjectileLifecycleSystem() = default;
 
   void Update() {

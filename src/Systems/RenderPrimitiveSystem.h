@@ -15,7 +15,7 @@ class RenderPrimitiveSystem : public System {
 
   RenderPrimitiveSystem(RenderPrimitiveSystem&&) = delete;
   RenderPrimitiveSystem& operator=(RenderPrimitiveSystem&&) = delete;
-  
+
   ~RenderPrimitiveSystem() = default;
 
   void Update(RenderQueue& renderQueue) {

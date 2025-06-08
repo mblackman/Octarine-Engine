@@ -17,7 +17,7 @@ class RenderDebugGUISystem : public System {
 
   RenderDebugGUISystem(RenderDebugGUISystem&&) = delete;
   RenderDebugGUISystem& operator=(RenderDebugGUISystem&&) = delete;
-  
+
   ~RenderDebugGUISystem() = default;
 
   void Update(SDL_Renderer* renderer) const {

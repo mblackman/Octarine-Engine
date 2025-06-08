@@ -14,7 +14,7 @@ class Renderer {
 
   Renderer(Renderer&&) = delete;
   Renderer& operator=(Renderer&&) = delete;
-  
+
   ~Renderer() = default;
 
   void Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, const SDL_FRect& camera,

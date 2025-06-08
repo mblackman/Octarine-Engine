@@ -29,7 +29,7 @@ class DisplayHealthSystem : public System {
 
   DisplayHealthSystem(DisplayHealthSystem&&) = delete;
   DisplayHealthSystem& operator=(DisplayHealthSystem&&) = delete;
-  
+
   ~DisplayHealthSystem() = default;
 
   void Update(const std::unique_ptr<Registry>& registry) {
