@@ -6,7 +6,6 @@
 #include <string>
 
 class Logger {
-private:
   static std::shared_ptr<spdlog::logger> lua_logger_;
 
  public:

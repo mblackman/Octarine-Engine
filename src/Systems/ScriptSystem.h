@@ -20,7 +20,6 @@
 #include "../Events/KeyInputEvent.h"
 #include "../Game/Game.h"
 #include "../General/Logger.h"
-#include "Lua/ComponentLuaFactory.h"
 #include "Lua/LuaEntityLoader.h"
 #include "sol_ImGui.h"
 
@@ -202,7 +201,7 @@ class ScriptSystem : public System {
     return heldKeys_.find(lowerKey) != heldKeys_.end();
   }
 
-  void OnKeyInput(KeyInputEvent &event) {
+  void OnKeyInput(const KeyInputEvent &event) {
     const std::string key = makeKey(SDL_GetKeyName(event.inputKey));
     if (event.isPressed) {
       if (heldKeys_.find(key) == heldKeys_.end()) {
@@ -217,7 +216,7 @@ class ScriptSystem : public System {
 
   static std::string makeKey(const std::string &key) {
     std::string lowerKey = key;
-    std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), ::tolower);
+    std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), tolower);
     return lowerKey;
   }
 
@@ -236,7 +235,6 @@ class ScriptSystem : public System {
     return assetManager->GetFullPath(relativePath);
   }
 
- private:
   std::unordered_set<std::string> pressedKeys_;
   std::unordered_set<std::string> heldKeys_;
   std::unordered_map<std::string, std::unordered_set<std::string> > keyMap_;

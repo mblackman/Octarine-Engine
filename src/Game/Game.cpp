@@ -1,7 +1,6 @@
 #include "Game.h"
 
 #include <SDL3/SDL.h>
-#include <SDL3_image/SDL_image.h>
 
 #include <glm/glm.hpp>
 #include <memory>
@@ -234,7 +233,7 @@ void Game::Update() {
   milliseconds_previous_frame_ = SDL_GetTicks();
 
   registry_->GetSystem<MovementSystem>().Update(deltaTime);
-  registry_->GetSystem<AnimationSystem>().Update();
+  registry_->GetSystem<AnimationSystem>().Update(deltaTime);
   registry_->GetSystem<CollisionSystem>().Update(event_bus_);
   registry_->GetSystem<KeyboardControlSystem>().Update();
   registry_->GetSystem<CameraFollowSystem>().Update(camera_);
@@ -266,11 +265,11 @@ void Game::Render() {
   SDL_RenderPresent(sdl_renderer_);
 }
 
-void Game::SubscribeToEvents(std::unique_ptr<EventBus> &eventBus) {
+void Game::SubscribeToEvents(const std::unique_ptr<EventBus> &eventBus) {
   eventBus->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
 }
 
-void Game::OnKeyInputEvent(KeyInputEvent &event) {
+void Game::OnKeyInputEvent(const KeyInputEvent &event) {
   if (!event.isPressed) {
     return;
   }

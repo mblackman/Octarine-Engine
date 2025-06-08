@@ -5,7 +5,6 @@
 #include "../Components/CameraFollowComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
-#include "../General/Logger.h"
 
 class CameraFollowSystem : public System {
  public:
@@ -14,16 +13,18 @@ class CameraFollowSystem : public System {
     RequireComponent<TransformComponent>();
   }
 
-  void Update(SDL_Rect& camera) {
+  void Update(SDL_Rect& camera) const {
     for (auto entity : GetEntities()) {
       const auto transform = entity.GetComponent<TransformComponent>();
 
-      if (transform.position.x + (camera.w / 2) < Game::mapWidth) {
-        camera.x = transform.position.x - (Game::windowWidth / 2);
+      const int posX = static_cast<int>(transform.position.x);
+      const int posY = static_cast<int>(transform.position.y);
+      if (static_cast<float>(posX + camera.w / 2) < Game::mapWidth) {
+        camera.x = posX - Game::windowWidth / 2;
       }
 
-      if (transform.position.y + (camera.h / 2) < Game::mapHeight) {
-        camera.y = transform.position.y - (Game::windowHeight / 2);
+      if (static_cast<float>(posY + camera.h / 2) < Game::mapHeight) {
+        camera.y = posY - Game::windowHeight / 2;
       }
 
       camera.x = std::max(0, camera.x);

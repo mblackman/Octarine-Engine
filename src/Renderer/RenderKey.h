@@ -4,7 +4,6 @@
 #include "./RenderableType.h"
 
 struct RenderKey {
- public:
   unsigned int layer;
   float depth;
   RenderableType type;

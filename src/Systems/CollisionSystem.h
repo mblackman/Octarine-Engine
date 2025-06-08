@@ -5,7 +5,6 @@
 #include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
-#include "../General/Logger.h"
 
 class CollisionSystem : public System {
  public:
@@ -16,7 +15,7 @@ class CollisionSystem : public System {
 
   ~CollisionSystem() = default;
 
-  void Update(std::unique_ptr<EventBus>& eventBus) {
+  void Update(const std::unique_ptr<EventBus>& eventBus) {
     auto entities = GetEntities();
 
     for (auto i = entities.begin(); i != entities.end(); i++) {
@@ -28,8 +27,7 @@ class CollisionSystem : public System {
         auto entityB = *j;
         const auto& transformB = entityB.GetComponent<TransformComponent>();
         const auto& colliderB = entityB.GetComponent<BoxColliderComponent>();
-        const bool isColliding =
-            CheckAABBCollision(transformA, colliderA, transformB, colliderB);
+        const bool isColliding = CheckAABBCollision(transformA, colliderA, transformB, colliderB);
         if (isColliding) {
           eventBus->EmitEvent<CollisionEvent>(entityA, entityB);
         }
@@ -37,17 +35,13 @@ class CollisionSystem : public System {
     }
   }
 
-  static bool CheckAABBCollision(const TransformComponent& transformA,
-                          const BoxColliderComponent& colliderA,
-                          const TransformComponent& transformB,
-                          const BoxColliderComponent& colliderB) {
-    return !((transformA.position.x >
-              (transformB.position.x + colliderB.width * transformB.scale.x)) ||
-             ((transformA.position.x + colliderA.width * transformA.scale.x) <
-              transformB.position.x) ||
-             ((transformA.position.y + colliderA.height * transformA.scale.y) <
-              transformB.position.y) ||
-             (transformA.position.y >
-              (transformB.position.y + colliderB.height * transformB.scale.y)));
+  static bool CheckAABBCollision(const TransformComponent& transformA, const BoxColliderComponent& colliderA,
+                                 const TransformComponent& transformB, const BoxColliderComponent& colliderB) {
+    const float width = static_cast<float>(colliderA.width);
+    const float height = static_cast<float>(colliderA.height);
+    return !(transformA.position.x > transformB.position.x + width * transformB.scale.x ||
+             transformA.position.x + colliderA.width * transformA.scale.x < transformB.position.x ||
+             transformA.position.y + colliderA.height * transformA.scale.y < transformB.position.y ||
+             transformA.position.y > transformB.position.y + height * transformB.scale.y);
   }
 };

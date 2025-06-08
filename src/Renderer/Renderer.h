@@ -10,16 +10,13 @@ class Renderer {
   Renderer() = default;
   ~Renderer() = default;
 
-  void Render(const RenderQueue& renderQueue, SDL_Renderer* renderer,
-              SDL_Rect& camera, std::unique_ptr<AssetManager>& assetManager);
+  void Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, const SDL_Rect& camera,
+              const std::unique_ptr<AssetManager>& assetManager);
 
  private:
   static void RenderSprite(const Entity& entity, SDL_Renderer* renderer,
-                    std::unique_ptr<AssetManager>& assetManager,
-                    SDL_Rect& camera);
-  static void RenderSquare(const Entity& entity, SDL_Renderer* renderer,
-                    SDL_Rect& camera);
+                           const std::unique_ptr<AssetManager>& assetManager, const SDL_Rect& camera);
+  static void RenderSquare(const Entity& entity, SDL_Renderer* renderer, const SDL_Rect& camera);
   static void RenderText(const Entity& entity, SDL_Renderer* renderer,
-                  std::unique_ptr<AssetManager>& assetManager,
-                  SDL_Rect& camera);
+                         const std::unique_ptr<AssetManager>& assetManager, const SDL_Rect& camera);
 };

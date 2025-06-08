@@ -10,7 +10,6 @@
 #include "../ECS/ECS.h"
 
 class DisplayHealthSystem : public System {
- private:
   std::unordered_map<int, std::shared_ptr<Entity>> health_trackers_;
   std::set<int> living_entities_;
   std::set<int> removed_entities_;
@@ -27,7 +26,7 @@ class DisplayHealthSystem : public System {
 
   ~DisplayHealthSystem() = default;
 
-  void Update(std::unique_ptr<Registry>& registry) {
+  void Update(const std::unique_ptr<Registry>& registry) {
     living_entities_.clear();
     removed_entities_.clear();
 
@@ -82,7 +81,7 @@ class DisplayHealthSystem : public System {
   }
 
  private:
-  void CreateHealthTracker(std::unique_ptr<Registry>& registry, int entityId) {
+  void CreateHealthTracker(const std::unique_ptr<Registry>& registry, int entityId) {
     auto healthTracker = registry->CreateEntity();
     healthTracker.AddComponent<TextLabelComponent>(
         glm::vec2(0, 0), 100, "100", "arial-font-10", SDL_Color{255, 255, 255},
@@ -95,10 +94,10 @@ class DisplayHealthSystem : public System {
   SDL_Color GetHealthColor(float healthPercentage) {
     if (healthPercentage > 0.66) {
       return high_health_color;
-    } else if (healthPercentage > 0.33) {
-      return medium_health_color;
-    } else {
-      return low_health_color;
     }
+    if (healthPercentage > 0.33) {
+      return medium_health_color;
+    }
+    return low_health_color;
   }
 };

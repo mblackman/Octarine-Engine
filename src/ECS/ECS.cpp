@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <deque>
-#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <vector>
@@ -56,7 +55,7 @@ Entity Registry::CreateEntity() {
     free_ids_.pop_front();
   }
 
-  const Entity entity(entityId, this);
+  const Entity entity(static_cast<int>(entityId), this);
 
   entities_to_add_.insert(entity);
 
@@ -139,7 +138,7 @@ bool Registry::EntityHasTag(Entity entity, const std::string& tag) const {
     return false;
   }
 
-  return (entity_by_tag_.at(tag) == entity);
+  return entity_by_tag_.at(tag) == entity;
 }
 
 Entity Registry::GetEntityByTag(const std::string& tag) const {

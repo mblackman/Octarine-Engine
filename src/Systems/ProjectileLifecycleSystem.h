@@ -2,7 +2,6 @@
 
 #include "../Components/ProjectileComponent.h"
 #include "../ECS/ECS.h"
-#include "../General/Logger.h"
 
 class ProjectileLifecycleSystem : public System {
  public:

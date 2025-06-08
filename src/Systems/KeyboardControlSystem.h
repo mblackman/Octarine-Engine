@@ -10,7 +10,6 @@
 #include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
-#include "../General/Logger.h"
 
 class KeyboardControlSystem : public System {
  public:
@@ -22,12 +21,12 @@ class KeyboardControlSystem : public System {
 
   ~KeyboardControlSystem() = default;
 
-  void SubscribeToEvents(std::unique_ptr<EventBus>& eventBus) {
+  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
     eventBus->SubscribeEvent<KeyboardControlSystem, KeyInputEvent>(
         this, &KeyboardControlSystem::OnKeyInput);
   }
 
-  void OnKeyInput(KeyInputEvent& event) {
+  void OnKeyInput(const KeyInputEvent& event) {
     for (auto entity : GetEntities()) {
       const auto& keyboardComponent = entity.GetComponent<KeyboardControlComponent>();
       auto& spriteComponent = entity.GetComponent<SpriteComponent>();
@@ -59,6 +58,7 @@ class KeyboardControlSystem : public System {
               glm::vec2(keyboardComponent.velocity, 0);
           spriteComponent.srcRect.y = spriteComponent.height * 1;
           break;
+        default:;
       }
     }
   }

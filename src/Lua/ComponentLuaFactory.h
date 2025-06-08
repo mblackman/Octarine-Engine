@@ -9,8 +9,6 @@
 #include "Components/SquarePrimitiveComponent.h"
 #include "Components/UIButtonComponent.h"
 
-constexpr int kMillisecondsPerSecond = 1000;
-
 namespace LuaComponentHelpers {
 inline glm::vec2 SafeGetVec2(const sol::table& parentTable, const std::string& key, float defaultX = 0.0f,
                              float defaultY = 0.0f) {
@@ -47,7 +45,7 @@ class ComponentLuaFactory {
     using namespace LuaComponentHelpers;
     const glm::vec2 position = SafeGetVec2(data, "position");
     const glm::vec2 scale = SafeGetVec2(data, "scale", 1.0f, 1.0f);
-    const double rotation = SafeGetOptionalValue<double>(data, "rotation", 0.0);
+    const auto rotation = SafeGetOptionalValue<double>(data, "rotation", 0.0);
     return TransformComponent(position, scale, rotation);
   }
 
@@ -60,27 +58,27 @@ class ComponentLuaFactory {
   static SpriteComponent CreateSpriteComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;
     const std::string textureAssetId = data["texture_asset_id"].get<std::string>();
-    const int width = data["width"].get<int>();
-    const int height = data["height"].get<int>();
-    const int layer = SafeGetOptionalValue<int>(data, "layer", 1);
-    const bool fixed = SafeGetOptionalValue<bool>(data, "fixed", false);
-    const int srcRectX = SafeGetOptionalValue<int>(data, "src_rect_x", 0);
-    const int srcRectY = SafeGetOptionalValue<int>(data, "src_rect_y", 0);
+    const auto width = data["width"].get<float>();
+    const auto height = data["height"].get<float>();
+    const auto layer = SafeGetOptionalValue<int>(data, "layer", 1);
+    const auto fixed = SafeGetOptionalValue<bool>(data, "fixed", false);
+    const auto srcRectX = SafeGetOptionalValue<float>(data, "src_rect_x", 0);
+    const auto srcRectY = SafeGetOptionalValue<float>(data, "src_rect_y", 0);
     return SpriteComponent(textureAssetId, width, height, layer, fixed, srcRectX, srcRectY);
   }
 
   static SquarePrimitiveComponent CreateSquarePrimitiveComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;
     const glm::vec2 position = SafeGetVec2(data, "position");
-    const int layer = SafeGetOptionalValue<int>(data, "layer", 1);
-    const float width = SafeGetOptionalValue<float>(data, "width", 0.0f);
-    const float height = SafeGetOptionalValue<float>(data, "height", 0.0f);
-    const Uint8 red = SafeGetOptionalValue<Uint8>(data, "r", 255);
-    const Uint8 green = SafeGetOptionalValue<Uint8>(data, "g", 255);
-    const Uint8 blue = SafeGetOptionalValue<Uint8>(data, "b", 255);
-    const Uint8 alpha = SafeGetOptionalValue<Uint8>(data, "a", 255);
+    const auto layer = SafeGetOptionalValue<int>(data, "layer", 1);
+    const auto width = SafeGetOptionalValue<float>(data, "width", 0.0f);
+    const auto height = SafeGetOptionalValue<float>(data, "height", 0.0f);
+    const auto red = SafeGetOptionalValue<Uint8>(data, "r", 255);
+    const auto green = SafeGetOptionalValue<Uint8>(data, "g", 255);
+    const auto blue = SafeGetOptionalValue<Uint8>(data, "b", 255);
+    const auto alpha = SafeGetOptionalValue<Uint8>(data, "a", 255);
     const SDL_Color color = {red, green, blue, alpha};
-    const bool fixed = SafeGetOptionalValue<bool>(data, "fixed", false);
+    const auto fixed = SafeGetOptionalValue<bool>(data, "fixed", false);
     return SquarePrimitiveComponent(position, layer, width, height, color, fixed);
   }
 

@@ -13,8 +13,9 @@
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 
+constexpr int kMillisecondsPerSecond = 1000;
 constexpr int kFps = 60;
-constexpr int kMillisecondsPerFrame = 1000 / kFps;
+constexpr int kMillisecondsPerFrame = kMillisecondsPerSecond / kFps;
 
 class Game {
 public:
@@ -44,8 +45,8 @@ private:
   void Update();
   void Render();
   void Setup();
-  void SubscribeToEvents(std::unique_ptr<EventBus>& eventBus);
-  void OnKeyInputEvent(KeyInputEvent& event);
+  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus);
+  void OnKeyInputEvent(const KeyInputEvent& event);
   static KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);
 
   SDL_Window* window_;

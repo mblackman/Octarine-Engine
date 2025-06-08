@@ -13,7 +13,6 @@ class IPool {
  */
 template <typename T>
 class Pool : public IPool {
- private:
   std::vector<T> data_;
   size_t size_;
 

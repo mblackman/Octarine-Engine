@@ -6,18 +6,17 @@
 #include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
-#include "../General/Logger.h"
 
 class DamageSystem : public System {
  public:
   DamageSystem() { RequireComponent<BoxColliderComponent>(); }
 
-  void SubscribeToEvents(std::unique_ptr<EventBus>& eventBus) {
+  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
     eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(
         this, &DamageSystem::OnCollision);
   }
 
-  void OnCollision(CollisionEvent& event) {
+  void OnCollision(const CollisionEvent& event) {
     const auto a = event.entityA;
     const auto b = event.entityB;
     auto aId = std::to_string(event.entityA.GetId());

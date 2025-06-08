@@ -10,7 +10,6 @@
 class GameConfig;
 
 class AssetManager {
-private:
   std::map<std::string, SDL_Texture*> textures_;
   std::map<std::string, TTF_Font*> fonts_;
   std::optional<SDL_ScaleMode> default_scale_mode_;
@@ -26,10 +25,8 @@ public:
   void AddTexture(SDL_Renderer* renderer, const std::string& assetId,
                   const std::string& path);
   [[nodiscard]] SDL_Texture* GetTexture(const std::string& assetId) const;
-  void AddFont(const std::string& assetId, const std::string& path,
-               int fontSize);
+  void AddFont(const std::string& assetId, const std::string& path, float fontSize);
   [[nodiscard]] TTF_Font* GetFont(const std::string& assetId) const;
-  [[nodiscard]] std::string GetBasePath() const;
   [[nodiscard]] std::string GetFullPath(const std::string& relativePath) const;
   void SetDefaultScaleMode(const std::string& scaleMode);
 };

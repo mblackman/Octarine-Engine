@@ -33,7 +33,6 @@ class Component : public IComponent {
 };
 
 class Entity {
- private:
   int id_;
   class Registry* registry_;
 
@@ -78,7 +77,6 @@ class Entity {
 };
 
 class System {
- private:
   Signature component_signature_;
   std::vector<Entity> entities_;
 
@@ -101,7 +99,6 @@ class System {
  * Manages the creation and destruction of entities, systems, and components.
  */
 class Registry {
- private:
   int num_entities_{};
   std::vector<Entity> entities_;
 
@@ -246,7 +243,7 @@ bool Registry::HasSystem() const {
 template <typename T>
 T& Registry::GetSystem() const {
   const auto it = systems_.find(std::type_index(typeid(T)));
-  return *(std::static_pointer_cast<T>(it->second));
+  return *std::static_pointer_cast<T>(it->second);
 }
 
 template <typename ComponentArg>

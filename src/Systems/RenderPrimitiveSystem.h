@@ -19,7 +19,7 @@ class RenderPrimitiveSystem : public System {
       if (entity.HasComponent<SquarePrimitiveComponent>()) {
         const auto square = entity.GetComponent<SquarePrimitiveComponent>();
         RenderKey renderKey(square.layer, square.position.y,
-                            RenderableType::SQUARE_PRIMITIVE, entity);
+                            SQUARE_PRIMITIVE, entity);
 
         renderQueue.AddRenderKey(renderKey);
       }

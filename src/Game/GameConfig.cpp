@@ -17,7 +17,7 @@ inline constexpr auto kWhiteSpaceSymbols = " \t\n\r\f\v";
 
 std::string TrimRight(const std::string &s) {
   const size_t end = s.find_last_not_of(kWhiteSpaceSymbols);
-  return (end == std::string::npos) ? "" : s.substr(0, end + 1);
+  return end == std::string::npos ? "" : s.substr(0, end + 1);
 }
 
 inline auto ReadConfigFile(void *dst, const Uint64 dstLen) -> std::unordered_map<std::string, std::string> {
@@ -68,7 +68,8 @@ inline bool SetStringValue(GameConfig *gameConfig, const std::unordered_map<std:
   if (const auto it = config.find(key); it != config.end()) {
     (gameConfig->*setValue)(it->second);
     return true;
-  } else if (required) {
+  }
+  if (required) {
     Logger::Error("Could not find config setting: " + key);
     return false;
   }

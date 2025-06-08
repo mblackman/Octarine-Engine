@@ -2,7 +2,7 @@
 
 Octarine Engine colors imagination as a lightweight 2D game engine that is present where magic happens. It has its own ECS, supports Lua scripting, and is a yellowish-purple color.
 
-This engine utilizes:
+This engine uses:
 
 -   GLM: <https://github.com/g-truc/glm>
 -   ImGui: <https://github.com/ocornut/imgui>
