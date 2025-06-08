@@ -35,7 +35,7 @@ class GameConfig {
  private:
   template <typename T>
   bool SetValue(const std::unordered_map<std::string, std::string>& config, const std::string& key,
-                void (GameConfig::*setter)(T), const std::function<T(const std::string&)> converter,
+                void (GameConfig::*setter)(T), const std::function<T(const std::string&)>& converter,
                 const bool required = false) {
     if (const auto it = config.find(key); it != config.end()) {
       try {
