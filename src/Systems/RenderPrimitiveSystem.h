@@ -18,7 +18,7 @@ class RenderPrimitiveSystem : public System {
 
   ~RenderPrimitiveSystem() = default;
 
-  void Update(RenderQueue& renderQueue) {
+  void Update(RenderQueue& renderQueue) const {
     const auto entities = GetEntities();
 
     for (auto entity : entities) {

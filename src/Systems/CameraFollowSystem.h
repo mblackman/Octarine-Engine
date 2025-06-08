@@ -5,6 +5,7 @@
 #include "../Components/CameraFollowComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
+#include "General/Constants.h"
 
 class CameraFollowSystem : public System {
  public:
@@ -15,15 +16,14 @@ class CameraFollowSystem : public System {
 
   void Update(SDL_FRect& camera) const {
     for (auto entity : GetEntities()) {
-      constexpr float half = 2.0f;
       const auto transform = entity.GetComponent<TransformComponent>();
 
-      if (transform.position.x + camera.w / half < Game::mapWidth) {
-        camera.x = transform.position.x - static_cast<float>(Game::windowWidth) / half;
+      if (transform.position.x + camera.w / Constants::kHalf < Game::mapWidth) {
+        camera.x = transform.position.x - static_cast<float>(Game::windowWidth) / Constants::kHalf;
       }
 
-      if (transform.position.y + camera.h / half < Game::mapHeight) {
-        camera.y = transform.position.y - static_cast<float>(Game::windowHeight) / half;
+      if (transform.position.y + camera.h / Constants::kHalf < Game::mapHeight) {
+        camera.y = transform.position.y - static_cast<float>(Game::windowHeight) / Constants::kHalf;
       }
 
       camera.x = std::max(0.0f, camera.x);

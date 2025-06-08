@@ -6,13 +6,13 @@
 #include "./RenderKey.h"
 
 class RenderQueue {
+  constexpr static size_t kInitialCapacity = 1024;
+
  public:
   using value_type = RenderKey;
   using const_iterator = std::vector<RenderKey>::const_iterator;
 
-  explicit RenderQueue(size_t initial_capacity = 1024) {
-    render_keys_.reserve(initial_capacity);
-  }
+  explicit RenderQueue(const size_t initial_capacity = kInitialCapacity) { render_keys_.reserve(initial_capacity); }
 
   ~RenderQueue() = default;
 
@@ -24,7 +24,7 @@ class RenderQueue {
 
   void AddRenderKey(const RenderKey& key) { render_keys_.push_back(key); }
 
-  void AddRenderKey(RenderKey&& key) { render_keys_.push_back(std::move(key)); }
+  void AddRenderKey(RenderKey&& key) { render_keys_.push_back(key); }
 
   void Clear() { render_keys_.clear(); }
 

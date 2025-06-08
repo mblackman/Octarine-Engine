@@ -42,9 +42,10 @@ class UIButtonSystem : public System {
       const auto transform = entity.GetComponent<TransformComponent>();
       const float mouseX = event.event.x;
       const float mouseY = event.event.y;
-      const bool isClick =
-          transform.position.x <= mouseX && transform.position.x + boxCollider.width * transform.scale.x >= mouseX &&
-          transform.position.y <= mouseY && transform.position.y + boxCollider.height * transform.scale.y >= mouseY;
+      const bool isClick = transform.position.x <= mouseX &&
+                           transform.position.x + static_cast<float>(boxCollider.width) * transform.scale.x >= mouseX &&
+                           transform.position.y <= mouseY &&
+                           transform.position.y + static_cast<float>(boxCollider.height) * transform.scale.y >= mouseY;
       if (isClick) {
         if (auto result = button.clickFunction(button.buttonTable, entity); !result.valid()) {
           sol::error err = result;

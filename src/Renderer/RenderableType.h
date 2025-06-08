@@ -1,3 +1,3 @@
 #pragma once
 
-enum RenderableType { SPRITE, SQUARE_PRIMITIVE, TEXT };
+enum RenderableType : std::uint8_t { SPRITE, SQUARE_PRIMITIVE, TEXT };

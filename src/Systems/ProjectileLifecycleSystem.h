@@ -15,7 +15,7 @@ class ProjectileLifecycleSystem : public System {
 
   ~ProjectileLifecycleSystem() = default;
 
-  void Update() {
+  void Update() const {
     for (auto entity : GetEntities()) {
       const auto projectile = entity.GetComponent<ProjectileComponent>();
 

@@ -5,40 +5,34 @@
 #include <memory>
 #include <sol/sol.hpp>
 
-#include "GameConfig.h"
 #include "../AssetManager/AssetManager.h"
 #include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
-
-constexpr int kMillisecondsPerSecond = 1000;
-constexpr int kFps = 60;
-constexpr int kMillisecondsPerFrame = kMillisecondsPerSecond / kFps;
+#include "GameConfig.h"
 
 class Game {
-public:
+ public:
   Game();
 
- Game(const Game&) = delete;
- Game& operator=(const Game&) = delete;
+  Game(const Game&) = delete;
+  Game& operator=(const Game&) = delete;
 
- Game(Game&&) = delete;
- Game& operator=(Game&&) = delete;
+  Game(Game&&) = delete;
+  Game& operator=(Game&&) = delete;
 
- ~Game();
+  ~Game();
 
- bool Initialize(const std::string& assetPath);
- void Destroy() const;
- void Run();
+  bool Initialize(const std::string& assetPath);
+  void Destroy() const;
+  void Run();
   static void Quit() { s_is_running_ = false; }
 
   [[nodiscard]] SDL_Renderer* GetRenderer() const { return sdl_renderer_; }
 
-  [[nodiscard]] AssetManager* GetAssetManager() const {
-    return asset_manager_.get();
-  }
+  [[nodiscard]] AssetManager* GetAssetManager() const { return asset_manager_.get(); }
 
   [[nodiscard]] Registry* GetRegistry() const { return registry_.get(); }
 
@@ -47,7 +41,7 @@ public:
   static float mapWidth;
   static float mapHeight;
 
-private:
+ private:
   void ProcessInput() const;
   void Update();
   void Render();
@@ -61,7 +55,7 @@ private:
   SDL_FRect camera_;
   static inline bool s_is_running_{false};
   bool show_colliders_;
-  int milliseconds_previous_frame_ = 0;
+  Uint64 milliseconds_previous_frame_ = 0;
 
   sol::state lua;
   std::unique_ptr<Registry> registry_;

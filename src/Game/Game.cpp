@@ -37,6 +37,8 @@ int Game::windowHeight;
 float Game::mapWidth;
 float Game::mapHeight;
 
+constexpr Uint8 GREY_COLOR = 24;
+
 inline void LoadGame(sol::state &lua, const AssetManager *assetManager, const GameConfig &gameConfig) {
   const auto filePath = assetManager->GetFullPath(gameConfig.GetStartupScript());
 
@@ -86,11 +88,8 @@ bool Game::Initialize(const std::string &assetPath) {
     return false;
   }
 
-  windowWidth = 1920;
-  windowHeight = 1080;
-
-  SDL_CreateWindowAndRenderer(game_config_->GetGameTitle().c_str(), windowWidth, windowHeight, SDL_WINDOW_RESIZABLE,
-                              &window_, &sdl_renderer_);
+  SDL_CreateWindowAndRenderer(game_config_->GetGameTitle().c_str(), game_config_->GetDefaultWidth(),
+                              game_config_->GetDefaultHeight(), SDL_WINDOW_RESIZABLE, &window_, &sdl_renderer_);
 
   if (!window_) {
     Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
@@ -114,10 +113,10 @@ bool Game::Initialize(const std::string &assetPath) {
 
   camera_.x = 0;
   camera_.y = 0;
-  camera_.w = windowWidth;
-  camera_.h = windowHeight;
+  camera_.w = static_cast<float>(windowWidth);
+  camera_.h = static_cast<float>(windowHeight);
 
-  SDL_SetRenderDrawColor(sdl_renderer_, 21, 21, 21, 255);
+  SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
   asset_manager_->SetGameConfig(*game_config_);
   s_is_running_ = true;
   return true;
@@ -212,8 +211,8 @@ void Game::ProcessInput() const {
 
 void Game::Update() {
   // If we are too fast, waste some time until we reach the frame time
-  const int timeToWait = kMillisecondsPerFrame - (SDL_GetTicks() - milliseconds_previous_frame_);
-  if (timeToWait > 0 && timeToWait <= kMillisecondsPerFrame) {
+  const Uint64 timeToWait = Constants::kMillisecondsPerFrame - (SDL_GetTicks() - milliseconds_previous_frame_);
+  if (timeToWait > 0 && timeToWait <= static_cast<Uint64>(Constants::kMillisecondsPerFrame)) {
     SDL_Delay(timeToWait);
   }
 
@@ -228,7 +227,9 @@ void Game::Update() {
   SubscribeToEvents(event_bus_);
 
   // Calculate delta time
-  const double deltaTime = (SDL_GetTicks() - milliseconds_previous_frame_) / 1000.0;
+  const auto intermediate = static_cast<double>(SDL_GetTicks() - milliseconds_previous_frame_) /
+                            static_cast<double>(Constants::kMillisecondsPerSecond);
+  const auto deltaTime = static_cast<float>(intermediate);
 
   milliseconds_previous_frame_ = SDL_GetTicks();
 
@@ -240,12 +241,12 @@ void Game::Update() {
   registry_->GetSystem<ProjectileEmitSystem>().Update(deltaTime, registry_);
   registry_->GetSystem<ProjectileLifecycleSystem>().Update();
   registry_->GetSystem<DisplayHealthSystem>().Update(registry_);
-  registry_->GetSystem<ScriptSystem>().Update(deltaTime, SDL_GetTicks());
+  registry_->GetSystem<ScriptSystem>().Update(deltaTime);
   registry_->Update();
 }
 
 void Game::Render() {
-  SDL_SetRenderDrawColor(sdl_renderer_, 21, 21, 21, 255);
+  SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
   SDL_RenderClear(sdl_renderer_);
 
   // Render the game

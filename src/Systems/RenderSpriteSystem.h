@@ -24,19 +24,20 @@ class RenderSpriteSystem : public System {
 
   ~RenderSpriteSystem() = default;
 
-  void Update(RenderQueue& renderQueue, const SDL_FRect& camera) {
+  void Update(RenderQueue& renderQueue, const SDL_FRect& camera) const {
     auto entities = GetEntities();
 
     for (auto entity : GetEntities()) {
       const auto transform = entity.GetComponent<TransformComponent>();
-      const auto sprite = entity.GetComponent<SpriteComponent>();
+      const auto& sprite = entity.GetComponent<SpriteComponent>();
 
       bool isOutsideCamera = false;
 
       if (sprite.isFixed) {
-        isOutsideCamera =
-            transform.position.x + sprite.width * transform.scale.x < 0 || transform.position.x > Game::windowWidth ||
-            transform.position.y + sprite.height * transform.scale.y < 0 || transform.position.y > Game::windowHeight;
+        isOutsideCamera = transform.position.x + sprite.width * transform.scale.x < 0 ||
+                          transform.position.x > static_cast<float>(Game::windowWidth) ||
+                          transform.position.y + sprite.height * transform.scale.y < 0 ||
+                          transform.position.y > static_cast<float>(Game::windowHeight);
       } else {
         isOutsideCamera = transform.position.x + sprite.width * transform.scale.x < camera.x ||
                           transform.position.x > camera.x + camera.w ||

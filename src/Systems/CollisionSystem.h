@@ -21,7 +21,7 @@ class CollisionSystem : public System {
 
   ~CollisionSystem() = default;
 
-  void Update(const std::unique_ptr<EventBus>& eventBus) {
+  void Update(const std::unique_ptr<EventBus>& eventBus) const {
     auto entities = GetEntities();
 
     for (auto i = entities.begin(); i != entities.end(); i++) {
@@ -43,11 +43,19 @@ class CollisionSystem : public System {
 
   static bool CheckAABBCollision(const TransformComponent& transformA, const BoxColliderComponent& colliderA,
                                  const TransformComponent& transformB, const BoxColliderComponent& colliderB) {
-    const float width = static_cast<float>(colliderA.width);
-    const float height = static_cast<float>(colliderA.height);
-    return !(transformA.position.x > transformB.position.x + width * transformB.scale.x ||
-             transformA.position.x + colliderA.width * transformA.scale.x < transformB.position.x ||
-             transformA.position.y + colliderA.height * transformA.scale.y < transformB.position.y ||
-             transformA.position.y > transformB.position.y + height * transformB.scale.y);
+    // Calculate AABB for entity A
+    const float A_x_min = transformA.position.x + colliderA.offset.x;
+    const float A_y_min = transformA.position.y + colliderA.offset.y;
+    const float A_x_max = A_x_min + static_cast<float>(colliderA.width) * transformA.scale.x;
+    const float A_y_max = A_y_min + static_cast<float>(colliderA.height) * transformA.scale.y;
+
+    // Calculate AABB for entity B
+    const float B_x_min = transformB.position.x + colliderB.offset.x;
+    const float B_y_min = transformB.position.y + colliderB.offset.y;
+    const float B_x_max = B_x_min + static_cast<float>(colliderB.width) * transformB.scale.x;
+    const float B_y_max = B_y_min + static_cast<float>(colliderB.height) * transformB.scale.y;
+
+    // Check for overlap on both axes
+    return (A_x_min < B_x_max && A_x_max > B_x_min && A_y_min < B_y_max && A_y_max > B_y_min);
   }
 };

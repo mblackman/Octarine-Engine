@@ -29,9 +29,9 @@ class Pool final : public IPool {
  public:
   explicit Pool(const size_t size = 100) : size_(0) { Resize(size); }
 
-  bool IsEmpty() const { return size_ == 0; }
+  [[nodiscard]] bool IsEmpty() const { return size_ == 0; }
 
-  size_t GetSize() const { return size_; }
+  [[nodiscard]] size_t GetSize() const { return size_; }
 
   void Resize(size_t size) { data_.resize(size); }
 
@@ -83,8 +83,7 @@ class Pool final : public IPool {
   T& Get(int id) {
     const auto index = id_to_indexes_.find(id);
     if (index == id_to_indexes_.end()) {
-      throw std::runtime_error("Element not found with id: " +
-                               std::to_string(id));
+      throw std::runtime_error("Element not found with id: " + std::to_string(id));
     }
 
     return static_cast<T&>(data_[index->second]);
