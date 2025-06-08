@@ -6,10 +6,7 @@ struct ProjectileComponent {
   int duration;
   bool isFriendly;
 
-  explicit ProjectileComponent(int damage = 0, int spawnTime = 0, int duration = 0,
-                      bool isFriendly = false)
-      : damage(damage),
-        spawnTime(spawnTime),
-        duration(duration),
-        isFriendly(isFriendly) {}
+  explicit ProjectileComponent(const int damage = 0, const int spawnTime = 0, const int duration = 0,
+                               const bool isFriendly = false)
+      : damage(damage), spawnTime(spawnTime), duration(duration), isFriendly(isFriendly) {}
 };

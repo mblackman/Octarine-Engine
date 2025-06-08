@@ -14,17 +14,14 @@ struct SpriteComponent {
   SDL_FRect srcRect{};
   SDL_FlipMode flip;
 
-  explicit SpriteComponent(std::string assetId = "", float width = 0,
-                           float height = 0,
-                           int layer = 0, bool isFixed = false,
-                           float srcRectX = 0,
-                           float srcRectY = 0)
-    : assetId(std::move(std::move(assetId))),
-      width(width),
-      height(height),
-      layer(layer),
-      isFixed(isFixed),
-      flip(SDL_FLIP_NONE) {
+  explicit SpriteComponent(std::string assetId = "", const float width = 0, const float height = 0, const int layer = 0,
+                           const bool isFixed = false, const float srcRectX = 0, const float srcRectY = 0)
+      : assetId(std::move(std::move(assetId))),
+        width(width),
+        height(height),
+        layer(layer),
+        isFixed(isFixed),
+        flip(SDL_FLIP_NONE) {
     this->srcRect = {srcRectX, srcRectY, width, height};
   }
 };
