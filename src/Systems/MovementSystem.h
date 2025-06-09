@@ -40,7 +40,7 @@ class MovementSystem : public System {
     }
   }
 
-  void Update(float deltaTime) const {
+  void Update(const float deltaTime) const {
     for (auto entity : GetEntities()) {
       auto& transform = entity.GetComponent<TransformComponent>();
       const auto rigidBody = entity.GetComponent<RigidBodyComponent>();
@@ -54,29 +54,14 @@ class MovementSystem : public System {
         transform.position.y += rigidBody.velocity.y * static_cast<float>(deltaTime);
 
         if (isPlayer) {
-          const auto& spriteComponent = entity.GetComponent<SpriteComponent>();
-          if (transform.position.x < 0) {
-            transform.position.x = 0;
-          }
-
-          if (transform.position.y < 0) {
-            transform.position.y = 0;
-          }
-
-          if (transform.position.x + spriteComponent.width * transform.scale.x > Game::mapWidth) {
-            transform.position.x = Game::mapWidth - spriteComponent.width * transform.scale.x;
-          }
-
-          if (transform.position.y + spriteComponent.height * transform.scale.y > Game::mapHeight) {
-            transform.position.y = Game::mapHeight - spriteComponent.height * transform.scale.y;
-          }
+          UpdatePlayerMovement(entity, transform);
         }
       }
     }
   }
 
  private:
-  static void OnObstacleCollision(Entity enemy) {
+  static void OnObstacleCollision(const Entity enemy) {
     auto& rigidBody = enemy.GetComponent<RigidBodyComponent>();
 
     rigidBody.velocity = rigidBody.velocity * -1.0f;
@@ -103,5 +88,24 @@ class MovementSystem : public System {
     }
 
     return isEntityOutsideMap;
+  }
+
+  void UpdatePlayerMovement(const std::vector<Entity>::value_type entity, TransformComponent& transform) const {
+    const auto& spriteComponent = entity.GetComponent<SpriteComponent>();
+    if (transform.position.x < 0) {
+      transform.position.x = 0;
+    }
+
+    if (transform.position.y < 0) {
+      transform.position.y = 0;
+    }
+
+    if (transform.position.x + spriteComponent.width * transform.scale.x > Game::mapWidth) {
+      transform.position.x = Game::mapWidth - spriteComponent.width * transform.scale.x;
+    }
+
+    if (transform.position.y + spriteComponent.height * transform.scale.y > Game::mapHeight) {
+      transform.position.y = Game::mapHeight - spriteComponent.height * transform.scale.y;
+    }
   }
 };
