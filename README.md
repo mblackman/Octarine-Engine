@@ -18,7 +18,7 @@ All dependencies are managed via [vcpkg](https://github.com/microsoft/vcpkg).
 Before you begin, ensure you have the following installed:
 
 1.  **Git:** For cloning the project and vcpkg.
-2.  **CMake:** Version 3.10 or higher. ([Download CMake](https://cmake.org/download/))
+2.  **CMake:** Version 3.15 or higher. ([Download CMake](https://cmake.org/download/))
 3.  **C++ Compiler:** A C++17 compliant compiler (e.g., GCC, Clang, MSVC).
     * On Ubuntu, you can install `build-essential` which includes GCC: `sudo apt update && sudo apt install build-essential g++`
 4.  **CLion IDE:** (Recommended for development) [JetBrains CLion](https://www.jetbrains.com/clion/).
