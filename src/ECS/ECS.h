@@ -3,6 +3,7 @@
 #include <bitset>
 #include <deque>
 #include <memory>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <typeindex>
@@ -74,11 +75,16 @@ class Entity {
   [[nodiscard]] bool InGroup(const std::string& group) const;
 
   void Blam() const;
+
+  void AddParent(const Entity& parent) const;
+
+  void RemoveParent() const;
 };
 
 class System {
   Signature component_signature_;
   std::vector<Entity> entities_;
+  std::vector<Entity> root_entities_;
 
  public:
   System() = default;
@@ -95,8 +101,13 @@ class System {
 
   [[nodiscard]] std::vector<Entity> GetEntities() const { return entities_; }
 
-  void AddEntity(Entity entity);
-  void RemoveEntity(Entity entity);
+  [[nodiscard]] std::vector<Entity> GetRootEntities() const { return entities_; }
+
+  void AddEntity(const Entity& entity);
+  void RemoveEntity(const Entity& entity);
+
+  void AddRootEntity(const Entity& entity);
+  void RemoveRootEntity(const Entity& entity);
 
   template <typename T>
   void RequireComponent();
@@ -108,9 +119,13 @@ class System {
 class Registry {
   int num_entities_{};
   std::vector<Entity> entities_;
+  // Entities without a parent
+  std::vector<Entity> root_entities_;
 
   std::set<Entity> entities_to_add_;
   std::set<Entity> entities_to_remove_;
+  std::vector<std::pair<Entity, Entity>> entity_child_to_add_parent_;
+  std::set<Entity> entities_to_remove_parent_;
 
   // Keeps track of the tags for each entity in both directions.
   std::unordered_map<std::string, Entity> entity_by_tag_;
@@ -134,6 +149,27 @@ class Registry {
   // A queue of ids that have been freed from destroyed entities.
   std::deque<int> free_ids_;
 
+  // A map of parent-child relationships
+  std::unordered_map<int, std::set<Entity>> parent_to_children_map_;
+  std::unordered_map<int, Entity> child_to_parent_map_;
+
+  template <typename Func>
+  void UpdateInterestedSystems(const Entity& entity, Func&& update) const;
+
+  void AddEntityToSystems(const Entity& entity, bool isRoot) const;
+
+  void RemoveEntityFromSystems(const Entity& entity) const;
+
+  void AddRootEntityToSystems(const Entity& entity) const;
+
+  void RemoveRootEntityFromSystems(const Entity& entity) const;
+
+  void UpdateAddEntities();
+  void UpdateProcessParentAdditions();
+  void UpdateProcessParentRemovals();
+  void UpdateProcessEntityRemovals_ReparentChildren(const Entity& entity);
+  void UpdateProcessEntityRemovals();
+
  public:
   Registry() = default;
 
@@ -150,20 +186,26 @@ class Registry {
   // Entity management
   Entity CreateEntity();
 
-  void BlamEntity(Entity entity);
+  void BlamEntity(const Entity& entity);
+
+  void SetParent(const Entity& parent, const Entity& child);
+
+  void RemoveParent(const Entity& entity);
+
+  std::optional<Entity> GetParent(const Entity& entity);
 
   // Tag management
-  void TagEntity(Entity entity, const std::string& tag);
-  [[nodiscard]] bool EntityHasTag(Entity entity, const std::string& tag) const;
+  void TagEntity(const Entity& entity, const std::string& tag);
+  [[nodiscard]] bool EntityHasTag(const Entity& entity, const std::string& tag) const;
   [[nodiscard]] Entity GetEntityByTag(const std::string& tag) const;
-  void RemoveEntityTag(Entity entity);
+  void RemoveEntityTag(const Entity& entity);
 
   // Group management
-  void GroupEntity(Entity entity, const std::string& group);
-  [[nodiscard]] bool EntityInGroup(Entity entity, const std::string& group) const;
+  void GroupEntity(const Entity& entity, const std::string& group);
+  [[nodiscard]] bool EntityInGroup(const Entity& entity, const std::string& group) const;
   [[nodiscard]] std::vector<Entity> GetEntitiesByGroup(const std::string& group) const;
-  void RemoveEntityGroup(Entity entity, const std::string& group);
-  void RemoveEntityGroups(Entity entity);
+  void RemoveEntityGroup(const Entity& entity, const std::string& group);
+  void RemoveEntityGroups(const Entity& entity);
 
   // System management
   template <typename T, typename... TArgs>
@@ -178,25 +220,21 @@ class Registry {
   template <typename T>
   T& GetSystem() const;
 
-  void AddEntityToSystems(Entity entity) const;
-
-  void RemoveEntityFromSystems(Entity entity) const;
-
   // Component management
   template <typename ComponentArg>
-  void AddComponent(Entity entity, ComponentArg&& component);
+  void AddComponent(const Entity& entity, ComponentArg&& component);
 
   template <typename T, typename... TArgs>
-  void AddComponent(Entity entity, TArgs&&... args);
+  void AddComponent(const Entity& entity, TArgs&&... args);
 
   template <typename T>
-  void RemoveComponent(Entity entity);
+  void RemoveComponent(const Entity& entity);
 
   template <typename T>
-  [[nodiscard]] bool HasComponent(Entity entity) const;
+  [[nodiscard]] bool HasComponent(const Entity& entity) const;
 
   template <typename T>
-  T& GetComponent(Entity entity) const;
+  T& GetComponent(const Entity& entity) const;
 };
 
 // Entity implementations
@@ -233,6 +271,20 @@ void System::RequireComponent() {
   component_signature_.set(componentId);
 }
 
+template <typename Func>
+void Registry::UpdateInterestedSystems(const Entity& entity, Func&& update) const {
+  const auto entityId = entity.GetId();
+  const auto& entityComponentSignature = entity_component_signatures_[entityId];
+
+  for (const auto& [typeIndex, system] : systems_) {
+    const auto& systemComponentSignature = system->GetComponentSignature();
+
+    if ((entityComponentSignature & systemComponentSignature) == systemComponentSignature) {
+      update(*system);
+    }
+  }
+}
+
 // Registry implementations
 template <typename T, typename... TArgs>
 void Registry::AddSystem(TArgs&&... args) {
@@ -261,7 +313,7 @@ T& Registry::GetSystem() const {
 }
 
 template <typename ComponentArg>
-void Registry::AddComponent(const Entity entity, ComponentArg&& component) {
+void Registry::AddComponent(const Entity& entity, ComponentArg&& component) {
   using ActualComponentType = std::decay_t<ComponentArg>;
 
   const auto componentId = Component<ActualComponentType>::GetId();
@@ -286,13 +338,13 @@ void Registry::AddComponent(const Entity entity, ComponentArg&& component) {
 }
 
 template <typename T, typename... TArgs>
-void Registry::AddComponent(const Entity entity, TArgs&&... args) {
+void Registry::AddComponent(const Entity& entity, TArgs&&... args) {
   T newComponent(std::forward<TArgs>(args)...);
   AddComponent(entity, std::move(newComponent));
 }
 
 template <typename T>
-void Registry::RemoveComponent(const Entity entity) {
+void Registry::RemoveComponent(const Entity& entity) {
   const auto componentId = Component<T>::GetId();
   const auto entityId = entity.GetId();
 
@@ -305,12 +357,12 @@ void Registry::RemoveComponent(const Entity entity) {
 }
 
 template <typename T>
-bool Registry::HasComponent(const Entity entity) const {
+bool Registry::HasComponent(const Entity& entity) const {
   return entity_component_signatures_[entity.GetId()].test(Component<T>::GetId());
 }
 
 template <typename T>
-T& Registry::GetComponent(const Entity entity) const {
+T& Registry::GetComponent(const Entity& entity) const {
   const auto componentId = Component<T>::GetId();
   const auto entityId = entity.GetId();
 
