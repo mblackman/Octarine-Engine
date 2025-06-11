@@ -34,19 +34,19 @@ class RenderSpriteSystem : public System {
       bool isOutsideCamera = false;
 
       if (sprite.isFixed) {
-        isOutsideCamera = transform.position.x + sprite.width * transform.scale.x < 0 ||
-                          transform.position.x > static_cast<float>(Game::windowWidth) ||
-                          transform.position.y + sprite.height * transform.scale.y < 0 ||
-                          transform.position.y > static_cast<float>(Game::windowHeight);
+        isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < 0 ||
+                          transform.globalPosition.x > static_cast<float>(Game::windowWidth) ||
+                          transform.globalPosition.y + sprite.height * transform.globalScale.y < 0 ||
+                          transform.globalPosition.y > static_cast<float>(Game::windowHeight);
       } else {
-        isOutsideCamera = transform.position.x + sprite.width * transform.scale.x < camera.x ||
-                          transform.position.x > camera.x + camera.w ||
-                          transform.position.y + sprite.height * transform.scale.y < camera.y ||
-                          transform.position.y > camera.y + camera.h;
+        isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < camera.x ||
+                          transform.globalPosition.x > camera.x + camera.w ||
+                          transform.globalPosition.y + sprite.height * transform.globalScale.y < camera.y ||
+                          transform.globalPosition.y > camera.y + camera.h;
       }
 
       if (!isOutsideCamera) {
-        RenderKey renderKey(sprite.layer, transform.position.y, SPRITE, entity);
+        RenderKey renderKey(sprite.layer, transform.globalPosition.y, SPRITE, entity);
 
         renderQueue.AddRenderKey(renderKey);
       }

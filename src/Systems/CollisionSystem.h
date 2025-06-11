@@ -24,12 +24,12 @@ class CollisionSystem : public System {
   void Update(const std::unique_ptr<EventBus>& eventBus) const {
     auto entities = GetEntities();
 
-    for (auto i = entities.begin(); i != entities.end(); i++) {
+    for (auto i = entities.begin(); i != entities.end(); ++i) {
       auto entityA = *i;
       const auto& transformA = entityA.GetComponent<TransformComponent>();
       const auto& colliderA = entityA.GetComponent<BoxColliderComponent>();
 
-      for (auto j = i + 1; j != entities.end(); j++) {
+      for (auto j = i + 1; j != entities.end(); ++j) {
         auto entityB = *j;
         const auto& transformB = entityB.GetComponent<TransformComponent>();
         const auto& colliderB = entityB.GetComponent<BoxColliderComponent>();

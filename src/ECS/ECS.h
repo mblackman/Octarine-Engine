@@ -79,6 +79,10 @@ class Entity {
   void AddParent(const Entity& parent) const;
 
   void RemoveParent() const;
+
+  [[nodiscard]] std::optional<Entity> GetParent() const;
+
+  [[nodiscard]] std::optional<std::vector<Entity>> GetChildren() const;
 };
 
 class System {
@@ -101,7 +105,7 @@ class System {
 
   [[nodiscard]] std::vector<Entity> GetEntities() const { return entities_; }
 
-  [[nodiscard]] std::vector<Entity> GetRootEntities() const { return entities_; }
+  [[nodiscard]] std::vector<Entity> GetRootEntities() const { return root_entities_; }
 
   void AddEntity(const Entity& entity);
   void RemoveEntity(const Entity& entity);
@@ -150,7 +154,7 @@ class Registry {
   std::deque<int> free_ids_;
 
   // A map of parent-child relationships
-  std::unordered_map<int, std::set<Entity>> parent_to_children_map_;
+  std::unordered_map<int, std::vector<Entity>> parent_to_children_;
   std::unordered_map<int, Entity> child_to_parent_map_;
 
   template <typename Func>
@@ -167,7 +171,6 @@ class Registry {
   void UpdateAddEntities();
   void UpdateProcessParentAdditions();
   void UpdateProcessParentRemovals();
-  void UpdateProcessEntityRemovals_ReparentChildren(const Entity& entity);
   void UpdateProcessEntityRemovals();
 
  public:
@@ -193,6 +196,8 @@ class Registry {
   void RemoveParent(const Entity& entity);
 
   std::optional<Entity> GetParent(const Entity& entity);
+
+  std::optional<std::vector<Entity>> GetChildren(const Entity& entity);
 
   // Tag management
   void TagEntity(const Entity& entity, const std::string& tag);

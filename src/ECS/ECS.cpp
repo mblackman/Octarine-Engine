@@ -15,6 +15,10 @@ int IComponent::next_id_ = 0;
 // Entity Implementation
 int Entity::GetId() const { return id_; }
 
+std::optional<Entity> Entity::GetParent() const { return registry_->GetParent(*this); }
+
+std::optional<std::vector<Entity>> Entity::GetChildren() const { return registry_->GetChildren(*this); }
+
 void Entity::Tag(const std::string& tag) const { registry_->TagEntity(*this, tag); }
 
 bool Entity::HasTag(const std::string& tag) const { return registry_->EntityHasTag(*this, tag); }
@@ -25,7 +29,7 @@ bool Entity::InGroup(const std::string& group) const { return registry_->EntityI
 
 void Entity::Blam() const { registry_->BlamEntity(*this); }
 
-void Entity::AddParent(const Entity& parent) const { registry_->SetParent(*this, parent); }
+void Entity::AddParent(const Entity& parent) const { registry_->SetParent(parent, *this); }
 
 void Entity::RemoveParent() const {}
 
@@ -77,6 +81,12 @@ std::optional<Entity> Registry::GetParent(const Entity& entity) {
   }
   return {};
 }
+std::optional<std::vector<Entity>> Registry::GetChildren(const Entity& entity) {
+  if (const auto it = parent_to_children_.find(entity.GetId()); it != parent_to_children_.end()) {
+    return it->second;
+  }
+  return {};
+}
 
 void Registry::AddEntityToSystems(const Entity& entity, const bool isRoot) const {
   UpdateInterestedSystems(entity, [entity, isRoot](System& system) {
@@ -122,7 +132,7 @@ void Registry::UpdateProcessParentAdditions() {
       continue;
     }
 
-    parent_to_children_map_[parent.GetId()].insert(child);
+    parent_to_children_[parent.GetId()].emplace_back(child);
     child_to_parent_map_.insert_or_assign(childId, parent);
 
     // Remove child from root entities if it was a root entity
@@ -141,11 +151,11 @@ void Registry::UpdateProcessParentRemovals() {
       const Entity oldParent = it->second;
 
       // Remove child from old parent's children list
-      if (auto parentChildrenIt = parent_to_children_map_.find(oldParent.GetId());
-          parentChildrenIt != parent_to_children_map_.end()) {
-        parentChildrenIt->second.erase(child);
+      if (auto parentChildrenIt = parent_to_children_.find(oldParent.GetId());
+          parentChildrenIt != parent_to_children_.end()) {
+        Collections::SwapAndPop(parentChildrenIt->second, child);
         if (parentChildrenIt->second.empty()) {
-          parent_to_children_map_.erase(parentChildrenIt);
+          parent_to_children_.erase(parentChildrenIt);
         }
       }
 
@@ -164,67 +174,69 @@ void Registry::UpdateProcessParentRemovals() {
   entities_to_remove_parent_.clear();
 }
 
-void Registry::UpdateProcessEntityRemovals_ReparentChildren(const Entity& entity) {
-  const auto parentIt = child_to_parent_map_.find(entity.GetId());
-  std::optional<Entity> newParent;
-  if (parentIt != child_to_parent_map_.end()) {
-    newParent = parentIt->second;
+void Registry::UpdateProcessEntityRemovals() {
+  if (entities_to_remove_.empty()) {
+    return;
   }
 
-  auto childrenIt = parent_to_children_map_.find(entity.GetId());
-  if (childrenIt != parent_to_children_map_.end()) {
-    for (const auto& child : childrenIt->second) {
-      if (newParent.has_value()) {
-        // The new parent is the grandparent.
-        child_to_parent_map_.insert_or_assign(child.GetId(), *newParent);
-        parent_to_children_map_.at(newParent->GetId()).insert(child);
-        Logger::Info("Re-parented child " + std::to_string(child.GetId()) + " to " +
-                     std::to_string(newParent->GetId()) + " after parent " + std::to_string(entity.GetId()) +
-                     " destroyed.");
-      } else {
-        // The new parent is the root.
-        child_to_parent_map_.erase(child.GetId());
-        root_entities_.push_back(child);
-        AddRootEntityToSystems(child);
-        Logger::Info("Re-parented child " + std::to_string(child.GetId()) + " to root after parent " +
-                     std::to_string(entity.GetId()) + " destroyed.");
+  std::deque<Entity> queue;
+
+  for (const auto& entity : entities_to_remove_) {
+    queue.push_back(entity);
+  }
+
+  while (!queue.empty()) {
+    Entity current = queue.front();
+    queue.pop_front();
+
+    auto childrenIt = parent_to_children_.find(current.GetId());
+    if (childrenIt != parent_to_children_.end()) {
+      for (const auto& child : childrenIt->second) {
+        if (entities_to_remove_.find(child) == entities_to_remove_.end()) {
+          queue.push_back(child);
+          entities_to_remove_.insert(child);
+        }
       }
     }
-    // The destroyed entity no longer has children.
-    parent_to_children_map_.erase(childrenIt);
   }
 
-  if (parentIt != child_to_parent_map_.end()) {
-    const Entity& parent = parentIt->second;
-    parent_to_children_map_.at(parent.GetId()).erase(entity);
-    child_to_parent_map_.erase(parentIt);
-  }
-}
+  for (const auto& entity : entities_to_remove_) {
+    const int entityId = entity.GetId();
 
-void Registry::UpdateProcessEntityRemovals() {
-  for (auto entity : entities_to_remove_) {
+    auto parentIt = child_to_parent_map_.find(entityId);
+    if (parentIt != child_to_parent_map_.end()) {
+      const Entity& parent = parentIt->second;
+      if (entities_to_remove_.find(parent) == entities_to_remove_.end()) {
+        auto parentChildrenIt = parent_to_children_.find(parent.GetId());
+        if (parentChildrenIt != parent_to_children_.end()) {
+          Collections::SwapAndPop(parentChildrenIt->second, entity);
+          if (parentChildrenIt->second.empty()) {
+            parent_to_children_.erase(parentChildrenIt);
+          }
+        }
+      }
+    }
+
+    child_to_parent_map_.erase(entityId);
+    parent_to_children_.erase(entityId);
+
     RemoveEntityFromSystems(entity);
-    free_ids_.push_front(entity.GetId());
-    entity_component_signatures_[entity.GetId()].reset();
+    free_ids_.push_front(entityId);
+    entity_component_signatures_[entityId].reset();
 
     for (const auto& pool : component_pools_) {
       if (pool) {
-        pool->Remove(entity.GetId());
+        pool->Remove(entityId);
       }
     }
 
     RemoveEntityTag(entity);
     RemoveEntityGroups(entity);
 
-    UpdateProcessEntityRemovals_ReparentChildren(entity);
-
-    if (Collections::SwapAndPop(root_entities_, entity)) {
-      RemoveRootEntityFromSystems(entity);
-    }
-
+    Collections::SwapAndPop(root_entities_, entity);
     Collections::SwapAndPop(entities_, entity);
 
-    Logger::Info("Entity destroyed: " + std::to_string(entity.GetId()));
+    Logger::Info("Entity destroyed: " + std::to_string(entityId));
   }
 
   entities_to_remove_.clear();

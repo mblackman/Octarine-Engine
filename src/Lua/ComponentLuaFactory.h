@@ -21,6 +21,19 @@ inline glm::vec2 SafeGetVec2(const sol::table& parentTable, const std::string& k
   return result;
 }
 
+inline SDL_Color SafeGetColor(const sol::table& parentTable, const std::string& key, Uint8 defaultR = 0,
+                              Uint8 defaultG = 0, Uint8 defaultB = 0, Uint8 defaultA = 0) {
+  SDL_Color result = {defaultR, defaultG, defaultB, defaultA};
+  if (sol::optional<sol::table> vecTableOpt = parentTable[key]; vecTableOpt && vecTableOpt.value().valid()) {
+    sol::table& vecTable = vecTableOpt.value();
+    result.r = vecTable["r"].get_or(defaultR);
+    result.g = vecTable["g"].get_or(defaultG);
+    result.b = vecTable["b"].get_or(defaultB);
+    result.a = vecTable["a"].get_or(defaultA);
+  }
+  return result;
+}
+
 template <typename T>
 T SafeGetOptionalValue(const sol::table& dataTable, const std::string& key, T defaultValue) {
   return dataTable[key].get_or(defaultValue);
@@ -73,11 +86,7 @@ class ComponentLuaFactory {
     const auto layer = SafeGetOptionalValue<int>(data, "layer", 1);
     const auto width = SafeGetOptionalValue<float>(data, "width", 0.0f);
     const auto height = SafeGetOptionalValue<float>(data, "height", 0.0f);
-    const auto red = SafeGetOptionalValue<Uint8>(data, "r", Constants::kUnt8Max);
-    const auto green = SafeGetOptionalValue<Uint8>(data, "g", Constants::kUnt8Max);
-    const auto blue = SafeGetOptionalValue<Uint8>(data, "b", Constants::kUnt8Max);
-    const auto alpha = SafeGetOptionalValue<Uint8>(data, "a", Constants::kUnt8Max);
-    const SDL_Color color = {red, green, blue, alpha};
+    const SDL_Color color = SafeGetColor(data, "color");
     const auto fixed = SafeGetOptionalValue<bool>(data, "fixed", false);
     return SquarePrimitiveComponent(position, layer, width, height, color, fixed);
   }
@@ -127,8 +136,8 @@ class ComponentLuaFactory {
 
   static ScriptComponent CreateScriptComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;
-    const sol::protected_function updateFn = SafeGetProtectedFunction(data, "update_function");
-    const sol::protected_function onDebugGuiFn = SafeGetProtectedFunction(data, "on_debug_gui_function");
+    const sol::protected_function updateFn = SafeGetProtectedFunction(data, "on_update");
+    const sol::protected_function onDebugGuiFn = SafeGetProtectedFunction(data, "on_debug_gui");
     return ScriptComponent(updateFn, onDebugGuiFn);
   }
 
@@ -136,7 +145,18 @@ class ComponentLuaFactory {
     using namespace LuaComponentHelpers;
     const bool isActive = SafeGetOptionalValue<bool>(data, "is_active", true);
     const sol::optional<sol::table> btnTable = SafeGetOptionalTable(data, "button_table");
-    const sol::protected_function clickFn = SafeGetProtectedFunction(data, "click_function");
+    const sol::protected_function clickFn = SafeGetProtectedFunction(data, "on_click");
     return UIButtonComponent(isActive, btnTable, clickFn);
+  }
+
+  static TextLabelComponent CreateTextLabelComponent(const sol::table& data) {
+    using namespace LuaComponentHelpers;
+    const glm::vec2 offsetPosition = SafeGetVec2(data, "position");
+    const int layer = SafeGetOptionalValue<int>(data, "layer", 1);
+    const std::string text = data["text"].get<std::string>();
+    const std::string fontId = data["font_id"].get<std::string>();
+    const SDL_Color color = SafeGetColor(data, "color");
+    const bool isFixed = SafeGetOptionalValue<bool>(data, "is_fixed", true);
+    return TextLabelComponent(offsetPosition, layer, text, fontId, color, isFixed);
   }
 };

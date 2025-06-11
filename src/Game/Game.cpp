@@ -28,6 +28,7 @@
 #include "../Systems/RenderTextSystem.h"
 #include "../Systems/ScriptSystem.h"
 #include "../Systems/UIButtonSystem.h"
+#include "Systems/TransformSystem.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -150,6 +151,7 @@ void Game::Run() {
 }
 
 void Game::Setup() {
+  registry_->AddSystem<TransformSystem>();
   registry_->AddSystem<CameraFollowSystem>();
   registry_->AddSystem<ProjectileEmitSystem>();
   registry_->AddSystem<ProjectileLifecycleSystem>();
@@ -235,6 +237,7 @@ void Game::Update() {
 
   milliseconds_previous_frame_ = SDL_GetTicks();
 
+  registry_->GetSystem<TransformSystem>().Update();  // Important to update first as it updates global positions.
   registry_->GetSystem<MovementSystem>().Update(deltaTime);
   registry_->GetSystem<AnimationSystem>().Update(deltaTime);
   registry_->GetSystem<CollisionSystem>().Update(event_bus_);
