@@ -117,8 +117,8 @@ class ComponentLuaFactory {
     const glm::vec2 projectileVelocity = SafeGetVec2(data, "projectile_velocity");
     const int repeatFrequency =
         SafeGetOptionalValue<int>(data, "repeat_frequency", 5) * Constants::kMillisecondsPerSecond;
-    const int projectileDuration =
-        SafeGetOptionalValue<int>(data, "projectile_duration", 1) * Constants::kMillisecondsPerSecond;
+    const float projectileDuration =
+        SafeGetOptionalValue<float>(data, "projectile_duration", 1.0f) * Constants::kMillisecondsPerSecond;
     const int projectileDamage = SafeGetOptionalValue<int>(data, "hit_damage", 10);
     const bool isFriendly = SafeGetOptionalValue<bool>(data, "friendly", false);
 
