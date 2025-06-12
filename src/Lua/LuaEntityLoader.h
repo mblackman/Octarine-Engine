@@ -53,6 +53,19 @@ class LuaEntityLoader {
         continue;
       }
 
+      // Add tag and groups
+
+      const sol::optional<std::string> tag = currentData["tag"];
+      const sol::optional<std::string> group = currentData["group"];
+
+      if (tag.has_value() && !tag.value().empty()) {
+        entity.Tag(tag.value());
+      }
+
+      if (group.has_value() && !group.value().empty()) {
+        entity.Group(group.value());
+      }
+
       // Add all defined components to the entity
       const sol::table& componentsTable = componentsTableOpt.value();
       for (const auto& [name, data] : componentsTable) {
