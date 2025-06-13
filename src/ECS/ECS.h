@@ -13,7 +13,7 @@
 #include "../General/Logger.h"
 #include "../General/Pool.h"
 
-const unsigned int kMaxComponents = 32;
+constexpr unsigned int kMaxComponents = 32;
 
 // This used to track which components are present in an entity and which
 // entities a system is interested in.
