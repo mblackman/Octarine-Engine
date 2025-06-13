@@ -123,7 +123,7 @@ class ScriptSystem : public System {
   void Update(float deltaTime) {
     for (auto entity : GetEntities()) {
       if (auto &script = entity.GetComponent<ScriptComponent>(); script.updateFunction != sol::lua_nil) {
-        if (auto result = script.updateFunction(entity, deltaTime); !result.valid()) {
+        if (auto result = script.updateFunction(script.scriptTable, entity, deltaTime); !result.valid()) {
           sol::error err = result;
           std::string what = err.what();
           Logger::ErrorLua(what);
