@@ -171,6 +171,8 @@ class Registry {
   void UpdateAddEntities();
   void UpdateProcessParentAdditions();
   void UpdateProcessParentRemovals();
+  void GatherDescendantsForRemoval();
+  void DestroyEntity(const std::set<Entity>::value_type& entity);
   void UpdateProcessEntityRemovals();
 
  public:
