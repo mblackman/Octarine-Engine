@@ -21,6 +21,7 @@ class LuaEntityLoader {
   static void TagAndGroupEntity(const sol::table& currentData, const Entity& entity) {
     const sol::optional<std::string> tag = currentData["tag"];
     const sol::optional<std::string> group = currentData["group"];
+    const int entityMask = currentData["mask"].get_or(Constants::kDefaultEntityMask);
 
     if (tag.has_value() && !tag.value().empty()) {
       entity.Tag(tag.value());
@@ -29,6 +30,8 @@ class LuaEntityLoader {
     if (group.has_value() && !group.value().empty()) {
       entity.Group(group.value());
     }
+
+    entity.SetEntityMask(entityMask);
   }
 
   static void LoadEntityComponents(const sol::table& currentData, const Entity& entity) {

@@ -47,7 +47,6 @@ class MovementSystem : public System {
       const bool isPlayer = entity.HasTag("player");
 
       if (!isPlayer && IsEntityOutsideMap(entity)) {
-        Logger::Info("Entity went outside map " + std::to_string(entity.GetId()));
         entity.Blam();
       } else {
         transform.position.x += rigidBody.velocity.x * static_cast<float>(deltaTime);

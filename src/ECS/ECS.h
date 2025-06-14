@@ -13,11 +13,15 @@
 #include "../General/Logger.h"
 #include "../General/Pool.h"
 
-constexpr unsigned int kMaxComponents = 32;
+constexpr unsigned int kMaxComponents = 64;
+constexpr unsigned int kMaxEntityMasks = 32;
 
 // This used to track which components are present in an entity and which
 // entities a system is interested in.
 typedef std::bitset<kMaxComponents> Signature;
+
+// Used to determine which
+typedef std::bitset<kMaxEntityMasks> EntityMask;
 
 struct IComponent {
  protected:
@@ -73,6 +77,9 @@ class Entity {
   [[nodiscard]] bool HasTag(const std::string& tag) const;
   void Group(const std::string& group) const;
   [[nodiscard]] bool InGroup(const std::string& group) const;
+
+  void SetEntityMask(EntityMask entityMask) const;
+  [[nodiscard]] EntityMask GetEntityMask() const;
 
   void Blam() const;
 
@@ -138,6 +145,9 @@ class Registry {
   // Keeps track of the groups for each entity in both directions.
   std::unordered_map<std::string, std::set<Entity>> entities_by_groups_;
   std::unordered_map<int, std::set<std::string>> groups_by_entity_;
+
+  // Keeps track of the entity masks for each entity
+  std::unordered_map<int, EntityMask> entity_masks_;
 
   // Each pool at an index corresponds to a component type.
   // [Pool index = entity id]
@@ -213,6 +223,9 @@ class Registry {
   [[nodiscard]] std::vector<Entity> GetEntitiesByGroup(const std::string& group) const;
   void RemoveEntityGroup(const Entity& entity, const std::string& group);
   void RemoveEntityGroups(const Entity& entity);
+
+  void SetEntityMask(const Entity& entity, const EntityMask entityMask);
+  EntityMask GetEntityMask(const Entity& entity) const;
 
   // System management
   template <typename T, typename... TArgs>
@@ -341,7 +354,7 @@ void Registry::AddComponent(const Entity& entity, ComponentArg&& component) {
 
   entity_component_signatures_[entityId].set(componentId);
 
-  Logger::Info("Added component: " + std::to_string(componentId) + " to entity: " + std::to_string(entityId));
+  // Logger::Info("Added component: " + std::to_string(componentId) + " to entity: " + std::to_string(entityId));
 }
 
 template <typename T, typename... TArgs>
@@ -360,7 +373,7 @@ void Registry::RemoveComponent(const Entity& entity) {
   auto componentPool = std::static_pointer_cast<Pool<T>>(component_pools_[componentId]);
   componentPool->Remove(entityId);
 
-  Logger::Info("Removed component: " + std::to_string(entityId) + " from entity: " + std::to_string(entityId));
+  // Logger::Info("Removed component: " + std::to_string(entityId) + " from entity: " + std::to_string(entityId));
 }
 
 template <typename T>

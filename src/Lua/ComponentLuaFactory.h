@@ -103,7 +103,9 @@ class ComponentLuaFactory {
     const int width = SafeGetOptionalValue<int>(data, "width", 1);
     const int height = SafeGetOptionalValue<int>(data, "height", 1);
     const glm::vec2 offset = SafeGetVec2(data, "offset");
-    return BoxColliderComponent(width, height, offset);
+    const auto collisionMask = SafeGetOptionalValue<int>(data, "collision_mask", Constants::kDefaultEntityMask);
+    const auto entityMask = EntityMask(collisionMask);
+    return BoxColliderComponent(width, height, offset, entityMask);
   }
 
   static HealthComponent CreateHealthComponent(const sol::table& data) {
@@ -118,10 +120,11 @@ class ComponentLuaFactory {
     const auto repeatFrequency = SafeGetOptionalValue<float>(data, "repeat_frequency", 1.0f);
     const auto projectileDuration = SafeGetOptionalValue<float>(data, "projectile_duration", 1.0f);
     const int projectileDamage = SafeGetOptionalValue<int>(data, "hit_damage", 10);
-    const bool isFriendly = SafeGetOptionalValue<bool>(data, "friendly", false);
+    const auto collisionMask = SafeGetOptionalValue<int>(data, "collision_mask", Constants::kDefaultEntityMask);
+    const auto entityMask = EntityMask(collisionMask);
 
     return ProjectileEmitterComponent(projectileVelocity, projectileDuration, repeatFrequency, projectileDamage,
-                                      isFriendly);
+                                      entityMask);
   }
 
   static CameraFollowComponent CreateCameraFollowComponent(const sol::table& data) { return {}; }

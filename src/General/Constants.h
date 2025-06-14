@@ -9,4 +9,6 @@ static constexpr float kHalf = 2.0f;
 static constexpr Uint8 kUnt8Max = 255;
 static constexpr int kDefaultWindowWidth = 1280;
 static constexpr int kDefaultWindowHeight = 720;
+
+static constexpr int kDefaultEntityMask = 1;
 }  // namespace Constants
