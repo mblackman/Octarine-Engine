@@ -26,13 +26,13 @@ struct Box {
   float minX, minY;
   float maxX, maxY;
 
-  bool intersectsInDimension(const Box& other, const int dim) const {
+  [[nodiscard]] bool intersectsInDimension(const Box& other, const int dim) const {
     if (dim == 0) return !(maxX < other.minX || minX > other.maxX);
     if (dim == 1) return !(maxY < other.minY || minY > other.maxY);
     return false;  // Invalid dimension
   }
 
-  bool intersects(const Box& other) const {
+  [[nodiscard]] bool intersects(const Box& other) const {
     return !(collisionMask & other.entityMask).none() && intersectsInDimension(other, 0) &&
            intersectsInDimension(other, 1);
   }
@@ -131,7 +131,7 @@ class CollisionSystem : public System {
       for (size_t i = 0; i < boxes.size(); ++i) {
         for (size_t j = i + 1; j < boxes.size(); ++j) {
           if (boxes[i]->intersects(*boxes[j])) {
-            result.intersectingPairs.push_back({boxes[i]->entity, boxes[j]->entity});
+            result.intersectingPairs.emplace_back(boxes[i]->entity, boxes[j]->entity);
           }
         }
       }
@@ -198,12 +198,12 @@ class CollisionSystem : public System {
     for (const auto* spanBox : spanningBoxes) {
       for (const auto* otherBox : leftPartition) {
         if (spanBox->intersects(*otherBox)) {
-          result.intersectingPairs.push_back({spanBox->entity, otherBox->entity});
+          result.intersectingPairs.emplace_back(spanBox->entity, otherBox->entity);
         }
       }
       for (const auto* otherBox : rightPartition) {
         if (spanBox->intersects(*otherBox)) {
-          result.intersectingPairs.push_back({spanBox->entity, otherBox->entity});
+          result.intersectingPairs.emplace_back(spanBox->entity, otherBox->entity);
         }
       }
     }
