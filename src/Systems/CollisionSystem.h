@@ -50,6 +50,12 @@ struct BoxConstructionData {
   BoxColliderComponent collider;
 };
 
+struct Partitions {
+  std::vector<const Box*> left;
+  std::vector<const Box*> right;
+  std::vector<const Box*> spanning;
+};
+
 class CollisionSystem : public System {
  public:
   CollisionSystem() {
@@ -122,19 +128,67 @@ class CollisionSystem : public System {
     });
   }
 
+  void find_intersections_brute_force(const std::vector<const Box*>& boxes, CollisionResult& result) const {
+    for (size_t i = 0; i < boxes.size(); ++i) {
+      for (size_t j = i + 1; j < boxes.size(); ++j) {
+        if (boxes[i]->intersects(*boxes[j])) {
+          result.intersectingPairs.emplace_back(boxes[i]->entity, boxes[j]->entity);
+        }
+      }
+    }
+  }
+
+  [[nodiscard]] Partitions partition_boxes(const int currentDimension, const std::vector<const Box*>& sortedBoxes,
+                                           const float medianValue) const {
+    Partitions p;
+
+    for (const auto* box : sortedBoxes) {
+      bool touchesLeftSide = false;
+      bool touchesRightSide = false;
+
+      if (currentDimension == 0) {
+        touchesLeftSide = box->minX <= medianValue;
+        touchesRightSide = box->maxX >= medianValue;
+      } else {
+        touchesLeftSide = box->minY <= medianValue;
+        touchesRightSide = box->maxY >= medianValue;
+      }
+
+      if (touchesLeftSide && touchesRightSide) {
+        p.spanning.push_back(box);
+      } else if (touchesLeftSide) {
+        p.left.push_back(box);
+      } else {
+        p.right.push_back(box);
+      }
+    }
+
+    return p;
+  }
+
+  void check_spanning_vs_partitions(CollisionResult& result, const Partitions& p) const {
+    for (const auto* spanBox : p.spanning) {
+      for (const auto* otherBox : p.left) {
+        if (spanBox->intersects(*otherBox)) {
+          result.intersectingPairs.emplace_back(spanBox->entity, otherBox->entity);
+        }
+      }
+      for (const auto* otherBox : p.right) {
+        if (spanBox->intersects(*otherBox)) {
+          result.intersectingPairs.emplace_back(spanBox->entity, otherBox->entity);
+        }
+      }
+    }
+  }
+
+  // NOLINTNEXTLINE(misc-no-recursion)
   CollisionResult find_intersections_recursive(const std::vector<const Box*>& boxes, int currentDimension,
                                                const int currentDepth) {
     CollisionResult result;
 
     if (boxes.size() < kMinScanThreshold || currentDepth >= kMaxRecursionDepth) {
-      // Perform a simple brute-force check for remaining boxes in this sub-problem
-      for (size_t i = 0; i < boxes.size(); ++i) {
-        for (size_t j = i + 1; j < boxes.size(); ++j) {
-          if (boxes[i]->intersects(*boxes[j])) {
-            result.intersectingPairs.emplace_back(boxes[i]->entity, boxes[j]->entity);
-          }
-        }
-      }
+      // Perform a simple brute-force check for remaining boxes in this subproblems
+      find_intersections_brute_force(boxes, result);
       return result;
     }
 
@@ -151,62 +205,28 @@ class CollisionSystem : public System {
 
     // Find a "median" point for partitioning, akin to ApproxMedian.
     const Box* median_box = sortedBoxes[sortedBoxes.size() / 2];
-    const float medianValue = (currentDimension == 0) ? median_box->minX : median_box->minY;
+    const float medianValue = currentDimension == 0 ? median_box->minX : median_box->minY;
 
     // Divide boxes into sub-partitions: left, right, and spanning the median.
-    std::vector<const Box*> leftPartition;
-    std::vector<const Box*> rightPartition;
-    std::vector<const Box*> spanningBoxes;
-
-    for (const auto* box : sortedBoxes) {
-      bool touchesLeftSide = false;
-      bool touchesRightSide = false;
-
-      if (currentDimension == 0) {
-        touchesLeftSide = box->minX <= medianValue;
-        touchesRightSide = box->maxX >= medianValue;
-      } else {
-        touchesLeftSide = box->minY <= medianValue;
-        touchesRightSide = box->maxY >= medianValue;
-      }
-
-      if (touchesLeftSide && touchesRightSide) {
-        spanningBoxes.push_back(box);
-      } else if (touchesLeftSide) {
-        leftPartition.push_back(box);
-      } else {
-        rightPartition.push_back(box);
-      }
-    }
+    const Partitions p = partition_boxes(currentDimension, sortedBoxes, medianValue);
 
     // Recurse for intersections within the spanning boxes (next dimension)
     CollisionResult spanningResults =
-        find_intersections_recursive(spanningBoxes, (currentDimension + 1) % kMaxDimensions, currentDepth + 1);
+        find_intersections_recursive(p.spanning, (currentDimension + 1) % kMaxDimensions, currentDepth + 1);
     result.intersectingPairs.insert(result.intersectingPairs.end(), spanningResults.intersectingPairs.begin(),
                                     spanningResults.intersectingPairs.end());
 
     // Recurse for intersections within left and right partitions (same dimension, narrower range)
-    CollisionResult leftResults = find_intersections_recursive(leftPartition, currentDimension, currentDepth + 1);
+    CollisionResult leftResults = find_intersections_recursive(p.left, currentDimension, currentDepth + 1);
     result.intersectingPairs.insert(result.intersectingPairs.end(), leftResults.intersectingPairs.begin(),
                                     leftResults.intersectingPairs.end());
 
-    CollisionResult rightResults = find_intersections_recursive(rightPartition, currentDimension, currentDepth + 1);
+    CollisionResult rightResults = find_intersections_recursive(p.right, currentDimension, currentDepth + 1);
     result.intersectingPairs.insert(result.intersectingPairs.end(), rightResults.intersectingPairs.begin(),
                                     rightResults.intersectingPairs.end());
 
     // Find intersections between spanning boxes and non-spanning boxes at the current level.
-    for (const auto* spanBox : spanningBoxes) {
-      for (const auto* otherBox : leftPartition) {
-        if (spanBox->intersects(*otherBox)) {
-          result.intersectingPairs.emplace_back(spanBox->entity, otherBox->entity);
-        }
-      }
-      for (const auto* otherBox : rightPartition) {
-        if (spanBox->intersects(*otherBox)) {
-          result.intersectingPairs.emplace_back(spanBox->entity, otherBox->entity);
-        }
-      }
-    }
+    check_spanning_vs_partitions(result, p);
 
     return result;
   }
