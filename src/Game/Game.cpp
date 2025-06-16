@@ -138,8 +138,9 @@ void Game::Run() {
 
   while (s_is_running_) {
     ProcessInput();
-    Update();
-    Render();
+    const float deltaTime = WaitTime();
+    Update(deltaTime);
+    Render(deltaTime);
   }
 }
 
@@ -206,14 +207,7 @@ void Game::ProcessInput() const {
   }
 }
 
-void Game::Update() {
-  // If we are too fast, waste some time until we reach the frame time
-  const Uint64 elapsedTime = SDL_GetTicks() - milliseconds_previous_frame_;
-  if (elapsedTime < Constants::kMillisecondsPerFrame) {
-    const Uint32 timeToWait = Constants::kMillisecondsPerFrame - static_cast<Uint32>(elapsedTime);
-    SDL_Delay(timeToWait);
-  }
-
+void Game::Update(const float deltaTime) {
   // Subscribe to events
   event_bus_->Reset();
   registry_->GetSystem<DamageSystem>().SubscribeToEvents(event_bus_);
@@ -224,13 +218,7 @@ void Game::Update() {
   registry_->GetSystem<ScriptSystem>().SubscribeToEvents(event_bus_);
   SubscribeToEvents(event_bus_);
 
-  // Calculate delta time
-  const auto intermediate = static_cast<double>(SDL_GetTicks() - milliseconds_previous_frame_) /
-                            static_cast<double>(Constants::kMillisecondsPerSecond);
-  const auto deltaTime = static_cast<float>(intermediate);
-
-  milliseconds_previous_frame_ = SDL_GetTicks();
-
+  // Update our systems and registry
   registry_->GetSystem<TransformSystem>().Update();  // Important to update first as it updates global positions.
   registry_->GetSystem<MovementSystem>().Update(deltaTime);
   registry_->GetSystem<AnimationSystem>().Update(deltaTime);
@@ -244,7 +232,7 @@ void Game::Update() {
   registry_->Update();
 }
 
-void Game::Render() {
+void Game::Render(const float deltaTime) {
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
   SDL_RenderClear(sdl_renderer_);
 
@@ -256,13 +244,31 @@ void Game::Render() {
 
   render_queue_.Sort();
   renderer_->Render(render_queue_, sdl_renderer_, camera_, asset_manager_);
-  registry_->GetSystem<RenderDebugGUISystem>().Update(sdl_renderer_);
 
   if (GameConfig::GetInstance().GetEngineOptions().drawColliders) {
     registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
   }
 
+  registry_->GetSystem<RenderDebugGUISystem>().Update(deltaTime, sdl_renderer_);
+
   SDL_RenderPresent(sdl_renderer_);
+}
+
+float Game::WaitTime() {
+  const Uint64 elapsedTime = SDL_GetTicks() - milliseconds_previous_frame_;
+  if (elapsedTime < Constants::kMillisecondsPerFrame) {
+    const Uint32 timeToWait = Constants::kMillisecondsPerFrame - static_cast<Uint32>(elapsedTime);
+    SDL_Delay(timeToWait);
+  }
+
+  // Calculate delta time
+  const auto intermediate = static_cast<double>(SDL_GetTicks() - milliseconds_previous_frame_) /
+                            static_cast<double>(Constants::kMillisecondsPerSecond);
+  const auto deltaTime = static_cast<float>(intermediate);
+
+  milliseconds_previous_frame_ = SDL_GetTicks();
+
+  return deltaTime;
 }
 
 void Game::SubscribeToEvents(const std::unique_ptr<EventBus> &eventBus) {

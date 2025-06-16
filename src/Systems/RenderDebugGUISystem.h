@@ -20,8 +20,9 @@ class RenderDebugGUISystem : public System {
 
   ~RenderDebugGUISystem() = default;
 
-  void Update(SDL_Renderer* renderer) const {
-    if (!GameConfig::GetInstance().GetEngineOptions().showDebugGUI) {
+  void Update(const float deltaTime, SDL_Renderer* renderer) const {
+    if (!GameConfig::GetInstance().GetEngineOptions().showDebugGUI &&
+        !GameConfig::GetInstance().GetEngineOptions().showFpsCounter) {
       return;
     }
 
@@ -29,20 +30,43 @@ class RenderDebugGUISystem : public System {
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
-    if (GameConfig::GetInstance().GetEngineOptions().showImGuiDemoWindow) {
-      ImGui::ShowDemoWindow();
+    if (GameConfig::GetInstance().GetEngineOptions().showFpsCounter) {
+      FPSWindow(deltaTime);
     }
+    if (GameConfig::GetInstance().GetEngineOptions().showDebugGUI) {
+      EngineOptionsWindow();
 
-    for (auto entity : GetEntities()) {
-      if (auto& script = entity.GetComponent<ScriptComponent>(); script.onDebugGUIFunction != sol::lua_nil) {
-        if (auto result = script.onDebugGUIFunction(script.scriptTable, entity); !result.valid()) {
-          sol::error err = result;
-          std::string what = err.what();
-          Logger::ErrorLua(what);
+      if (GameConfig::GetInstance().GetEngineOptions().showImGuiDemoWindow) {
+        ImGui::ShowDemoWindow();
+      }
+
+      for (auto entity : GetEntities()) {
+        if (auto& script = entity.GetComponent<ScriptComponent>(); script.onDebugGUIFunction != sol::lua_nil) {
+          if (auto result = script.onDebugGUIFunction(script.scriptTable, entity); !result.valid()) {
+            sol::error err = result;
+            std::string what = err.what();
+            Logger::ErrorLua(what);
+          }
         }
       }
     }
+
     ImGui::Render();
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+  }
+
+ private:
+  void EngineOptionsWindow() const {
+    ImGui::Begin("Engine Options");
+    ImGui::Checkbox("Show ImGui Demo Window", &GameConfig::GetInstance().GetEngineOptions().showImGuiDemoWindow);
+    ImGui::Checkbox("Show FPS Counter", &GameConfig::GetInstance().GetEngineOptions().showFpsCounter);
+    ImGui::Checkbox("Draw Colliders", &GameConfig::GetInstance().GetEngineOptions().drawColliders);
+    ImGui::End();
+  }
+
+  void FPSWindow(const float deltaTime) const {
+    ImGui::Begin("FPS");
+    ImGui::Text("FPS: %.2f", 1.0f / deltaTime);
+    ImGui::End();
   }
 };
