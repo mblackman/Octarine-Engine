@@ -11,7 +11,6 @@
 #include "../Events/KeyInputEvent.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
-#include "GameConfig.h"
 
 class Game {
  public:
@@ -36,11 +35,6 @@ class Game {
 
   [[nodiscard]] Registry* GetRegistry() const { return registry_.get(); }
 
-  static int windowWidth;
-  static int windowHeight;
-  static float mapWidth;
-  static float mapHeight;
-
  private:
   void ProcessInput() const;
   void Update();
@@ -54,7 +48,6 @@ class Game {
   SDL_Renderer* sdl_renderer_;
   SDL_FRect camera_;
   static inline bool s_is_running_{false};
-  bool show_colliders_;
   Uint64 milliseconds_previous_frame_ = 0;
 
   sol::state lua;
@@ -62,6 +55,5 @@ class Game {
   std::unique_ptr<AssetManager> asset_manager_;
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
-  std::unique_ptr<GameConfig> game_config_;
   RenderQueue render_queue_;
 };

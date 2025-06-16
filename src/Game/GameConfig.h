@@ -1,17 +1,19 @@
 #pragma once
 
-#include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
 
+#include "EngineOptions.h"
 #include "General/Constants.h"
 #include "General/Logger.h"
 
 class GameConfig {
  public:
-  GameConfig() = default;
+  static GameConfig& GetInstance() {
+    static GameConfig instance;
+    return instance;
+  }
 
   GameConfig(const GameConfig&) = delete;
   GameConfig& operator=(const GameConfig&) = delete;
@@ -19,11 +21,12 @@ class GameConfig {
   GameConfig(GameConfig&&) = delete;
   GameConfig& operator=(GameConfig&&) = delete;
 
-  ~GameConfig() = default;
-
   bool LoadConfig(const std::unordered_map<std::string, std::string>& settings);
 
   bool LoadConfigFromFile(const std::string& assetPath);
+
+  [[nodiscard]] const EngineOptions& GetEngineOptions() const;
+  [[nodiscard]] EngineOptions& GetEngineOptions();
 
   [[nodiscard]] std::string GetAssetPath() const;
   [[nodiscard]] std::string GetGameTitle() const;
@@ -32,7 +35,15 @@ class GameConfig {
   [[nodiscard]] int GetDefaultWidth() const;
   [[nodiscard]] int GetDefaultHeight() const;
 
+  int windowWidth{};
+  int windowHeight{};
+  float playableAreaWidth{};
+  float playableAreaHeight{};
+
  private:
+  GameConfig() = default;
+  ~GameConfig() = default;
+
   template <typename T>
   bool SetValue(const std::unordered_map<std::string, std::string>& config, const std::string& key,
                 void (GameConfig::*setter)(T), const std::function<T(const std::string&)>& converter,
@@ -85,9 +96,9 @@ class GameConfig {
   void SetDefaultWidth(int defaultWidth);
   void SetDefaultHeight(int defaultHeight);
 
-  static std::unique_ptr<GameConfig> instance_;
-  static std::once_flag once_flag_;
+  bool has_loaded_config_ = false;
 
+  EngineOptions engine_options_;
   std::string asset_path_;
   std::string game_title_;
   std::string startup_script_;

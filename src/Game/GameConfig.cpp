@@ -99,6 +99,7 @@ bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
 
   // Create the instance and populate it with the config settings
   SetAssetPath(assetPath);
+  has_loaded_config_ = true;
   return LoadConfig(config);
 }
 
@@ -114,16 +115,38 @@ bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string> &
   return success;
 }
 
-std::string GameConfig::GetAssetPath() const { return asset_path_; }
+const EngineOptions &GameConfig::GetEngineOptions() const { return engine_options_; }
 
-std::string GameConfig::GetGameTitle() const { return game_title_; }
+EngineOptions &GameConfig::GetEngineOptions() { return engine_options_; }
 
-std::string GameConfig::GetStartupScript() const { return startup_script_; }
+std::string GameConfig::GetAssetPath() const {
+  assert(has_loaded_config_);
+  return asset_path_;
+}
 
-std::optional<std::string> GameConfig::GetDefaultScaleMode() const { return default_scaling_mode_; }
+std::string GameConfig::GetGameTitle() const {
+  assert(has_loaded_config_);
+  return game_title_;
+}
 
-int GameConfig::GetDefaultWidth() const { return default_width_; }
-int GameConfig::GetDefaultHeight() const { return default_height_; }
+std::string GameConfig::GetStartupScript() const {
+  assert(has_loaded_config_);
+  return startup_script_;
+}
+
+std::optional<std::string> GameConfig::GetDefaultScaleMode() const {
+  assert(has_loaded_config_);
+  return default_scaling_mode_;
+}
+
+int GameConfig::GetDefaultWidth() const {
+  assert(has_loaded_config_);
+  return default_width_;
+}
+int GameConfig::GetDefaultHeight() const {
+  assert(has_loaded_config_);
+  return default_height_;
+}
 
 void GameConfig::SetAssetPath(const std::string &assetPath) {
   if (assetPath.empty()) {

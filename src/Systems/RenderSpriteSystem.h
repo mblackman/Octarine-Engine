@@ -34,10 +34,12 @@ class RenderSpriteSystem : public System {
       bool isOutsideCamera = false;
 
       if (sprite.isFixed) {
+        const auto windowWidth = static_cast<float>(GameConfig::GetInstance().windowWidth);
+        const auto windowHeight = static_cast<float>(GameConfig::GetInstance().windowHeight);
         isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < 0 ||
-                          transform.globalPosition.x > static_cast<float>(Game::windowWidth) ||
+                          transform.globalPosition.x > windowWidth ||
                           transform.globalPosition.y + sprite.height * transform.globalScale.y < 0 ||
-                          transform.globalPosition.y > static_cast<float>(Game::windowHeight);
+                          transform.globalPosition.y > windowHeight;
       } else {
         isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < camera.x ||
                           transform.globalPosition.x > camera.x + camera.w ||

@@ -21,10 +21,17 @@ class RenderDebugGUISystem : public System {
   ~RenderDebugGUISystem() = default;
 
   void Update(SDL_Renderer* renderer) const {
+    if (!GameConfig::GetInstance().GetEngineOptions().showDebugGUI) {
+      return;
+    }
+
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
-    ImGui::ShowDemoWindow();
+
+    if (GameConfig::GetInstance().GetEngineOptions().showImGuiDemoWindow) {
+      ImGui::ShowDemoWindow();
+    }
 
     for (auto entity : GetEntities()) {
       if (auto& script = entity.GetComponent<ScriptComponent>(); script.onDebugGUIFunction != sol::lua_nil) {

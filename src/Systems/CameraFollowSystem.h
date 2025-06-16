@@ -5,6 +5,7 @@
 #include "../Components/CameraFollowComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
+#include "Game/GameConfig.h"
 #include "General/Constants.h"
 
 class CameraFollowSystem : public System {
@@ -18,12 +19,12 @@ class CameraFollowSystem : public System {
     for (auto entity : GetEntities()) {
       const auto transform = entity.GetComponent<TransformComponent>();
 
-      if (transform.position.x + camera.w / Constants::kHalf < Game::mapWidth) {
-        camera.x = transform.position.x - static_cast<float>(Game::windowWidth) / Constants::kHalf;
+      if (transform.position.x + camera.w / Constants::kHalf < GameConfig::GetInstance().playableAreaWidth) {
+        camera.x = transform.position.x - static_cast<float>(GameConfig::GetInstance().windowWidth) / Constants::kHalf;
       }
 
-      if (transform.position.y + camera.h / Constants::kHalf < Game::mapHeight) {
-        camera.y = transform.position.y - static_cast<float>(Game::windowHeight) / Constants::kHalf;
+      if (transform.position.y + camera.h / Constants::kHalf < GameConfig::GetInstance().playableAreaHeight) {
+        camera.y = transform.position.y - static_cast<float>(GameConfig::GetInstance().windowHeight) / Constants::kHalf;
       }
 
       camera.x = std::max(0.0f, camera.x);

@@ -9,13 +9,6 @@
 #include "../Game/GameConfig.h"
 #include "../General/Logger.h"
 
-void AssetManager::SetGameConfig(const GameConfig &gameConfig) {
-  if (const auto scaleMode = gameConfig.GetDefaultScaleMode(); scaleMode.has_value()) {
-    SetDefaultScaleMode(scaleMode.value());
-  }
-  base_path_ = gameConfig.GetAssetPath();
-}
-
 AssetManager::~AssetManager() { ClearAssets(); }
 
 void AssetManager::ClearAssets() {
@@ -37,6 +30,10 @@ void AssetManager::AddTexture(SDL_Renderer *renderer, const std::string &assetId
   if (!texture) {
     Logger::Error("Failed to create texture: " + std::string(SDL_GetError()));
     return;
+  }
+
+  if (!default_scale_mode_.has_value() && GameConfig::GetInstance().GetDefaultScaleMode().has_value()) {
+    SetDefaultScaleMode(GameConfig::GetInstance().GetDefaultScaleMode().value());
   }
 
   if (default_scale_mode_.has_value()) {
@@ -61,7 +58,7 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
 TTF_Font *AssetManager::GetFont(const std::string &assetId) const { return fonts_.at(assetId); }
 
 std::string AssetManager::GetFullPath(const std::string &relativePath) const {
-  const std::filesystem::path basePath = base_path_;
+  const std::filesystem::path basePath = GameConfig::GetInstance().GetAssetPath();
   const std::filesystem::path assetPath = basePath / relativePath;
   return assetPath.string();
 }
