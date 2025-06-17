@@ -45,14 +45,6 @@ struct CollisionResult {
   std::vector<std::pair<Entity, Entity>> intersectingPairs;
 };
 
-struct BoxConstructionData {
-  Entity entity;
-  EntityMask entityMask;
-  EntityMask collisionMask;
-  TransformComponent transform;
-  BoxColliderComponent collider;
-};
-
 struct Partitions {
   int leftEnd;
   int rightStart;
@@ -78,50 +70,49 @@ class CollisionSystem : public System {
 
     if (collisionResult_.valid() &&
         collisionResult_.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
-      // Future is still running.
       return;
     }
 
     if (collisionResult_.valid()) {
-      // Future is done.
       const auto [intersecting_pairs] = collisionResult_.get();
       for (const auto& [fst, snd] : intersecting_pairs) {
         eventBus->EmitEvent<CollisionEvent>(fst, snd);
       }
     }
 
-    std::vector<BoxConstructionData> boxes;
-
-    for (auto entity : GetEntities()) {
-      const auto& transform = entity.GetComponent<TransformComponent>();
-      const auto& collider = entity.GetComponent<BoxColliderComponent>();
-      boxes.emplace_back(entity, entity.GetEntityMask(), collider.collisionMask, transform, collider);
-    }
-
-    if (boxes.empty()) {
+    const auto entities = GetEntities();
+    if (entities.empty()) {
       return;
     }
+
+    // TODO speed up box creation more!
+    std::vector<Box> boxes;
+    boxes.reserve(entities.size());
+
+    for (auto entity : entities) {
+      const auto& transform = entity.GetComponent<TransformComponent>();
+      const auto& collider = entity.GetComponent<BoxColliderComponent>();
+
+      boxes.emplace_back(entity, entity.GetEntityMask(), collider.collisionMask, transform.position.x,
+                         transform.position.y,
+                         transform.position.x + static_cast<float>(collider.width) * transform.scale.x,
+                         transform.position.y + static_cast<float>(collider.height) * transform.scale.y);
+    }
+
     collisionResult_ = start_async_collision_detection(std::move(boxes));
   }
 
  private:
   std::future<CollisionResult> collisionResult_;
 
-  std::future<CollisionResult> start_async_collision_detection(std::vector<BoxConstructionData> constructionData) {
-    return std::async(std::launch::async, [constructionData = std::move(constructionData), this]() -> CollisionResult {
-      AGGREGATE_PROFILE_SESSION;
-      PROFILE_NAMED_SCOPE("Async Box Creation");
-      std::vector<Box> boxes;
+  std::future<CollisionResult> start_async_collision_detection(std::vector<Box> boxes) {
+    return std::async(std::launch::async, [boxes = std::move(boxes), this]() mutable -> CollisionResult {
+      AGGREGATE_PROFILE_SESSION("Async Box Creation");
       std::vector<std::pair<Entity, Entity>> intersectingPairs;
 
-      boxes.reserve(constructionData.size());
-      for (const auto& [entity, entityMask, collisionMask, transform, collider] : constructionData) {
-        boxes.emplace_back(entity, entityMask, collisionMask, transform.position.x, transform.position.y,
-                           transform.position.x + static_cast<float>(collider.width) * transform.scale.x,
-                           transform.position.y + static_cast<float>(collider.height) * transform.scale.y);
+      if (!boxes.empty()) {
+        find_intersections_recursive(boxes, 0, static_cast<int>(boxes.size()), 0, 0, intersectingPairs);
       }
-
-      find_intersections_recursive(boxes, 0, static_cast<int>(boxes.size()), 0, 0, intersectingPairs);
       return CollisionResult{intersectingPairs};
     });
   }
