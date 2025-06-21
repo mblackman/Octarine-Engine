@@ -29,6 +29,13 @@ ComponentTypeID GetComponentTypeID() {
   return typeID;
 }
 
+template <typename... TComponents>
+Signature GetSignature() {
+  Signature signature;
+  (signature.set(GetComponentTypeID<TComponents>()), ...);
+  return signature;
+}
+
 class Archetype;
 
 struct ChunkHeader {
@@ -36,10 +43,10 @@ struct ChunkHeader {
 };
 
 struct ComponentInfo {
-  ComponentTypeID id;
+  ComponentTypeID id{};
   std::string name;
-  size_t size;
-  size_t alignment;
+  size_t size{};
+  size_t alignment{};
 };
 
 struct EntityLocation {
@@ -49,8 +56,8 @@ struct EntityLocation {
 };
 
 struct ArchetypeEdge {
-  Archetype& add;
-  Archetype& remove;
+  Archetype* add;
+  Archetype* remove;
 };
 
 class ComponentRegistry {
@@ -59,39 +66,60 @@ class ComponentRegistry {
   void RegisterComponent() {
     const ComponentTypeID id = GetComponentTypeID<T>();
 
-    if (id >= m_component_infos.size()) {
-      m_component_infos.resize(id + 1);
+    if (id >= component_infos_.size()) {
+      component_infos_.resize(id + 1);
+    } else if (component_infos_[id].id != 0) {
+      return;
     }
 
-    m_component_infos[id] = {.id = id, .name = "TODO", .size = sizeof(T), .alignment = alignof(T)};
+    component_infos_[id] = {.id = id, .name = "TODO", .size = sizeof(T), .alignment = alignof(T)};
   }
 
-  const ComponentInfo& GetInfo(const ComponentTypeID id) const { return m_component_infos[id]; }
+  [[nodiscard]] const ComponentInfo& GetInfo(const ComponentTypeID id) const { return component_infos_[id]; }
 
  private:
-  std::vector<ComponentInfo> m_component_infos;
+  std::vector<ComponentInfo> component_infos_;
 };
 
 inline size_t usableSpace = kChunkSize - sizeof(ChunkHeader);
 
 class Chunk {
  public:
-  explicit Chunk() : header_() { buffer_ = new unsigned char[usableSpace]; }
+  explicit Chunk() : header_(), buffer_(new unsigned char[usableSpace]) { header_.entity_count = 0; }
 
-  ~Chunk() { delete buffer_; }
+  ~Chunk() { delete[] buffer_; }
 
-  void* GetComponentArray(const size_t offset) const {
-    assert(offset < usableSpace);
-    assert(offset > 0);
+  Chunk(Chunk&& other) noexcept : header_(other.header_), buffer_(other.buffer_) {
+    other.buffer_ = nullptr;
+    other.header_.entity_count = 0;
+  }
+
+  Chunk& operator=(Chunk&& other) noexcept {
+    if (this != &other) {
+      delete[] buffer_;
+      header_ = other.header_;
+      buffer_ = other.buffer_;
+      other.buffer_ = nullptr;
+      other.header_.entity_count = 0;
+    }
+    return *this;
+  }
+
+  Chunk(const Chunk&) = delete;
+  Chunk& operator=(const Chunk&) = delete;
+
+  [[nodiscard]] void* GetComponentArray(const size_t offset) const {
+    assert(offset > 0 && offset < usableSpace);
     return buffer_ + offset;
   }
 
-  size_t GetEntityCount() const { return header_.entity_count; }
+  [[nodiscard]] size_t GetEntityCount() const { return header_.entity_count; }
+
+  [[nodiscard]] const Entity* GetEntityArray() const { return reinterpret_cast<const Entity*>(buffer_); }
 
   template <typename T>
   void AddComponent(const T& component, const size_t offset, const size_t index) {
-    assert(offset < usableSpace);
-    assert(offset > 0);
+    assert(offset > 0 && offset < usableSpace);
     assert(index < header_.entity_count);
     memcpy(buffer_ + offset + index * sizeof(T), &component, sizeof(T));
   }
@@ -101,16 +129,26 @@ class Chunk {
     header_.entity_count++;
   }
 
-  void RemoveEntity(const size_t index, const std::vector<size_t>& componentOffset,
-                    const std::vector<ComponentInfo>& componentInfo) {
-    assert(componentOffset.size() == componentInfo.size());
-    const int lastIndex = header_.entity_count - 1;
-    std::swap(buffer_[index * sizeof(Entity)], buffer_[lastIndex * sizeof(Entity)]);
+  void RemoveEntity(const size_t index, const std::vector<size_t>& componentOffsets,
+                    const std::vector<ComponentInfo>& componentInfos) {
+    assert(componentOffsets.size() == componentInfos.size());
+    const size_t lastIndex = header_.entity_count - 1;
+    if (index >= header_.entity_count) return;  // Bounds check
 
-    for (size_t i = 0; i < componentOffset.size(); ++i) {
-      const auto& info = componentInfo[i];
-      const auto offset = componentOffset[i];
-      std::swap(buffer_[offset + index * info.size], buffer_[offset + lastIndex * info.size]);
+    if (index != lastIndex) {
+      auto* entity_array = reinterpret_cast<Entity*>(buffer_);
+
+      entity_array[index] = entity_array[lastIndex];
+
+      for (size_t i = 0; i < componentOffsets.size(); ++i) {
+        const auto& info = componentInfos[i];
+        const auto offset = componentOffsets[i];
+
+        unsigned char* dest_ptr = buffer_ + offset + index * info.size;
+        const unsigned char* source_ptr = buffer_ + offset + lastIndex * info.size;
+
+        memcpy(dest_ptr, source_ptr, info.size);
+      }
     }
 
     header_.entity_count--;
@@ -124,12 +162,12 @@ class Chunk {
 class Archetype {
  public:
   explicit Archetype(const Signature signature, const ComponentRegistry& componentRegistry)
-      : signature_(signature), chunk_capacity_(0) {
+      : edges(), signature_(signature), chunk_capacity_(0) {
     component_infos_.reserve(signature.count());
 
     for (size_t i = 0; i < signature.size(); ++i) {
       if (signature.test(i)) {
-        const auto componentInfo = componentRegistry.GetInfo(i);
+        const auto& componentInfo = componentRegistry.GetInfo(i);
         component_infos_.emplace_back(componentInfo);
       }
     }
@@ -141,11 +179,11 @@ class Archetype {
     CalculateLayout();
   }
 
-  const Signature& GetSignature() const { return signature_; }
+  [[nodiscard]] const Signature& GetSignature() const { return signature_; }
 
   EntityLocation AddEntity(const Entity entity) {
     size_t index = 0;
-    for (auto chunk : chunks_) {
+    for (auto& chunk : chunks_) {
       if (chunk.GetEntityCount() < chunk_capacity_) {
         chunk.AddEntity(entity);
         return {this, index, chunk.GetEntityCount() - 1};
@@ -154,8 +192,8 @@ class Archetype {
     }
 
     Chunk newChunk;
-    newChunk.AddEntity(entity);
     chunks_.emplace_back(std::move(newChunk));
+    chunks_.back().AddEntity(entity);
     return {this, index, 0};
   }
 
@@ -185,21 +223,48 @@ class Archetype {
 
   void CopyComponents(const EntityLocation& sourceLocation, const EntityLocation& destinationLocation) const {
     assert(sourceLocation.archetype != this);
-    assert((sourceLocation.archetype->signature_ & this->signature_) == sourceLocation.archetype->signature_);
+    const auto& source_sig = sourceLocation.archetype->GetSignature();
+    assert((this->signature_ & source_sig) == source_sig);
 
-    const auto sourceChunk = sourceLocation.archetype->chunks_[sourceLocation.chunkIndex];
-    const auto destChunk = chunks_[destinationLocation.chunkIndex];
+    const auto& sourceChunk = sourceLocation.archetype->chunks_[sourceLocation.chunkIndex];
+    auto& destChunk = chunks_[destinationLocation.chunkIndex];  // Note: destChunk should not be const
 
-    for (const ComponentTypeID id : sourceLocation.archetype->GetSignature()) {
-      const auto sourceTypeIndex = sourceLocation.archetype->component_type_to_index_.at(id);
-      const auto destTypeIndex = component_type_to_index_.at(id);
-      const auto info = component_infos_[destTypeIndex];
-      const auto sourceArray =
-          sourceChunk.GetComponentArray(sourceLocation.archetype->component_offsets_[sourceTypeIndex]);
-      const auto destArray = destChunk.GetComponentArray(component_offsets_[destTypeIndex]);
+    for (size_t id = 0; id < source_sig.size(); ++id) {
+      if (source_sig.test(id)) {
+        const auto sourceTypeIndex = sourceLocation.archetype->component_type_to_index_.at(id);
+        const auto destTypeIndex = this->component_type_to_index_.at(id);
+        const auto& info = this->component_infos_[destTypeIndex];
 
-      memcpy(destArray + destinationLocation.indexInChunk * info.size,
-             sourceArray + sourceLocation.indexInChunk * info.size, info.size);
+        const void* sourceArray =
+            sourceChunk.GetComponentArray(sourceLocation.archetype->component_offsets_[sourceTypeIndex]);
+        void* destArray = destChunk.GetComponentArray(this->component_offsets_[destTypeIndex]);
+
+        const unsigned char* source_component_ptr =
+            static_cast<const unsigned char*>(sourceArray) + sourceLocation.indexInChunk * info.size;
+        unsigned char* dest_component_ptr =
+            static_cast<unsigned char*>(destArray) + destinationLocation.indexInChunk * info.size;
+
+        memcpy(dest_component_ptr, source_component_ptr, info.size);
+      }
+    }
+  }
+
+  template <typename Func, typename... TComponents>
+  void ForEach(Func func) {
+    for (size_t chunk_idx = 0; chunk_idx < chunks_.size(); ++chunk_idx) {
+      auto& chunk = chunks_[chunk_idx];
+      const size_t entity_count = chunk.GetEntityCount();
+      if (entity_count == 0) {
+        continue;
+      }
+
+      // Create a tuple of pointers to the component arrays for this chunk
+      auto component_arrays = std::make_tuple(GetComponentArray<TComponents>(chunk_idx)...);
+
+      for (size_t i = 0; i < entity_count; ++i) {
+        // Use std::apply to call 'func' with the i-th element of each array
+        std::apply([&](auto*... arrays) { func(arrays[i]...); }, component_arrays);
+      }
     }
   }
 
