@@ -6,11 +6,12 @@
 #include <sol/sol.hpp>
 
 #include "../AssetManager/AssetManager.h"
-#include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
+
+class Registry;
 
 class Game {
  public:

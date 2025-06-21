@@ -7,28 +7,16 @@
 #include <sol/sol.hpp>
 #include <string>
 
-#include "../ECS/ECS.h"
 #include "../Events/KeyInputEvent.h"
 #include "../General/Logger.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
-#include "../Systems/AnimationSystem.h"
-#include "../Systems/CameraFollowSystem.h"
-#include "../Systems/CollisionSystem.h"
-#include "../Systems/DamageSystem.h"
-#include "../Systems/DisplayHealthSystem.h"
-#include "../Systems/DrawColliderSystem.h"
-#include "../Systems/KeyboardControlSystem.h"
-#include "../Systems/MovementSystem.h"
-#include "../Systems/ProjectileEmitSystem.h"
-#include "../Systems/ProjectileLifecycleSystem.h"
-#include "../Systems/RenderDebugGUISystem.h"
-#include "../Systems/RenderPrimitiveSystem.h"
-#include "../Systems/RenderSpriteSystem.h"
-#include "../Systems/RenderTextSystem.h"
-#include "../Systems/ScriptSystem.h"
-#include "../Systems/UIButtonSystem.h"
-#include "Systems/TransformSystem.h"
+#include "Components/HealthComponent.h"
+#include "Components/SpriteComponent.h"
+#include "Components/TransformComponent.h"
+#include "ECS/Registry.h"
+#include "GameConfig.h"
+#include "Systems/AnimationSystem.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -140,36 +128,44 @@ void Game::Run() {
     ProcessInput();
     const float deltaTime = WaitTime();
     Update(deltaTime);
-    Render(deltaTime);
+    // Render(deltaTime);
   }
 }
 
 void Game::Setup() {
-  registry_->AddSystem<TransformSystem>();
-  registry_->AddSystem<CameraFollowSystem>();
-  registry_->AddSystem<ProjectileEmitSystem>();
-  registry_->AddSystem<ProjectileLifecycleSystem>();
-  registry_->AddSystem<DisplayHealthSystem>();
-  registry_->AddSystem<DamageSystem>();
-  registry_->AddSystem<MovementSystem>();
+  // registry_->AddSystem<TransformSystem>();
+  // registry_->AddSystem<CameraFollowSystem>();
+  // registry_->AddSystem<ProjectileEmitSystem>();
+  // registry_->AddSystem<ProjectileLifecycleSystem>();
+  // registry_->AddSystem<DisplayHealthSystem>();
+  // registry_->AddSystem<DamageSystem>();
+  // registry_->AddSystem<MovementSystem>();
+  //
+  // registry_->AddSystem<RenderSpriteSystem>();
+  // registry_->AddSystem<RenderTextSystem>();
+  // registry_->AddSystem<RenderPrimitiveSystem>();
+  // registry_->AddSystem<RenderDebugGUISystem>();
+  registry_->RegisterSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
+  // registry_->AddSystem<CollisionSystem>();
+  // registry_->AddSystem<DrawColliderSystem>();
+  // registry_->AddSystem<KeyboardControlSystem>();
+  // registry_->AddSystem<ScriptSystem>();
+  // registry_->AddSystem<UIButtonSystem>();
 
-  registry_->AddSystem<RenderSpriteSystem>();
-  registry_->AddSystem<RenderTextSystem>();
-  registry_->AddSystem<RenderPrimitiveSystem>();
-  registry_->AddSystem<RenderDebugGUISystem>();
-  registry_->AddSystem<AnimationSystem>();
-  registry_->AddSystem<CollisionSystem>();
-  registry_->AddSystem<DrawColliderSystem>();
-  registry_->AddSystem<KeyboardControlSystem>();
-  registry_->AddSystem<ScriptSystem>();
-  registry_->AddSystem<UIButtonSystem>();
+  const auto testEntity = registry_->CreateEntity();
+  registry_->AddComponent(testEntity, TransformComponent{glm::vec2{1, 1}});
+  registry_->AddComponent(testEntity, HealthComponent{100});
+
+  const auto animated = registry_->CreateEntity();
+  registry_->AddComponent(animated, SpriteComponent());
+  registry_->AddComponent(animated, AnimationComponent());
 
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
-  registry_->GetSystem<ScriptSystem>().CreateLuaBindings(lua, *this);
+  // registry_->GetSystem<ScriptSystem>().CreateLuaBindings(lua, *this);
   lua["game_window_width"] = GameConfig::GetInstance().windowWidth;
   lua["game_window_height"] = GameConfig::GetInstance().windowHeight;
 
-  LoadGame(lua, asset_manager_.get());
+  // LoadGame(lua, asset_manager_.get());
 }
 
 void Game::ProcessInput() const {
@@ -198,7 +194,7 @@ void Game::ProcessInput() const {
       case SDL_EVENT_MOUSE_BUTTON_DOWN:
       case SDL_EVENT_MOUSE_BUTTON_UP: {
         SDL_MouseButtonEvent mouseButtonEvent = event.button;
-        event_bus_->EmitEvent<MouseInputEvent>(mouseButtonEvent);
+        // event_bus_->EmitEvent<MouseInputEvent>(mouseButtonEvent);
         break;
       }
       default:
@@ -208,28 +204,35 @@ void Game::ProcessInput() const {
 }
 
 void Game::Update(const float deltaTime) {
+  auto query = registry_->CreateQuery<TransformComponent, HealthComponent>();
+  query.ForEach([](TransformComponent &transform, HealthComponent &health) {
+    if (transform.position.x < 0) {
+      transform.position.x = 0;
+    }
+  });
   // Subscribe to events
   event_bus_->Reset();
-  registry_->GetSystem<DamageSystem>().SubscribeToEvents(event_bus_);
-  registry_->GetSystem<KeyboardControlSystem>().SubscribeToEvents(event_bus_);
-  registry_->GetSystem<ProjectileEmitSystem>().SubscribeToEvents(event_bus_);
-  registry_->GetSystem<MovementSystem>().SubscribeToEvents(event_bus_);
-  registry_->GetSystem<UIButtonSystem>().SubscribeToEvents(event_bus_);
-  registry_->GetSystem<ScriptSystem>().SubscribeToEvents(event_bus_);
+  // registry_->GetSystem<DamageSystem>().SubscribeToEvents(event_bus_);
+  // registry_->GetSystem<KeyboardControlSystem>().SubscribeToEvents(event_bus_);
+  // registry_->GetSystem<ProjectileEmitSystem>().SubscribeToEvents(event_bus_);
+  // registry_->GetSystem<MovementSystem>().SubscribeToEvents(event_bus_);
+  // registry_->GetSystem<UIButtonSystem>().SubscribeToEvents(event_bus_);
+  // registry_->GetSystem<ScriptSystem>().SubscribeToEvents(event_bus_);
   SubscribeToEvents(event_bus_);
 
   // Update our systems and registry
-  registry_->GetSystem<TransformSystem>().Update();  // Important to update first as it updates global positions.
-  registry_->GetSystem<MovementSystem>().Update(deltaTime);
-  registry_->GetSystem<AnimationSystem>().Update(deltaTime);
-  registry_->GetSystem<CollisionSystem>().Update(event_bus_);
-  registry_->GetSystem<KeyboardControlSystem>().Update();
-  registry_->GetSystem<CameraFollowSystem>().Update(camera_);
-  registry_->GetSystem<ProjectileEmitSystem>().Update(deltaTime, registry_);
-  registry_->GetSystem<ProjectileLifecycleSystem>().Update(deltaTime);
-  registry_->GetSystem<DisplayHealthSystem>().Update(registry_);
-  registry_->GetSystem<ScriptSystem>().Update(deltaTime);
-  registry_->Update();
+  // registry_->GetSystem<TransformSystem>().Update();  // Important to update first as it updates global positions.
+  // registry_->GetSystem<MovementSystem>().Update(deltaTime);
+  // registry_->GetSystem<AnimationSystem>().Update(deltaTime);
+  // registry_->GetSystem<CollisionSystem>().Update(event_bus_);
+  // registry_->GetSystem<KeyboardControlSystem>().Update();
+  // registry_->GetSystem<CameraFollowSystem>().Update(camera_);
+  // registry_->GetSystem<ProjectileEmitSystem>().Update(deltaTime, registry_);
+  // registry_->GetSystem<ProjectileLifecycleSystem>().Update(deltaTime);
+  // registry_->GetSystem<DisplayHealthSystem>().Update(registry_);
+  // registry_->GetSystem<ScriptSystem>().Update(deltaTime);
+
+  registry_->Update(deltaTime);
 }
 
 void Game::Render(const float deltaTime) {
@@ -238,18 +241,18 @@ void Game::Render(const float deltaTime) {
 
   // Render the game
   render_queue_.Clear();
-  registry_->GetSystem<RenderSpriteSystem>().Update(render_queue_, camera_);
-  registry_->GetSystem<RenderTextSystem>().Update(render_queue_);
-  registry_->GetSystem<RenderPrimitiveSystem>().Update(render_queue_);
+  // registry_->GetSystem<RenderSpriteSystem>().Update(render_queue_, camera_);
+  // registry_->GetSystem<RenderTextSystem>().Update(render_queue_);
+  // registry_->GetSystem<RenderPrimitiveSystem>().Update(render_queue_);
 
   render_queue_.Sort();
   renderer_->Render(render_queue_, sdl_renderer_, camera_, asset_manager_);
 
   if (GameConfig::GetInstance().GetEngineOptions().drawColliders) {
-    registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
+    // registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
   }
 
-  registry_->GetSystem<RenderDebugGUISystem>().Update(deltaTime, sdl_renderer_);
+  // registry_->GetSystem<RenderDebugGUISystem>().Update(deltaTime, sdl_renderer_);
 
   SDL_RenderPresent(sdl_renderer_);
 }
