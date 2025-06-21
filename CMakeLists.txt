@@ -23,7 +23,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin/relwi
 set(SRC_FILES
         src/Main.cpp
         src/AssetManager/AssetManager.cpp
-        src/ECS/ECS.cpp
+        src/ECS/Registry.cpp
         src/Game/Game.cpp
         src/Game/GameConfig.cpp
         src/General/Logger.cpp

@@ -1,0 +1,101 @@
+#pragma once
+#include <bitset>
+#include <cstdint>
+#include <optional>
+#include <queue>
+
+constexpr unsigned int kMaxEntityMasks = 32;
+constexpr unsigned int kStartingEntityPoolSize = 1000;
+
+// Used to determine which
+typedef std::bitset<kMaxEntityMasks> EntityMask;
+typedef std::uint32_t EntityID;
+
+struct Entity {
+  EntityID id;
+  std::uint32_t generation;
+
+  [[nodiscard]] int GetId() const;
+
+  bool operator==(const Entity& other) const { return id == other.id && generation == other.generation; }
+
+  bool operator!=(const Entity& other) const { return id != other.id || generation != other.generation; }
+
+  bool operator<(const Entity& other) const { return id < other.id && generation < other.generation; }
+
+  bool operator>(const Entity& other) const { return id > other.id && generation > other.generation; }
+
+  bool operator<=(const Entity& other) const { return id <= other.id && generation <= other.generation; }
+
+  bool operator>=(const Entity& other) const { return id >= other.id && generation >= other.generation; }
+
+  template <class ComponentTypeToPass>
+  void AddComponent(ComponentTypeToPass&& component);
+
+  template <typename T, typename... TArgs>
+  void AddComponent(TArgs&&... args);
+
+  template <typename T>
+  void RemoveComponent() const;
+
+  template <typename T>
+  [[nodiscard]] bool HasComponent() const;
+
+  template <typename T>
+  T& GetComponent() const;
+
+  void Tag(const std::string& tag) const;
+  [[nodiscard]] bool HasTag(const std::string& tag) const;
+  void Group(const std::string& group) const;
+  [[nodiscard]] bool InGroup(const std::string& group) const;
+
+  void SetEntityMask(EntityMask entityMask) const;
+  [[nodiscard]] EntityMask GetEntityMask() const;
+
+  void Blam() const;
+
+  void AddParent(const Entity& parent) const;
+
+  void RemoveParent() const;
+
+  [[nodiscard]] std::optional<Entity> GetParent() const;
+
+  [[nodiscard]] std::optional<std::vector<Entity>> GetChildren() const;
+};
+
+class EntityManager {
+ public:
+  EntityManager() {
+    for (uint32_t i = 0; i < kStartingEntityPoolSize; ++i) {
+      available_entities_.push(i);
+    }
+  }
+
+  Entity CreateEntity() {
+    uint32_t id;
+    if (!available_entities_.empty()) {
+      id = available_entities_.front();
+      available_entities_.pop();
+    } else {
+      id = living_entity_count_++;
+      if (id >= generations_.size()) {
+        generations_.resize(id + 1);
+      }
+    }
+    return {id, generations_[id]};
+  }
+
+  void BlamEntity(const Entity entity) {
+    generations_[entity.id]++;
+    available_entities_.push(entity.id);
+  }
+
+  [[nodiscard]] bool IsValid(const Entity entity) const {
+    return entity.id < generations_.size() && generations_[entity.id] == entity.generation;
+  }
+
+ private:
+  std::queue<uint32_t> available_entities_;
+  std::vector<uint32_t> generations_;
+  uint32_t living_entity_count_ = 0;
+};
