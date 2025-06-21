@@ -1,8 +1,10 @@
 #pragma once
 
+class Registry;
+
 class System {
  public:
-  System() = default;
+  explicit System(Registry* registry) {}
 
   System(const System&) = delete;
   System& operator=(const System&) = delete;
