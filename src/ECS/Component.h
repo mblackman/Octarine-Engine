@@ -10,6 +10,7 @@
 
 #include "Entity.h"
 #include "General/Logger.h"
+#include "Iter.h"
 
 constexpr unsigned int kMaxComponents = 64;
 constexpr size_t kChunkSize = 16 * 1024;  // 16KB
@@ -258,12 +259,29 @@ class Archetype {
         continue;
       }
 
-      // Create a tuple of pointers to the component arrays for this chunk
       auto component_arrays = std::make_tuple(GetComponentArray<TComponents>(chunk_idx)...);
 
       for (size_t i = 0; i < entity_count; ++i) {
-        // Use std::apply to call 'func' with the i-th element of each array
         std::apply([&](auto*... arrays) { func(arrays[i]...); }, component_arrays);
+      }
+    }
+  }
+
+  template <typename Func, typename... TComponents>
+  void ForEach(Func func, Iter& iter) {
+    for (size_t chunk_idx = 0; chunk_idx < chunks_.size(); ++chunk_idx) {
+      auto& chunk = chunks_[chunk_idx];
+      const size_t entity_count = chunk.GetEntityCount();
+      if (entity_count == 0) {
+        continue;
+      }
+
+      auto component_arrays = std::make_tuple(GetComponentArray<TComponents>(chunk_idx)...);
+      const auto entityArray = chunk.GetEntityArray();
+
+      for (size_t i = 0; i < entity_count; ++i) {
+        iter.entity = entityArray[i];
+        std::apply([&](auto*... arrays) { func(iter, arrays[i]...); }, component_arrays);
       }
     }
   }

@@ -1,6 +1,14 @@
 #include "Registry.h"
 
+#include <ranges>
+
 #include "../General/Logger.h"
+
+void Registry::Update(const float deltaTime) const {
+  for (const auto& system : systems_) {
+    system->Update(*this, deltaTime);
+  }
+}
 
 Entity Registry::CreateEntity() {
   const Entity entity = entity_manager_->CreateEntity();
@@ -34,6 +42,11 @@ std::vector<Archetype*> Registry::GetMatchingArchetypes(const Signature signatur
   }
   return matchingArchetypes;
 }
+void Registry::UpdateQueries() {
+  for (const auto& [key, val] : queries_) {
+    val->Update();
+  }
+}
 
 Archetype* Registry::FindOrCreateArchetype(Signature signature) {
   if (const auto it = archetypes_.find(signature); it != archetypes_.end()) {
@@ -42,6 +55,6 @@ Archetype* Registry::FindOrCreateArchetype(Signature signature) {
 
   auto [new_iterator, success] =
       archetypes_.emplace(signature, std::make_unique<Archetype>(signature, *component_registry_));
-
+  UpdateQueries();
   return new_iterator->second.get();
 }
