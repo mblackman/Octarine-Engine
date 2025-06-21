@@ -19,7 +19,7 @@ class IPool {
 };
 
 /**
- * @brief A data pool that provides O(1) insertion, deletion, and access
+ * @brief A sparse-set pool that provides O(1) insertion, deletion, and access
  * via an integer ID.
  *
  * This pool stores objects of type T in a contiguous block of memory.
@@ -30,7 +30,7 @@ class IPool {
  * @tparam T The type of object to store in the pool.
  */
 template <typename T>
-class Pool final : public IPool {
+class SparsePool final : public IPool {
  private:
   std::vector<T> data_;
 
@@ -43,7 +43,7 @@ class Pool final : public IPool {
    * @param initial_capacity The initial amount of memory to reserve.
    * This helps avoid reallocations on initial insertions.
    */
-  explicit Pool(const size_t initial_capacity = 100) { data_.reserve(initial_capacity); }
+  explicit SparsePool(const size_t initial_capacity = 100) { data_.reserve(initial_capacity); }
 
   /**
    * @brief Checks if the pool contains an element with the given ID.
