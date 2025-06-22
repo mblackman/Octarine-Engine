@@ -10,6 +10,7 @@
 class GameConfig;
 
 class AssetManager {
+  std::string base_path_;
   std::map<std::string, SDL_Texture*> textures_;
   std::map<std::string, TTF_Font*> fonts_;
   std::optional<SDL_ScaleMode> default_scale_mode_;
@@ -17,13 +18,15 @@ class AssetManager {
  public:
   AssetManager() = default;
 
-  AssetManager(const AssetManager&) = delete;
-  AssetManager& operator=(const AssetManager&) = delete;
+  AssetManager(const AssetManager&) = default;
+  AssetManager& operator=(const AssetManager&) = default;
 
-  AssetManager(AssetManager&&) = delete;
-  AssetManager& operator=(AssetManager&&) = delete;
+  AssetManager(AssetManager&&) noexcept = default;
+  AssetManager& operator=(AssetManager&&) = default;
 
   ~AssetManager();
+
+  void LoadGameConfig(const GameConfig& config);
 
   void ClearAssets();
   void AddTexture(SDL_Renderer* renderer, const std::string& assetId, const std::string& path);

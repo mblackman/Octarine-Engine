@@ -11,20 +11,24 @@
 #include "../General/Logger.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
+#include "Components/CameraComponents.h"
 #include "Components/HealthComponent.h"
+#include "Components/ScriptComponent.h"
 #include "Components/SpriteComponent.h"
 #include "Components/TransformComponent.h"
 #include "ECS/Registry.h"
 #include "GameConfig.h"
 #include "Systems/AnimationSystem.h"
+#include "Systems/RenderSpriteSystem.h"
+#include "Systems/ScriptSystem.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 
 constexpr Uint8 GREY_COLOR = 24;
 
-inline void LoadGame(sol::state &lua, const AssetManager *assetManager) {
-  const auto filePath = assetManager->GetFullPath(GameConfig::GetInstance().GetStartupScript());
+inline void LoadGame(sol::state &lua, const AssetManager &assetManager, const GameConfig &gameConfig) {
+  const auto filePath = assetManager.GetFullPath(gameConfig.GetStartupScript());
 
   Logger::Info("Loading entry script: " + filePath);
   sol::protected_function_result result;
@@ -45,7 +49,6 @@ inline void LoadGame(sol::state &lua, const AssetManager *assetManager) {
 
 Game::Game() : window_(nullptr), sdl_renderer_(nullptr), camera_() {
   registry_ = std::make_unique<Registry>();
-  asset_manager_ = std::make_unique<AssetManager>();
   event_bus_ = std::make_unique<EventBus>();
   renderer_ = std::make_unique<Renderer>();
   Logger::Info("Game Constructor called.");
@@ -66,15 +69,18 @@ bool Game::Initialize(const std::string &assetPath) {
     return false;
   }
 
-  if (!GameConfig::GetInstance().LoadConfigFromFile(assetPath)) {
+  registry_->Set<GameConfig>(GameConfig());
+  auto &gameConfig = registry_->Get<GameConfig>();
+
+  if (!gameConfig.LoadConfigFromFile(assetPath)) {
     Logger::Error("Failed to load game config.");
     return false;
   }
 
-  GameConfig::GetInstance().windowWidth = GameConfig::GetInstance().GetDefaultWidth();
-  GameConfig::GetInstance().windowHeight = GameConfig::GetInstance().GetDefaultHeight();
-  SDL_CreateWindowAndRenderer(GameConfig::GetInstance().GetGameTitle().c_str(), GameConfig::GetInstance().windowWidth,
-                              GameConfig::GetInstance().windowHeight, SDL_WINDOW_RESIZABLE, &window_, &sdl_renderer_);
+  gameConfig.windowWidth = gameConfig.GetDefaultWidth();
+  gameConfig.windowHeight = gameConfig.GetDefaultHeight();
+  SDL_CreateWindowAndRenderer(gameConfig.GetGameTitle().c_str(), gameConfig.windowWidth, gameConfig.windowHeight,
+                              SDL_WINDOW_RESIZABLE, &window_, &sdl_renderer_);
 
   if (!window_) {
     Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
@@ -98,8 +104,8 @@ bool Game::Initialize(const std::string &assetPath) {
 
   camera_.x = 0;
   camera_.y = 0;
-  camera_.w = static_cast<float>(GameConfig::GetInstance().windowWidth);
-  camera_.h = static_cast<float>(GameConfig::GetInstance().windowHeight);
+  camera_.w = static_cast<float>(gameConfig.windowWidth);
+  camera_.h = static_cast<float>(gameConfig.windowHeight);
 
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
   s_is_running_ = true;
@@ -133,6 +139,12 @@ void Game::Run() {
 }
 
 void Game::Setup() {
+  registry_->Set<RenderQueue>(RenderQueue());
+  registry_->Set<CameraComponent>(CameraComponent());
+  registry_->Set<RenderQueue>(RenderQueue());
+  registry_->Set<AssetManager>(AssetManager());
+
+  ScriptSystem scriptSystem;
   // registry_->AddSystem<TransformSystem>();
   // registry_->AddSystem<CameraFollowSystem>();
   // registry_->AddSystem<ProjectileEmitSystem>();
@@ -141,7 +153,7 @@ void Game::Setup() {
   // registry_->AddSystem<DamageSystem>();
   // registry_->AddSystem<MovementSystem>();
   //
-  // registry_->AddSystem<RenderSpriteSystem>();
+  registry_->RegisterSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
   // registry_->AddSystem<RenderTextSystem>();
   // registry_->AddSystem<RenderPrimitiveSystem>();
   // registry_->AddSystem<RenderDebugGUISystem>();
@@ -149,23 +161,20 @@ void Game::Setup() {
   // registry_->AddSystem<CollisionSystem>();
   // registry_->AddSystem<DrawColliderSystem>();
   // registry_->AddSystem<KeyboardControlSystem>();
-  // registry_->AddSystem<ScriptSystem>();
+
   // registry_->AddSystem<UIButtonSystem>();
 
-  const auto testEntity = registry_->CreateEntity();
-  registry_->AddComponent(testEntity, TransformComponent{glm::vec2{1, 1}});
-  registry_->AddComponent(testEntity, HealthComponent{100});
-
-  const auto animated = registry_->CreateEntity();
-  registry_->AddComponent(animated, SpriteComponent());
-  registry_->AddComponent(animated, AnimationComponent());
-
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
-  // registry_->GetSystem<ScriptSystem>().CreateLuaBindings(lua, *this);
-  lua["game_window_width"] = GameConfig::GetInstance().windowWidth;
-  lua["game_window_height"] = GameConfig::GetInstance().windowHeight;
+  scriptSystem.CreateLuaBindings(lua, *this);
+  auto &gameConfig = registry_->Get<GameConfig>();
+  lua["game_window_width"] = gameConfig.windowWidth;
+  lua["game_window_height"] = gameConfig.windowHeight;
 
-  // LoadGame(lua, asset_manager_.get());
+  auto &assetManager = registry_->Get<AssetManager>();
+  assetManager.LoadGameConfig(gameConfig);
+  LoadGame(lua, assetManager, gameConfig);
+
+  registry_->RegisterSystem<ScriptComponent>(std::move(scriptSystem));
 }
 
 void Game::ProcessInput() const {
@@ -236,19 +245,23 @@ void Game::Update(const float deltaTime) {
 }
 
 void Game::Render(const float deltaTime) {
+  auto &renderQueue = registry_->Get<RenderQueue>();
+  auto &gameConfig = registry_->Get<GameConfig>();
+  auto &assetManager = registry_->Get<AssetManager>();
+
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
   SDL_RenderClear(sdl_renderer_);
 
   // Render the game
-  render_queue_.Clear();
+  renderQueue.Clear();
   // registry_->GetSystem<RenderSpriteSystem>().Update(render_queue_, camera_);
   // registry_->GetSystem<RenderTextSystem>().Update(render_queue_);
   // registry_->GetSystem<RenderPrimitiveSystem>().Update(render_queue_);
 
-  render_queue_.Sort();
-  renderer_->Render(render_queue_, sdl_renderer_, camera_, asset_manager_);
+  renderQueue.Sort();
+  renderer_->Render(renderQueue, sdl_renderer_, camera_, assetManager);
 
-  if (GameConfig::GetInstance().GetEngineOptions().drawColliders) {
+  if (gameConfig.GetEngineOptions().drawColliders) {
     // registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
   }
 
@@ -283,13 +296,14 @@ void Game::OnKeyInputEvent(const KeyInputEvent &event) {
     return;
   }
 
+  auto &gameConfig = registry_->Get<GameConfig>();
+
   switch (event.inputKey) {
     case SDLK_ESCAPE:
       s_is_running_ = false;
       break;
     case SDLK_GRAVE:
-      GameConfig::GetInstance().GetEngineOptions().showDebugGUI =
-          !GameConfig::GetInstance().GetEngineOptions().showDebugGUI;
+      gameConfig.GetEngineOptions().showDebugGUI = !gameConfig.GetEngineOptions().showDebugGUI;
       break;
     default:
       break;
