@@ -10,16 +10,14 @@
 
 class GameConfig {
  public:
-  static GameConfig& GetInstance() {
-    static GameConfig instance;
-    return instance;
-  }
+  GameConfig() = default;
+  ~GameConfig() = default;
 
-  GameConfig(const GameConfig&) = delete;
-  GameConfig& operator=(const GameConfig&) = delete;
+  GameConfig(const GameConfig&) = default;
+  GameConfig& operator=(const GameConfig&) = default;
 
-  GameConfig(GameConfig&&) = delete;
-  GameConfig& operator=(GameConfig&&) = delete;
+  GameConfig(GameConfig&&) = default;
+  GameConfig& operator=(GameConfig&&) = default;
 
   bool LoadConfig(const std::unordered_map<std::string, std::string>& settings);
 
@@ -41,9 +39,6 @@ class GameConfig {
   float playableAreaHeight{};
 
  private:
-  GameConfig() = default;
-  ~GameConfig() = default;
-
   template <typename T>
   bool SetValue(const std::unordered_map<std::string, std::string>& config, const std::string& key,
                 void (GameConfig::*setter)(T), const std::function<T(const std::string&)>& converter,

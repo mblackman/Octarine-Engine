@@ -2,8 +2,6 @@
 
 #include <glm/glm.hpp>
 
-#include "ECS/ECS.h"
-
 struct BoxColliderComponent {
   int width;
   int height;

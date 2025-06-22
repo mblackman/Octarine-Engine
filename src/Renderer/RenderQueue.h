@@ -16,8 +16,8 @@ class RenderQueue {
 
   ~RenderQueue() = default;
 
-  RenderQueue(const RenderQueue&) = delete;
-  RenderQueue& operator=(const RenderQueue&) = delete;
+  RenderQueue(const RenderQueue&) = default;
+  RenderQueue& operator=(const RenderQueue&) = default;
 
   RenderQueue(RenderQueue&&) = default;
   RenderQueue& operator=(RenderQueue&&) = default;
@@ -28,7 +28,7 @@ class RenderQueue {
 
   void Clear() { render_keys_.clear(); }
 
-  void Sort() { std::sort(render_keys_.begin(), render_keys_.end()); }
+  void Sort() { std::ranges::sort(render_keys_); }
 
   [[nodiscard]] const_iterator begin() const noexcept { return render_keys_.cbegin(); }
 

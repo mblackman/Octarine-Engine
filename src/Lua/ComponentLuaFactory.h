@@ -5,8 +5,15 @@
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
 #include "Components/AnimationComponent.h"
+#include "Components/BoxColliderComponent.h"
+#include "Components/CameraFollowComponent.h"
+#include "Components/HealthComponent.h"
+#include "Components/KeyboardControlComponent.h"
+#include "Components/ProjectileEmitterComponent.h"
 #include "Components/RigidBodyComponent.h"
+#include "Components/ScriptComponent.h"
 #include "Components/SquarePrimitiveComponent.h"
+#include "Components/TextLabelComponent.h"
 #include "Components/UIButtonComponent.h"
 
 namespace LuaComponentHelpers {

@@ -32,8 +32,6 @@ class Game {
 
   [[nodiscard]] SDL_Renderer* GetRenderer() const { return sdl_renderer_; }
 
-  [[nodiscard]] AssetManager* GetAssetManager() const { return asset_manager_.get(); }
-
   [[nodiscard]] Registry* GetRegistry() const { return registry_.get(); }
 
  private:
@@ -54,8 +52,6 @@ class Game {
 
   sol::state lua;
   std::unique_ptr<Registry> registry_;
-  std::unique_ptr<AssetManager> asset_manager_;
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
-  RenderQueue render_queue_;
 };

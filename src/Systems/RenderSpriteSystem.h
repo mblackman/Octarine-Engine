@@ -4,54 +4,40 @@
 
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
-#include "../ECS/ECS.h"
 #include "../Renderer/RenderKey.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/RenderableType.h"
+#include "Components/CameraComponents.h"
+#include "ECS/Iter.h"
+#include "ECS/Registry.h"
+#include "Game/GameConfig.h"
 
-class RenderSpriteSystem : public System {
+class RenderSpriteSystem {
  public:
-  RenderSpriteSystem() {
-    RequireComponent<TransformComponent>();
-    RequireComponent<SpriteComponent>();
-  }
+  void operator()(const Iter& iter, const TransformComponent& transform, const SpriteComponent& sprite) const {
+    const auto& gameConfig = iter.registry->Get<GameConfig>();
+    auto& renderQueue = iter.registry->Get<RenderQueue>();
+    auto& camera = iter.registry->Get<CameraComponent>().viewport;
+    bool isOutsideCamera = false;
 
-  RenderSpriteSystem(const RenderSpriteSystem&) = delete;
-  RenderSpriteSystem& operator=(const RenderSpriteSystem&) = delete;
+    if (sprite.isFixed) {
+      const auto windowWidth = static_cast<float>(gameConfig.windowWidth);
+      const auto windowHeight = static_cast<float>(gameConfig.windowHeight);
+      isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < 0 ||
+                        transform.globalPosition.x > windowWidth ||
+                        transform.globalPosition.y + sprite.height * transform.globalScale.y < 0 ||
+                        transform.globalPosition.y > windowHeight;
+    } else {
+      isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < camera.x ||
+                        transform.globalPosition.x > camera.x + camera.w ||
+                        transform.globalPosition.y + sprite.height * transform.globalScale.y < camera.y ||
+                        transform.globalPosition.y > camera.y + camera.h;
+    }
 
-  RenderSpriteSystem(RenderSpriteSystem&&) = delete;
-  RenderSpriteSystem& operator=(RenderSpriteSystem&&) = delete;
+    if (!isOutsideCamera) {
+      const RenderKey renderKey(sprite.layer, transform.globalPosition.y, SPRITE, iter.entity);
 
-  ~RenderSpriteSystem() = default;
-
-  void Update(RenderQueue& renderQueue, const SDL_FRect& camera) const {
-    auto entities = GetEntities();
-
-    for (auto entity : GetEntities()) {
-      const auto transform = entity.GetComponent<TransformComponent>();
-      const auto& sprite = entity.GetComponent<SpriteComponent>();
-
-      bool isOutsideCamera = false;
-
-      if (sprite.isFixed) {
-        const auto windowWidth = static_cast<float>(GameConfig::GetInstance().windowWidth);
-        const auto windowHeight = static_cast<float>(GameConfig::GetInstance().windowHeight);
-        isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < 0 ||
-                          transform.globalPosition.x > windowWidth ||
-                          transform.globalPosition.y + sprite.height * transform.globalScale.y < 0 ||
-                          transform.globalPosition.y > windowHeight;
-      } else {
-        isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < camera.x ||
-                          transform.globalPosition.x > camera.x + camera.w ||
-                          transform.globalPosition.y + sprite.height * transform.globalScale.y < camera.y ||
-                          transform.globalPosition.y > camera.y + camera.h;
-      }
-
-      if (!isOutsideCamera) {
-        RenderKey renderKey(sprite.layer, transform.globalPosition.y, SPRITE, entity);
-
-        renderQueue.AddRenderKey(renderKey);
-      }
+      renderQueue.AddRenderKey(renderKey);
     }
   }
 };
