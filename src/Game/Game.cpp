@@ -47,7 +47,7 @@ inline void LoadGame(sol::state &lua, const AssetManager &assetManager, const Ga
   Logger::Info("Just opened entry script: " + filePath);
 }
 
-Game::Game() : window_(nullptr), sdl_renderer_(nullptr), camera_() {
+Game::Game() : window_(nullptr), sdl_renderer_(nullptr) {
   registry_ = std::make_unique<Registry>();
   event_bus_ = std::make_unique<EventBus>();
   renderer_ = std::make_unique<Renderer>();
@@ -102,11 +102,6 @@ bool Game::Initialize(const std::string &assetPath) {
   ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
   ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
 
-  camera_.x = 0;
-  camera_.y = 0;
-  camera_.w = static_cast<float>(gameConfig.windowWidth);
-  camera_.h = static_cast<float>(gameConfig.windowHeight);
-
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
   s_is_running_ = true;
   return true;
@@ -134,13 +129,16 @@ void Game::Run() {
     ProcessInput();
     const float deltaTime = WaitTime();
     Update(deltaTime);
-    // Render(deltaTime);
+    Render(deltaTime);
   }
 }
 
 void Game::Setup() {
+  auto &gameConfig = registry_->Get<GameConfig>();
+  const SDL_FRect camera(0, 0, static_cast<float>(gameConfig.windowWidth), static_cast<float>(gameConfig.windowHeight));
+
   registry_->Set<RenderQueue>(RenderQueue());
-  registry_->Set<CameraComponent>(CameraComponent());
+  registry_->Set<CameraComponent>(CameraComponent{camera});
   registry_->Set<RenderQueue>(RenderQueue());
   registry_->Set<AssetManager>(AssetManager());
 
@@ -166,7 +164,6 @@ void Game::Setup() {
 
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
   scriptSystem.CreateLuaBindings(lua, *this);
-  auto &gameConfig = registry_->Get<GameConfig>();
   lua["game_window_width"] = gameConfig.windowWidth;
   lua["game_window_height"] = gameConfig.windowHeight;
 
@@ -247,19 +244,17 @@ void Game::Update(const float deltaTime) {
 void Game::Render(const float deltaTime) {
   auto &renderQueue = registry_->Get<RenderQueue>();
   auto &gameConfig = registry_->Get<GameConfig>();
-  auto &assetManager = registry_->Get<AssetManager>();
 
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
   SDL_RenderClear(sdl_renderer_);
 
   // Render the game
-  renderQueue.Clear();
   // registry_->GetSystem<RenderSpriteSystem>().Update(render_queue_, camera_);
   // registry_->GetSystem<RenderTextSystem>().Update(render_queue_);
   // registry_->GetSystem<RenderPrimitiveSystem>().Update(render_queue_);
 
   renderQueue.Sort();
-  renderer_->Render(renderQueue, sdl_renderer_, camera_, assetManager);
+  renderer_->Render(registry_.get(), sdl_renderer_);
 
   if (gameConfig.GetEngineOptions().drawColliders) {
     // registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
@@ -268,6 +263,7 @@ void Game::Render(const float deltaTime) {
   // registry_->GetSystem<RenderDebugGUISystem>().Update(deltaTime, sdl_renderer_);
 
   SDL_RenderPresent(sdl_renderer_);
+  renderQueue.Clear();
 }
 
 float Game::WaitTime() {

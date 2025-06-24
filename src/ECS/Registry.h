@@ -67,7 +67,7 @@ class Registry {
   // void RemoveComponent(Entity entity);
 
   template <typename T>
-  T& GetComponent(const Entity entity) {
+  T& GetComponent(const Entity entity) const {
     const auto it = entity_locations_.find(entity.id);
     if (it == entity_locations_.end()) {
       throw std::runtime_error("Failed to get required component " + std::string(typeid(T).name()) + " for entity " +
@@ -91,7 +91,7 @@ class Registry {
   }
 
   template <typename T>
-  bool HasComponent(const Entity entity) {
+  bool HasComponent(const Entity entity) const {
     const auto it = entity_locations_.find(entity.id);
     if (it == entity_locations_.end()) {
       Logger::Warn("Could not find entity with ID: " + std::to_string(entity.id) + " to check for component");
@@ -148,18 +148,21 @@ class Registry {
   }
 
   template <typename T>
-  T& Get() {
+  const T& Get() const {
     const auto id = GetComponentTypeID<T>();
     try {
-      return std::any_cast<T&>(singleton_components_.at(id));
+      return std::any_cast<const T&>(singleton_components_.at(id));
+
     } catch (const std::out_of_range& e) {
-      // Handle case where the component has not been set
-      // You could throw a more descriptive exception, log an error, or assert.
       throw std::runtime_error("Attempted to Get a singleton component that has not been Set.");
     } catch (const std::bad_any_cast& e) {
-      // This case is unlikely if your IDs are correct, but good practice.
       throw std::runtime_error("Type mismatch in Get. This indicates a logic error.");
     }
+  }
+
+  template <typename T>
+  T& Get() {
+    return const_cast<T&>(static_cast<const std::decay_t<decltype(*this)>&>(*this).Get<T>());
   }
 
  private:

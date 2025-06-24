@@ -7,6 +7,8 @@
 #include "../AssetManager/AssetManager.h"
 #include "./RenderQueue.h"
 
+class Registry;
+
 class Renderer {
  public:
   Renderer() = default;
@@ -19,12 +21,11 @@ class Renderer {
 
   ~Renderer() = default;
 
-  void Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, const SDL_FRect& camera,
-              const AssetManager& assetManager) const;
+  void Render(const Registry* registry, SDL_Renderer* renderer) const;
 
  private:
-  static void RenderSprite(const Entity& entity, SDL_Renderer* renderer, const AssetManager& assetManager,
-                           const SDL_FRect& camera);
+  static void RenderSprite(const Registry* registry, const Entity& entity, SDL_Renderer* renderer,
+                           const AssetManager& assetManager, const SDL_FRect& camera);
   static void RenderSquare(const Entity& entity, SDL_Renderer* renderer, const SDL_FRect& camera);
   static void RenderText(const Entity& entity, SDL_Renderer* renderer, const AssetManager& assetManager,
                          const SDL_FRect& camera);
