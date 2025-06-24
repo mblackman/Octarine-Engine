@@ -17,7 +17,7 @@ class RenderSpriteSystem {
   void operator()(const Iter& iter, const TransformComponent& transform, const SpriteComponent& sprite) const {
     const auto& gameConfig = iter.registry->Get<GameConfig>();
     auto& renderQueue = iter.registry->Get<RenderQueue>();
-    auto& camera = iter.registry->Get<CameraComponent>().viewport;
+    const auto& camera = iter.registry->Get<CameraComponent>().viewport;
     bool isOutsideCamera = false;
 
     if (sprite.isFixed) {

@@ -16,16 +16,21 @@
 #include "./RenderKey.h"
 #include "./RenderQueue.h"
 #include "./RenderableType.h"
+#include "Components/CameraComponents.h"
+#include "ECS/Registry.h"
 
-void Renderer::Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, const SDL_FRect& camera,
-                      const AssetManager& assetManager) const {
+void Renderer::Render(const Registry* registry, SDL_Renderer* renderer) const {
+  auto camera = registry->Get<CameraComponent>().viewport;
+  auto& assetManager = registry->Get<AssetManager>();
+  auto& renderQueue = registry->Get<RenderQueue>();
+
   for (const RenderKey& renderKey : renderQueue) {
     const Entity entity = renderKey.entity;
     const RenderableType type = renderKey.type;
 
     switch (type) {
       case SPRITE:
-        RenderSprite(entity, renderer, assetManager, camera);
+        RenderSprite(registry, entity, renderer, assetManager, camera);
         break;
       case TEXT:
         RenderText(entity, renderer, assetManager, camera);
@@ -40,18 +45,17 @@ void Renderer::Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, co
   }
 }
 
-void Renderer::RenderSprite(const Entity& entity, SDL_Renderer* renderer, const AssetManager& assetManager,
-                            const SDL_FRect& camera) {
-  // const auto transform = entity.GetComponent<TransformComponent>();
-  // const auto& sprite = entity.GetComponent<SpriteComponent>();
-  //
-  // const auto texture = assetManager->GetTexture(sprite.assetId);
-  // const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera.x;
-  // const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera.y;
-  //
-  // const SDL_FRect destRect = {x, y, sprite.width * transform.scale.x, sprite.height * transform.scale.y};
-  //
-  // SDL_RenderTextureRotated(renderer, texture, &sprite.srcRect, &destRect, transform.rotation, nullptr, sprite.flip);
+void Renderer::RenderSprite(const Registry* registry, const Entity& entity, SDL_Renderer* renderer,
+                            const AssetManager& assetManager, const SDL_FRect& camera) {
+  const auto transform = registry->GetComponent<TransformComponent>(entity);
+  const auto& sprite = registry->GetComponent<SpriteComponent>(entity);
+  const auto texture = assetManager.GetTexture(sprite.assetId);
+  const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera.x;
+  const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera.y;
+
+  const SDL_FRect destRect = {x, y, sprite.width * transform.scale.x, sprite.height * transform.scale.y};
+
+  SDL_RenderTextureRotated(renderer, texture, &sprite.srcRect, &destRect, transform.rotation, nullptr, sprite.flip);
 }
 
 void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer, const SDL_FRect& camera) {
