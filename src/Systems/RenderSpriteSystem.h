@@ -8,16 +8,17 @@
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/RenderableType.h"
 #include "Components/CameraComponents.h"
-#include "ECS/Iter.h"
+#include "ECS/Iterable.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"
 
 class RenderSpriteSystem {
  public:
-  void operator()(const Iter& iter, const TransformComponent& transform, const SpriteComponent& sprite) const {
-    const auto& gameConfig = iter.registry->Get<GameConfig>();
-    auto& renderQueue = iter.registry->Get<RenderQueue>();
-    const auto& camera = iter.registry->Get<CameraComponent>().viewport;
+  void operator()(const ContextFacade& context, const TransformComponent& transform,
+                  const SpriteComponent& sprite) const {
+    const auto& gameConfig = context.Registry()->Get<GameConfig>();
+    auto& renderQueue = context.Registry()->Get<RenderQueue>();
+    const auto& camera = context.Registry()->Get<CameraComponent>().viewport;
     bool isOutsideCamera = false;
 
     if (sprite.isFixed) {
@@ -35,7 +36,7 @@ class RenderSpriteSystem {
     }
 
     if (!isOutsideCamera) {
-      const RenderKey renderKey(sprite.layer, transform.globalPosition.y, SPRITE, iter.entity);
+      const RenderKey renderKey(sprite.layer, transform.globalPosition.y, SPRITE, context.Entity());
 
       renderQueue.AddRenderKey(renderKey);
     }

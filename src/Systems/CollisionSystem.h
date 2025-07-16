@@ -12,6 +12,7 @@
 #include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
+#include "ECS/Iterable.h"
 #include "General/PerfUtils.h"
 
 constexpr int kMaxDimensions = 2;
@@ -50,22 +51,9 @@ struct Partitions {
   int rightStart;
 };
 
-class CollisionSystem : public System {
+class CollisionSystem {
  public:
-  CollisionSystem() {
-    RequireComponent<TransformComponent>();
-    RequireComponent<BoxColliderComponent>();
-  }
-
-  CollisionSystem(const CollisionSystem&) = delete;
-  CollisionSystem& operator=(const CollisionSystem&) = delete;
-
-  CollisionSystem(CollisionSystem&&) = delete;
-  CollisionSystem& operator=(CollisionSystem&&) = delete;
-
-  ~CollisionSystem() = default;
-
-  void Update(const std::unique_ptr<EventBus>& eventBus) {
+  void operator()(const Iterable& iter, TransformComponent& transform, BoxColliderComponent& collider) {
     PROFILE_NAMED_SCOPE("Collision System Update");
 
     if (collisionResult_.valid() &&

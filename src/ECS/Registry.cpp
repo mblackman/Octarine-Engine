@@ -4,9 +4,10 @@
 
 #include "../General/Logger.h"
 
-void Registry::Update(const float deltaTime) const {
+void Registry::Update(const float deltaTime) {
+  delta_time_ = deltaTime;
   for (const auto& system : systems_) {
-    system->Update(*this, deltaTime);
+    system->Update(*this);
   }
 }
 

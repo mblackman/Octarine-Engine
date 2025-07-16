@@ -19,6 +19,7 @@
 #include "ECS/Registry.h"
 #include "GameConfig.h"
 #include "Systems/AnimationSystem.h"
+#include "Systems/CameraFollowSystem.h"
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "imgui.h"
@@ -144,7 +145,7 @@ void Game::Setup() {
 
   ScriptSystem scriptSystem;
   // registry_->AddSystem<TransformSystem>();
-  // registry_->AddSystem<CameraFollowSystem>();
+  registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
   // registry_->AddSystem<ProjectileEmitSystem>();
   // registry_->AddSystem<ProjectileLifecycleSystem>();
   // registry_->AddSystem<DisplayHealthSystem>();
