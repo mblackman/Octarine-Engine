@@ -34,28 +34,35 @@ void Registry::BlamEntity(const Entity entity) {
   entity_locations_.erase(it);
 }
 
-std::vector<Archetype*> Registry::GetMatchingArchetypes(const Signature signature) const {
+std::vector<Archetype*> Registry::GetMatchingArchetypes(const Type& type) const {
   std::vector<Archetype*> matchingArchetypes;
   for (const auto& [key, value] : archetypes_) {
-    if ((key & signature) == signature) {
+    if (key.Contains(type)) {
       matchingArchetypes.push_back(value.get());
     }
   }
   return matchingArchetypes;
 }
 void Registry::UpdateQueries() {
-  for (const auto& [key, val] : queries_) {
+  for (const auto& val : queries_ | std::views::values) {
     val->Update();
   }
 }
 
-Archetype* Registry::FindOrCreateArchetype(Signature signature) {
-  if (const auto it = archetypes_.find(signature); it != archetypes_.end()) {
+Archetype* Registry::FindOrCreateArchetype(const std::vector<ComponentID>& components) {
+  auto type = CreateType(components);
+  if (const auto it = archetypes_.find(type); it != archetypes_.end()) {
     return it->second.get();
   }
 
-  auto [new_iterator, success] =
-      archetypes_.emplace(signature, std::make_unique<Archetype>(signature, *component_registry_));
+  std::vector<ComponentInfo> componentInfos;
+  componentInfos.reserve(components.size());
+
+  for (const auto& component : components) {
+    componentInfos.push_back(component_registry_->GetInfo(component));
+  }
+
+  auto [new_iterator, success] = archetypes_.emplace(type, std::make_unique<Archetype>(componentInfos));
   UpdateQueries();
   return new_iterator->second.get();
 }

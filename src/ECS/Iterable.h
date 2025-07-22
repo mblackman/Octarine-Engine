@@ -18,7 +18,7 @@ class AnyContext {
   [[nodiscard]] virtual Entity GetEntity() const = 0;
   [[nodiscard]] virtual Registry* GetRegistry() const = 0;
   [[nodiscard]] virtual float GetDeltaTime() const = 0;
-  [[nodiscard]] virtual void* GetComponentPtr(ComponentTypeID id) = 0;
+  [[nodiscard]] virtual void* GetComponentPtr(ComponentID id) = 0;
 };
 
 class ContextFacade {
@@ -31,7 +31,7 @@ class ContextFacade {
 
   template <typename T>
   T& Component() const {
-    void* ptr = impl_->GetComponentPtr(GetComponentTypeID<T>());
+    void* ptr = impl_->GetComponentPtr(GetComponentID<T>());
     return *static_cast<T*>(ptr);
   }
 
@@ -98,10 +98,10 @@ class Iterable {
 namespace Internal {
 
 template <typename... TComponents>
-void* FindComponentInTuple(ComponentTypeID id, std::tuple<TComponents&...>& tuple) {
+void* FindComponentInTuple(ComponentID id, std::tuple<TComponents&...>& tuple) {
   void* ptr = nullptr;
   auto check = [&]<typename T>(T& component) {
-    if (GetComponentTypeID<std::remove_reference_t<T>>() == id) {
+    if (GetComponentID<std::remove_reference_t<T>>() == id) {
       ptr = &component;
     }
   };
@@ -119,7 +119,7 @@ class ContextImpl final : public AnyContext {
   [[nodiscard]] Registry* GetRegistry() const override { return registry_; }
   [[nodiscard]] float GetDeltaTime() const override { return dt_; }
 
-  void* GetComponentPtr(ComponentTypeID id) override { return FindComponentInTuple<TComponents...>(id, components_); }
+  void* GetComponentPtr(ComponentID id) override { return FindComponentInTuple<TComponents...>(id, components_); }
 
  private:
   Registry* registry_;
