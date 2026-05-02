@@ -1,5 +1,10 @@
-# Minimum CMake version required
 cmake_minimum_required(VERSION 3.15)
+
+# Auto-detect vcpkg toolchain if not provided (fixes 'find_package' errors in new profiles)
+if (NOT CMAKE_TOOLCHAIN_FILE AND EXISTS "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake")
+    set(CMAKE_TOOLCHAIN_FILE "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
+    message(STATUS "Auto-detected vcpkg toolchain: ${CMAKE_TOOLCHAIN_FILE}")
+endif ()
 
 # Project name and language
 project(OctarineEngine
@@ -13,6 +18,10 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+# Profiling option — when ON, enables TIMER/ACCUM logging in PerfUtils.h.
+# OFF by default so Debug and Release builds have zero profiling overhead.
+option(OCTARINE_ENABLE_PROFILING "Enable per-system performance instrumentation" OFF)
 
 # Set output directories for all build types
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin/debug")
@@ -42,6 +51,11 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
         CXX_STANDARD_REQUIRED ON
         CXX_EXTENSIONS OFF
 )
+
+if (OCTARINE_ENABLE_PROFILING)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_PROFILING)
+    message(STATUS "Octarine: Profiling ENABLED")
+endif ()
 
 # Dependencies
 find_package(glm CONFIG REQUIRED)
@@ -88,6 +102,7 @@ if (MSVC)
             /W3
             /permissive-
             /MP
+            /bigobj
     )
     target_compile_options(${PROJECT_NAME} PUBLIC
             $<IF:$<CONFIG:Debug>,,-WX>

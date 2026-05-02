@@ -3,6 +3,7 @@
 #include <stack>
 
 #include "../Ecs/Registry.h"
+#include "../General/Logger.h"
 #include "ComponentLuaFactory.h"
 
 class LuaEntityLoader {
@@ -41,7 +42,7 @@ class LuaEntityLoader {
   static void LoadEntityComponents(const sol::table& currentData, Registry* registry, const Entity& entity) {
     sol::optional<sol::table> componentsTableOpt = currentData["components"];
     if (!componentsTableOpt || !componentsTableOpt.value().valid()) {
-      std::cout << "LoadEntityFromLua: Entity has no 'components' table. Skipping." << std::endl;
+      Logger::Info("LoadEntityFromLua: Entity has no 'components' table. Skipping.");
       return;
     }
 
@@ -52,14 +53,14 @@ class LuaEntityLoader {
       auto componentDataTable = data.as<sol::table>();
 
       if (!componentDataTable.valid()) {
-        std::cerr << "LoadEntityFromLua: Invalid data table for component: " << componentName << std::endl;
+        Logger::Error("LoadEntityFromLua: Invalid data table for component: " + componentName);
         continue;
       }
 
       if (auto it = GetComponentFactoryMap().find(componentName); it != GetComponentFactoryMap().end()) {
         it->second(registry, entity, componentDataTable);
       } else {
-        std::cerr << "LoadEntityFromLua: Unknown component type '" << componentName << "' in Lua table." << std::endl;
+        Logger::Error("LoadEntityFromLua: Unknown component type '" + componentName + "' in Lua table.");
       }
     }
   }
@@ -75,7 +76,7 @@ class LuaEntityLoader {
    */
   static void LoadEntityFromLua(Registry* registry, const sol::table& entityData) {
     if (!entityData.valid()) {
-      std::cerr << "LoadEntityFromLua: Invalid root entity data table." << std::endl;
+      Logger::Error("LoadEntityFromLua: Invalid root entity data table.");
       return;
     }
 

@@ -36,6 +36,9 @@ class RenderDebugGUISystem {
     if (engineOptions.showFpsCounter) {
       FPSWindow(deltaTime);
     }
+    if (engineOptions.showEntityInfo) {
+      EntityInfoWindow(registry);
+    }
     if (engineOptions.showDebugGUI) {
       EngineOptionsWindow(engineOptions);
 
@@ -57,6 +60,7 @@ class RenderDebugGUISystem {
     ImGui::Begin("Engine Options");
     ImGui::Checkbox("Show ImGui Demo Window", &options.showImGuiDemoWindow);
     ImGui::Checkbox("Show FPS Counter", &options.showFpsCounter);
+    ImGui::Checkbox("Show Entity Info", &options.showEntityInfo);
     ImGui::Checkbox("Draw Colliders", &options.drawColliders);
     ImGui::End();
   }
@@ -64,6 +68,13 @@ class RenderDebugGUISystem {
   static void FPSWindow(const float deltaTime) {
     ImGui::Begin("FPS");
     ImGui::Text("FPS: %.2f", 1.0f / deltaTime);
+    ImGui::End();
+  }
+
+  static void EntityInfoWindow(const Registry* registry) {
+    const auto count = registry->GetEntityCount();
+    ImGui::Begin("Entity Info");
+    ImGui::Text("Entity Count: %d", count);
     ImGui::End();
   }
 };

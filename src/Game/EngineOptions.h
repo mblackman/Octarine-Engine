@@ -5,4 +5,5 @@ struct EngineOptions {
   bool drawColliders = false;
   bool showImGuiDemoWindow = false;
   bool showFpsCounter = true;
+  bool showEntityInfo = true;
 };

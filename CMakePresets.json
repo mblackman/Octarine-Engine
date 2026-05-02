@@ -1,0 +1,65 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 15, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "NMake Makefiles",
+      "binaryDir": "${sourceDir}/cmake-build-${presetName}",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      }
+    },
+    {
+      "name": "debug",
+      "inherits": "base",
+      "displayName": "Debug",
+      "description": "Debug build — no profiling, no optimizations",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OCTARINE_ENABLE_PROFILING": "OFF"
+      }
+    },
+    {
+      "name": "debug-profile",
+      "inherits": "base",
+      "displayName": "Debug + Profiling",
+      "description": "Debug build with per-system TIMER logging enabled",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OCTARINE_ENABLE_PROFILING": "ON"
+      }
+    },
+    {
+      "name": "release",
+      "inherits": "base",
+      "displayName": "Release",
+      "description": "Optimized build — no profiling, full compiler optimizations",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "OCTARINE_ENABLE_PROFILING": "OFF"
+      }
+    },
+    {
+      "name": "relwithdebinfo",
+      "inherits": "base",
+      "displayName": "Release + Debug Info",
+      "description": "Optimized build with debug symbols for profiling/debugging",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "OCTARINE_ENABLE_PROFILING": "OFF"
+      }
+    },
+    {
+      "name": "release-profile",
+      "inherits": "base",
+      "displayName": "Release + Profiling",
+      "description": "Optimized build with per-system TIMER logging for performance analysis",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
+        "OCTARINE_ENABLE_PROFILING": "ON"
+      }
+    }
+  ]
+}

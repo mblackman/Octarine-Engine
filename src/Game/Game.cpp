@@ -46,6 +46,7 @@
 #include "Systems/RenderTextSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "Systems/TransformSystem.h"
+#include "General/PerfUtils.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -256,14 +257,26 @@ void Game::ProcessInput() const {
 void Game::Update(const float deltaTime) { registry_->Update(deltaTime); }
 
 void Game::Render(const float deltaTime) {
+  PROFILE_NAMED_SCOPE("Game::Render (total)");
   auto &renderQueue = registry_->Get<RenderQueue>();
   auto &gameConfig = registry_->Get<GameConfig>();
 
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
   SDL_RenderClear(sdl_renderer_);
 
+#ifdef OCTARINE_PROFILING
+  {
+    PerfUtils::ScopedTimer sortTimer("Render: Sort");
+    renderQueue.Sort();
+  }
+  {
+    PerfUtils::ScopedTimer drawTimer("Render: Draw");
+    renderer_->Render(registry_.get(), sdl_renderer_);
+  }
+#else
   renderQueue.Sort();
   renderer_->Render(registry_.get(), sdl_renderer_);
+#endif
 
   if (gameConfig.GetEngineOptions().drawColliders) {
     auto colliderQuery = registry_->CreateQuery<TransformComponent, BoxColliderComponent>();

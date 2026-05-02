@@ -1,5 +1,8 @@
 #pragma once
+#include <atomic>
 #include <chrono>
+#include <map>
+#include <mutex>
 #include <source_location>
 #include <string>
 #include <utility>
@@ -121,8 +124,16 @@ auto LogTime(const std::string &name, Func &&func) -> std::invoke_result_t<Func>
 }
 }  // namespace PerfUtils
 
+// When OCTARINE_PROFILING is defined (via CMake), these macros create scoped timers
+// that log system-level frame timing. When NOT defined, they compile to nothing.
+#ifdef OCTARINE_PROFILING
 #define PROFILE_SCOPE PerfUtils::ScopedTimer timer(__FUNCTION__)
 #define PROFILE_NAMED_SCOPE(name) PerfUtils::ScopedTimer timer(name)
-
 #define ACCUMULATE_PROFILE_SCOPE(name) PerfUtils::AccumulatingScopedTimer accTimer##__LINE__(name)
 #define AGGREGATE_PROFILE_SESSION(name) PerfUtils::AggregateProfilingSession aggSession##__LINE__(name)
+#else
+#define PROFILE_SCOPE ((void)0)
+#define PROFILE_NAMED_SCOPE(name) ((void)0)
+#define ACCUMULATE_PROFILE_SCOPE(name) ((void)0)
+#define AGGREGATE_PROFILE_SESSION(name) ((void)0)
+#endif
