@@ -147,7 +147,7 @@ void Game::Setup() {
 
   ScriptSystem scriptSystem;
   // registry_->AddSystem<TransformSystem>();
-  registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
+  // registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
   // registry_->RegisterSystem<TransformComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
   //  registry_->AddSystem<ProjectileEmitSystem>();
   //  registry_->AddSystem<ProjectileLifecycleSystem>();
@@ -159,7 +159,7 @@ void Game::Setup() {
   // registry_->AddSystem<RenderTextSystem>();
   // registry_->AddSystem<RenderPrimitiveSystem>();
   // registry_->AddSystem<RenderDebugGUISystem>();
-  registry_->RegisterSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
+  // registry_->RegisterSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
   // registry_->AddSystem<CollisionSystem>();
   // registry_->AddSystem<DrawColliderSystem>();
   // registry_->AddSystem<KeyboardControlSystem>();
@@ -214,12 +214,12 @@ void Game::ProcessInput() const {
 }
 
 void Game::Update(const float deltaTime) {
-  const auto query = registry_->CreateQuery<TransformComponent, HealthComponent>();
-  query->ForEach([](TransformComponent &transform, HealthComponent &health) {
-    if (transform.position.x < 0) {
-      transform.position.x = 0;
-    }
-  });
+  // const auto query = registry_->CreateQuery<TransformComponent, HealthComponent>();
+  // query->ForEach([](TransformComponent &transform, HealthComponent &health) {
+  //   if (transform.position.x < 0) {
+  //     transform.position.x = 0;
+  //   }
+  // });
   // Subscribe to events
   event_bus_->Reset();
   // registry_->GetSystem<DamageSystem>().SubscribeToEvents(event_bus_);

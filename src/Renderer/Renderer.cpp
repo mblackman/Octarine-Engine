@@ -20,15 +20,14 @@
 #include "ECS/Registry.h"
 
 void Renderer::Render(const Registry* registry, SDL_Renderer* renderer) const {
-  auto camera = registry->Get<CameraComponent>().viewport;
+  const auto camera = registry->Get<CameraComponent>().viewport;
   auto& assetManager = registry->Get<AssetManager>();
   auto& renderQueue = registry->Get<RenderQueue>();
 
   for (const RenderKey& renderKey : renderQueue) {
     const Entity entity = renderKey.entity;
-    const RenderableType type = renderKey.type;
 
-    switch (type) {
+    switch (const RenderableType type = renderKey.type) {
       case SPRITE:
         RenderSprite(registry, entity, renderer, assetManager, camera);
         break;

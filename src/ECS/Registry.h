@@ -1,9 +1,16 @@
 #pragma once
 
 #include <any>
+#include <cstring>
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <typeindex>
+#include <typeinfo>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
 
 #include "Component.h"
 #include "Entity.h"
@@ -15,43 +22,25 @@ class Query;
 template <typename... TComponents>
 class ComponentQuery;
 
-namespace Internal {
-inline ComponentID GetNextComponentID() {
-  // This provides a simple incrementing counter for component types.
-  static ComponentID lastID = 0;
-  return lastID++;
-}
-
-template <typename T>
-inline ComponentID GetComponentID() {
-  // For each component type T, this will be instantiated once.
-  // The static id will be initialized with a unique ID from the counter
-  // on its first call, and that same ID will be returned on subsequent calls.
-  static const ComponentID id = GetNextComponentID();
-  return id;
-}
-
-}  // namespace Internal
-
 class ComponentRegistry {
  public:
   template <typename T>
   void RegisterComponent(const Entity& componentEntity) {
-    const EntityID id = componentEntity.id;
-
-    if (id >= component_infos_.size()) {
-      component_infos_.resize(id + 1);
-    } else if (component_infos_[id].id != 0) {
-      return;
+    const ComponentID id = componentEntity.GetId();
+    ComponentInfo info{id, typeid(T).name(), sizeof(T), alignof(T)};
+    if constexpr (std::is_move_constructible_v<T>) {
+      info.move_construct = [](void* dst, void* src) { ::new (dst) T(std::move(*static_cast<T*>(src))); };
+    } else {
+      info.move_construct = [](void* dst, void* src) { std::memcpy(dst, src, sizeof(T)); };
     }
-
-    component_infos_[id] = {.id = id, .name = "TODO", .size = sizeof(T), .alignment = alignof(T)};
+    info.destroy = [](void* ptr) { static_cast<T*>(ptr)->~T(); };
+    component_infos_.try_emplace(id, std::move(info));
   }
 
-  [[nodiscard]] const ComponentInfo& GetInfo(const EntityID id) const { return component_infos_[id]; }
+  [[nodiscard]] const ComponentInfo& GetInfo(const ComponentID id) const { return component_infos_.at(id); }
 
  private:
-  std::vector<ComponentInfo> component_infos_;
+  std::unordered_map<ComponentID, ComponentInfo> component_infos_;
 };
 
 class Registry {
@@ -59,7 +48,9 @@ class Registry {
   template <typename... TComponents>
   friend class ComponentQuery;
 
-  Registry() : root_archetype_(new Archetype({})) {
+  using ArchetypeList = std::vector<ArchetypeID>;
+
+  Registry() : root_archetype_(std::make_unique<Archetype>(std::vector<ComponentInfo>{})) {
     entity_manager_ = std::make_unique<EntityManager>();
     component_registry_ = std::make_unique<ComponentRegistry>();
   }
@@ -74,63 +65,57 @@ class Registry {
   // Component management
   template <typename T>
   Entity Component() {
-    static ComponentID id = Internal::GetComponentID<T>();
-    if (!component_to_entity_.contains(id)) {
-      const auto entity = CreateEntity();
-      component_to_entity_[id] = entity;
-      component_registry_->RegisterComponent<T>(entity);
-      return entity;
+    const std::type_index key(typeid(T));
+    if (const auto it = component_to_entity_.find(key); it != component_to_entity_.end()) {
+      return it->second;
     }
-    return component_to_entity_.at(id);
+    const auto entity = CreateEntity();
+    component_to_entity_.emplace(key, entity);
+    component_registry_->RegisterComponent<T>(entity);
+    return entity;
   }
 
   template <typename T>
   Entity Component() const {
-    static ComponentID id = Internal::GetComponentID<T>();
-    if (!component_to_entity_.contains(id)) {
+    const std::type_index key(typeid(T));
+    const auto it = component_to_entity_.find(key);
+    if (it == component_to_entity_.end()) {
       throw std::runtime_error("Component type " + std::string(typeid(T).name()) +
                                " has not been used yet. Cannot get component.");
     }
-    return component_to_entity_.at(id);
+    return it->second;
   }
 
   template <typename T>
   void AddComponent(const Entity entity, T component) {
-    const auto& oldLocation = entity_locations_[entity.id];
+    const EntityLocation oldLocation = entity_locations_[entity.id];
     const auto componentEntity = Component<T>();
+    const ComponentID componentId = componentEntity.GetId();
 
     Archetype* newArchetype = nullptr;
-
-    auto it = oldLocation.archetype->edges.find(componentEntity.id);
+    auto it = oldLocation.archetype->edges.find(componentId);
     if (it != oldLocation.archetype->edges.end() && it->second.add != nullptr) {
       newArchetype = it->second.add;
     } else {
-      std::vector<ComponentInfo> componentInfos;
-      componentInfos.reserve(oldLocation.archetype->type().size() + 1);
-      componentInfos.push_back(component_registry_->GetInfo(componentEntity.id));
+      newArchetype = GetOrCreateArchetype(oldLocation.archetype->type(), componentId);
 
-      for (const auto& id : oldLocation.archetype->type()) {
-        componentInfos.push_back(component_registry_->GetInfo(id));
-      }
-
-      newArchetype = new Archetype(componentInfos);
-      newArchetype->edges.insert(std::make_pair(componentEntity.id, ArchetypeEdge{nullptr, oldLocation.archetype}));
-
+      newArchetype->edges.insert(std::make_pair(componentId, ArchetypeEdge{nullptr, oldLocation.archetype}));
       if (it != oldLocation.archetype->edges.end()) {
         it->second.add = newArchetype;
       } else {
-        oldLocation.archetype->edges.insert(std::make_pair(componentEntity.id, ArchetypeEdge{newArchetype, nullptr}));
+        oldLocation.archetype->edges.insert(std::make_pair(componentId, ArchetypeEdge{newArchetype, nullptr}));
       }
     }
 
     const EntityLocation newLocation = newArchetype->AddEntity(entity);
     newArchetype->AddComponent(newLocation, componentEntity, component);
-
     newArchetype->CopyComponents(oldLocation, newLocation);
 
-    oldLocation.archetype->RemoveEntity(oldLocation);
-
+    const auto swapped = oldLocation.archetype->RemoveEntity(oldLocation);
     entity_locations_[entity.id] = newLocation;
+    if (swapped) {
+      entity_locations_[swapped->id] = oldLocation;
+    }
   }
 
   // template <typename T>
@@ -146,11 +131,11 @@ class Registry {
     const auto componentEntity = Component<T>();
     const auto [archetype, chunkIndex, indexInChunk] = it->second;
 
-    if (!archetype->HasComponent(componentEntity.id)) {
+    if (!archetype->HasComponent(componentEntity.GetId())) {
       throw std::runtime_error("Failed to get required component " + std::string(typeid(T).name()) + " for entity " +
                                std::to_string(entity.id));
     }
-    const auto componentArray = archetype->GetComponentArray<T>(chunkIndex, componentEntity.id);
+    const auto componentArray = archetype->GetComponentArray<T>(chunkIndex, componentEntity.GetId());
 
     if (componentArray == nullptr) {
       throw std::runtime_error("Failed to get required component " + std::string(typeid(T).name()) + " for entity " +
@@ -168,10 +153,9 @@ class Registry {
       return false;
     }
     const auto componentEntity = Component<T>();
-    return it->second.archetype->HasComponent(componentEntity.id);
+    return it->second.archetype->HasComponent(componentEntity.GetId());
   }
 
-  [[nodiscard]] Archetype* GetMatchingArchetype(const ArchetypeType& type) const;
   [[nodiscard]] std::vector<Archetype*> GetMatchingArchetypes(const ArchetypeType& type) const;
 
   // Queries
@@ -185,18 +169,20 @@ class Registry {
   // System Management
   template <typename... TArgs, typename Func>
   void RegisterSystem(Func&& func) {
+    using StoredFunc = std::decay_t<Func>;
     class SystemWrapper final : public ISystem {
      public:
-      explicit SystemWrapper(Registry* registry, Func&& f)
+      SystemWrapper(Registry* registry, Func&& f)
           : func_(std::forward<Func>(f)), query_(registry->CreateQuery<TArgs...>()) {}
 
       void Update(const Registry& registry) override {
         query_->Update();
-        query_->ForEach(this->func_);
+        // Pass by reference so captured state in the system lambda persists across invocations.
+        query_->ForEach(func_);
       }
 
      private:
-      Func func_;
+      StoredFunc func_;
       std::unique_ptr<ComponentQuery<TArgs...>> query_;
     };
 
@@ -207,15 +193,15 @@ class Registry {
   template <typename T>
   T& Set(T value) {
     const auto entityComponent = Component<T>();
-    singleton_components_[entityComponent.id] = std::move(value);
-    return std::any_cast<T&>(singleton_components_.at(entityComponent.id));
+    singleton_components_[entityComponent.GetId()] = std::move(value);
+    return std::any_cast<T&>(singleton_components_.at(entityComponent.GetId()));
   }
 
   template <typename T>
   const T& Get() const {
     const auto entityComponent = Component<T>();
     try {
-      return std::any_cast<const T&>(singleton_components_.at(entityComponent.id));
+      return std::any_cast<const T&>(singleton_components_.at(entityComponent.GetId()));
 
     } catch (const std::out_of_range& e) {
       throw std::runtime_error("Attempted to Get a singleton component that has not been Set.");
@@ -235,13 +221,18 @@ class Registry {
   bool HasPair(Entity entity, Entity relationship, Entity target);
 
  private:
+  Archetype* GetOrCreateArchetype(std::vector<ComponentID> componentIDs, ComponentID newComponentId);
+
   std::unique_ptr<EntityManager> entity_manager_;
   std::unique_ptr<ComponentRegistry> component_registry_;
   std::unordered_map<EntityID, EntityLocation> entity_locations_;
   std::unordered_map<ArchetypeID, std::unique_ptr<Archetype>> archetypes_;
-  Archetype* root_archetype_ = nullptr;  // The root of the archetype graph. Empty signature.
+  std::unique_ptr<Archetype> root_archetype_;  // The root of the archetype graph. Empty signature.
   std::vector<std::unique_ptr<ISystem>> systems_;
-  std::unordered_map<EntityID, std::any> singleton_components_;
-  std::unordered_map<ComponentID, Entity> component_to_entity_;
+  std::unordered_map<ComponentID, std::any> singleton_components_;
+  std::unordered_map<std::type_index, Entity> component_to_entity_;
+  // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
+  std::unordered_map<ComponentID, ArchetypeList> component_index_;
+  std::unordered_map<EntityID, std::unordered_set<EcsId>> pairs_;
   float delta_time_{};
 };

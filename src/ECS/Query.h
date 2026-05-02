@@ -1,4 +1,6 @@
 #pragma once
+#include <algorithm>
+
 #include "Iterable.h"
 #include "Registry.h"
 
@@ -20,26 +22,31 @@ template <typename... TComponents>
 class ComponentQuery final : public Query {
  public:
   explicit ComponentQuery(Registry* registry)
-      : registry_(registry), type_({(registry->Component<TComponents>().id)...}) {}
+      : registry_(registry), type_({(registry->Component<TComponents>().GetId())...}) {
+    // type_ stays in user-pack order so Iterator can map TComponents...[Is] to type_[Is].
+    // sorted_type_ is the canonical form used for archetype matching (two-pointer superset check).
+    sorted_type_ = type_;
+    std::ranges::sort(sorted_type_);
+  }
 
   void Update() override {
-    const auto matching_archetypes = registry_->GetMatchingArchetypes(type_);
+    const auto matching_archetypes = registry_->GetMatchingArchetypes(sorted_type_);
     archetype_query_ = ArchetypeQuery<TComponents...>(type_, matching_archetypes);
   }
 
   template <typename Func>
-  void ForEach(Func func) {
+  void ForEach(Func& func) {
     for (const auto iterable = CreateIterable(); auto&& context : iterable) {
       if constexpr (std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
         func(context, context.Component<TComponents>()...);
       } else if constexpr (std::is_invocable_v<Func, Entity, TComponents&...>) {
-        func(context.Entity(), context.Entity(), context.Component<TComponents>()...);
+        func(context.Entity(), context.Component<TComponents>()...);
       } else if constexpr (std::is_invocable_v<Func, TComponents&...>) {
         func(context.Component<TComponents>()...);
       } else {
         static_assert(!std::is_same_v<Func, Func>,
                       "The function passed to ForEach does not match the required signatures. "
-                      "Expected one of: void(Iter&, T&...), void(Entity, T&...), or void(T&...).");
+                      "Expected one of: void(ContextFacade&, T&...), void(Entity, T&...), or void(T&...).");
       }
     }
   }
@@ -64,6 +71,7 @@ class ComponentQuery final : public Query {
   }
 
   Registry* registry_;
-  ArchetypeType type_;
+  ArchetypeType type_;         // user-pack order — used by ArchetypeQuery::Iterator
+  ArchetypeType sorted_type_;  // sorted ascending — used for archetype matching
   ArchetypeQuery<TComponents...> archetype_query_;
 };

@@ -50,31 +50,35 @@ class EntityManager {
   }
 
   Entity CreateEntity() {
-    EntityID id;
+    std::uint32_t baseId;
     if (!available_entities_.empty()) {
-      id = available_entities_.front();
+      baseId = available_entities_.front();
       available_entities_.pop();
     } else {
-      id = living_entity_count_++;
-      if (id >= generations_.size()) {
-        generations_.resize(id + 1);
+      baseId = static_cast<std::uint32_t>(living_entity_count_++);
+      if (baseId >= generations_.size()) {
+        generations_.resize(baseId + 1);
       }
     }
-    id += (generations_[id] << kEntityGenerationOffset);
-    return Entity(id);
+    const EntityID packed =
+        static_cast<EntityID>(baseId) | (static_cast<EntityID>(generations_[baseId]) << kEntityGenerationOffset);
+    return Entity(packed);
   }
 
   void BlamEntity(const Entity entity) {
-    generations_[entity.id]++;
-    available_entities_.push(entity.id);
+    const std::uint32_t baseId = entity.GetId();
+    if (baseId >= generations_.size()) return;
+    generations_[baseId]++;
+    available_entities_.push(baseId);
   }
 
   [[nodiscard]] bool IsValid(const Entity entity) const {
-    return entity.id < generations_.size() && generations_[entity.id] == entity.GetGeneration();
+    const std::uint32_t baseId = entity.GetId();
+    return baseId < generations_.size() && generations_[baseId] == entity.GetGeneration();
   }
 
  private:
-  std::queue<EntityID> available_entities_;
+  std::queue<std::uint32_t> available_entities_;
   std::vector<EntityGeneration> generations_;
   EntityID living_entity_count_ = 0;
 };

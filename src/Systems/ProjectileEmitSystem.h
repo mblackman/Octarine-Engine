@@ -13,20 +13,24 @@
 #include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
 
-class ProjectileEmitSystem : public System {
+class ProjectileEmitSystem {
  public:
-  ProjectileEmitSystem() : spawnFriendlyProjectiles_(false) {
-    RequireComponent<TransformComponent>();
-    RequireComponent<ProjectileEmitterComponent>();
+  void operator()(const ContextFacade& context, const TransformComponent& transform,
+                  ProjectileEmitterComponent& emitter) {
+    const bool isPlayer = false;  // context.Entity().HasTag("player");
+
+    if (!isPlayer) {
+      emitter.countDownTimer -= context.DeltaTime();
+
+      if (emitter.countDownTimer <= 0.0f) {
+        SpawnProjectile(transform, context.Entity(), context.Registry(), emitter);
+        emitter.countDownTimer = emitter.frequency;
+      }
+    } else if (spawnFriendlyProjectiles_) {
+      SpawnProjectile(transform, context.Entity(), context.Registry(), emitter, true);
+      spawnFriendlyProjectiles_ = false;
+    }
   }
-
-  ProjectileEmitSystem(const ProjectileEmitSystem&) = delete;
-  ProjectileEmitSystem& operator=(const ProjectileEmitSystem&) = delete;
-
-  ProjectileEmitSystem(ProjectileEmitSystem&&) = delete;
-  ProjectileEmitSystem& operator=(ProjectileEmitSystem&&) = delete;
-
-  ~ProjectileEmitSystem() = default;
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
     eventBus->SubscribeEvent<ProjectileEmitSystem, KeyInputEvent>(this, &ProjectileEmitSystem::OnKeyInput);
@@ -42,54 +46,34 @@ class ProjectileEmitSystem : public System {
     }
   }
 
-  void Update(const float deltaTime, const std::unique_ptr<Registry>& registry) {
-    for (auto entity : GetEntities()) {
-      auto transform = entity.GetComponent<TransformComponent>();
-      auto& emitter = entity.GetComponent<ProjectileEmitterComponent>();
-      const bool isPlayer = entity.HasTag("player");
-
-      if (!isPlayer) {
-        emitter.countDownTimer -= deltaTime;
-
-        if (emitter.countDownTimer <= 0.0f) {
-          SpawnProjectile(transform, entity, registry, emitter);
-          emitter.countDownTimer = emitter.frequency;
-        }
-      } else if (spawnFriendlyProjectiles_) {
-        SpawnProjectile(transform, entity, registry, emitter, true);
-        spawnFriendlyProjectiles_ = false;
-      }
-    }
-  }
-
  private:
-  bool spawnFriendlyProjectiles_;
+  bool spawnFriendlyProjectiles_ = false;
 
-  static void SpawnProjectile(const TransformComponent& transform, const Entity& entity,
-                              const std::unique_ptr<Registry>& registry, ProjectileEmitterComponent& emitter,
-                              bool isPlayer = false) {
+  static void SpawnProjectile(const TransformComponent& transform, const Entity& entity, Registry* registry,
+                              ProjectileEmitterComponent& emitter, bool isPlayer = false) {
     auto projectilePosition = transform.position;
     auto velocity = emitter.velocity;
 
-    if (entity.HasComponent<SpriteComponent>()) {
-      const auto& sprite = entity.GetComponent<SpriteComponent>();
+    if (registry->HasComponent<SpriteComponent>(entity)) {
+      const auto& sprite = registry->GetComponent<SpriteComponent>(entity);
       projectilePosition.x += transform.scale.x * static_cast<float>(sprite.width) / 2;
       projectilePosition.y += transform.scale.y * static_cast<float>(sprite.height) / 2;
     }
 
-    if (isPlayer && entity.HasComponent<RigidBodyComponent>()) {
-      const auto rigidBody = entity.GetComponent<RigidBodyComponent>();
+    if (isPlayer && registry->HasComponent<RigidBodyComponent>(entity)) {
+      const auto rigidBody = registry->GetComponent<RigidBodyComponent>(entity);
       const auto direction = glm::normalize(rigidBody.velocity);
       velocity = direction * emitter.velocity;
     }
 
     auto projectile = registry->CreateEntity();
-    projectile.Group("projectiles");
-    projectile.SetEntityMask(entity.GetEntityMask());
-    projectile.AddComponent<TransformComponent>(projectilePosition, glm::vec2(1.0, 1.0), 0.0);
-    projectile.AddComponent<RigidBodyComponent>(velocity);
-    projectile.AddComponent<BoxColliderComponent>(4, 4, glm::vec2(0, 0), emitter.collisionMask);
-    projectile.AddComponent<SpriteComponent>("bullet-texture", 4.0f, 4.0f, 4);
-    projectile.AddComponent<ProjectileComponent>(emitter.damage, emitter.duration);
+    // projectile.Group("projectiles");
+    // projectile.SetEntityMask(entity.GetEntityMask());
+    // registry->AddComponent(projectile, TransformComponent(projectilePosition, glm::vec2(1.0, 1.0), 0.0));
+    // projectile.AddComponent<TransformComponent>(projectilePosition, glm::vec2(1.0, 1.0), 0.0);
+    // projectile.AddComponent<RigidBodyComponent>(velocity);
+    // projectile.AddComponent<BoxColliderComponent>(4, 4, glm::vec2(0, 0), emitter.collisionMask);
+    // projectile.AddComponent<SpriteComponent>("bullet-texture", 4.0f, 4.0f, 4);
+    // projectile.AddComponent<ProjectileComponent>(emitter.damage, emitter.duration);
   }
 };
