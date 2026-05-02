@@ -2,15 +2,8 @@
 
 class Registry;
 
-class System {
+class ISystem {
  public:
-  explicit System(Registry* registry) {}
-
-  System(const System&) = delete;
-  System& operator=(const System&) = delete;
-
-  System(System&&) = delete;
-  System& operator=(System&&) = delete;
-
-  ~System() = default;
+  virtual ~ISystem() = default;
+  virtual void Update(const Registry& registry, float deltaTime) = 0;
 };

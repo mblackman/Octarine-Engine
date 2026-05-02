@@ -10,10 +10,11 @@ constexpr unsigned int kStartingEntityPoolSize = 1000;
 // Used to determine which
 typedef std::bitset<kMaxEntityMasks> EntityMask;
 typedef std::uint32_t EntityID;
+typedef std::uint16_t EntityGeneration;
 
 struct Entity {
   EntityID id;
-  std::uint32_t generation;
+  EntityGeneration generation;
 
   [[nodiscard]] EntityID GetId() const { return id; }
 
@@ -48,6 +49,7 @@ struct Entity {
   [[nodiscard]] std::optional<std::vector<Entity>> GetChildren() const;
 };
 
+// TODO need to handle recycling entity generations
 class EntityManager {
  public:
   EntityManager() {
@@ -81,7 +83,7 @@ class EntityManager {
   }
 
  private:
-  std::queue<uint32_t> available_entities_;
-  std::vector<uint32_t> generations_;
-  uint32_t living_entity_count_ = 0;
+  std::queue<EntityID> available_entities_;
+  std::vector<EntityGeneration> generations_;
+  EntityID living_entity_count_ = 0;
 };

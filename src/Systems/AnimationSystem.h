@@ -4,37 +4,18 @@
 
 #include "../Components/AnimationComponent.h"
 #include "../Components/SpriteComponent.h"
-#include "../ECS/ECS.h"
 
-class AnimationSystem : public System {
+class AnimationSystem {
  public:
-  AnimationSystem() {
-    RequireComponent<SpriteComponent>();
-    RequireComponent<AnimationComponent>();
-  }
-
-  AnimationSystem(const AnimationSystem&) = delete;
-  AnimationSystem& operator=(const AnimationSystem&) = delete;
-
-  AnimationSystem(AnimationSystem&&) = delete;
-  AnimationSystem& operator=(AnimationSystem&&) = delete;
-
-  ~AnimationSystem() = default;
-
-  void Update(const float deltaTime) const {
-    for (auto entity : GetEntities()) {
-      auto& animation = entity.GetComponent<AnimationComponent>();
-      auto& sprite = entity.GetComponent<SpriteComponent>();
-
-      if (animation.numFrames <= 0 || animation.frameRateSpeed <= 0 || animation.isFinished) {
-        continue;
-      }
-
-      UpdateAnimationState(animation, deltaTime);
-
-      sprite.srcRect.x = static_cast<float>(animation.currentFrame) * sprite.width;
-      // sprite.srcRect.y = animation.currentFrame * sprite.height;
+  void operator()(const Iter& iter, SpriteComponent& sprite, AnimationComponent& animation) const {
+    if (animation.numFrames <= 0 || animation.frameRateSpeed <= 0 || animation.isFinished) {
+      return;
     }
+
+    UpdateAnimationState(animation, iter.deltaTime);
+
+    sprite.srcRect.x = static_cast<float>(animation.currentFrame) * sprite.width;
+    // sprite.srcRect.y = animation.currentFrame * sprite.height;
   }
 
  private:
