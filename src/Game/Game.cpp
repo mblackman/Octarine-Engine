@@ -14,6 +14,7 @@
 #include "Components/BoxColliderComponent.h"
 #include "Components/CameraComponents.h"
 #include "Components/CameraFollowComponent.h"
+#include "Components/HealthComponent.h"
 #include "Components/KeyboardControlComponent.h"
 #include "Components/ProjectileComponent.h"
 #include "Components/ProjectileEmitterComponent.h"
@@ -31,6 +32,7 @@
 #include "Systems/AnimationSystem.h"
 #include "Systems/CameraFollowSystem.h"
 #include "Systems/DamageSystem.h"
+#include "Systems/DisplayHealthSystem.h"
 #include "Systems/DrawColliderSystem.h"
 #include "Systems/KeyboardControlSystem.h"
 #include "Systems/MovementSystem.h"
@@ -188,6 +190,9 @@ void Game::Setup() {
 
   // Camera follows after gameplay-driven transform updates
   registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
+
+  // Health UI updates before render so values reflect current frame
+  registry_->RegisterSystem<HealthComponent, TextLabelComponent, SquarePrimitiveComponent>(DisplayHealthSystem());
 
   // Render queue producers
   registry_->RegisterSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
