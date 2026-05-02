@@ -13,6 +13,14 @@ class IEventCallback {
   virtual void CallEvent(Event& e) = 0;
 
  public:
+  IEventCallback() = default;
+
+  IEventCallback(const IEventCallback&) = delete;
+  IEventCallback& operator=(const IEventCallback&) = delete;
+
+  IEventCallback(IEventCallback&&) = delete;
+  IEventCallback& operator=(IEventCallback&&) = delete;
+
   virtual ~IEventCallback() = default;
 
   void Execute(Event& e) { CallEvent(e); }
@@ -23,17 +31,22 @@ class EventCallback final : public IEventCallback {
   std::function<void(Event&)> invoker_;
 
  public:
-  EventCallback(TOwner* ownerInstance, void (TOwner::*callbackFunction)(TEvent&)) {
-    invoker_ = [ownerInstance, callbackFunction](Event& e) {
-      std::invoke(callbackFunction, ownerInstance, static_cast<TEvent&>(e));
-    };
-  }
+  EventCallback(TOwner* ownerInstance, void (TOwner::*callbackFunction)(TEvent&))
+      : invoker_([ownerInstance, callbackFunction](Event& e) {
+          std::invoke(callbackFunction, ownerInstance, static_cast<TEvent&>(e));
+        }) {}
 
-  EventCallback(TOwner* ownerInstance, void (TOwner::*callbackFunction)(const TEvent&)) {
-    invoker_ = [ownerInstance, callbackFunction](Event& e) {
-      std::invoke(callbackFunction, ownerInstance, static_cast<const TEvent&>(e));
-    };
-  }
+  // Constructor for const TEvent&
+  EventCallback(TOwner* ownerInstance, void (TOwner::*callbackFunction)(const TEvent&))
+      : invoker_([ownerInstance, callbackFunction](Event& e) {
+          std::invoke(callbackFunction, ownerInstance, static_cast<const TEvent&>(e));
+        }) {}
+
+  EventCallback(const EventCallback&) = delete;
+  EventCallback& operator=(const EventCallback&) = delete;
+
+  EventCallback(EventCallback&&) = delete;
+  EventCallback& operator=(EventCallback&&) = delete;
 
   ~EventCallback() override = default;
 
@@ -51,6 +64,13 @@ class EventBus {
 
  public:
   EventBus() { Logger::Info("Event bus created"); }
+
+  EventBus(const EventBus&) = delete;
+  EventBus& operator=(const EventBus&) = delete;
+
+  EventBus(EventBus&&) = delete;
+  EventBus& operator=(EventBus&&) = delete;
+
   ~EventBus() { Logger::Info("Event bus destructed"); }
 
   void Reset() { subscribers_.clear(); }

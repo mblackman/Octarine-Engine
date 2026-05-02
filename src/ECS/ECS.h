@@ -68,12 +68,12 @@ class Entity {
   template <typename T>
   T& GetComponent() const;
 
-  void Tag(const std::string& tag);
+  void Tag(const std::string& tag) const;
   [[nodiscard]] bool HasTag(const std::string& tag) const;
-  void Group(const std::string& group);
+  void Group(const std::string& group) const;
   [[nodiscard]] bool InGroup(const std::string& group) const;
 
-  void Blam();
+  void Blam() const;
 };
 
 class System {
@@ -154,14 +154,14 @@ class Registry {
 
   // Tag management
   void TagEntity(Entity entity, const std::string& tag);
-  bool EntityHasTag(Entity entity, const std::string& tag) const;
-  Entity GetEntityByTag(const std::string& tag) const;
+  [[nodiscard]] bool EntityHasTag(Entity entity, const std::string& tag) const;
+  [[nodiscard]] Entity GetEntityByTag(const std::string& tag) const;
   void RemoveEntityTag(Entity entity);
 
   // Group management
   void GroupEntity(Entity entity, const std::string& group);
-  bool EntityInGroup(Entity entity, const std::string& group) const;
-  std::vector<Entity> GetEntitiesByGroup(const std::string& group) const;
+  [[nodiscard]] bool EntityInGroup(Entity entity, const std::string& group) const;
+  [[nodiscard]] std::vector<Entity> GetEntitiesByGroup(const std::string& group) const;
   void RemoveEntityGroup(Entity entity, const std::string& group);
   void RemoveEntityGroups(Entity entity);
 
@@ -173,14 +173,14 @@ class Registry {
   void RemoveSystem();
 
   template <typename T>
-  bool HasSystem() const;
+  [[nodiscard]] bool HasSystem() const;
 
   template <typename T>
   T& GetSystem() const;
 
-  void AddEntityToSystems(Entity entity);
+  void AddEntityToSystems(Entity entity) const;
 
-  void RemoveEntityFromSystems(Entity entity);
+  void RemoveEntityFromSystems(Entity entity) const;
 
   // Component management
   template <typename ComponentArg>
@@ -193,7 +193,7 @@ class Registry {
   void RemoveComponent(Entity entity);
 
   template <typename T>
-  bool HasComponent(Entity entity) const;
+  [[nodiscard]] bool HasComponent(Entity entity) const;
 
   template <typename T>
   T& GetComponent(Entity entity) const;

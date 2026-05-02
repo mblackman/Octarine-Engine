@@ -43,7 +43,7 @@ inline void SetEntityPosition(const Entity entity, const double x, const double 
   transform.position = glm::vec2(static_cast<float>(x), static_cast<float>(y));
 }
 
-inline void SetEntitySpriteSrcRect(const Entity entity, const int srcRectX, const int srcRectY) {
+inline void SetEntitySpriteSrcRect(const Entity entity, const float srcRectX, const float srcRectY) {
   if (!entity.HasComponent<SpriteComponent>()) {
     Logger::Error("Entity does not have SpriteComponent.");
     return;
@@ -120,10 +120,10 @@ class ScriptSystem : public System {
     eventBus->SubscribeEvent<ScriptSystem, KeyInputEvent>(this, &ScriptSystem::OnKeyInput);
   }
 
-  void Update(double deltaTime, int elapsedTime) {
+  void Update(float deltaTime) {
     for (auto entity : GetEntities()) {
       if (auto &script = entity.GetComponent<ScriptComponent>(); script.updateFunction != sol::lua_nil) {
-        if (auto result = script.updateFunction(entity, deltaTime, elapsedTime); !result.valid()) {
+        if (auto result = script.updateFunction(entity, deltaTime); !result.valid()) {
           sol::error err = result;
           std::string what = err.what();
           Logger::ErrorLua(what);
@@ -156,8 +156,8 @@ class ScriptSystem : public System {
     lua.set_function("load_asset", [this, &game](sol::table assetTable) {
       this->LoadAsset(std::move(assetTable), game.GetAssetManager(), game.GetRenderer());
     });
-    lua.set_function("load_entity", [this, &game](sol::table assetTable) {
-      LuaEntityLoader::LoadEntityFromLua(game.GetRegistry(), std::move(assetTable));
+    lua.set_function("load_entity", [this, &game](const sol::table &assetTable) {
+      LuaEntityLoader::LoadEntityFromLua(game.GetRegistry(), assetTable);
     });
     lua.set_function("get_asset_path", [this, &game](const std::string &relativePath) {
       return this->GetAssetPath(relativePath, game.GetAssetManager());
@@ -230,7 +230,7 @@ class ScriptSystem : public System {
     if (const std::string assetType = assetTable["type"]; assetType == "texture") {
       assetManager->AddTexture(renderer, assetTable["id"], assetTable["file"]);
     } else if (assetType == "font") {
-      const int fontSize = assetTable["font_size"];
+      const float fontSize = assetTable["font_size"];
       assetManager->AddFont(assetTable["id"], assetTable["file"], fontSize);
     } else {
       Logger::Error("Unknown asset type: " + assetType);
@@ -245,4 +245,3 @@ class ScriptSystem : public System {
   std::unordered_set<std::string> heldKeys_;
   std::unordered_map<std::string, std::unordered_set<std::string> > keyMap_;
 };
-

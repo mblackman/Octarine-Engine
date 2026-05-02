@@ -73,10 +73,10 @@ class ComponentLuaFactory {
     const auto layer = SafeGetOptionalValue<int>(data, "layer", 1);
     const auto width = SafeGetOptionalValue<float>(data, "width", 0.0f);
     const auto height = SafeGetOptionalValue<float>(data, "height", 0.0f);
-    const auto red = SafeGetOptionalValue<Uint8>(data, "r", 255);
-    const auto green = SafeGetOptionalValue<Uint8>(data, "g", 255);
-    const auto blue = SafeGetOptionalValue<Uint8>(data, "b", 255);
-    const auto alpha = SafeGetOptionalValue<Uint8>(data, "a", 255);
+    const auto red = SafeGetOptionalValue<Uint8>(data, "r", Constants::kUnt8Max);
+    const auto green = SafeGetOptionalValue<Uint8>(data, "g", Constants::kUnt8Max);
+    const auto blue = SafeGetOptionalValue<Uint8>(data, "b", Constants::kUnt8Max);
+    const auto alpha = SafeGetOptionalValue<Uint8>(data, "a", Constants::kUnt8Max);
     const SDL_Color color = {red, green, blue, alpha};
     const auto fixed = SafeGetOptionalValue<bool>(data, "fixed", false);
     return SquarePrimitiveComponent(position, layer, width, height, color, fixed);
@@ -106,8 +106,10 @@ class ComponentLuaFactory {
   static ProjectileEmitterComponent CreateProjectileEmitterComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;
     const glm::vec2 projectileVelocity = SafeGetVec2(data, "projectile_velocity");
-    const int repeatFrequency = SafeGetOptionalValue<int>(data, "repeat_frequency", 5) * kMillisecondsPerSecond;
-    const int projectileDuration = SafeGetOptionalValue<int>(data, "projectile_duration", 1) * kMillisecondsPerSecond;
+    const int repeatFrequency =
+        SafeGetOptionalValue<int>(data, "repeat_frequency", 5) * Constants::kMillisecondsPerSecond;
+    const int projectileDuration =
+        SafeGetOptionalValue<int>(data, "projectile_duration", 1) * Constants::kMillisecondsPerSecond;
     const int projectileDamage = SafeGetOptionalValue<int>(data, "hit_damage", 10);
     const bool isFriendly = SafeGetOptionalValue<bool>(data, "friendly", false);
 
@@ -115,7 +117,7 @@ class ComponentLuaFactory {
                                       isFriendly);
   }
 
-  static CameraFollowComponent CreateCameraFollowComponent(const sol::table& data) { return CameraFollowComponent(); }
+  static CameraFollowComponent CreateCameraFollowComponent(const sol::table& data) { return {}; }
 
   static KeyboardControlComponent CreateKeyboardControlledComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;

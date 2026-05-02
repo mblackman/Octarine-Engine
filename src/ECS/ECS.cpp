@@ -13,31 +13,23 @@ int IComponent::next_id_ = 0;
 // Entity Implementation
 int Entity::GetId() const { return id_; }
 
-void Entity::Tag(const std::string& tag) { registry_->TagEntity(*this, tag); }
+void Entity::Tag(const std::string& tag) const { registry_->TagEntity(*this, tag); }
 
-bool Entity::HasTag(const std::string& tag) const {
-  return registry_->EntityHasTag(*this, tag);
-}
+bool Entity::HasTag(const std::string& tag) const { return registry_->EntityHasTag(*this, tag); }
 
-void Entity::Group(const std::string& group) {
-  registry_->GroupEntity(*this, group);
-}
+void Entity::Group(const std::string& group) const { registry_->GroupEntity(*this, group); }
 
-bool Entity::InGroup(const std::string& group) const {
-  return registry_->EntityInGroup(*this, group);
-}
+bool Entity::InGroup(const std::string& group) const { return registry_->EntityInGroup(*this, group); }
 
-void Entity::Blam() { registry_->BlamEntity(*this); }
+void Entity::Blam() const { registry_->BlamEntity(*this); }
 
 // Systems implementation
 void System::AddEntity(const Entity entity) { entities_.push_back(entity); }
 
 void System::RemoveEntity(const Entity entity) {
-  entities_.erase(std::remove_if(entities_.begin(), entities_.end(),
-                                 [&entity](const Entity& other) {
-                                   return other == entity;
-                                 }),
-                  entities_.end());
+  entities_.erase(
+      std::remove_if(entities_.begin(), entities_.end(), [&entity](const Entity& other) { return other == entity; }),
+      entities_.end());
 }
 
 // Registry implementation
@@ -64,21 +56,17 @@ Entity Registry::CreateEntity() {
   return entity;
 }
 
-void Registry::BlamEntity(const Entity entity) {
-  entities_to_remove_.insert(entity);
-}
+void Registry::BlamEntity(const Entity entity) { entities_to_remove_.insert(entity); }
 
-void Registry::AddEntityToSystems(Entity entity) {
+void Registry::AddEntityToSystems(Entity entity) const {
   const auto entityId = entity.GetId();
 
   const auto& entityComponentSignature = entity_component_signatures_[entityId];
 
   for (const auto& system : systems_) {
-    const auto& systemComponentSignature =
-        system.second->GetComponentSignature();
+    const auto& systemComponentSignature = system.second->GetComponentSignature();
 
-    const bool isInterested = (entityComponentSignature & systemComponentSignature) ==
-                        systemComponentSignature;
+    const bool isInterested = (entityComponentSignature & systemComponentSignature) == systemComponentSignature;
 
     if (isInterested) {
       system.second->AddEntity(entity);
@@ -86,7 +74,7 @@ void Registry::AddEntityToSystems(Entity entity) {
   }
 }
 
-void Registry::RemoveEntityFromSystems(const Entity entity) {
+void Registry::RemoveEntityFromSystems(const Entity entity) const {
   for (const auto& system : systems_) {
     system.second->RemoveEntity(entity);
   }
@@ -141,9 +129,7 @@ bool Registry::EntityHasTag(Entity entity, const std::string& tag) const {
   return entity_by_tag_.at(tag) == entity;
 }
 
-Entity Registry::GetEntityByTag(const std::string& tag) const {
-  return entity_by_tag_.at(tag);
-}
+Entity Registry::GetEntityByTag(const std::string& tag) const { return entity_by_tag_.at(tag); }
 
 void Registry::RemoveEntityTag(Entity entity) {
   const auto tag = tag_by_entity_.find(entity.GetId());
@@ -169,15 +155,14 @@ bool Registry::EntityInGroup(Entity entity, const std::string& group) const {
   return groups->second.find(group) != groups->second.end();
 }
 
-std::vector<Entity> Registry::GetEntitiesByGroup(
-    const std::string& group) const {
+std::vector<Entity> Registry::GetEntitiesByGroup(const std::string& group) const {
   const auto entities = entities_by_groups_.find(group);
 
   if (entities == entities_by_groups_.end()) {
     return {};
   }
 
-  return std::vector(entities->second.begin(), entities->second.end());
+  return {entities->second.begin(), entities->second.end()};
 }
 
 void Registry::RemoveEntityGroup(Entity entity, const std::string& group) {

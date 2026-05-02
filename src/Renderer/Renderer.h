@@ -18,7 +18,7 @@ class Renderer {
   ~Renderer() = default;
 
   void Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, const SDL_FRect& camera,
-              const std::unique_ptr<AssetManager>& assetManager);
+              const std::unique_ptr<AssetManager>& assetManager) const;
 
  private:
   static void RenderSprite(const Entity& entity, SDL_Renderer* renderer,

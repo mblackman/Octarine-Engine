@@ -31,7 +31,7 @@ class LuaEntityLoader {
       return;
     }
 
-    const sol::table componentsTable = componentsTableOpt.value();
+    const sol::table& componentsTable = componentsTableOpt.value();
 
     for (const auto& [fst, snd] : componentsTable) {
       auto componentName = fst.as<std::string>();

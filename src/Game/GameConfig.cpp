@@ -62,21 +62,6 @@ inline auto ReadConfigFile(void *dst, const Uint64 dstLen) -> std::unordered_map
   return config;
 }
 
-inline bool SetStringValue(GameConfig *gameConfig, const std::unordered_map<std::string, std::string> &config,
-                           const std::string &key, void (GameConfig::*setValue)(const std::string &),
-                           const bool required = false) {
-  if (const auto it = config.find(key); it != config.end()) {
-    (gameConfig->*setValue)(it->second);
-    return true;
-  }
-  if (required) {
-    Logger::Error("Could not find config setting: " + key);
-    return false;
-  }
-  Logger::Info("Could not find config setting: " + key);
-  return true;
-}
-
 bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
   const auto storage = SDL_OpenTitleStorage(assetPath.c_str(), 0);
 
@@ -120,9 +105,11 @@ bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
 bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string> &settings) {
   bool success = true;
 
-  success &= SetStringValue(this, settings, "Title", &GameConfig::SetGameTitle, true);
-  success &= SetStringValue(this, settings, "StartupScript", &GameConfig::SetStartupScript, true);
-  success &= SetStringValue(this, settings, "DefaultScalingMode", &GameConfig::SetDefaultScaleMode, false);
+  success &= SetValue(settings, "Title", &GameConfig::SetGameTitle, true);
+  success &= SetValue(settings, "StartupScript", &GameConfig::SetStartupScript, true);
+  success &= SetValue(settings, "DefaultScalingMode", &GameConfig::SetDefaultScaleMode, false);
+  success &= SetValue(settings, "DefaultWindowWidth", &GameConfig::SetDefaultWidth, false);
+  success &= SetValue(settings, "DefaultWindowHeight", &GameConfig::SetDefaultHeight, false);
 
   return success;
 }
@@ -134,6 +121,9 @@ std::string GameConfig::GetGameTitle() const { return game_title_; }
 std::string GameConfig::GetStartupScript() const { return startup_script_; }
 
 std::optional<std::string> GameConfig::GetDefaultScaleMode() const { return default_scaling_mode_; }
+
+int GameConfig::GetDefaultWidth() const { return default_width_; }
+int GameConfig::GetDefaultHeight() const { return default_height_; }
 
 void GameConfig::SetAssetPath(const std::string &assetPath) {
   if (assetPath.empty()) {
@@ -171,3 +161,5 @@ void GameConfig::SetDefaultScaleMode(const std::string &defaultScaleMode) {
     Logger::Info("Default scaling mode set to: " + *default_scaling_mode_);
   }
 }
+void GameConfig::SetDefaultWidth(const int defaultWidth) { default_width_ = defaultWidth; }
+void GameConfig::SetDefaultHeight(const int defaultHeight) { default_height_ = defaultHeight; }

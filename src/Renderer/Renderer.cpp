@@ -19,7 +19,7 @@
 #include "./RenderableType.h"
 
 void Renderer::Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, const SDL_FRect& camera,
-                      const std::unique_ptr<AssetManager>& assetManager) {
+                      const std::unique_ptr<AssetManager>& assetManager) const {
   for (const RenderKey& renderKey : renderQueue) {
     const Entity entity = renderKey.entity;
     const RenderableType type = renderKey.type;
@@ -44,7 +44,7 @@ void Renderer::Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, co
 void Renderer::RenderSprite(const Entity& entity, SDL_Renderer* renderer,
                             const std::unique_ptr<AssetManager>& assetManager, const SDL_FRect& camera) {
   const auto transform = entity.GetComponent<TransformComponent>();
-  const auto sprite = entity.GetComponent<SpriteComponent>();
+  const auto& sprite = entity.GetComponent<SpriteComponent>();
 
   const auto texture = assetManager->GetTexture(sprite.assetId);
   const float x = sprite.isFixed ? transform.position.x : transform.position.x - camera.x;
@@ -68,7 +68,7 @@ void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer, const 
 
 void Renderer::RenderText(const Entity& entity, SDL_Renderer* renderer,
                           const std::unique_ptr<AssetManager>& assetManager, const SDL_FRect& camera) {
-  const auto textLabel = entity.GetComponent<TextLabelComponent>();
+  const auto& textLabel = entity.GetComponent<TextLabelComponent>();
   const auto font = assetManager->GetFont(textLabel.fontId);
   SDL_Surface* surface = TTF_RenderText_Blended(font, textLabel.text.c_str(), 0, textLabel.color);
   SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);

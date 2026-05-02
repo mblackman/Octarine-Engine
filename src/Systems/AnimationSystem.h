@@ -21,7 +21,7 @@ class AnimationSystem : public System {
 
   ~AnimationSystem() = default;
 
-  void Update(const double deltaTime) const {
+  void Update(const float deltaTime) const {
     for (auto entity : GetEntities()) {
       auto& animation = entity.GetComponent<AnimationComponent>();
       auto& sprite = entity.GetComponent<SpriteComponent>();

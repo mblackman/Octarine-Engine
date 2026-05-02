@@ -97,7 +97,7 @@ class DisplayHealthSystem : public System {
     health_trackers_[entityId] = std::make_shared<Entity>(healthTracker);
   }
 
-  SDL_Color GetHealthColor(float healthPercentage) {
+  SDL_Color GetHealthColor(float healthPercentage) const {
     if (healthPercentage > 0.66) {
       return high_health_color;
     }

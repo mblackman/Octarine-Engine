@@ -18,13 +18,12 @@ class RenderTextSystem : public System {
 
   ~RenderTextSystem() = default;
 
-  void Update(RenderQueue& renderQueue) {
+  void Update(RenderQueue& renderQueue) const {
     const auto entities = GetEntities();
 
     for (auto entity : entities) {
-      const auto text = entity.GetComponent<TextLabelComponent>();
-      RenderKey renderKey(text.layer, text.position.y, TEXT,
-                          entity);
+      const auto& text = entity.GetComponent<TextLabelComponent>();
+      RenderKey renderKey(text.layer, text.position.y, TEXT, entity);
 
       renderQueue.AddRenderKey(renderKey);
     }

@@ -42,13 +42,13 @@ class ProjectileEmitSystem : public System {
     }
   }
 
-  void Update(const double deltaTime, const std::unique_ptr<Registry>& registry) {
+  void Update(const float deltaTime, const std::unique_ptr<Registry>& registry) {
     for (auto entity : GetEntities()) {
       auto transform = entity.GetComponent<TransformComponent>();
       auto& emitter = entity.GetComponent<ProjectileEmitterComponent>();
 
       if (!emitter.isFriendly) {
-        emitter.countDownTimer -= deltaTime * kMillisecondsPerSecond;
+        emitter.countDownTimer -= deltaTime * Constants::kMillisecondsPerSecond;
 
         if (emitter.countDownTimer <= 0) {
           SpawnProjectile(transform, entity, registry, emitter);

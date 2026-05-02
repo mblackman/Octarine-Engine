@@ -21,17 +21,17 @@ class DrawColliderSystem : public System {
 
   ~DrawColliderSystem() = default;
 
-  void Update(SDL_Renderer* renderer, const SDL_FRect& camera) {
+  void Update(SDL_Renderer* renderer, const SDL_FRect& camera) const {
     for (auto entity : GetEntities()) {
       const auto& transform = entity.GetComponent<TransformComponent>();
       const auto& collider = entity.GetComponent<BoxColliderComponent>();
-      constexpr Uint8 uint8Max = 255;
 
       const SDL_FRect rect = {transform.position.x - static_cast<float>(camera.x),
-                              transform.position.y - static_cast<float>(camera.y), collider.width * transform.scale.x,
-                              collider.height * transform.scale.y};
+                              transform.position.y - static_cast<float>(camera.y),
+                              static_cast<float>(collider.width) * transform.scale.x,
+                              static_cast<float>(collider.height) * transform.scale.y};
 
-      SDL_SetRenderDrawColor(renderer, uint8Max, 0, 0, uint8Max);
+      SDL_SetRenderDrawColor(renderer, Constants::kUnt8Max, 0, 0, Constants::kUnt8Max);
       SDL_RenderRect(renderer, &rect);
     }
   }
