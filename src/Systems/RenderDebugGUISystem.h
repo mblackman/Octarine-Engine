@@ -9,29 +9,38 @@
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
+#include "Components/ScriptComponent.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 
 class RenderDebugGUISystem : public System {
-public:
-  RenderDebugGUISystem() = default;
+ public:
+  RenderDebugGUISystem() { RequireComponent<ScriptComponent>(); }
 
   ~RenderDebugGUISystem() = default;
 
-  static void Update(SDL_Renderer* renderer,
-                     std::unique_ptr<Registry>& registry) {
+  void Update(SDL_Renderer* renderer) {
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
     ImGui::ShowDemoWindow();
-    SpawnEnemyWindow(registry);
 
+    for (auto entity : GetEntities()) {
+      if (auto &script = entity.GetComponent<ScriptComponent>(); script.onDebugGUIFunction != sol::lua_nil) {
+        if (auto result = script.onDebugGUIFunction(entity); !result.valid()) {
+          sol::error err = result;
+          std::string what = err.what();
+          Logger::ErrorLua(what);
+        }
+      }
+    }
+    Logger::Log("Rendering debug GUI");
     ImGui::Render();
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
   }
 
-private:
+ private:
   static void SpawnEnemyWindow(std::unique_ptr<Registry>& registry) {
     if (ImGui::Begin("Spawn enemy")) {
       static int xPos = 0, yPos = 0;
@@ -39,8 +48,7 @@ private:
       static int xVelocity = 0, yVelocity = 0;
       const char* sprites[] = {"truck-image", "tank-image"};
       static int spriteSelectedIndex = 0;
-      static float projectileAngle = 0.0, projectileFrequency = 1.0,
-                   projectileDuration = 5.0;
+      static float projectileAngle = 0.0, projectileFrequency = 1.0, projectileDuration = 5.0;
       static int projectileSpeed = 100, projectileDamage = 10;
       static int maxHealth = 100, startingHealth = 100;
 
@@ -59,8 +67,7 @@ private:
       if (ImGui::BeginCombo("Sprite", combo_preview_value)) {
         for (int n = 0; n < IM_ARRAYSIZE(sprites); n++) {
           const bool is_selected = (spriteSelectedIndex == n);
-          if (ImGui::Selectable(sprites[n], is_selected))
-            spriteSelectedIndex = n;
+          if (ImGui::Selectable(sprites[n], is_selected)) spriteSelectedIndex = n;
 
           // Set the initial focus when opening the combo (scrolling + keyboard
           // navigation focus)
@@ -85,23 +92,18 @@ private:
       if (ImGui::Button("Spawn")) {
         auto sprite = std::string(sprites[spriteSelectedIndex]);
         const auto radians = glm::radians(projectileAngle);
-        auto projectileVelocity =
-            glm::vec2(glm::cos(radians), glm::sin(radians)) *
-            (float)projectileSpeed;
-        auto projectileFrequencyMs =
-            static_cast<int>(projectileFrequency * 1000);
+        auto projectileVelocity = glm::vec2(glm::cos(radians), glm::sin(radians)) * (float)projectileSpeed;
+        auto projectileFrequencyMs = static_cast<int>(projectileFrequency * 1000);
         auto projectileDurationMs = static_cast<int>(projectileDuration * 1000);
 
         auto enemy = registry->CreateEntity();
         enemy.Group("enemies");
-        enemy.AddComponent<TransformComponent>(
-            glm::vec2(xPos, yPos), glm::vec2(scale, scale), rotation);
+        enemy.AddComponent<TransformComponent>(glm::vec2(xPos, yPos), glm::vec2(scale, scale), rotation);
         enemy.AddComponent<RigidBodyComponent>(glm::vec2(xVelocity, yVelocity));
         enemy.AddComponent<SpriteComponent>(sprite, 32, 32, 1);
         enemy.AddComponent<BoxColliderComponent>(32, 32);
-        enemy.AddComponent<ProjectileEmitterComponent>(
-            projectileVelocity, projectileDurationMs, projectileFrequencyMs,
-            projectileDamage, false);
+        enemy.AddComponent<ProjectileEmitterComponent>(projectileVelocity, projectileDurationMs, projectileFrequencyMs,
+                                                       projectileDamage, false);
         enemy.AddComponent<HealthComponent>(maxHealth, startingHealth);
       }
     }
