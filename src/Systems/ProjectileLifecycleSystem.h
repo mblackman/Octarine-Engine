@@ -15,12 +15,12 @@ class ProjectileLifecycleSystem : public System {
 
   ~ProjectileLifecycleSystem() = default;
 
-  void Update() const {
+  void Update(const float deltaTime) const {
     for (auto entity : GetEntities()) {
-      const auto projectile = entity.GetComponent<ProjectileComponent>();
+      auto& projectile = entity.GetComponent<ProjectileComponent>();
 
-      if (static_cast<int>(SDL_GetTicks()) - projectile.spawnTime >
-          projectile.duration) {
+      projectile.timer += deltaTime;
+      if (projectile.timer > projectile.duration) {
         entity.Blam();
       }
     }

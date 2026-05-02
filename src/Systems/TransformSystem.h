@@ -5,6 +5,13 @@
 #include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
 
+struct TransformUpdateJob {
+  Entity entity;
+  glm::vec2 parent_global_position;
+  glm::vec2 parent_global_scale;
+  double parent_global_rotation;
+};
+
 class TransformSystem : public System {
  public:
   TransformSystem() { RequireComponent<TransformComponent>(); }
@@ -18,43 +25,34 @@ class TransformSystem : public System {
   ~TransformSystem() = default;
 
   void Update() const {
-    for (auto entity : GetRootEntities()) {
-      auto& transform = entity.GetComponent<TransformComponent>();
-      transform.globalPosition.x = transform.position.x;
-      transform.globalPosition.y = transform.position.y;
-      transform.globalScale.x = transform.scale.x;
-      transform.globalScale.y = transform.scale.y;
-      transform.globalRotation = transform.rotation;
+    std::stack<TransformUpdateJob> jobs;
 
-      auto children = entity.GetChildren();
+    for (const auto& rootEntity : GetRootEntities()) {
+      jobs.push({rootEntity, glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 1.0f), 0.0});
+    }
 
-      if (children.has_value()) {
-        for (const auto& child : children.value()) {
-          UpdateEntityTransform(child, transform.position, transform.scale, transform.rotation);
-        }
+    while (!jobs.empty()) {
+      const auto [entity, parent_global_position, parent_global_scale, parent_global_rotation] = jobs.top();
+      jobs.pop();
+
+      if (!entity.HasComponent<TransformComponent>()) {
+        continue;
       }
-    }
-  }
 
- private:
-  void UpdateEntityTransform(const Entity entity, glm::vec2 position, glm::vec2 scale, double rotation) const {
-    if (entity.HasComponent<TransformComponent>()) {
       auto& transform = entity.GetComponent<TransformComponent>();
-      position += transform.position;
-      scale *= transform.scale;
-      rotation += transform.rotation;
-      transform.globalPosition.x = position.x;
-      transform.globalPosition.y = position.y;
-      transform.globalScale.x = scale.x;
-      transform.globalScale.y = scale.y;
-      transform.globalRotation = rotation;
-    }
 
-    auto children = entity.GetChildren();
+      const glm::vec2 globalPosition = parent_global_position + transform.position;
+      const glm::vec2 globalScale = parent_global_scale * transform.scale;
+      const double globalRotation = parent_global_rotation + transform.rotation;
 
-    if (children.has_value()) {
-      for (const auto& child : children.value()) {
-        UpdateEntityTransform(child, position, scale, rotation);
+      transform.globalPosition = globalPosition;
+      transform.globalScale = globalScale;
+      transform.globalRotation = globalRotation;
+
+      if (auto children = entity.GetChildren(); children.has_value()) {
+        for (const auto& child : children.value()) {
+          jobs.push({child, globalPosition, globalScale, globalRotation});
+        }
       }
     }
   }

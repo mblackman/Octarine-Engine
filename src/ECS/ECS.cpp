@@ -1,6 +1,5 @@
 #include "ECS.h"
 
-#include <algorithm>
 #include <deque>
 #include <memory>
 #include <optional>

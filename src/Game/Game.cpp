@@ -215,8 +215,9 @@ void Game::ProcessInput() const {
 
 void Game::Update() {
   // If we are too fast, waste some time until we reach the frame time
-  const Uint64 timeToWait = Constants::kMillisecondsPerFrame - (SDL_GetTicks() - milliseconds_previous_frame_);
-  if (timeToWait > 0 && timeToWait <= static_cast<Uint64>(Constants::kMillisecondsPerFrame)) {
+  const Uint64 elapsedTime = SDL_GetTicks() - milliseconds_previous_frame_;
+  if (elapsedTime < Constants::kMillisecondsPerFrame) {
+    const Uint32 timeToWait = Constants::kMillisecondsPerFrame - static_cast<Uint32>(elapsedTime);
     SDL_Delay(timeToWait);
   }
 
@@ -244,7 +245,7 @@ void Game::Update() {
   registry_->GetSystem<KeyboardControlSystem>().Update();
   registry_->GetSystem<CameraFollowSystem>().Update(camera_);
   registry_->GetSystem<ProjectileEmitSystem>().Update(deltaTime, registry_);
-  registry_->GetSystem<ProjectileLifecycleSystem>().Update();
+  registry_->GetSystem<ProjectileLifecycleSystem>().Update(deltaTime);
   registry_->GetSystem<DisplayHealthSystem>().Update(registry_);
   registry_->GetSystem<ScriptSystem>().Update(deltaTime);
   registry_->Update();

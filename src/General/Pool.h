@@ -1,93 +1,143 @@
 #pragma once
 
+#include <stdexcept>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 class IPool {
  public:
   IPool() = default;
+  virtual ~IPool() = default;
+
   IPool(const IPool&) = delete;
   IPool& operator=(const IPool&) = delete;
-
   IPool(IPool&&) = delete;
   IPool& operator=(IPool&&) = delete;
 
-  virtual ~IPool() = default;
   virtual void Remove(int id) = 0;
 };
 
 /**
- * A contiguous set of object of type T.
+ * @brief A data pool that provides O(1) insertion, deletion, and access
+ * via an integer ID.
+ *
+ * This pool stores objects of type T in a contiguous block of memory.
+ * It uses a "swap and pop" strategy for removals to avoid memory fragmentation
+ * and maintain data locality, which is ideal for performance-critical applications
+ * like games. The order of elements is not guaranteed.
+ *
+ * @tparam T The type of object to store in the pool.
  */
 template <typename T>
 class Pool final : public IPool {
+ private:
   std::vector<T> data_;
-  size_t size_;
 
-  std::unordered_map<int, int> index_to_ids_;
-  std::unordered_map<int, int> id_to_indexes_;
+  std::unordered_map<int, size_t> id_to_index_;
+  std::unordered_map<size_t, int> index_to_id_;
 
  public:
-  explicit Pool(const size_t size = 100) : size_(0) { Resize(size); }
+  /**
+   * @brief Constructs the Pool.
+   * @param initial_capacity The initial amount of memory to reserve.
+   * This helps avoid reallocations on initial insertions.
+   */
+  explicit Pool(const size_t initial_capacity = 100) { data_.reserve(initial_capacity); }
 
-  [[nodiscard]] bool IsEmpty() const { return size_ == 0; }
+  /**
+   * @brief Checks if the pool contains an element with the given ID.
+   */
+  [[nodiscard]] bool Contains(const int id) const { return id_to_index_.count(id) > 0; }
 
-  [[nodiscard]] size_t GetSize() const { return size_; }
+  /**
+   * @brief Checks if the pool is empty.
+   */
+  [[nodiscard]] bool IsEmpty() const { return data_.empty(); }
 
-  void Resize(size_t size) { data_.resize(size); }
+  /**
+   * @brief Gets the number of elements currently in the pool.
+   */
+  [[nodiscard]] size_t GetSize() const { return data_.size(); }
 
+  /**
+   * @brief Removes all elements from the pool and clears all memory.
+   */
   void Clear() {
     data_.clear();
-    size_ = 0;
-    index_to_ids_.clear();
-    id_to_indexes_.clear();
+    id_to_index_.clear();
+    index_to_id_.clear();
   }
 
-  void Set(int id, const T value) {
-    if (id_to_indexes_.find(id) != id_to_indexes_.end()) {
-      int index = id_to_indexes_[id];
-      data_[index] = value;
+  /**
+   * @brief Adds a new element or updates an existing one.
+   * @param id The ID of the element.
+   * @param value The object to add or use for the update.
+   */
+  void Set(const int id, T value) {
+    if (const auto it = id_to_index_.find(id); it != id_to_index_.end()) {
+      data_[it->second] = std::move(value);
     } else {
-      size_t index = size_;
-      id_to_indexes_.emplace(id, index);
-      index_to_ids_.emplace(index, id);
+      const size_t new_index = data_.size();
 
-      if (index >= data_.capacity()) {
-        Resize(size_ * 2);
-      }
+      id_to_index_[id] = new_index;
+      index_to_id_[new_index] = id;
 
-      data_[index] = value;
-      size_++;
+      data_.emplace_back(std::move(value));
     }
   }
 
-  void Remove(int id) override {
-    const auto index = id_to_indexes_.find(id);
-    if (index == id_to_indexes_.end()) {
+  /**
+   * @brief Removes an element from the pool using the "swap and pop" method.
+   * This is an O(1) operation but does not preserve the order of elements.
+   * @param id The ID of the element to remove.
+   */
+  void Remove(const int id) override {
+    const auto it = id_to_index_.find(id);
+    if (it == id_to_index_.end()) {
+      // The ID doesn't exist, so there's nothing to do.
       return;
     }
 
-    int indexOfRemoved = index->second;
-    int indexOfLast = size_ - 1;
-    data_[indexOfRemoved] = data_[indexOfLast];
+    const size_t index_to_remove = it->second;
 
-    const int entityIdOfLastElement = index_to_ids_[indexOfLast];
-    id_to_indexes_[entityIdOfLastElement] = indexOfRemoved;
-    index_to_ids_[indexOfRemoved] = entityIdOfLastElement;
+    const size_t last_index = data_.size() - 1;
 
-    id_to_indexes_.erase(id);
-    index_to_ids_.erase(indexOfLast);
+    if (index_to_remove != last_index) {
+      data_[index_to_remove] = std::move(data_[last_index]);
 
-    size_--;
-  }
-
-  T& Get(int id) {
-    const auto index = id_to_indexes_.find(id);
-    if (index == id_to_indexes_.end()) {
-      throw std::runtime_error("Element not found with id: " + std::to_string(id));
+      const int id_of_last_element = index_to_id_.at(last_index);
+      id_to_index_[id_of_last_element] = index_to_remove;
+      index_to_id_[index_to_remove] = id_of_last_element;
     }
 
-    return static_cast<T&>(data_[index->second]);
+    id_to_index_.erase(id);
+    index_to_id_.erase(last_index);
+
+    data_.pop_back();
   }
 
-  T& operator[](unsigned int index) { return data_[index]; }
+  /**
+   * @brief Gets a reference to an element by its ID.
+   * @throws std::runtime_error if the ID is not found.
+   */
+  T& Get(const int id) {
+    const auto it = id_to_index_.find(id);
+    if (it == id_to_index_.end()) {
+      throw std::runtime_error("Pool::Get Error: Element not found with id: " + std::to_string(id));
+    }
+    return data_[it->second];
+  }
+
+  /**
+   * @brief Gets a const reference to an element by its ID.
+   * @throws std::runtime_error if the ID is not found.
+   */
+  const T& Get(const int id) const {
+    const auto it = id_to_index_.find(id);
+    if (it == id_to_index_.end()) {
+      throw std::runtime_error("Pool::Get Error: Element not found with id: " + std::to_string(id));
+    }
+    return data_[it->second];
+  }
 };
