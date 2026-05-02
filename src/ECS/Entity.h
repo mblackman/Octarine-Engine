@@ -1,6 +1,5 @@
 #pragma once
 #include <bitset>
-#include <optional>
 #include <queue>
 
 #include "ECS.h"

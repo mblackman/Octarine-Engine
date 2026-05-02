@@ -7,12 +7,12 @@
 
 class AnimationSystem {
  public:
-  void operator()(const Iter& iter, SpriteComponent& sprite, AnimationComponent& animation) const {
+  void operator()(const ContextFacade& context, SpriteComponent& sprite, AnimationComponent& animation) const {
     if (animation.numFrames <= 0 || animation.frameRateSpeed <= 0 || animation.isFinished) {
       return;
     }
 
-    UpdateAnimationState(animation, iter.deltaTime);
+    UpdateAnimationState(animation, context.DeltaTime());
 
     sprite.srcRect.x = static_cast<float>(animation.currentFrame) * sprite.width;
     // sprite.srcRect.y = animation.currentFrame * sprite.height;

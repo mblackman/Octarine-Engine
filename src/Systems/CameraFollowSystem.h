@@ -5,34 +5,30 @@
 #include "../Components/CameraFollowComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../ECS/System.h"
+#include "Components/CameraComponents.h"
+#include "ECS/Iterable.h"
+#include "ECS/Registry.h"
 #include "Game/GameConfig.h"
 #include "General/Constants.h"
 
-class CameraFollowSystem : public System {
+class CameraFollowSystem {
  public:
-  CameraFollowSystem(Registry* registry) : System(registry) {
-    // RequireComponent<CameraFollowComponent>();
-    // RequireComponent<TransformComponent>();
-  }
+  void operator()(const ContextFacade& context, const TransformComponent& transform,
+                  CameraFollowComponent& cameraFollow) const {
+    auto& camera = context.Registry()->Get<CameraComponent>();
+    const auto& gameConfig = context.Registry()->Get<GameConfig>();
 
-  void Update(SDL_FRect& camera) const {
-    //   for (auto entity : GetEntities()) {
-    //     const auto transform = entity.GetComponent<TransformComponent>();
-    //
-    //     if (transform.position.x + camera.w / Constants::kHalf < GameConfig::GetInstance().playableAreaWidth) {
-    //       camera.x = transform.position.x - static_cast<float>(GameConfig::GetInstance().windowWidth) /
-    //       Constants::kHalf;
-    //     }
-    //
-    //     if (transform.position.y + camera.h / Constants::kHalf < GameConfig::GetInstance().playableAreaHeight) {
-    //       camera.y = transform.position.y - static_cast<float>(GameConfig::GetInstance().windowHeight) /
-    //       Constants::kHalf;
-    //     }
-    //
-    //     camera.x = std::max(0.0f, camera.x);
-    //     camera.y = std::max(0.0f, camera.y);
-    //     camera.x = std::min(camera.w, camera.x);
-    //     camera.y = std::min(camera.h, camera.y);
-    //   }
-    // }
-  };
+    if (transform.position.x + camera.viewport.w / Constants::kHalf < gameConfig.playableAreaWidth) {
+      camera.viewport.x = transform.position.x - static_cast<float>(gameConfig.windowWidth) / Constants::kHalf;
+    }
+
+    if (transform.position.y + camera.viewport.h / Constants::kHalf < gameConfig.playableAreaHeight) {
+      camera.viewport.y = transform.position.y - static_cast<float>(gameConfig.windowHeight) / Constants::kHalf;
+    }
+
+    camera.viewport.x = std::max(0.0f, camera.viewport.x);
+    camera.viewport.y = std::max(0.0f, camera.viewport.y);
+    camera.viewport.x = std::min(camera.viewport.w, camera.viewport.x);
+    camera.viewport.y = std::min(camera.viewport.h, camera.viewport.y);
+  }
+};

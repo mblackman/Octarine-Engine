@@ -107,7 +107,7 @@ class ScriptSystem {
     eventBus->SubscribeEvent<ScriptSystem, KeyInputEvent>(this, &ScriptSystem::OnKeyInput);
   }
 
-  void operator()(const Iter &iter, ScriptComponent &script) const {
+  void operator()(const ContextFacade &context, ScriptComponent &script) const {
     // for (auto entity : GetEntities()) {
     //   if (auto &script = entity.GetComponent<ScriptComponent>(); script.updateFunction != sol::lua_nil) {
     //     if (auto result = script.updateFunction(script.scriptTable, entity, deltaTime); !result.valid()) {

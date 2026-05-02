@@ -1,16 +1,12 @@
 #pragma once
 
-#include <spdlog/common.h>
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
+#include <cassert>
 #include <set>
 #include <unordered_map>
 #include <vector>
 
 #include "Entity.h"
-#include "General/Logger.h"
-#include "Iter.h"
 
 constexpr unsigned int kMaxComponents = 64;
 constexpr size_t kChunkSize = 16 * 1024;  // 16KB
@@ -162,6 +158,9 @@ class Chunk {
 
 class Archetype {
  public:
+  template <typename... TComponents>
+  friend class ArchetypeQuery;
+
   explicit Archetype(const Signature signature, const ComponentRegistry& componentRegistry)
       : edges(), signature_(signature), chunk_capacity_(0) {
     component_infos_.reserve(signature.count());
@@ -246,42 +245,6 @@ class Archetype {
             static_cast<unsigned char*>(destArray) + destinationLocation.indexInChunk * info.size;
 
         memcpy(dest_component_ptr, source_component_ptr, info.size);
-      }
-    }
-  }
-
-  template <typename Func, typename... TComponents>
-  void ForEach(Func func) {
-    for (size_t chunk_idx = 0; chunk_idx < chunks_.size(); ++chunk_idx) {
-      auto& chunk = chunks_[chunk_idx];
-      const size_t entity_count = chunk.GetEntityCount();
-      if (entity_count == 0) {
-        continue;
-      }
-
-      auto component_arrays = std::make_tuple(GetComponentArray<TComponents>(chunk_idx)...);
-
-      for (size_t i = 0; i < entity_count; ++i) {
-        std::apply([&](auto*... arrays) { func(arrays[i]...); }, component_arrays);
-      }
-    }
-  }
-
-  template <typename Func, typename... TComponents>
-  void ForEach(Func func, Iter& iter) {
-    for (size_t chunk_idx = 0; chunk_idx < chunks_.size(); ++chunk_idx) {
-      auto& chunk = chunks_[chunk_idx];
-      const size_t entity_count = chunk.GetEntityCount();
-      if (entity_count == 0) {
-        continue;
-      }
-
-      auto component_arrays = std::make_tuple(GetComponentArray<TComponents>(chunk_idx)...);
-      const auto entityArray = chunk.GetEntityArray();
-
-      for (size_t i = 0; i < entity_count; ++i) {
-        iter.entity = entityArray[i];
-        std::apply([&](auto*... arrays) { func(iter, arrays[i]...); }, component_arrays);
       }
     }
   }

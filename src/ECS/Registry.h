@@ -1,15 +1,28 @@
 #pragma once
 
 #include <any>
+#include <memory>
+#include <stdexcept>
+#include <string>
 
+#include "ArchetypeQuery.h"
 #include "Component.h"
 #include "Entity.h"
-#include "Iter.h"
+#include "General/Logger.h"
+#include "Iterable.h"
 #include "System.h"
 
 class Query {
  public:
+  Query() = default;
   virtual ~Query() = default;
+
+  Query(Query&&) = default;
+  Query(Query& query) = default;
+
+  Query& operator=(Query&&) = default;
+  Query& operator=(const Query& query) = default;
+
   virtual void Update() = 0;
 };
 
@@ -18,12 +31,15 @@ class ComponentQuery;
 
 class Registry {
  public:
+  template <typename... TComponents>
+  friend class ComponentQuery;
+
   Registry() {
     entity_manager_ = std::make_unique<EntityManager>();
     component_registry_ = std::make_unique<ComponentRegistry>();
   }
 
-  void Update(float deltaTime) const;
+  void Update(float deltaTime);
 
   // Entity management
   Entity CreateEntity();
@@ -91,7 +107,7 @@ class Registry {
   }
 
   template <typename T>
-  bool HasComponent(const Entity entity) const {
+  [[nodiscard]] bool HasComponent(const Entity entity) const {
     const auto it = entity_locations_.find(entity.id);
     if (it == entity_locations_.end()) {
       Logger::Warn("Could not find entity with ID: " + std::to_string(entity.id) + " to check for component");
@@ -129,7 +145,7 @@ class Registry {
       explicit SystemWrapper(Registry* registry, Func&& f)
           : func_(std::forward<Func>(f)), query_(registry->CreateQuery<TArgs...>()) {}
 
-      void Update(const Registry& registry, float deltaTime) override { query_.ForEach(this->func_, deltaTime); }
+      void Update(const Registry& registry) override { query_.ForEach(this->func_); }
 
      private:
       Func func_;
@@ -176,38 +192,58 @@ class Registry {
   std::unordered_map<Signature, std::unique_ptr<Query>> queries_;
   std::vector<std::unique_ptr<ISystem>> systems_;
   std::unordered_map<ComponentTypeID, std::any> singleton_components_;
+  float delta_time_;
 };
 
 template <typename... TComponents>
 class ComponentQuery final : public Query {
  public:
-  explicit ComponentQuery(Registry* registry) : registry_(registry), signature_(GetSignature<TComponents...>()) {}
+  explicit ComponentQuery(Registry* registry)
+      : registry_(registry),
+        signature_(GetSignature<TComponents...>()),
+        archetype_query_(registry_->GetMatchingArchetypes(signature_)) {}
 
-  void Update() override { cached_archetypes_ = registry_->GetMatchingArchetypes(signature_); }
+  void Update() override {
+    archetype_query_ = ArchetypeQuery<TComponents...>(registry_->GetMatchingArchetypes(signature_));
+  }
 
   template <typename Func>
-  void ForEach(Func func, const float deltaTime = 0) {
-    if constexpr (std::is_invocable_v<Func, Iter&, TComponents&...>) {
-      Iter iter{registry_, deltaTime};
-
-      for (auto* archetype : cached_archetypes_) {
-        archetype->ForEach<Func, TComponents...>(std::forward<Func>(func), iter);
+  void ForEach(Func func) {
+    for (const auto iterable = CreateIterable(); auto&& context : iterable) {
+      if constexpr (std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
+        func(context, context.Component<TComponents>()...);
+      } else if constexpr (std::is_invocable_v<Func, Entity, TComponents&...>) {
+        func(context.Entity(), context.Entity(), context.Component<TComponents>()...);
+      } else if constexpr (std::is_invocable_v<Func, TComponents&...>) {
+        func(context.Component<TComponents>()...);
+      } else {
+        static_assert(!std::is_same_v<Func, Func>,
+                      "The function passed to ForEach does not match the required signatures. "
+                      "Expected one of: void(Iter&, T&...), void(Entity, T&...), or void(T&...).");
       }
-
-    } else if constexpr (std::is_invocable_v<Func, TComponents&...>) {
-      for (auto* archetype : cached_archetypes_) {
-        archetype->ForEach<Func, TComponents...>(std::forward<Func>(func));
-      }
-
-    } else {
-      static_assert(!std::is_same_v<Func, Func>,
-                    "The function passed to ForEach does not match the required signatures. "
-                    "Expected either: void(Iter&, T*...) or void(Entity, T&...).");
     }
   }
 
+  template <typename Func>
+  void Iterate(Func&& func) {
+    func(CreateIterable());
+  }
+
  private:
+  Iterable CreateIterable() {
+    auto beginFunc = [&]() {
+      return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.begin(), registry_,
+                                                                                  registry_->delta_time_));
+    };
+    auto endFunc = [&]() {
+      return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.end(), registry_,
+                                                                                  registry_->delta_time_));
+    };
+
+    return Iterable(beginFunc, endFunc);
+  }
+
   Registry* registry_;
   Signature signature_;
-  std::vector<Archetype*> cached_archetypes_;
+  ArchetypeQuery<TComponents...> archetype_query_;
 };
