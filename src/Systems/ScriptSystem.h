@@ -15,12 +15,13 @@
 #include "../Components/ScriptComponent.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
-#include "../Components/UIButtonComponent.h"
 #include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
 #include "../Game/Game.h"
 #include "../General/Logger.h"
+#include "Lua/ComponentLuaFactory.h"
+#include "Lua/LuaEntityLoader.h"
 #include "sol_ImGui.h"
 
 inline glm::vec2 GetEntityPosition(const Entity entity) {
@@ -151,7 +152,7 @@ class ScriptSystem : public System {
       this->LoadAsset(std::move(assetTable), game.GetAssetManager(), game.GetRenderer());
     });
     lua.set_function("load_entity", [this, &game](sol::table assetTable) {
-      this->LoadEntity(std::move(assetTable), game.GetRegistry());
+      LuaEntityLoader::LoadEntityFromLua(game.GetRegistry(), std::move(assetTable));
     });
     lua.set_function("get_asset_path", [this, &game](const std::string &relativePath) {
       return this->GetAssetPath(relativePath, game.GetAssetManager());
@@ -220,8 +221,6 @@ class ScriptSystem : public System {
     return lowerKey;
   }
 
-  void LoadEntity(sol::table entityTable, Registry *registry) const;
-
   void LoadAsset(sol::table assetTable, AssetManager *assetManager, SDL_Renderer *renderer) const {
     if (const std::string assetType = assetTable["type"]; assetType == "texture") {
       assetManager->AddTexture(renderer, assetTable["id"], assetTable["file"]);
@@ -243,128 +242,3 @@ class ScriptSystem : public System {
   std::unordered_map<std::string, std::unordered_set<std::string> > keyMap_;
 };
 
-inline void ScriptSystem::LoadEntity(sol::table entityTable, Registry *registry) const {
-  Entity newEntity = registry->CreateEntity();
-
-  // Tag
-  if (sol::optional<std::string> tag = entityTable["tag"]; tag != sol::nullopt) {
-    newEntity.Tag(entityTable["tag"]);
-  }
-
-  // Group
-  if (sol::optional<std::string> group = entityTable["group"]; group != sol::nullopt) {
-    newEntity.Group(entityTable["group"]);
-  }
-
-  // Components
-  if (sol::optional<sol::table> hasComponents = entityTable["components"]; hasComponents != sol::nullopt) {
-    // Transform
-    sol::optional<sol::table> transform = entityTable["components"]["transform"];
-    if (transform != sol::nullopt) {
-      newEntity.AddComponent<TransformComponent>(
-          glm::vec2(entityTable["components"]["transform"]["position"]["x"],
-                    entityTable["components"]["transform"]["position"]["y"]),
-          glm::vec2(entityTable["components"]["transform"]["scale"]["x"].get_or(1.0),
-                    entityTable["components"]["transform"]["scale"]["y"].get_or(1.0)),
-          entityTable["components"]["transform"]["rotation"].get_or(0.0));
-    }
-
-    // RigidBody
-    sol::optional<sol::table> rigidbody = entityTable["components"]["rigidbody"];
-    if (rigidbody != sol::nullopt) {
-      newEntity.AddComponent<RigidBodyComponent>(
-          glm::vec2(entityTable["components"]["rigidbody"]["velocity"]["x"].get_or(0.0),
-                    entityTable["components"]["rigidbody"]["velocity"]["y"].get_or(0.0)));
-    }
-
-    // Sprite
-    if (sol::optional<sol::table> sprite = entityTable["components"]["sprite"]; sprite != sol::nullopt) {
-      newEntity.AddComponent<SpriteComponent>(
-          entityTable["components"]["sprite"]["texture_asset_id"], entityTable["components"]["sprite"]["width"],
-          entityTable["components"]["sprite"]["height"], entityTable["components"]["sprite"]["layer"].get_or(1),
-          entityTable["components"]["sprite"]["fixed"].get_or(false),
-          entityTable["components"]["sprite"]["src_rect_x"].get_or(0),
-          entityTable["components"]["sprite"]["src_rect_y"].get_or(0));
-    }
-
-    // Square primitive
-    if (sol::optional<sol::table> square = entityTable["components"]["square"]; square != sol::nullopt) {
-      sol::table color = entityTable["components"]["square"]["color"];
-      Uint8 alphaDefault = 255;
-      SDL_Color sdlColor = {color["r"], color["g"], color["b"], color["a"].get_or(alphaDefault)};
-      newEntity.AddComponent<SquarePrimitiveComponent>(
-          glm::vec2(entityTable["components"]["square"]["position"]["x"].get_or(0),
-                    entityTable["components"]["square"]["position"]["y"].get_or(0)),
-          entityTable["components"]["square"]["layer"].get_or(1), entityTable["components"]["square"]["width"],
-          entityTable["components"]["square"]["height"], sdlColor,
-          entityTable["components"]["square"]["is_fixed"].get_or(false));
-    }
-
-    // Animation
-    sol::optional<sol::table> animation = entityTable["components"]["animation"];
-    if (animation != sol::nullopt) {
-      newEntity.AddComponent<AnimationComponent>(entityTable["components"]["animation"]["num_frames"].get_or(1),
-                                                 entityTable["components"]["animation"]["speed_rate"].get_or(1));
-    }
-
-    // BoxCollider
-    sol::optional<sol::table> collider = entityTable["components"]["boxcollider"];
-    if (collider != sol::nullopt) {
-      newEntity.AddComponent<BoxColliderComponent>(
-          entityTable["components"]["boxcollider"]["width"], entityTable["components"]["boxcollider"]["height"],
-          glm::vec2(entityTable["components"]["boxcollider"]["offset"]["x"].get_or(0),
-                    entityTable["components"]["boxcollider"]["offset"]["y"].get_or(0)));
-    }
-
-    // Health
-    if (sol::optional<sol::table> health = entityTable["components"]["health"]; health != sol::nullopt) {
-      newEntity.AddComponent<HealthComponent>(
-          static_cast<int>(entityTable["components"]["health"]["max_health"].get_or(100)));
-    }
-
-    // ProjectileEmitter
-    sol::optional<sol::table> projectileEmitter = entityTable["components"]["projectile_emitter"];
-    if (projectileEmitter != sol::nullopt) {
-      newEntity.AddComponent<ProjectileEmitterComponent>(
-          glm::vec2(entityTable["components"]["projectile_emitter"]["projectile_velocity"]["x"],
-                    entityTable["components"]["projectile_emitter"]["projectile_velocity"]["y"]),
-          1000 * entityTable["components"]["projectile_emitter"]["repeat_frequency"].get_or(1),
-          1000 * entityTable["components"]["projectile_emitter"]["projectile_duration"].get_or(10),
-          entityTable["components"]["projectile_emitter"]["hit_damage"].get_or(10),
-          entityTable["components"]["projectile_emitter"]["friendly"].get_or(false));
-    }
-
-    // CameraFollow
-    sol::optional<sol::table> cameraFollow = entityTable["components"]["camera_follow"];
-    if (cameraFollow != sol::nullopt) {
-      newEntity.AddComponent<CameraFollowComponent>();
-    }
-
-    // KeyboardControlled
-    sol::optional<sol::table> keyboardControlled = entityTable["components"]["keyboard_controller"];
-    if (keyboardControlled != sol::nullopt) {
-      double velocity = entityTable["components"]["keyboard_controller"]["velocity"];
-      newEntity.AddComponent<KeyboardControlComponent>(velocity);
-    }
-
-    sol::optional<sol::table> script = entityTable["components"]["script"];
-    if (script != sol::nullopt) {
-      sol::optional<sol::protected_function> updateFunction = entityTable["components"]["script"]["on_update"];
-      sol::optional<sol::protected_function> debugGuiFunction = entityTable["components"]["script"]["on_debug_gui"];
-      newEntity.AddComponent<ScriptComponent>(updateFunction.value_or(sol::lua_nil),
-                                              debugGuiFunction.value_or(sol::lua_nil));
-    }
-
-    if (sol::optional<sol::table> button = entityTable["components"]["button"]; button != sol::nullopt) {
-      sol::table buttonTable = entityTable["components"]["button"];
-      bool isActive = entityTable["components"]["button"]["is_active"].get_or(false);
-      sol::optional<sol::protected_function> onClick = entityTable["components"]["button"]["on_click_script"];
-
-      if (onClick != sol::nullopt) {
-        newEntity.AddComponent<UIButtonComponent>(isActive, buttonTable, onClick.value());
-      } else {
-        newEntity.AddComponent<UIButtonComponent>(isActive, buttonTable);
-      }
-    }
-  }
-}
