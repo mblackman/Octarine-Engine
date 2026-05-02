@@ -40,6 +40,25 @@ void Registry::BlamEntity(const Entity entity) {
   if (swapped) {
     entity_locations_[swapped->id] = removedLocation;
   }
+
+  // Drop relationship entries authored by this entity, and any pair targeting it.
+  pairs_.erase(entity.id);
+  const auto targetId = static_cast<std::uint32_t>(entity.GetId());
+  for (auto pairIt = pairs_.begin(); pairIt != pairs_.end();) {
+    auto& pairSet = pairIt->second;
+    for (auto setIt = pairSet.begin(); setIt != pairSet.end();) {
+      if (Pair(*setIt).GetTarget() == targetId) {
+        setIt = pairSet.erase(setIt);
+      } else {
+        ++setIt;
+      }
+    }
+    if (pairSet.empty()) {
+      pairIt = pairs_.erase(pairIt);
+    } else {
+      ++pairIt;
+    }
+  }
 }
 
 std::vector<Archetype*> Registry::GetMatchingArchetypes(const ArchetypeType& type) const {
@@ -90,7 +109,12 @@ std::vector<Archetype*> Registry::GetMatchingArchetypes(const ArchetypeType& typ
 }
 
 EntityLocation Registry::TransitionAddComponent(const Entity entity, const ComponentID componentId) {
-  const EntityLocation oldLocation = entity_locations_[entity.id];
+  const auto locIt = entity_locations_.find(entity.id);
+  if (locIt == entity_locations_.end()) {
+    Logger::Warn("TransitionAddComponent called on missing entity " + std::to_string(entity.id));
+    return {nullptr, 0, 0};
+  }
+  const EntityLocation oldLocation = locIt->second;
   if (oldLocation.archetype->HasComponent(componentId)) {
     return oldLocation;
   }
@@ -122,7 +146,12 @@ EntityLocation Registry::TransitionAddComponent(const Entity entity, const Compo
 }
 
 EntityLocation Registry::TransitionRemoveComponent(const Entity entity, const ComponentID componentId) {
-  const EntityLocation oldLocation = entity_locations_[entity.id];
+  const auto locIt = entity_locations_.find(entity.id);
+  if (locIt == entity_locations_.end()) {
+    Logger::Warn("TransitionRemoveComponent called on missing entity " + std::to_string(entity.id));
+    return {nullptr, 0, 0};
+  }
+  const EntityLocation oldLocation = locIt->second;
   if (!oldLocation.archetype->HasComponent(componentId)) {
     return oldLocation;
   }

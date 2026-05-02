@@ -26,6 +26,7 @@ void Renderer::Render(const Registry* registry, SDL_Renderer* renderer) const {
 
   for (const RenderKey& renderKey : renderQueue) {
     const Entity entity = renderKey.entity;
+    if (!registry->IsAlive(entity)) continue;
 
     switch (const RenderableType type = renderKey.type) {
       case SPRITE:

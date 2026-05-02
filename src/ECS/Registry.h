@@ -82,6 +82,8 @@ class Registry {
   // Defer destroy until end of Registry::Update — safe to call during system iteration.
   void QueueBlamEntity(const Entity entity) { pending_blams_.push_back(entity); }
 
+  [[nodiscard]] bool IsAlive(const Entity entity) const { return entity_locations_.contains(entity.id); }
+
   // Component management
   template <typename T>
   Entity Component() {
@@ -110,6 +112,7 @@ class Registry {
   void AddComponent(const Entity entity, T component) {
     const Entity componentEntity = Component<T>();
     const EntityLocation newLocation = TransitionAddComponent(entity, componentEntity.GetId());
+    if (newLocation.archetype == nullptr) return;
     newLocation.archetype->AddComponent(newLocation, componentEntity, component);
   }
 

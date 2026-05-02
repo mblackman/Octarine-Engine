@@ -69,8 +69,8 @@ class ProjectileEmitSystem {
 
     auto projectile = registry->CreateEntity();
     const auto entityMask = registry->GetComponent<EntityMaskComponent>(entity);
-    registry->AddTag(projectile, "projectile");
-    registry->AddComponent(entity, EntityMaskComponent(entityMask.mask));
+    registry->AddTag(projectile, "projectiles");
+    registry->AddComponent(projectile, EntityMaskComponent(entityMask.mask));
     registry->AddComponent(projectile, TransformComponent(projectilePosition, glm::vec2(1.0, 1.0), 0.0));
     registry->AddComponent(projectile, RigidBodyComponent(velocity));
     registry->AddComponent(projectile, BoxColliderComponent(4, 4, glm::vec2(0, 0), emitter.collisionMask));
