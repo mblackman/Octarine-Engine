@@ -1,7 +1,7 @@
 #include "./Game/Game.h"
 #include "./General/Logger.h"
 
-int main(const int argc, char* argv[]) {
+int main(const int argc, char *argv[]) {
   Logger::Init();
 
   std::string gamePath;
@@ -16,7 +16,7 @@ int main(const int argc, char* argv[]) {
         Logger::Info("Game path set to: " + gamePath);
       } else {
         Logger::Error(
-            "Error: " + currentArg + " flag requires a path argument.");
+          "Error: " + currentArg + " flag requires a path argument.");
         return 1;
       }
     } else {

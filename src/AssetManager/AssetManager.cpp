@@ -9,7 +9,7 @@
 
 #include "../General/Logger.h"
 
-void AssetManager::SetGameConfig(const GameConfig& gameConfig) {
+void AssetManager::SetGameConfig(const GameConfig &gameConfig) {
   if (const auto scaleMode = gameConfig.GetDefaultScaleMode();
     scaleMode.has_value()) {
     SetDefaultScaleMode(scaleMode.value());
@@ -20,10 +20,10 @@ void AssetManager::SetGameConfig(const GameConfig& gameConfig) {
 AssetManager::~AssetManager() { ClearAssets(); }
 
 void AssetManager::ClearAssets() {
-  for (const auto& [fst, snd] : textures_) {
+  for (const auto &[fst, snd]: textures_) {
     SDL_DestroyTexture(snd);
   }
-  for (const auto& [fst, snd] : fonts_) {
+  for (const auto &[fst, snd]: fonts_) {
     TTF_CloseFont(snd);
   }
 
@@ -31,12 +31,12 @@ void AssetManager::ClearAssets() {
   fonts_.clear();
 }
 
-void AssetManager::AddTexture(SDL_Renderer* renderer,
-                              const std::string& assetId,
-                              const std::string& path) {
+void AssetManager::AddTexture(SDL_Renderer *renderer,
+                              const std::string &assetId,
+                              const std::string &path) {
   const std::string fullPath = GetFullPath(path);
 
-  SDL_Texture* texture = IMG_LoadTexture(renderer, fullPath.c_str());
+  SDL_Texture *texture = IMG_LoadTexture(renderer, fullPath.c_str());
   if (!texture) {
     Logger::Error("Failed to create texture: " + std::string(SDL_GetError()));
     return;
@@ -51,30 +51,30 @@ void AssetManager::AddTexture(SDL_Renderer* renderer,
   Logger::Info("Added texture: " + assetId + " from path: " + fullPath);
 }
 
-SDL_Texture* AssetManager::GetTexture(const std::string& assetId) const {
+SDL_Texture *AssetManager::GetTexture(const std::string &assetId) const {
   return textures_.at(assetId);
 }
 
-void AssetManager::AddFont(const std::string& assetId, const std::string& path,
+void AssetManager::AddFont(const std::string &assetId, const std::string &path,
                            const int fontSize) {
   const std::string fullPath = GetFullPath(path);
-  TTF_Font* font = TTF_OpenFont(fullPath.c_str(), fontSize);
+  TTF_Font *font = TTF_OpenFont(fullPath.c_str(), fontSize);
   fonts_.emplace(assetId, font);
 
   Logger::Info("Added font: " + assetId + " from path: " + fullPath);
 }
 
-TTF_Font* AssetManager::GetFont(const std::string& assetId) const {
+TTF_Font *AssetManager::GetFont(const std::string &assetId) const {
   return fonts_.at(assetId);
 }
 
-std::string AssetManager::GetFullPath(const std::string& relativePath) const {
+std::string AssetManager::GetFullPath(const std::string &relativePath) const {
   const std::filesystem::path basePath = base_path_;
   const std::filesystem::path assetPath = basePath / relativePath;
   return assetPath.string();
 }
 
-void AssetManager::SetDefaultScaleMode(const std::string& scaleMode) {
+void AssetManager::SetDefaultScaleMode(const std::string &scaleMode) {
   if (scaleMode == "nearest") {
     default_scale_mode_ = SDL_SCALEMODE_NEAREST;
   } else if (scaleMode == "linear") {

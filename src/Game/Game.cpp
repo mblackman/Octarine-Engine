@@ -38,8 +38,8 @@ int Game::windowHeight;
 float Game::mapWidth;
 float Game::mapHeight;
 
-inline void LoadGame(sol::state& lua, const AssetManager* assetManager,
-                     const GameConfig& gameConfig) {
+inline void LoadGame(sol::state &lua, const AssetManager *assetManager,
+                     const GameConfig &gameConfig) {
   const auto filePath = assetManager->
       GetFullPath(gameConfig.GetStartupScript());
 
@@ -68,7 +68,7 @@ Game::Game()
 
 Game::~Game() { Logger::Info("Game Destructor called."); }
 
-bool Game::Initialize(const std::string& assetPath) {
+bool Game::Initialize(const std::string &assetPath) {
   const auto SDL_INI =
       SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD;
 
@@ -93,10 +93,10 @@ bool Game::Initialize(const std::string& assetPath) {
   windowHeight = 1080;
 
   SDL_CreateWindowAndRenderer(
-      game_config_->GetGameTitle().c_str(),
-      windowWidth, windowHeight,
-      SDL_WINDOW_RESIZABLE,
-      &window_, &sdl_renderer_);
+    game_config_->GetGameTitle().c_str(),
+    windowWidth, windowHeight,
+    SDL_WINDOW_RESIZABLE,
+    &window_, &sdl_renderer_);
 
   if (!window_) {
     Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
@@ -110,8 +110,8 @@ bool Game::Initialize(const std::string& assetPath) {
 
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  (void)io;
+  ImGuiIO &io = ImGui::GetIO();
+  (void) io;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
@@ -187,7 +187,7 @@ void Game::ProcessInput() {
 
   while (SDL_PollEvent(&event)) {
     ImGui_ImplSDL3_ProcessEvent(&event);
-    auto& io = ImGui::GetIO();
+    auto &io = ImGui::GetIO();
     float mouseX, mouseY;
     const unsigned int buttons = SDL_GetMouseState(&mouseX, &mouseY);
     io.MousePos = ImVec2(mouseX, mouseY);
@@ -274,11 +274,11 @@ void Game::Render() {
   SDL_RenderPresent(sdl_renderer_);
 }
 
-void Game::SubscribeToEvents(std::unique_ptr<EventBus>& eventBus) {
+void Game::SubscribeToEvents(std::unique_ptr<EventBus> &eventBus) {
   eventBus->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
 }
 
-void Game::OnKeyInputEvent(KeyInputEvent& event) {
+void Game::OnKeyInputEvent(KeyInputEvent &event) {
   if (!event.isPressed) {
     return;
   }
@@ -295,7 +295,7 @@ void Game::OnKeyInputEvent(KeyInputEvent& event) {
   }
 }
 
-KeyInputEvent Game::GetKeyInputEvent(SDL_KeyboardEvent* event) {
+KeyInputEvent Game::GetKeyInputEvent(SDL_KeyboardEvent *event) {
   bool isPressed = event->down;
   return {event->key, event->mod, isPressed};
 }
