@@ -242,9 +242,9 @@ class Registry {
     try {
       return std::any_cast<const T&>(singleton_components_.at(entityComponent.GetId()));
 
-    } catch (const std::out_of_range& e) {
+    } catch (const std::out_of_range&) {
       throw std::runtime_error("Attempted to Get a singleton component that has not been Set.");
-    } catch (const std::bad_any_cast& e) {
+    } catch (const std::bad_any_cast&) {
       throw std::runtime_error("Type mismatch in Get. This indicates a logic error.");
     }
   }

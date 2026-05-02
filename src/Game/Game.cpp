@@ -261,11 +261,6 @@ void Game::Render(const float deltaTime) {
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
   SDL_RenderClear(sdl_renderer_);
 
-  // Render the game
-  // registry_->GetSystem<RenderSpriteSystem>().Update(render_queue_, camera_);
-  // registry_->GetSystem<RenderTextSystem>().Update(render_queue_);
-  // registry_->GetSystem<RenderPrimitiveSystem>().Update(render_queue_);
-
   renderQueue.Sort();
   renderer_->Render(registry_.get(), sdl_renderer_);
 

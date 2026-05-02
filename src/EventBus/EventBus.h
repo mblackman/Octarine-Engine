@@ -73,8 +73,6 @@ class EventBus {
 
   ~EventBus() { Logger::Info("Event bus destructed"); }
 
-  void Reset() { subscribers_.clear(); }
-
   template <typename TOwner, typename TEvent>
   void SubscribeEvent(TOwner* ownerInstance, void (TOwner::*callbackFunction)(TEvent&)) {
     const std::type_index eventTypeId = typeid(TEvent);
