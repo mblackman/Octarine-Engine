@@ -13,10 +13,16 @@ typedef std::bitset<kMaxEntityMasks> EntityMask;
 typedef std::uint16_t EntityGeneration;
 
 struct Entity {
-  EcsId id;
+  EntityID id;
 
-  [[nodiscard]] std::uint32_t GetId() const { return id; }
-  [[nodiscard]] std::uint16_t GetGeneration() const { return id >> kEntityGenerationOffset; }
+  Entity() = default;
+
+  explicit Entity(const EcsId id) : id(id) {}
+
+  [[nodiscard]] std::uint32_t GetId() const { return static_cast<std::uint32_t>(id); }
+  [[nodiscard]] std::uint16_t GetGeneration() const {
+    return static_cast<std::uint16_t>(id >> kEntityGenerationOffset);
+  }
 
   bool operator==(const Entity& other) const { return id == other.id; }
 
@@ -29,6 +35,8 @@ struct Entity {
   bool operator<=(const Entity& other) const { return id <= other.id; }
 
   bool operator>=(const Entity& other) const { return id >= other.id; }
+
+  explicit operator EntityID() const { return id; }
 };
 
 // TODO need to handle recycling entity generations
@@ -42,7 +50,7 @@ class EntityManager {
   }
 
   Entity CreateEntity() {
-    EcsId id;
+    EntityID id;
     if (!available_entities_.empty()) {
       id = available_entities_.front();
       available_entities_.pop();

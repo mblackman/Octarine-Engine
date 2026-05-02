@@ -16,10 +16,12 @@
 #include "Components/ScriptComponent.h"
 #include "Components/SpriteComponent.h"
 #include "Components/TransformComponent.h"
+#include "ECS/Query.h"
 #include "ECS/Registry.h"
 #include "GameConfig.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/CameraFollowSystem.h"
+#include "Systems/ProjectileEmitSystem.h"
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "imgui.h"
@@ -146,11 +148,12 @@ void Game::Setup() {
   ScriptSystem scriptSystem;
   // registry_->AddSystem<TransformSystem>();
   registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
-  // registry_->AddSystem<ProjectileEmitSystem>();
-  // registry_->AddSystem<ProjectileLifecycleSystem>();
-  // registry_->AddSystem<DisplayHealthSystem>();
-  // registry_->AddSystem<DamageSystem>();
-  // registry_->AddSystem<MovementSystem>();
+  // registry_->RegisterSystem<TransformComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
+  //  registry_->AddSystem<ProjectileEmitSystem>();
+  //  registry_->AddSystem<ProjectileLifecycleSystem>();
+  //  registry_->AddSystem<DisplayHealthSystem>();
+  //  registry_->AddSystem<DamageSystem>();
+  //  registry_->AddSystem<MovementSystem>();
   //
   registry_->RegisterSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
   // registry_->AddSystem<RenderTextSystem>();
@@ -211,8 +214,8 @@ void Game::ProcessInput() const {
 }
 
 void Game::Update(const float deltaTime) {
-  auto query = registry_->CreateQuery<TransformComponent, HealthComponent>();
-  query.ForEach([](TransformComponent &transform, HealthComponent &health) {
+  const auto query = registry_->CreateQuery<TransformComponent, HealthComponent>();
+  query->ForEach([](TransformComponent &transform, HealthComponent &health) {
     if (transform.position.x < 0) {
       transform.position.x = 0;
     }

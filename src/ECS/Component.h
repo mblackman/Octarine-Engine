@@ -36,74 +36,11 @@ struct ArchetypeEdge {
 };
 
 namespace Internal {
-inline ComponentID GetNextComponentID() {
-  // TODO This should limit to writing to only the first 32 bits, but given that requires over 2B components, we're ok.
-  static ComponentID lastID = 0;
-  return lastID++;
-}
-
 inline ArchetypeID GetNextArchetypeID() {
   static ArchetypeID lastID = 0;
   return lastID++;
 }
 }  // namespace Internal
-
-template <typename T>
-ComponentID GetComponentID() {
-  static ComponentID id = Internal::GetNextComponentID();
-  return id;
-}
-
-struct Type {
-  std::vector<ComponentID> ids;
-
-  [[nodiscard]] auto begin() const { return ids.begin(); }
-  [[nodiscard]] auto end() const { return ids.end(); }
-  [[nodiscard]] auto size() const { return ids.size(); }
-
-  bool operator==(const Type& other) const = default;
-
-  [[nodiscard]] bool Contains(const Type& other) const { return std::ranges::includes(ids, other.ids); }
-};
-
-template <typename... TComponents>
-Type CreateType() {
-  Type type;
-  type.ids.reserve(sizeof...(TComponents));
-  (type.ids.push_back(GetComponentID<TComponents>()), ...);
-  std::ranges::sort(type.ids);
-  return type;
-}
-
-inline Type CreateType(const std::vector<ComponentID>& components) {
-  Type type;
-  type.ids = components;
-  std::ranges::sort(type.ids);
-  return type;
-}
-
-inline Type CreateType(const std::vector<ComponentInfo>& components) {
-  Type type;
-  type.ids.reserve(components.size());
-  for (const auto& info : components) {
-    type.ids.push_back(info.id);
-  }
-  std::ranges::sort(type.ids);
-  return type;
-}
-
-namespace std {
-template <>
-struct hash<Type> {
-  size_t operator()(const Type& type) const noexcept {
-    size_t seed = 0;
-    for (const auto& id : type.ids) {
-      seed ^= 0x9e3779b9 + id + (seed << 6) + (seed >> 2);
-    }
-    return seed;
-  }
-};
-}  // namespace std
 
 inline size_t usableSpace = kChunkSize - sizeof(ChunkHeader);
 
@@ -189,17 +126,17 @@ class Archetype {
   friend class ArchetypeQuery;
 
   explicit Archetype(const std::vector<ComponentInfo>& componentsInfo)
-      : archetype_id_(Internal::GetNextArchetypeID()),
-        archetype_type_(CreateType(componentsInfo)),
-        component_infos_(componentsInfo),
-        chunk_capacity_(0) {
+      : archetype_id_(Internal::GetNextArchetypeID()), component_infos_(componentsInfo), chunk_capacity_(0) {
+    archetype_type_.reserve(component_infos_.size());
+
     for (int i = 0; i < component_infos_.size(); ++i) {
       component_type_to_index_[component_infos_[i].id] = i;
+      archetype_type_.push_back(component_infos_[i].id);
     }
     CalculateLayout();
   }
 
-  [[nodiscard]] const Type& type() const { return archetype_type_; }
+  [[nodiscard]] const ArchetypeType& type() const { return archetype_type_; }
 
   EntityLocation AddEntity(const Entity entity) {
     size_t index = 0;
@@ -223,22 +160,20 @@ class Archetype {
   }
 
   [[nodiscard]] bool HasComponent(const ComponentID id) const {
-    return std::ranges::find(archetype_type_.begin(), archetype_type_.end(), id) != archetype_type_.end();
+    return std::ranges::find(archetype_type_, id) != archetype_type_.end();
   }
 
   template <typename T>
-  void AddComponent(const EntityLocation& location, const T& component) {
+  void AddComponent(const EntityLocation& location, const Entity& componentEntity, const T& component) {
     AssertLocation(location);
-    const ComponentID componentId = GetComponentID<T>();
-    assert(HasComponent(componentId));
-    const auto index = component_type_to_index_[componentId];
+    assert(HasComponent(componentEntity.id));
+    const auto index = component_type_to_index_[componentEntity.id];
     chunks_[location.chunkIndex].AddComponent(component, component_offsets_[index], location.indexInChunk);
   }
 
   template <typename T>
-  T* GetComponentArray(const size_t chunkIndex) {
+  T* GetComponentArray(const size_t chunkIndex, const ComponentID componentId) {
     assert(chunkIndex < chunks_.size());
-    const ComponentID componentId = GetComponentID<T>();
     assert(HasComponent(componentId));
     assert(component_type_to_index_.contains(componentId));
     const auto index = component_type_to_index_[componentId];
@@ -249,12 +184,12 @@ class Archetype {
     assert(sourceLocation.archetype != this);
     assert(destinationLocation.archetype == this);
     const auto& sourceType = sourceLocation.archetype->type();
-    assert(archetype_type_.Contains(sourceType));
+    assert(ArchetypeTypeOverlaps(sourceType));
 
     const auto& sourceChunk = sourceLocation.archetype->chunks_[sourceLocation.chunkIndex];
     auto& destChunk = chunks_[destinationLocation.chunkIndex];  // Note: destChunk should not be const
 
-    for (ComponentID id : sourceType) {
+    for (EntityID id : sourceType) {
       const auto sourceTypeIndex = sourceLocation.archetype->component_type_to_index_.at(id);
       const auto destTypeIndex = this->component_type_to_index_.at(id);
       const auto& info = this->component_infos_[destTypeIndex];
@@ -272,7 +207,7 @@ class Archetype {
     }
   }
 
-  std::unordered_map<ComponentID, ArchetypeEdge> edges;
+  std::unordered_map<EntityID, ArchetypeEdge> edges;
 
  private:
   void CalculateLayout() {
@@ -301,6 +236,16 @@ class Archetype {
     }
   }
 
+  bool ArchetypeTypeOverlaps(const ArchetypeType& inner) const {
+    for (auto& type : inner) {
+      if (std::ranges::find(archetype_type_, type) == archetype_type_.end()) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
   void AssertLocation(const EntityLocation& location) const {
     assert(location.archetype == this);
     assert(location.chunkIndex < chunks_.size());
@@ -308,10 +253,10 @@ class Archetype {
   }
 
   ArchetypeID archetype_id_;
-  Type archetype_type_;
+  ArchetypeType archetype_type_;
   std::vector<ComponentInfo> component_infos_;
   std::vector<size_t> component_offsets_;
-  std::unordered_map<ComponentID, size_t> component_type_to_index_;
+  std::unordered_map<EntityID, size_t> component_type_to_index_;
   std::vector<Chunk> chunks_;
   int chunk_capacity_;
 };

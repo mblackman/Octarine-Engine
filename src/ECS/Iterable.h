@@ -1,7 +1,13 @@
 #pragma once
 
+#include <functional>
+#include <memory>
+#include <tuple>
+#include <type_traits>
+
 #include "ArchetypeQuery.h"
 #include "Entity.h"
+#include "Registry.h"
 
 class Registry;
 
@@ -18,7 +24,7 @@ class AnyContext {
   [[nodiscard]] virtual Entity GetEntity() const = 0;
   [[nodiscard]] virtual Registry* GetRegistry() const = 0;
   [[nodiscard]] virtual float GetDeltaTime() const = 0;
-  [[nodiscard]] virtual void* GetComponentPtr(ComponentID id) = 0;
+  [[nodiscard]] virtual void* GetComponentPtr(EntityID id) = 0;
 };
 
 class ContextFacade {
@@ -31,7 +37,8 @@ class ContextFacade {
 
   template <typename T>
   T& Component() const {
-    void* ptr = impl_->GetComponentPtr(GetComponentID<T>());
+    const auto componentEntity = impl_->GetRegistry()->Component<T>();
+    void* ptr = impl_->GetComponentPtr(componentEntity.GetId());
     return *static_cast<T*>(ptr);
   }
 
@@ -98,14 +105,20 @@ class Iterable {
 namespace Internal {
 
 template <typename... TComponents>
-void* FindComponentInTuple(ComponentID id, std::tuple<TComponents&...>& tuple) {
+void* FindComponentInTuple(Registry* registry, EntityID id, std::tuple<TComponents&...>& tuple) {
   void* ptr = nullptr;
-  auto check = [&]<typename T>(T& component) {
-    if (GetComponentID<std::remove_reference_t<T>>() == id) {
+  auto check = [&]<typename T0>(T0& component) {
+    if (ptr) {
+      return;
+    }
+    using ComponentType = std::remove_reference_t<T0>;
+    if (registry->Component<ComponentType>().GetId() == id) {
       ptr = &component;
     }
   };
-  (check(std::get<TComponents&>(tuple)), ...);
+
+  std::apply([&](auto&... comps) { (check(comps), ...); }, tuple);
+
   return ptr;
 }
 
@@ -119,7 +132,9 @@ class ContextImpl final : public AnyContext {
   [[nodiscard]] Registry* GetRegistry() const override { return registry_; }
   [[nodiscard]] float GetDeltaTime() const override { return dt_; }
 
-  void* GetComponentPtr(ComponentID id) override { return FindComponentInTuple<TComponents...>(id, components_); }
+  void* GetComponentPtr(EntityID id) override {
+    return FindComponentInTuple<TComponents...>(registry_, id, components_);
+  }
 
  private:
   Registry* registry_;

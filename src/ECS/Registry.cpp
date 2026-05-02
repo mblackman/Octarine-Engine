@@ -3,6 +3,7 @@
 #include <ranges>
 
 #include "../General/Logger.h"
+#include "Query.h"
 
 void Registry::Update(const float deltaTime) {
   delta_time_ = deltaTime;
@@ -13,11 +14,6 @@ void Registry::Update(const float deltaTime) {
 
 Entity Registry::CreateEntity() {
   const Entity entity = entity_manager_->CreateEntity();
-
-  if (root_archetype_ == nullptr) {
-    root_archetype_ = FindOrCreateArchetype({});
-  }
-
   const auto entityLocation = root_archetype_->AddEntity(entity);
   entity_locations_[entity.id] = entityLocation;
   return entity;
@@ -34,35 +30,46 @@ void Registry::BlamEntity(const Entity entity) {
   entity_locations_.erase(it);
 }
 
-std::vector<Archetype*> Registry::GetMatchingArchetypes(const Type& type) const {
-  std::vector<Archetype*> matchingArchetypes;
-  for (const auto& [key, value] : archetypes_) {
-    if (key.Contains(type)) {
-      matchingArchetypes.push_back(value.get());
+Archetype* Registry::GetMatchingArchetype(const ArchetypeType& type) const {
+  Archetype* currentNode = root_archetype_;
+  if (!type.empty()) {
+    for (const ComponentID id : type) {
+      const auto it = currentNode->edges.find(id);
+      if (it == currentNode->edges.end() || it->second.add == nullptr) {
+        return nullptr;
+      }
+      currentNode = it->second.add;
     }
   }
-  return matchingArchetypes;
-}
-void Registry::UpdateQueries() {
-  for (const auto& val : queries_ | std::views::values) {
-    val->Update();
-  }
+
+  return currentNode;
 }
 
-Archetype* Registry::FindOrCreateArchetype(const std::vector<ComponentID>& components) {
-  auto type = CreateType(components);
-  if (const auto it = archetypes_.find(type); it != archetypes_.end()) {
-    return it->second.get();
+std::vector<Archetype*> Registry::GetMatchingArchetypes(const ArchetypeType& type) const {
+  Archetype* start_node = GetMatchingArchetype(type);
+
+  std::vector<Archetype*> matching_archetypes;
+  std::queue<Archetype*> to_visit;
+  std::unordered_set<Archetype*> visited;
+
+  if (start_node) {
+    to_visit.push(start_node);
+    visited.insert(start_node);
   }
 
-  std::vector<ComponentInfo> componentInfos;
-  componentInfos.reserve(components.size());
+  while (!to_visit.empty()) {
+    Archetype* current = to_visit.front();
+    to_visit.pop();
 
-  for (const auto& component : components) {
-    componentInfos.push_back(component_registry_->GetInfo(component));
+    matching_archetypes.push_back(current);
+
+    for (const auto& [add, remove] : current->edges | std::views::values) {
+      if (add != nullptr && !visited.contains(add)) {
+        visited.insert(add);
+        to_visit.push(add);
+      }
+    }
   }
 
-  auto [new_iterator, success] = archetypes_.emplace(type, std::make_unique<Archetype>(componentInfos));
-  UpdateQueries();
-  return new_iterator->second.get();
+  return matching_archetypes;
 }
