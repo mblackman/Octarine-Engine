@@ -7,26 +7,22 @@
 #include "../Renderer/RenderableType.h"
 
 class RenderPrimitiveSystem : public System {
-   public:
-    RenderPrimitiveSystem() {
+ public:
+  RenderPrimitiveSystem() {}
+
+  ~RenderPrimitiveSystem() = default;
+
+  void Update(RenderQueue& renderQueue) {
+    auto entities = GetEntities();
+
+    for (auto entity : entities) {
+      if (entity.HasComponent<SquarePrimitiveComponent>()) {
+        auto square = entity.GetComponent<SquarePrimitiveComponent>();
+        RenderKey renderKey(square.layer, square.position.y,
+                            RenderableType::SQUARE_PRIMITIVE, entity);
+
+        renderQueue.AddRenderKey(renderKey);
+      }
     }
-
-    ~RenderPrimitiveSystem() = default;
-
-    void Update(RenderQueue& renderQueue) {
-        auto entities = GetEntities();
-
-        for (auto entity : entities) {
-            if (entity.HasComponent<SquarePrimitiveComponent>()) {
-                auto square = entity.GetComponent<SquarePrimitiveComponent>();
-                RenderKey renderKey(
-                    square.layer,
-                    square.position.y,
-                    RenderableType::SQUARE_PRIMITIVE,
-                    entity);
-
-                renderQueue.AddRenderKey(renderKey);
-            }
-        }
-    }
+  }
 };

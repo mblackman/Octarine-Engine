@@ -5,9 +5,8 @@
 #include <string>
 
 struct MouseInputEvent : public Event {
-   public:
-    SDL_MouseButtonEvent event;
+ public:
+  SDL_MouseButtonEvent event;
 
-    MouseInputEvent(SDL_MouseButtonEvent& event)
-        : event(event) {}
+  MouseInputEvent(SDL_MouseButtonEvent& event) : event(event) {}
 };
