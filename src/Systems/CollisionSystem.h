@@ -3,16 +3,16 @@
 #include <algorithm>
 #include <chrono>
 #include <future>
-#include <iostream>
-#include <limits>
+#include <utility>
 #include <vector>
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/TransformComponent.h"
-#include "../ECS/ECS.h"
+#include "../ECS/Entity.h"
+#include "../ECS/Iterable.h"
+#include "../ECS/Registry.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
-#include "ECS/Iterable.h"
 #include "General/PerfUtils.h"
 
 constexpr int kMaxDimensions = 2;
@@ -53,8 +53,11 @@ struct Partitions {
 
 class CollisionSystem {
  public:
-  void operator()(const Iterable& iter, TransformComponent& transform, BoxColliderComponent& collider) {
+  void operator()(const ContextFacade& ctx, const Iterable& iter) {
     PROFILE_NAMED_SCOPE("Collision System Update");
+
+    auto* registry = ctx.Registry();
+    auto* eventBus = registry->Get<EventBus*>();
 
     if (collisionResult_.valid() &&
         collisionResult_.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {
@@ -68,23 +71,20 @@ class CollisionSystem {
       }
     }
 
-    const auto entities = GetEntities();
-    if (entities.empty()) {
-      return;
-    }
-
-    // TODO speed up box creation more!
     std::vector<Box> boxes;
-    boxes.reserve(entities.size());
+    for (auto&& entityCtx : iter) {
+      const Entity entity = entityCtx.Entity();
+      const auto& transform = entityCtx.Component<TransformComponent>();
+      const auto& collider = entityCtx.Component<BoxColliderComponent>();
 
-    for (auto entity : entities) {
-      const auto& transform = entity.GetComponent<TransformComponent>();
-      const auto& collider = entity.GetComponent<BoxColliderComponent>();
-
-      boxes.emplace_back(entity, entity.GetEntityMask(), collider.collisionMask, transform.position.x,
+      boxes.emplace_back(entity, collider.collisionMask, collider.collisionMask, transform.position.x,
                          transform.position.y,
                          transform.position.x + static_cast<float>(collider.width) * transform.scale.x,
                          transform.position.y + static_cast<float>(collider.height) * transform.scale.y);
+    }
+
+    if (boxes.empty()) {
+      return;
     }
 
     collisionResult_ = start_async_collision_detection(std::move(boxes));
@@ -109,8 +109,8 @@ class CollisionSystem {
                                       std::vector<std::pair<Entity, Entity>>& intersectingPairs) const {
     ACCUMULATE_PROFILE_SCOPE("Brute Force Intersection");
 
-    for (size_t i = begin; i < end; ++i) {
-      for (size_t j = i + 1; j < end; ++j) {
+    for (int i = begin; i < end; ++i) {
+      for (int j = i + 1; j < end; ++j) {
         if (boxes[i].intersects(boxes[j])) {
           intersectingPairs.emplace_back(boxes[i].entity, boxes[j].entity);
         }

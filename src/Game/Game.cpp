@@ -31,6 +31,7 @@
 #include "GameConfig.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/CameraFollowSystem.h"
+#include "Systems/CollisionSystem.h"
 #include "Systems/DamageSystem.h"
 #include "Systems/DisplayHealthSystem.h"
 #include "Systems/DrawColliderSystem.h"
@@ -43,6 +44,7 @@
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/RenderTextSystem.h"
 #include "Systems/ScriptSystem.h"
+#include "Systems/TransformSystem.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -187,6 +189,12 @@ void Game::Setup() {
       registry_->RegisterSystem<KeyboardControlComponent, RigidBodyComponent, SpriteComponent>(KeyboardControlSystem());
 
   auto &movementSystem = registry_->RegisterSystem<TransformComponent, RigidBodyComponent>(MovementSystem());
+
+  // Collision after movement integrates positions; emits CollisionEvent for damage/movement subscribers
+  registry_->RegisterBulkSystem<TransformComponent, BoxColliderComponent>(CollisionSystem());
+
+  // Transform hierarchy resolution — produces globalPosition/globalScale/globalRotation for downstream
+  registry_->RegisterBulkSystem<TransformComponent>(TransformSystem());
 
   // Camera follows after gameplay-driven transform updates
   registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
