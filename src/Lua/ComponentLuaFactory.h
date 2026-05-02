@@ -138,7 +138,7 @@ class ComponentLuaFactory {
     using namespace LuaComponentHelpers;
     const sol::protected_function updateFn = SafeGetProtectedFunction(data, "on_update");
     const sol::protected_function onDebugGuiFn = SafeGetProtectedFunction(data, "on_debug_gui");
-    return ScriptComponent(updateFn, onDebugGuiFn);
+    return ScriptComponent(data, updateFn, onDebugGuiFn);
   }
 
   static UIButtonComponent CreateUIButtonComponent(const sol::table& data) {

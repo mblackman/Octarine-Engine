@@ -4,11 +4,13 @@
 #include <utility>
 
 struct ScriptComponent {
+  sol::table scriptTable;
   sol::protected_function updateFunction;
   sol::protected_function onDebugGUIFunction;
 
-  explicit ScriptComponent(sol::protected_function updateFunction = sol::lua_nil,
+  explicit ScriptComponent(sol::table scriptTable = sol::lua_nil, sol::protected_function updateFunction = sol::lua_nil,
                            sol::protected_function onDebugGUIFunction = sol::lua_nil)
-      : updateFunction(std::move(std::move(updateFunction))),
+      : scriptTable(std::move(std::move(scriptTable))),
+        updateFunction(std::move(std::move(updateFunction))),
         onDebugGUIFunction(std::move(std::move(onDebugGUIFunction))) {}
 };
