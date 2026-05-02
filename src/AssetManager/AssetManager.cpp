@@ -1,8 +1,8 @@
 #include "AssetManager.h"
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_image.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 #include <filesystem>
 
@@ -30,22 +30,12 @@ void AssetManager::AddTexture(SDL_Renderer* renderer,
                               const std::string& assetId,
                               const std::string& path) {
   const std::string fullPath = GetFullPath(path);
-  SDL_Surface* surface = IMG_Load(fullPath.c_str());
-  if (!surface) {
-    Logger::Error("Failed to load image: " + fullPath + " - " + IMG_GetError());
-    return;
-  }
 
-  SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+  SDL_Texture* texture = IMG_LoadTexture(renderer, fullPath.c_str());
   if (!texture) {
-    Logger::Error(
-        "Failed to create texture from surface: " + std::string(
-            SDL_GetError()));
-    SDL_FreeSurface(surface);
+    Logger::Error("Failed to create texture: " + std::string(SDL_GetError()));
     return;
   }
-
-  SDL_FreeSurface(surface);
 
   textures_.emplace(assetId, texture);
 

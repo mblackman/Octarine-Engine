@@ -28,8 +28,9 @@ int main(int argc, char* argv[]) {
 
   Game game(gamePath);
 
-  game.Initialize();
-  game.Run();
+  if (game.Initialize()) {
+    game.Run();
+  }
   game.Destroy();
 
   return 0;

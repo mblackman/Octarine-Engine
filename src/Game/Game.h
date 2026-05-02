@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include <memory>
 #include <sol/sol.hpp>
@@ -20,7 +20,7 @@ class Game {
   explicit Game(const std::string& assetPath);
   ~Game();
 
-  void Initialize();
+  bool Initialize();
   void Destroy();
   void Run();
   static void Quit() { s_is_running_ = false; }

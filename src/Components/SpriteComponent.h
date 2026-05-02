@@ -1,9 +1,8 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include <string>
-#include <utility>
 #include <utility>
 
 struct SpriteComponent {
@@ -12,18 +11,20 @@ struct SpriteComponent {
   int height;
   int layer;
   bool isFixed;
-  SDL_Rect srcRect{};
-  SDL_RendererFlip flip;
+  SDL_FRect srcRect{};
+  SDL_FlipMode flip;
 
-  explicit SpriteComponent(std::string assetId = "", int width = 0, int height = 0,
-                  int layer = 0, bool isFixed = false, int srcRectX = 0,
-                  int srcRectY = 0)
-      : assetId(std::move(std::move(assetId))),
-        width(width),
-        height(height),
-        layer(layer),
-        isFixed(isFixed),
-        flip(SDL_FLIP_NONE) {
+  explicit SpriteComponent(std::string assetId = "", float width = 0,
+                           float height = 0,
+                           int layer = 0, bool isFixed = false,
+                           float srcRectX = 0,
+                           float srcRectY = 0)
+    : assetId(std::move(std::move(assetId))),
+      width(width),
+      height(height),
+      layer(layer),
+      isFixed(isFixed),
+      flip(SDL_FLIP_NONE) {
     this->srcRect = {srcRectX, srcRectY, width, height};
   }
 };

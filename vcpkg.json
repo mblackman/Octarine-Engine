@@ -7,20 +7,24 @@
     "version>=" : "1.0.1#3"
   }, {
     "name" : "imgui",
-    "version>=" : "1.91.8#2",
-    "features": [ "sdl2-binding", "sdl2-renderer-binding" ]
+    "version>=": "1.91.8",
+    "features": [
+      "sdl3-binding",
+      "sdl3-renderer-binding"
+    ]
   }, {
-    "name" : "sdl2",
-    "version>=" : "2.32.6"
+    "name": "sdl3",
+    "version>=": "3.2.14"
   }, {
-    "name" : "sdl2-image",
-    "version>=" : "2.8.8#1"
+    "name": "sdl3-image",
+    "version>=": "3.2.4",
+    "features": [
+      "png",
+      "jpeg"
+    ]
   }, {
-    "name" : "sdl2-mixer",
-    "version>=" : "2.8.1#1"
-  }, {
-    "name" : "sdl2-ttf",
-    "version>=" : "2.24.0"
+    "name": "sdl3-ttf",
+    "version>=": "3.2.2"
   }, {
     "name" : "spdlog",
     "version>=" : "1.15.3"
@@ -28,12 +32,6 @@
     "name" : "sol2",
     "version>=" : "3.5.0"
   } ],
-  "overrides": [
-    {
-      "name": "imgui",
-      "version": "1.91.8#2"
-    }
-  ],
   "version" : "0.1.0",
   "name" : "octarine-engine"
 }

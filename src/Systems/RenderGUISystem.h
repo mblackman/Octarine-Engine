@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL3/SDL.h>
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/HealthComponent.h"
@@ -10,8 +10,8 @@
 #include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
 #include "imgui.h"
-#include "imgui_impl_sdl2.h"
-#include "imgui_impl_sdlrenderer2.h"
+#include "imgui_impl_sdl3.h"
+#include "imgui_impl_sdlrenderer3.h"
 
 class RenderGUISystem : public System {
  public:
@@ -20,15 +20,14 @@ class RenderGUISystem : public System {
   ~RenderGUISystem() = default;
 
   static void Update(SDL_Renderer* renderer, std::unique_ptr<Registry>& registry) {
-    IMGUI_IMPL_API::ImGui::NewFrame();
-    ImGui_ImplSDLRenderer2_NewFrame();
-    ImGui_ImplSDL2_NewFrame();
+    ImGui_ImplSDLRenderer3_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
     ImGui::ShowDemoWindow();
     SpawnEnemyWindow(registry);
 
     ImGui::Render();
-    ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
+    ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
   }
 
  private:

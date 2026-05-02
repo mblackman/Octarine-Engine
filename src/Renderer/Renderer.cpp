@@ -1,9 +1,8 @@
 #include "./Renderer.h"
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
-#include <algorithm>
 #include <glm/glm.hpp>
 #include <memory>
 #include <string>
@@ -56,26 +55,28 @@ void Renderer::RenderSprite(const Entity& entity, SDL_Renderer* renderer,
   const float y =
       sprite.isFixed ? transform.position.y : transform.position.y - camera.y;
 
-  const SDL_Rect destRect = {static_cast<int>(x), static_cast<int>(y),
-                       static_cast<int>(sprite.width * transform.scale.x),
-                       static_cast<int>(sprite.height * transform.scale.y)};
+  const SDL_FRect destRect = {
+      x,
+      y,
+      sprite.width * transform.scale.x,
+      sprite.height * transform.scale.y
+  };
 
-  SDL_RenderCopyEx(renderer, texture, &sprite.srcRect, &destRect,
-                   transform.rotation, nullptr, sprite.flip);
+  SDL_RenderTextureRotated(renderer, texture, &sprite.srcRect, &destRect,
+                           transform.rotation, nullptr, sprite.flip);
 }
 
 void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer,
                             SDL_Rect& camera) {
   const auto square = entity.GetComponent<SquarePrimitiveComponent>();
-  const float x = square.isFixed ? square.position.x : square.position.x - camera.x;
-  const float y = square.isFixed ? square.position.y : square.position.y - camera.y;
+  const float x = square.isFixed
+                    ? square.position.x
+                    : square.position.x - camera.x;
+  const float y = square.isFixed
+                    ? square.position.y
+                    : square.position.y - camera.y;
 
-  const SDL_Rect rect = {
-      static_cast<int>(x),
-      static_cast<int>(y),
-      static_cast<int>(square.width),
-      static_cast<int>(square.height)
-  };
+  const SDL_FRect rect = {x, y, square.width, square.height};
 
   SDL_SetRenderDrawColor(renderer, square.color.r, square.color.g,
                          square.color.b, square.color.a);
@@ -88,20 +89,21 @@ void Renderer::RenderText(const Entity& entity, SDL_Renderer* renderer,
   const auto textLabel = entity.GetComponent<TextLabelComponent>();
   const auto font = assetManager->GetFont(textLabel.fontId);
   SDL_Surface* surface =
-      TTF_RenderText_Blended(font, textLabel.text.c_str(), textLabel.color);
+      TTF_RenderText_Blended(font, textLabel.text.c_str(), 0, textLabel.color);
   SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-  SDL_FreeSurface(surface);
+  SDL_DestroySurface(surface);
 
-  int labelWidth = 0;
-  int labelHeight = 0;
+  float labelWidth = 0;
+  float labelHeight = 0;
 
-  SDL_QueryTexture(texture, nullptr, nullptr, &labelWidth, &labelHeight);
+  SDL_GetTextureSize(texture, &labelWidth, &labelHeight);
 
-  const SDL_Rect destRect = {static_cast<int>(textLabel.position.x -
-                                        (textLabel.isFixed ? 0 : camera.x)),
-                       static_cast<int>(textLabel.position.y -
-                                        (textLabel.isFixed ? 0 : camera.y)),
-                       labelWidth, labelHeight};
+  const SDL_FRect destRect = {
+      textLabel.position.x - (textLabel.isFixed ? 0 : camera.x),
+      textLabel.position.y - (textLabel.isFixed ? 0 : camera.y),
+      labelWidth,
+      labelHeight
+  };
 
-  SDL_RenderCopy(renderer, texture, nullptr, &destRect);
+  SDL_RenderTexture(renderer, texture, nullptr, &destRect);
 }
