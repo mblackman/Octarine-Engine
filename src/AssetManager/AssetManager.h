@@ -14,7 +14,7 @@ class AssetManager {
   std::map<std::string, TTF_Font*> fonts_;
   std::optional<SDL_ScaleMode> default_scale_mode_;
 
- public:
+public:
   explicit AssetManager(std::string basePath);
   ~AssetManager();
 
