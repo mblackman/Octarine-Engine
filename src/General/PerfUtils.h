@@ -7,6 +7,13 @@
 #include "Logger.h"
 
 namespace PerfUtils {
+inline std::string DurationToMs(std::chrono::time_point<std::chrono::high_resolution_clock> start,
+                                std::chrono::time_point<std::chrono::high_resolution_clock> end) {
+  const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+  const auto ms = static_cast<double>(duration) * 0.001;
+  return std::to_string(ms);
+}
+
 class ScopedTimer {
  public:
   explicit ScopedTimer(std::string name = "", const std::source_location &loc = std::source_location::current())
@@ -20,11 +27,8 @@ class ScopedTimer {
 
   ~ScopedTimer() {
     const auto end = std::chrono::high_resolution_clock::now();
-    const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - m_start).count();
-    const auto ms = static_cast<double>(duration) * 0.001;
-
     const std::string finalName = m_name.empty() ? m_location.function_name() : m_name;
-    Logger::Info("TIMER: " + finalName + ": " + std::to_string(ms) + "ms");
+    Logger::Info("TIMER: " + finalName + ": " + DurationToMs(m_start, end) + "ms");
   }
 
  private:
@@ -43,20 +47,25 @@ class ProfilingAccumulator {
   static void Reset() {
     std::lock_guard lock(s_mutex);
     s_accumulated_times.clear();
+    s_start = std::chrono::high_resolution_clock::now();
   }
 
-  static void Report() {
+  static void Report(const std::string &name) {
     std::lock_guard lock(s_mutex);
-    Logger::Info("--- Accumulated Performance Report ---");
+    const std::string header = "--- Accumulated Performance Report: " + name + " ---";
+    Logger::Info(header);
+    const auto end = std::chrono::high_resolution_clock::now();
+    Logger::Info("ACCUM TOTAL: " + DurationToMs(s_start, end) + "ms");
     for (const auto &[name, total_duration] : s_accumulated_times) {
       const auto ms = static_cast<double>(total_duration.load()) * 0.001;
       Logger::Info("ACCUM: " + name + ": " + std::to_string(ms) + "ms");
     }
-    Logger::Info("------------------------------------");
+    Logger::Info(std::string(header.size(), '-'));
   }
 
  private:
   inline static std::mutex s_mutex;
+  inline static std::chrono::time_point<std::chrono::high_resolution_clock> s_start;
   inline static std::map<std::string, std::atomic<long long>> s_accumulated_times;
 };
 
@@ -83,13 +92,16 @@ class AccumulatingScopedTimer {
 
 class AggregateProfilingSession {
  public:
-  AggregateProfilingSession() { ProfilingAccumulator::Reset(); }
-  ~AggregateProfilingSession() { ProfilingAccumulator::Report(); }
+  explicit AggregateProfilingSession(std::string name) : m_name(std::move(name)) { ProfilingAccumulator::Reset(); }
+  ~AggregateProfilingSession() { ProfilingAccumulator::Report(m_name); }
 
   AggregateProfilingSession(const AggregateProfilingSession &) = delete;
   AggregateProfilingSession &operator=(const AggregateProfilingSession &) = delete;
   AggregateProfilingSession(AggregateProfilingSession &&) = delete;
   AggregateProfilingSession &operator=(AggregateProfilingSession &&) = delete;
+
+ private:
+  std::string m_name;
 };
 
 template <typename Func>
@@ -98,16 +110,12 @@ auto LogTime(const std::string &name, Func &&func) -> std::invoke_result_t<Func>
   if constexpr (std::is_void_v<std::invoke_result_t<Func>>) {
     func();
     const auto end = std::chrono::high_resolution_clock::now();
-    const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-    const auto ms = static_cast<double>(duration) * 0.001;
-    Logger::Info("TIMER: " + name + ": " + std::to_string(ms) + "ms");
+    Logger::Info("TIMER: " + name + ": " + DurationToMs(start, end) + "ms");
     return;
   } else {
     auto result = func();
     const auto end = std::chrono::high_resolution_clock::now();
-    const auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
-    const auto ms = static_cast<double>(duration) * 0.001;
-    Logger::Info("TIMER: " + name + ": " + std::to_string(ms) + "ms");
+    Logger::Info("TIMER: " + name + ": " + DurationToMs(start, end) + "ms");
     return result;
   }
 }
@@ -117,4 +125,4 @@ auto LogTime(const std::string &name, Func &&func) -> std::invoke_result_t<Func>
 #define PROFILE_NAMED_SCOPE(name) PerfUtils::ScopedTimer timer(name)
 
 #define ACCUMULATE_PROFILE_SCOPE(name) PerfUtils::AccumulatingScopedTimer accTimer##__LINE__(name)
-#define AGGREGATE_PROFILE_SESSION PerfUtils::AggregateProfilingSession aggSession##__LINE__
+#define AGGREGATE_PROFILE_SESSION(name) PerfUtils::AggregateProfilingSession aggSession##__LINE__(name)
