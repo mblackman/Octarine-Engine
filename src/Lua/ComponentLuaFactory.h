@@ -43,7 +43,6 @@ inline sol::optional<sol::table> SafeGetOptionalTable(const sol::table& dataTabl
 
 class ComponentLuaFactory {
  public:
-  
   static TransformComponent CreateTransformComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;
     const glm::vec2 position = SafeGetVec2(data, "position");
