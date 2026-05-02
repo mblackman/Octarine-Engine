@@ -22,23 +22,27 @@ void Registry::Update(const float deltaTime) {
 Entity Registry::CreateEntity() {
   const Entity entity = entity_manager_->CreateEntity();
   const auto entityLocation = root_archetype_->AddEntity(entity);
-  entity_locations_[entity.id] = entityLocation;
+  const std::uint32_t id = entity.GetId();
+  if (id >= entity_locations_.size()) {
+    entity_locations_.resize(id + 1, EntityLocation{nullptr, 0, 0});
+  }
+  entity_locations_[id] = entityLocation;
   return entity;
 }
 
 void Registry::BlamEntity(const Entity entity) {
-  const auto it = entity_locations_.find(entity.id);
-  if (it == entity_locations_.end()) {
+  const std::uint32_t id = entity.GetId();
+  if (id >= entity_locations_.size() || !entity_locations_[id].archetype || !entity_manager_->IsValid(entity)) {
     Logger::Warn("Could not find entity with ID: " + std::to_string(entity.id) + " to blam");
     return;
   }
 
-  const EntityLocation removedLocation = it->second;
+  const EntityLocation removedLocation = entity_locations_[id];
   const auto swapped = removedLocation.archetype->RemoveEntity(removedLocation);
   entity_manager_->BlamEntity(entity);
-  entity_locations_.erase(it);
+  entity_locations_[id] = EntityLocation{nullptr, 0, 0};
   if (swapped) {
-    entity_locations_[swapped->id] = removedLocation;
+    entity_locations_[swapped->GetId()] = removedLocation;
   }
 
   // Drop relationship entries authored by this entity, and any pair targeting it.
@@ -109,12 +113,12 @@ std::vector<Archetype*> Registry::GetMatchingArchetypes(const ArchetypeType& typ
 }
 
 EntityLocation Registry::TransitionAddComponent(const Entity entity, const ComponentID componentId) {
-  const auto locIt = entity_locations_.find(entity.id);
-  if (locIt == entity_locations_.end()) {
+  const std::uint32_t id = entity.GetId();
+  if (id >= entity_locations_.size() || !entity_locations_[id].archetype || !entity_manager_->IsValid(entity)) {
     Logger::Warn("TransitionAddComponent called on missing entity " + std::to_string(entity.id));
     return {nullptr, 0, 0};
   }
-  const EntityLocation oldLocation = locIt->second;
+  const EntityLocation oldLocation = entity_locations_[id];
   if (oldLocation.archetype->HasComponent(componentId)) {
     return oldLocation;
   }
@@ -138,20 +142,20 @@ EntityLocation Registry::TransitionAddComponent(const Entity entity, const Compo
   newArchetype->CopyComponents(oldLocation, newLocation);
 
   const auto swapped = oldLocation.archetype->RemoveEntity(oldLocation);
-  entity_locations_[entity.id] = newLocation;
+  entity_locations_[id] = newLocation;
   if (swapped) {
-    entity_locations_[swapped->id] = oldLocation;
+    entity_locations_[swapped->GetId()] = oldLocation;
   }
   return newLocation;
 }
 
 EntityLocation Registry::TransitionRemoveComponent(const Entity entity, const ComponentID componentId) {
-  const auto locIt = entity_locations_.find(entity.id);
-  if (locIt == entity_locations_.end()) {
+  const std::uint32_t id = entity.GetId();
+  if (id >= entity_locations_.size() || !entity_locations_[id].archetype || !entity_manager_->IsValid(entity)) {
     Logger::Warn("TransitionRemoveComponent called on missing entity " + std::to_string(entity.id));
     return {nullptr, 0, 0};
   }
-  const EntityLocation oldLocation = locIt->second;
+  const EntityLocation oldLocation = entity_locations_[id];
   if (!oldLocation.archetype->HasComponent(componentId)) {
     return oldLocation;
   }
@@ -175,9 +179,9 @@ EntityLocation Registry::TransitionRemoveComponent(const Entity entity, const Co
   newArchetype->CopyComponents(oldLocation, newLocation);
 
   const auto swapped = oldLocation.archetype->RemoveEntity(oldLocation);
-  entity_locations_[entity.id] = newLocation;
+  entity_locations_[id] = newLocation;
   if (swapped) {
-    entity_locations_[swapped->id] = oldLocation;
+    entity_locations_[swapped->GetId()] = oldLocation;
   }
   return newLocation;
 }
@@ -303,9 +307,9 @@ std::optional<Entity> Registry::GetParent(const Entity child) const {
   const auto it = pairs_.find(child.id);
   if (it == pairs_.end()) return std::nullopt;
 
-  const auto childOfIt = component_to_entity_.find(std::type_index(typeid(ChildOfRelation)));
-  if (childOfIt == component_to_entity_.end()) return std::nullopt;
-  const auto childOfRelationId = static_cast<std::uint32_t>(childOfIt->second.GetId());
+  const size_t type_idx = GetComponentTypeIndex<ChildOfRelation>();
+  if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) return std::nullopt;
+  const auto childOfRelationId = static_cast<std::uint32_t>(fast_component_to_entity_[type_idx].value().GetId());
 
   for (const EcsId rawPair : it->second) {
     const Pair p(rawPair);
@@ -319,9 +323,9 @@ std::optional<Entity> Registry::GetParent(const Entity child) const {
 std::vector<Entity> Registry::GetChildren(const Entity parent) const {
   std::vector<Entity> children;
 
-  const auto childOfIt = component_to_entity_.find(std::type_index(typeid(ChildOfRelation)));
-  if (childOfIt == component_to_entity_.end()) return children;
-  const auto childOfRelationId = static_cast<std::uint32_t>(childOfIt->second.GetId());
+  const size_t type_idx = GetComponentTypeIndex<ChildOfRelation>();
+  if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) return children;
+  const auto childOfRelationId = static_cast<std::uint32_t>(fast_component_to_entity_[type_idx].value().GetId());
   const auto parentId = static_cast<std::uint32_t>(parent.GetId());
 
   for (const auto& [entityId, pairSet] : pairs_) {

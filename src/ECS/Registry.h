@@ -19,10 +19,20 @@
 #include "General/Logger.h"
 #include "System.h"
 
+#include <atomic>
+
 class Query;
 
 template <typename... TComponents>
 class ComponentQuery;
+
+static inline std::atomic<size_t> s_component_type_counter{0};
+
+template <typename T>
+size_t GetComponentTypeIndex() {
+  static size_t type_id = s_component_type_counter++;
+  return type_id;
+}
 
 class Iterable;
 class ContextFacade;
@@ -82,30 +92,36 @@ class Registry {
   // Defer destroy until end of Registry::Update — safe to call during system iteration.
   void QueueBlamEntity(const Entity entity) { pending_blams_.push_back(entity); }
 
-  [[nodiscard]] bool IsAlive(const Entity entity) const { return entity_locations_.contains(entity.id); }
+  [[nodiscard]] bool IsAlive(const Entity entity) const {
+    const std::uint32_t id = entity.GetId();
+    if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity)) return false;
+    return entity_locations_[id].archetype != nullptr;
+  }
 
   // Component management
   template <typename T>
   Entity Component() {
-    const std::type_index key(typeid(T));
-    if (const auto it = component_to_entity_.find(key); it != component_to_entity_.end()) {
-      return it->second;
+    const size_t type_idx = GetComponentTypeIndex<T>();
+    if (type_idx >= fast_component_to_entity_.size()) {
+      fast_component_to_entity_.resize(type_idx + 1);
+    }
+    if (fast_component_to_entity_[type_idx].has_value()) {
+      return fast_component_to_entity_[type_idx].value();
     }
     const auto entity = CreateEntity();
-    component_to_entity_.emplace(key, entity);
+    fast_component_to_entity_[type_idx] = entity;
     component_registry_->RegisterComponent<T>(entity);
     return entity;
   }
 
   template <typename T>
   Entity Component() const {
-    const std::type_index key(typeid(T));
-    const auto it = component_to_entity_.find(key);
-    if (it == component_to_entity_.end()) {
+    const size_t type_idx = GetComponentTypeIndex<T>();
+    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) {
       throw std::runtime_error("Component type " + std::string(typeid(T).name()) +
                                " has not been used yet. Cannot get component.");
     }
-    return it->second;
+    return fast_component_to_entity_[type_idx].value();
   }
 
   template <typename T>
@@ -118,20 +134,20 @@ class Registry {
 
   template <typename T>
   void RemoveComponent(const Entity entity) {
-    const auto it = component_to_entity_.find(std::type_index(typeid(T)));
-    if (it == component_to_entity_.end()) return;
-    TransitionRemoveComponent(entity, it->second.GetId());
+    const size_t type_idx = GetComponentTypeIndex<T>();
+    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) return;
+    TransitionRemoveComponent(entity, fast_component_to_entity_[type_idx].value().GetId());
   }
 
   template <typename T>
   T& GetComponent(const Entity entity) const {
-    const auto it = entity_locations_.find(entity.id);
-    if (it == entity_locations_.end()) {
+    const std::uint32_t id = entity.GetId();
+    if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity) || !entity_locations_[id].archetype) {
       throw std::runtime_error("Failed to get required component " + std::string(typeid(T).name()) + " for entity " +
                                std::to_string(entity.id));
     }
     const auto componentEntity = Component<T>();
-    const auto [archetype, chunkIndex, indexInChunk] = it->second;
+    const auto [archetype, chunkIndex, indexInChunk] = entity_locations_[id];
 
     if (!archetype->HasComponent(componentEntity.GetId())) {
       throw std::runtime_error("Failed to get required component " + std::string(typeid(T).name()) + " for entity " +
@@ -149,13 +165,12 @@ class Registry {
 
   template <typename T>
   [[nodiscard]] bool HasComponent(const Entity entity) const {
-    const auto it = entity_locations_.find(entity.id);
-    if (it == entity_locations_.end()) {
-      Logger::Warn("Could not find entity with ID: " + std::to_string(entity.id) + " to check for component");
+    const std::uint32_t id = entity.GetId();
+    if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity) || !entity_locations_[id].archetype) {
       return false;
     }
     const auto componentEntity = Component<T>();
-    return it->second.archetype->HasComponent(componentEntity.GetId());
+    return entity_locations_[id].archetype->HasComponent(componentEntity.GetId());
   }
 
   [[nodiscard]] std::vector<Archetype*> GetMatchingArchetypes(const ArchetypeType& type) const;
@@ -213,7 +228,8 @@ class Registry {
         auto* registryPtr = const_cast<Registry*>(&registry);
         const float dt = registry.delta_time_;
         query_->Iterate([this, registryPtr, dt](const Iterable& iter) {
-          ContextFacade ctx(std::make_unique<Internal::BulkContextImpl>(registryPtr, dt));
+          Internal::BulkContextImpl bulkCtx(registryPtr, dt);
+          ContextFacade ctx(&bulkCtx);
           func_(ctx, iter);
         });
       }
@@ -283,9 +299,11 @@ class Registry {
   }
 
   [[nodiscard]] bool HasTag(const Entity entity, const Entity tagEntity) const {
-    const auto it = entity_locations_.find(entity.id);
-    if (it == entity_locations_.end()) return false;
-    return it->second.archetype->HasComponent(tagEntity.GetId());
+    const std::uint32_t id = entity.GetId();
+    if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity) || !entity_locations_[id].archetype) {
+      return false;
+    }
+    return entity_locations_[id].archetype->HasComponent(tagEntity.GetId());
   }
 
   [[nodiscard]] bool HasTag(const Entity entity, const std::string& name) const {
@@ -320,12 +338,12 @@ class Registry {
 
   std::unique_ptr<EntityManager> entity_manager_;
   std::unique_ptr<ComponentRegistry> component_registry_;
-  std::unordered_map<EntityID, EntityLocation> entity_locations_;
+  std::vector<EntityLocation> entity_locations_;
   std::unordered_map<ArchetypeID, std::unique_ptr<Archetype>> archetypes_;
   std::unique_ptr<Archetype> root_archetype_;  // The root of the archetype graph. Empty signature.
   std::vector<std::unique_ptr<ISystem>> systems_;
   std::unordered_map<ComponentID, std::any> singleton_components_;
-  std::unordered_map<std::type_index, Entity> component_to_entity_;
+  std::vector<std::optional<Entity>> fast_component_to_entity_;
   std::unordered_map<std::string, Entity> tag_to_entity_;
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
   std::unordered_map<ComponentID, ArchetypeList> component_index_;

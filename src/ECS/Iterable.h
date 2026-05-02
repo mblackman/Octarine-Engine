@@ -29,7 +29,7 @@ class AnyContext {
 
 class ContextFacade {
  public:
-  explicit ContextFacade(std::unique_ptr<AnyContext> impl) : impl_(std::move(impl)) {}
+  explicit ContextFacade(AnyContext* impl) : impl_(impl) {}
 
   [[nodiscard]] Entity Entity() const { return impl_->GetEntity(); }
   [[nodiscard]] Registry* Registry() const { return impl_->GetRegistry(); }
@@ -37,13 +37,19 @@ class ContextFacade {
 
   template <typename T>
   T& Component() const {
-    const auto componentEntity = impl_->GetRegistry()->Component<T>();
+    const auto componentEntity = impl_->GetRegistry()->template Component<T>();
     void* ptr = impl_->GetComponentPtr(componentEntity.GetId());
     return *static_cast<T*>(ptr);
   }
 
+  template <typename T>
+  T& Component(const ComponentID id) const {
+    void* ptr = impl_->GetComponentPtr(id);
+    return *static_cast<T*>(ptr);
+  }
+
  private:
-  std::unique_ptr<AnyContext> impl_;
+  AnyContext* impl_;
 };
 
 class AnyIteratorImpl {
@@ -57,7 +63,7 @@ class AnyIteratorImpl {
 
   virtual void Increment() = 0;
   [[nodiscard]] virtual bool IsEqual(const AnyIteratorImpl& other) const = 0;
-  [[nodiscard]] virtual std::unique_ptr<AnyContext> Dereference() const = 0;
+  [[nodiscard]] virtual AnyContext* Dereference() const = 0;
   [[nodiscard]] virtual std::unique_ptr<AnyIteratorImpl> Clone() const = 0;
 };
 
@@ -105,42 +111,43 @@ class Iterable {
 namespace Internal {
 
 template <typename... TComponents>
-void* FindComponentInTuple(Registry* registry, EntityID id, std::tuple<TComponents&...>& tuple) {
-  void* ptr = nullptr;
-  auto check = [&]<typename T0>(T0& component) {
-    if (ptr) {
-      return;
-    }
-    using ComponentType = std::remove_reference_t<T0>;
-    if (registry->Component<ComponentType>().GetId() == id) {
-      ptr = &component;
-    }
-  };
-
-  std::apply([&](auto&... comps) { (check(comps), ...); }, tuple);
-
-  return ptr;
-}
-
-template <typename... TComponents>
 class ContextImpl final : public AnyContext {
  public:
-  ContextImpl(Registry* registry, const float dt, const Entity entity, std::tuple<TComponents&...> components)
-      : registry_(registry), dt_(dt), entity_(entity), components_(components) {}
+  ContextImpl(Registry* registry, const float dt)
+      : registry_(registry), dt_(dt),
+        ids_{registry->template Component<std::remove_reference_t<TComponents>>().GetId()...} {}
+
+  void Update(const Entity entity, std::tuple<TComponents&...> components) {
+    entity_ = entity;
+    components_ = std::apply([](auto&... comps) {
+      return std::make_tuple(&comps...);
+    }, components);
+  }
 
   [[nodiscard]] Entity GetEntity() const override { return entity_; }
   [[nodiscard]] Registry* GetRegistry() const override { return registry_; }
   [[nodiscard]] float GetDeltaTime() const override { return dt_; }
 
   void* GetComponentPtr(EntityID id) override {
-    return FindComponentInTuple<TComponents...>(registry_, id, components_);
+    void* ptr = nullptr;
+    size_t i = 0;
+    auto check = [&]<typename T0>(T0* component) {
+      if (ptr) { ++i; return; }
+      if (ids_[i] == id) {
+        ptr = component;
+      }
+      ++i;
+    };
+    std::apply([&](auto... comps) { (check(comps), ...); }, components_);
+    return ptr;
   }
 
  private:
   Registry* registry_;
   float dt_;
-  Entity entity_;
-  std::tuple<TComponents&...> components_;
+  Entity entity_{};
+  std::tuple<std::remove_reference_t<TComponents>*...> components_;
+  std::array<ComponentID, sizeof...(TComponents)> ids_;
 };
 
 class BulkContextImpl final : public AnyContext {
@@ -162,7 +169,11 @@ class IteratorImpl final : public AnyIteratorImpl {
   using UnderlyingIterator = typename ArchetypeQuery<TComponents...>::Iterator;
 
  public:
-  IteratorImpl(UnderlyingIterator it, Registry* registry, const float dt) : it_(it), registry_(registry), dt_(dt) {}
+  IteratorImpl(UnderlyingIterator it, Registry* registry, const float dt) 
+      : it_(it), registry_(registry), dt_(dt), context_(registry, dt) {}
+
+  IteratorImpl(const IteratorImpl& other)
+      : AnyIteratorImpl(other), it_(other.it_), registry_(other.registry_), dt_(other.dt_), context_(other.registry_, other.dt_) {}
 
   void Increment() override { ++it_; }
 
@@ -171,12 +182,13 @@ class IteratorImpl final : public AnyIteratorImpl {
     return it_ == other_impl.it_;
   }
 
-  [[nodiscard]] std::unique_ptr<AnyContext> Dereference() const override {
-    return std::apply(
+  [[nodiscard]] AnyContext* Dereference() const override {
+    std::apply(
         [&](Entity e, TComponents&... comps) {
-          return std::make_unique<ContextImpl<TComponents...>>(registry_, dt_, e, std::tie(comps...));
+          context_.Update(e, std::tie(comps...));
         },
         *it_);
+    return &context_;
   }
 
   [[nodiscard]] std::unique_ptr<AnyIteratorImpl> Clone() const override {
@@ -187,6 +199,7 @@ class IteratorImpl final : public AnyIteratorImpl {
   UnderlyingIterator it_;
   Registry* registry_;
   float dt_;
+  mutable ContextImpl<TComponents...> context_;
 };
 
 }  // namespace Internal

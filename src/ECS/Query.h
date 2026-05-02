@@ -45,21 +45,30 @@ class ComponentQuery final : public Query {
   ComponentQuery& WithTag(const std::string& name) { return WithTag(registry_->TagId(name)); }
 
   template <typename Func>
-  void ForEach(Func& func) {
-    for (const auto iterable = CreateIterable(); auto&& context : iterable) {
-      if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...>) {
-        func(context, context.Entity(), context.Component<TComponents>()...);
-      } else if constexpr (std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
-        func(context, context.Component<TComponents>()...);
-      } else if constexpr (std::is_invocable_v<Func, Entity, TComponents&...>) {
-        func(context.Entity(), context.Component<TComponents>()...);
-      } else if constexpr (std::is_invocable_v<Func, TComponents&...>) {
-        func(context.Component<TComponents>()...);
-      } else {
-        static_assert(!std::is_same_v<Func, Func>,
-                      "The function passed to ForEach does not match the required signatures. "
-                      "Expected one of: void(ContextFacade&, Entity, T&...), void(ContextFacade&, T&...), "
-                      "void(Entity, T&...), or void(T&...).");
+  void ForEach(Func&& func) {
+    if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...> ||
+                  std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
+      for (const auto iterable = CreateIterable(); auto&& context : iterable) {
+        if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...>) {
+          func(context, context.Entity(), context.Component<TComponents>()...);
+        } else {
+          func(context, context.Component<TComponents>()...);
+        }
+      }
+    } else {
+      for (auto it = archetype_query_.begin(); it != archetype_query_.end(); ++it) {
+        std::apply([&](Entity e, TComponents&... comps) {
+          if constexpr (std::is_invocable_v<Func, Entity, TComponents&...>) {
+            func(e, comps...);
+          } else if constexpr (std::is_invocable_v<Func, TComponents&...>) {
+            func(comps...);
+          } else {
+            static_assert(!std::is_same_v<Func, Func>,
+                          "The function passed to ForEach does not match the required signatures. "
+                          "Expected one of: void(ContextFacade&, Entity, T&...), void(ContextFacade&, T&...), "
+                          "void(Entity, T&...), or void(T&...).");
+          }
+        }, *it);
       }
     }
   }

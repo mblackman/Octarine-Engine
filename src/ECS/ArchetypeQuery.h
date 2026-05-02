@@ -23,22 +23,16 @@ class ArchetypeQuery {
           archetype_it_(std::move(archetype_it)),
           archetype_end_it_(std::move(archetype_end_it)),
           chunk_idx_(0),
-          entity_idx_(0) {
+          entity_idx_(0),
+          current_entities_(nullptr) {
       assert(sizeof...(TComponents) == type_.size());
       AdvanceToValid();
     }
 
     Reference operator*() const {
       assert(sizeof...(TComponents) == type_.size());
-      Archetype* current_archetype = *archetype_it_;
-      auto component_arrays = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return std::make_tuple(current_archetype->GetComponentArray<TComponents>(chunk_idx_, type_[Is])...);
-      }(std::index_sequence_for<TComponents...>{});
-
-      auto* entity_array = current_archetype->chunks_[chunk_idx_].GetEntityArray();
-
-      return std::apply([&](auto*... arrays) { return std::tie(entity_array[entity_idx_], arrays[entity_idx_]...); },
-                        component_arrays);
+      return std::apply([&](auto*... arrays) { return std::tie(current_entities_[entity_idx_], arrays[entity_idx_]...); },
+                        current_arrays_);
     }
 
     Iterator& operator++() {
@@ -54,11 +48,22 @@ class ArchetypeQuery {
     bool operator!=(const Iterator& other) const { return !(*this == other); }
 
    private:
+    void UpdateChunkPointers() {
+      Archetype* current_archetype = *archetype_it_;
+      current_arrays_ = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return std::make_tuple(current_archetype->template GetComponentArray<TComponents>(chunk_idx_, type_[Is])...);
+      }(std::index_sequence_for<TComponents...>{});
+      current_entities_ = current_archetype->chunks_[chunk_idx_].GetEntityArray();
+    }
+
     void AdvanceToValid() {
       while (archetype_it_ != archetype_end_it_) {
-        const Archetype* current_archetype = *archetype_it_;
+        Archetype* current_archetype = *archetype_it_;
         while (chunk_idx_ < current_archetype->chunks_.size()) {
           if (entity_idx_ < current_archetype->chunks_[chunk_idx_].GetEntityCount()) {
+            if (entity_idx_ == 0) {
+              UpdateChunkPointers();
+            }
             return;  // Found a valid entity
           }
           chunk_idx_++;
@@ -78,6 +83,8 @@ class ArchetypeQuery {
     std::vector<Archetype*>::iterator archetype_end_it_;
     size_t chunk_idx_;
     size_t entity_idx_;
+    std::tuple<TComponents*...> current_arrays_;
+    const Entity* current_entities_;
   };
 
   ArchetypeQuery() = default;
