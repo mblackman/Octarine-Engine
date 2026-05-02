@@ -22,21 +22,28 @@ class MovementSystem {
     eventBus->SubscribeEvent<MovementSystem, CollisionEvent>(this, &MovementSystem::OnCollision);
   }
 
-  void operator()(const ContextFacade& ctx, const Entity entity, TransformComponent& transform,
-                  const RigidBodyComponent& rigidBody) const {
-    const float dt = ctx.DeltaTime();
-    const bool isPlayer = registry_->HasTag(entity, player_);
+  void operator()(const ContextFacade& context, const Iterable& iterable) const {
+    const float dt = context.DeltaTime();
+    const auto& gameConfig = registry_->Get<GameConfig>();
 
-    if (!isPlayer && IsEntityOutsideMap(entity, transform)) {
-      registry_->QueueBlamEntity(entity);
-      return;
-    }
+    for (auto&& ctx : iterable) {
+      const Entity entity = ctx.Entity();
+      auto& transform = ctx.Component<TransformComponent>();
+      const auto& rigidBody = ctx.Component<RigidBodyComponent>();
 
-    transform.position.x += rigidBody.velocity.x * dt;
-    transform.position.y += rigidBody.velocity.y * dt;
+      const bool isPlayer = registry_->HasTag(entity, player_);
 
-    if (isPlayer) {
-      ClampPlayerToPlayableArea(entity, transform);
+      if (!isPlayer && IsEntityOutsideMap(entity, transform, gameConfig)) {
+        registry_->QueueBlamEntity(entity);
+        continue;
+      }
+
+      transform.position.x += rigidBody.velocity.x * dt;
+      transform.position.y += rigidBody.velocity.y * dt;
+
+      if (isPlayer) {
+        ClampPlayerToPlayableArea(entity, transform, gameConfig);
+      }
     }
   }
 
@@ -63,8 +70,8 @@ class MovementSystem {
     }
   }
 
-  [[nodiscard]] bool IsEntityOutsideMap(const Entity entity, const TransformComponent& transform) const {
-    const auto& gameConfig = registry_->Get<GameConfig>();
+  [[nodiscard]] bool IsEntityOutsideMap(const Entity entity, const TransformComponent& transform,
+                                        const GameConfig& gameConfig) const {
     const bool pastFarEdges = transform.position.x > static_cast<float>(gameConfig.windowWidth) ||
                               transform.position.y > static_cast<float>(gameConfig.windowHeight);
     if (pastFarEdges) return true;
@@ -77,11 +84,11 @@ class MovementSystem {
     return transform.position.x < 0 || transform.position.y < 0;
   }
 
-  void ClampPlayerToPlayableArea(const Entity entity, TransformComponent& transform) const {
+  void ClampPlayerToPlayableArea(const Entity entity, TransformComponent& transform,
+                                 const GameConfig& gameConfig) const {
     if (!registry_->HasComponent<SpriteComponent>(entity)) return;
 
     const auto& sprite = registry_->GetComponent<SpriteComponent>(entity);
-    const auto& gameConfig = registry_->Get<GameConfig>();
 
     if (transform.position.x < 0) transform.position.x = 0;
     if (transform.position.y < 0) transform.position.y = 0;

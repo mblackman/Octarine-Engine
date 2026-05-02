@@ -49,7 +49,10 @@ void Renderer::RenderSprite(const Registry* registry, const Entity& entity, SDL_
                             const AssetManager& assetManager, const SDL_FRect& camera) {
   const auto transform = registry->GetComponent<TransformComponent>(entity);
   const auto& sprite = registry->GetComponent<SpriteComponent>(entity);
-  const auto texture = assetManager.GetTexture(sprite.assetId);
+  if (!sprite.cachedTexture) {
+    sprite.cachedTexture = assetManager.GetTexture(sprite.assetId);
+  }
+  const auto texture = sprite.cachedTexture;
   const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera.x;
   const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera.y;
 

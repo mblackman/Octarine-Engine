@@ -189,7 +189,7 @@ void Game::Setup() {
   auto &keyboardControlSystem =
       registry_->RegisterSystem<KeyboardControlComponent, RigidBodyComponent, SpriteComponent>(KeyboardControlSystem());
 
-  auto &movementSystem = registry_->RegisterSystem<TransformComponent, RigidBodyComponent>(MovementSystem());
+  auto &movementSystem = registry_->RegisterBulkSystem<TransformComponent, RigidBodyComponent>(MovementSystem());
 
   // Collision after movement integrates positions; emits CollisionEvent for damage/movement subscribers
   registry_->RegisterBulkSystem<TransformComponent, BoxColliderComponent, EntityMaskComponent>(CollisionSystem());
@@ -204,7 +204,7 @@ void Game::Setup() {
   registry_->RegisterSystem<HealthComponent, TextLabelComponent, SquarePrimitiveComponent>(DisplayHealthSystem());
 
   // Render queue producers
-  registry_->RegisterSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
+  registry_->RegisterBulkSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
   registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
   registry_->RegisterSystem<SquarePrimitiveComponent>(RenderPrimitiveSystem());
 
