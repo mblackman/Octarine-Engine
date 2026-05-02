@@ -35,7 +35,7 @@ struct Entity {
 // TODO need to handle recycling entity generations
 class EntityManager {
  public:
-  EntityManager() {
+  EntityManager() : living_entity_count_(kStartingEntityPoolSize) {
     for (uint32_t i = 0; i < kStartingEntityPoolSize; ++i) {
       available_entities_.push(i);
     }
