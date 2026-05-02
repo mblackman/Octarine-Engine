@@ -82,6 +82,13 @@ class System {
 
  public:
   System() = default;
+
+  System(const System&) = delete;
+  System& operator=(const System&) = delete;
+
+  System(System&&) = delete;
+  System& operator=(System&&) = delete;
+
   ~System() = default;
 
   [[nodiscard]] const Signature& GetComponentSignature() const { return component_signature_; }
@@ -129,6 +136,13 @@ class Registry {
 
  public:
   Registry() = default;
+
+  Registry(const Registry&) = delete;
+  Registry& operator=(const Registry&) = delete;
+
+  Registry(Registry&&) = delete;
+  Registry& operator=(Registry&&) = delete;
+
   ~Registry() = default;
 
   void Update();

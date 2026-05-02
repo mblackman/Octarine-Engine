@@ -237,7 +237,7 @@ void Game::Update() {
   registry_->GetSystem<CollisionSystem>().Update(event_bus_);
   registry_->GetSystem<KeyboardControlSystem>().Update();
   registry_->GetSystem<CameraFollowSystem>().Update(camera_);
-  registry_->GetSystem<ProjectileEmitSystem>().Update(registry_);
+  registry_->GetSystem<ProjectileEmitSystem>().Update(deltaTime, registry_);
   registry_->GetSystem<ProjectileLifecycleSystem>().Update();
   registry_->GetSystem<DisplayHealthSystem>().Update(registry_);
   registry_->GetSystem<ScriptSystem>().Update(deltaTime, SDL_GetTicks());

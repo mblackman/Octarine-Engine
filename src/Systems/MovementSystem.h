@@ -13,6 +13,12 @@ class MovementSystem : public System {
     RequireComponent<RigidBodyComponent>();
   }
 
+  MovementSystem(const MovementSystem&) = delete;
+  MovementSystem& operator=(const MovementSystem&) = delete;
+
+  MovementSystem(MovementSystem&&) = delete;
+  MovementSystem& operator=(MovementSystem&&) = delete;
+
   ~MovementSystem() = default;
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {

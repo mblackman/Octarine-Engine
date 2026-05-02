@@ -13,6 +13,12 @@ class AnimationSystem : public System {
     RequireComponent<AnimationComponent>();
   }
 
+  AnimationSystem(const AnimationSystem&) = delete;
+  AnimationSystem& operator=(const AnimationSystem&) = delete;
+
+  AnimationSystem(AnimationSystem&&) = delete;
+  AnimationSystem& operator=(AnimationSystem&&) = delete;
+
   ~AnimationSystem() = default;
 
   void Update(const double deltaTime) const {
@@ -25,10 +31,10 @@ class AnimationSystem : public System {
       }
 
       animation.frameTimer += deltaTime;
-      const float timePerFrame = 1.0f / static_cast<float>(animation.frameRateSpeed);
+      const double timePerFrame = 1.0f / static_cast<double>(animation.frameRateSpeed);
 
       if (animation.frameTimer >= timePerFrame) {
-        const int framesToAdvance = static_cast<int>(animation.frameTimer / timePerFrame);
+        const int framesToAdvance = static_cast<int>(std::round(animation.frameTimer / timePerFrame));
 
         if (animation.shouldLoop) {
           animation.currentFrame = (animation.currentFrame + framesToAdvance) % animation.numFrames;
@@ -46,7 +52,7 @@ class AnimationSystem : public System {
         }
       }
 
-      sprite.srcRect.x = static_cast<float>(animation.currentFrame * sprite.width);
+      sprite.srcRect.x = static_cast<float>(animation.currentFrame) * sprite.width;
       // sprite.srcRect.y = animation.currentFrame * sprite.height;
     }
   }

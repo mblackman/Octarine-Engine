@@ -12,6 +12,12 @@ class RenderDebugGUISystem : public System {
  public:
   RenderDebugGUISystem() { RequireComponent<ScriptComponent>(); }
 
+  RenderDebugGUISystem(const RenderDebugGUISystem&) = delete;
+  RenderDebugGUISystem& operator=(const RenderDebugGUISystem&) = delete;
+
+  RenderDebugGUISystem(RenderDebugGUISystem&&) = delete;
+  RenderDebugGUISystem& operator=(RenderDebugGUISystem&&) = delete;
+  
   ~RenderDebugGUISystem() = default;
 
   void Update(SDL_Renderer* renderer) const {

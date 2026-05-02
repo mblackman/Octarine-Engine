@@ -17,6 +17,13 @@ class AssetManager {
 
 public:
   AssetManager() = default;
+
+  AssetManager(const AssetManager&) = delete;
+  AssetManager& operator=(const AssetManager&) = delete;
+
+  AssetManager(AssetManager&&) = delete;
+  AssetManager& operator=(AssetManager&&) = delete;
+
   ~AssetManager();
 
   void SetGameConfig(const GameConfig& gameConfig);

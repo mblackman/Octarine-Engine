@@ -13,6 +13,12 @@ class CollisionSystem : public System {
     RequireComponent<BoxColliderComponent>();
   }
 
+  CollisionSystem(const CollisionSystem&) = delete;
+  CollisionSystem& operator=(const CollisionSystem&) = delete;
+
+  CollisionSystem(CollisionSystem&&) = delete;
+  CollisionSystem& operator=(CollisionSystem&&) = delete;
+  
   ~CollisionSystem() = default;
 
   void Update(const std::unique_ptr<EventBus>& eventBus) {

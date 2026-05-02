@@ -14,6 +14,12 @@ class UIButtonSystem : public System {
  public:
   UIButtonSystem() { RequireComponent<UIButtonComponent>(); }
 
+  UIButtonSystem(const UIButtonSystem&) = delete;
+  UIButtonSystem& operator=(const UIButtonSystem&) = delete;
+
+  UIButtonSystem(UIButtonSystem&&) = delete;
+  UIButtonSystem& operator=(UIButtonSystem&&) = delete;
+  
   ~UIButtonSystem() = default;
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {

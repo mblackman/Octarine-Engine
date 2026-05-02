@@ -19,6 +19,12 @@ class KeyboardControlSystem : public System {
     RequireComponent<SpriteComponent>();
   }
 
+  KeyboardControlSystem(const KeyboardControlSystem&) = delete;
+  KeyboardControlSystem& operator=(const KeyboardControlSystem&) = delete;
+
+  KeyboardControlSystem(KeyboardControlSystem&&) = delete;
+  KeyboardControlSystem& operator=(KeyboardControlSystem&&) = delete;
+
   ~KeyboardControlSystem() = default;
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {

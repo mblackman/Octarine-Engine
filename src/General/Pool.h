@@ -4,6 +4,13 @@
 
 class IPool {
  public:
+  IPool() = default;
+  IPool(const IPool&) = delete;
+  IPool& operator=(const IPool&) = delete;
+
+  IPool(IPool&&) = delete;
+  IPool& operator=(IPool&&) = delete;
+
   virtual ~IPool() = default;
   virtual void Remove(int id) = 0;
 };
@@ -12,7 +19,7 @@ class IPool {
  * A contiguous set of object of type T.
  */
 template <typename T>
-class Pool : public IPool {
+class Pool final : public IPool {
   std::vector<T> data_;
   size_t size_;
 
@@ -20,7 +27,7 @@ class Pool : public IPool {
   std::unordered_map<int, int> id_to_indexes_;
 
  public:
-  explicit Pool(size_t size = 100) : size_(0), index_to_ids_(), id_to_indexes_() {
+  explicit Pool(const size_t size = 100) : size_(0) {
     Resize(size);
   }
 

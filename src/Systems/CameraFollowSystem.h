@@ -13,22 +13,21 @@ class CameraFollowSystem : public System {
     RequireComponent<TransformComponent>();
   }
 
-  void Update(SDL_Rect& camera) const {
+  void Update(SDL_FRect& camera) const {
     for (auto entity : GetEntities()) {
+      constexpr float half = 2.0f;
       const auto transform = entity.GetComponent<TransformComponent>();
 
-      const int posX = static_cast<int>(transform.position.x);
-      const int posY = static_cast<int>(transform.position.y);
-      if (static_cast<float>(posX + camera.w / 2) < Game::mapWidth) {
-        camera.x = posX - Game::windowWidth / 2;
+      if (transform.position.x + camera.w / half < Game::mapWidth) {
+        camera.x = transform.position.x - static_cast<float>(Game::windowWidth) / half;
       }
 
-      if (static_cast<float>(posY + camera.h / 2) < Game::mapHeight) {
-        camera.y = posY - Game::windowHeight / 2;
+      if (transform.position.y + camera.h / half < Game::mapHeight) {
+        camera.y = transform.position.y - static_cast<float>(Game::windowHeight) / half;
       }
 
-      camera.x = std::max(0, camera.x);
-      camera.y = std::max(0, camera.y);
+      camera.x = std::max(0.0f, camera.x);
+      camera.y = std::max(0.0f, camera.y);
       camera.x = std::min(camera.w, camera.x);
       camera.y = std::min(camera.h, camera.y);
     }
