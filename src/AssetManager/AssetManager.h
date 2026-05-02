@@ -28,8 +28,8 @@ public:
 
  void SetGameConfig(const GameConfig& gameConfig);
 
-  void ClearAssets();
-  void AddTexture(SDL_Renderer* renderer, const std::string& assetId,
+ void ClearAssets();
+ void AddTexture(SDL_Renderer* renderer, const std::string& assetId,
                   const std::string& path);
   [[nodiscard]] SDL_Texture* GetTexture(const std::string& assetId) const;
   void AddFont(const std::string& assetId, const std::string& path, float fontSize);
