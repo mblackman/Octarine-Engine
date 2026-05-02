@@ -37,8 +37,9 @@ class Game {
 
  private:
   void ProcessInput() const;
-  void Update();
-  void Render();
+  void Update(float deltaTime);
+  void Render(float deltaTime);
+  [[nodiscard]] float WaitTime();
   void Setup();
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus);
   void OnKeyInputEvent(const KeyInputEvent& event);
