@@ -224,8 +224,8 @@ class Registry {
   void RemoveEntityGroup(const Entity& entity, const std::string& group);
   void RemoveEntityGroups(const Entity& entity);
 
-  void SetEntityMask(const Entity& entity, const EntityMask entityMask);
-  EntityMask GetEntityMask(const Entity& entity) const;
+  void SetEntityMask(const Entity& entity, EntityMask entityMask);
+  [[nodiscard]] EntityMask GetEntityMask(const Entity& entity) const;
 
   // System management
   template <typename T, typename... TArgs>
