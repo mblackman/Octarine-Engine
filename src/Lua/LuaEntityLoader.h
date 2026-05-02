@@ -1,5 +1,6 @@
 #pragma once
 #include <functional>
+#include <stack>
 
 #include "ComponentLuaFactory.h"
 #include "Components/BoxColliderComponent.h"
@@ -17,35 +18,73 @@ class LuaEntityLoader {
  public:
   using ComponentCreationFunction = std::function<void(Entity, const sol::table&)>;
 
+  /**
+   * @brief Loads entities from a Lua table definition, creating them in the registry.
+   *
+   * This function iteratively processes a tree-like structure of entities from a Lua
+   * table. It uses a stack to manage parent-child relationships and avoid deep recursion.
+   *
+   * @param registry A pointer to the game's entity-component-system registry.
+   * @param entityData The top-level sol::table containing the entity definition.
+   */
   static void LoadEntityFromLua(Registry* registry, const sol::table& entityData) {
     if (!entityData.valid()) {
-      std::cerr << "LoadEntityFromLua: Invalid entity data table." << std::endl;
+      std::cerr << "LoadEntityFromLua: Invalid root entity data table." << std::endl;
       return;
     }
 
-    const Entity entity = registry->CreateEntity();
+    std::stack<std::pair<sol::table, std::optional<Entity>>> nodesToProcess;
+    nodesToProcess.emplace(entityData, std::nullopt);
 
-    sol::optional<sol::table> componentsTableOpt = entityData["components"];
-    if (!componentsTableOpt || !componentsTableOpt.value().valid()) {
-      std::cout << "LoadEntityFromLua: Entity has no 'components' table." << std::endl;
-      return;
-    }
+    while (!nodesToProcess.empty()) {
+      auto [currentData, parentEntity] = nodesToProcess.top();
+      nodesToProcess.pop();
 
-    const sol::table& componentsTable = componentsTableOpt.value();
+      // Create the entity and establish parentage
+      const Entity entity = registry->CreateEntity();
+      if (parentEntity) {
+        entity.AddParent(*parentEntity);
+      }
 
-    for (const auto& [fst, snd] : componentsTable) {
-      auto componentName = fst.as<std::string>();
-      auto componentDataTable = snd.as<sol::table>();
-
-      if (!componentDataTable.valid()) {
-        std::cerr << "LoadEntityFromLua: Invalid data table for component: " << componentName << std::endl;
+      // An entity must have a component table to be valid.
+      sol::optional<sol::table> componentsTableOpt = currentData["components"];
+      if (!componentsTableOpt || !componentsTableOpt.value().valid()) {
+        std::cout << "LoadEntityFromLua: Entity has no 'components' table. Skipping children." << std::endl;
         continue;
       }
 
-      if (auto it = GetComponentFactoryMap().find(componentName); it != GetComponentFactoryMap().end()) {
-        it->second(entity, componentDataTable);
-      } else {
-        std::cerr << "LoadEntityFromLua: Unknown component type '" << componentName << "' in Lua table." << std::endl;
+      // Add all defined components to the entity
+      const sol::table& componentsTable = componentsTableOpt.value();
+      for (const auto& [name, data] : componentsTable) {
+        auto componentName = name.as<std::string>();
+        auto componentDataTable = data.as<sol::table>();
+
+        if (!componentDataTable.valid()) {
+          std::cerr << "LoadEntityFromLua: Invalid data table for component: " << componentName << std::endl;
+          continue;
+        }
+
+        if (auto it = GetComponentFactoryMap().find(componentName); it != GetComponentFactoryMap().end()) {
+          it->second(entity, componentDataTable);
+        } else {
+          std::cerr << "LoadEntityFromLua: Unknown component type '" << componentName << "' in Lua table." << std::endl;
+        }
+      }
+
+      // Add any child entities to the stack to be processed.
+      sol::optional<sol::table> childEntitiesOpt = currentData["entities"];
+      if (childEntitiesOpt && childEntitiesOpt.value().valid()) {
+        const sol::table& childEntitiesTable = childEntitiesOpt.value();
+
+        std::vector<sol::table> children;
+        children.reserve(childEntitiesTable.size());
+        for (const auto& [key, value] : childEntitiesTable) {
+          children.push_back(value.as<sol::table>());
+        }
+
+        for (auto it = children.rbegin(); it != children.rend(); ++it) {
+          nodesToProcess.emplace(*it, entity);
+        }
       }
     }
   }
@@ -71,7 +110,7 @@ class LuaEntityLoader {
     factories["sprite"] = [](Entity ent, const sol::table& data) {
       ent.AddComponent<SpriteComponent>(ComponentLuaFactory::CreateSpriteComponent(data));
     };
-    factories["square_primitive"] = [](Entity ent, const sol::table& data) {
+    factories["square"] = [](Entity ent, const sol::table& data) {
       ent.AddComponent<SquarePrimitiveComponent>(ComponentLuaFactory::CreateSquarePrimitiveComponent(data));
     };
     factories["animation"] = [](Entity ent, const sol::table& data) {
@@ -97,6 +136,9 @@ class LuaEntityLoader {
     };
     factories["ui_button"] = [](Entity ent, const sol::table& data) {
       ent.AddComponent<UIButtonComponent>(ComponentLuaFactory::CreateUIButtonComponent(data));
+    };
+    factories["text_label"] = [](Entity ent, const sol::table& data) {
+      ent.AddComponent<TextLabelComponent>(ComponentLuaFactory::CreateTextLabelComponent(data));
     };
 
     return factories;

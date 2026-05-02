@@ -47,8 +47,8 @@ void Renderer::RenderSprite(const Entity& entity, SDL_Renderer* renderer,
   const auto& sprite = entity.GetComponent<SpriteComponent>();
 
   const auto texture = assetManager->GetTexture(sprite.assetId);
-  const float x = sprite.isFixed ? transform.position.x : transform.position.x - camera.x;
-  const float y = sprite.isFixed ? transform.position.y : transform.position.y - camera.y;
+  const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera.x;
+  const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera.y;
 
   const SDL_FRect destRect = {x, y, sprite.width * transform.scale.x, sprite.height * transform.scale.y};
 
@@ -56,9 +56,12 @@ void Renderer::RenderSprite(const Entity& entity, SDL_Renderer* renderer,
 }
 
 void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer, const SDL_FRect& camera) {
+  const auto& transform = entity.GetComponent<TransformComponent>();
   const auto square = entity.GetComponent<SquarePrimitiveComponent>();
-  const float x = square.isFixed ? square.position.x : square.position.x - camera.x;
-  const float y = square.isFixed ? square.position.y : square.position.y - camera.y;
+  const float positionX = transform.globalPosition.x + square.position.x;
+  const float positionY = transform.globalPosition.y + square.position.y;
+  const float x = square.isFixed ? positionX : positionX - camera.x;
+  const float y = square.isFixed ? positionY : positionY - camera.y;
 
   const SDL_FRect rect = {x, y, square.width, square.height};
 
@@ -68,6 +71,7 @@ void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer, const 
 
 void Renderer::RenderText(const Entity& entity, SDL_Renderer* renderer,
                           const std::unique_ptr<AssetManager>& assetManager, const SDL_FRect& camera) {
+  const auto transform = entity.GetComponent<TransformComponent>();
   const auto& textLabel = entity.GetComponent<TextLabelComponent>();
   const auto font = assetManager->GetFont(textLabel.fontId);
   SDL_Surface* surface = TTF_RenderText_Blended(font, textLabel.text.c_str(), 0, textLabel.color);
@@ -76,11 +80,13 @@ void Renderer::RenderText(const Entity& entity, SDL_Renderer* renderer,
 
   float labelWidth = 0;
   float labelHeight = 0;
+  const float positionX = transform.globalPosition.x + textLabel.position.x;
+  const float positionY = transform.globalPosition.y + textLabel.position.y;
 
   SDL_GetTextureSize(texture, &labelWidth, &labelHeight);
 
-  const SDL_FRect destRect = {textLabel.position.x - (textLabel.isFixed ? 0 : camera.x),
-                              textLabel.position.y - (textLabel.isFixed ? 0 : camera.y), labelWidth, labelHeight};
+  const SDL_FRect destRect = {positionX - (textLabel.isFixed ? 0 : camera.x),
+                              positionY - (textLabel.isFixed ? 0 : camera.y), labelWidth, labelHeight};
 
   SDL_RenderTexture(renderer, texture, nullptr, &destRect);
 }
