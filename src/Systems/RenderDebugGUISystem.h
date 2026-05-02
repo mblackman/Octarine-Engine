@@ -13,13 +13,14 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 
-class RenderGUISystem : public System {
- public:
-  RenderGUISystem() = default;
+class RenderDebugGUISystem : public System {
+public:
+  RenderDebugGUISystem() = default;
 
-  ~RenderGUISystem() = default;
+  ~RenderDebugGUISystem() = default;
 
-  static void Update(SDL_Renderer* renderer, std::unique_ptr<Registry>& registry) {
+  static void Update(SDL_Renderer* renderer,
+                     std::unique_ptr<Registry>& registry) {
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
@@ -30,7 +31,7 @@ class RenderGUISystem : public System {
     ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
   }
 
- private:
+private:
   static void SpawnEnemyWindow(std::unique_ptr<Registry>& registry) {
     if (ImGui::Begin("Spawn enemy")) {
       static int xPos = 0, yPos = 0;
