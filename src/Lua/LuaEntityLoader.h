@@ -18,6 +18,45 @@ class LuaEntityLoader {
  public:
   using ComponentCreationFunction = std::function<void(Entity, const sol::table&)>;
 
+  static void TagAndGroupEntity(const sol::table& currentData, const Entity& entity) {
+    const sol::optional<std::string> tag = currentData["tag"];
+    const sol::optional<std::string> group = currentData["group"];
+
+    if (tag.has_value() && !tag.value().empty()) {
+      entity.Tag(tag.value());
+    }
+
+    if (group.has_value() && !group.value().empty()) {
+      entity.Group(group.value());
+    }
+  }
+
+  static void LoadEntityComponents(const sol::table& currentData, const Entity& entity) {
+    sol::optional<sol::table> componentsTableOpt = currentData["components"];
+    if (!componentsTableOpt || !componentsTableOpt.value().valid()) {
+      std::cout << "LoadEntityFromLua: Entity has no 'components' table. Skipping." << std::endl;
+      return;
+    }
+
+    // Add all defined components to the entity
+    const sol::table& componentsTable = componentsTableOpt.value();
+    for (const auto& [name, data] : componentsTable) {
+      auto componentName = name.as<std::string>();
+      auto componentDataTable = data.as<sol::table>();
+
+      if (!componentDataTable.valid()) {
+        std::cerr << "LoadEntityFromLua: Invalid data table for component: " << componentName << std::endl;
+        continue;
+      }
+
+      if (auto it = GetComponentFactoryMap().find(componentName); it != GetComponentFactoryMap().end()) {
+        it->second(entity, componentDataTable);
+      } else {
+        std::cerr << "LoadEntityFromLua: Unknown component type '" << componentName << "' in Lua table." << std::endl;
+      }
+    }
+  }
+
   /**
    * @brief Loads entities from a Lua table definition, creating them in the registry.
    *
@@ -46,43 +85,8 @@ class LuaEntityLoader {
         entity.AddParent(*parentEntity);
       }
 
-      // An entity must have a component table to be valid.
-      sol::optional<sol::table> componentsTableOpt = currentData["components"];
-      if (!componentsTableOpt || !componentsTableOpt.value().valid()) {
-        std::cout << "LoadEntityFromLua: Entity has no 'components' table. Skipping children." << std::endl;
-        continue;
-      }
-
-      // Add tag and groups
-
-      const sol::optional<std::string> tag = currentData["tag"];
-      const sol::optional<std::string> group = currentData["group"];
-
-      if (tag.has_value() && !tag.value().empty()) {
-        entity.Tag(tag.value());
-      }
-
-      if (group.has_value() && !group.value().empty()) {
-        entity.Group(group.value());
-      }
-
-      // Add all defined components to the entity
-      const sol::table& componentsTable = componentsTableOpt.value();
-      for (const auto& [name, data] : componentsTable) {
-        auto componentName = name.as<std::string>();
-        auto componentDataTable = data.as<sol::table>();
-
-        if (!componentDataTable.valid()) {
-          std::cerr << "LoadEntityFromLua: Invalid data table for component: " << componentName << std::endl;
-          continue;
-        }
-
-        if (auto it = GetComponentFactoryMap().find(componentName); it != GetComponentFactoryMap().end()) {
-          it->second(entity, componentDataTable);
-        } else {
-          std::cerr << "LoadEntityFromLua: Unknown component type '" << componentName << "' in Lua table." << std::endl;
-        }
-      }
+      TagAndGroupEntity(currentData, entity);
+      LoadEntityComponents(currentData, entity);
 
       // Add any child entities to the stack to be processed.
       sol::optional<sol::table> childEntitiesOpt = currentData["entities"];

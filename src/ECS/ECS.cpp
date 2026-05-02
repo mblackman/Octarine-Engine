@@ -173,11 +173,7 @@ void Registry::UpdateProcessParentRemovals() {
   entities_to_remove_parent_.clear();
 }
 
-void Registry::UpdateProcessEntityRemovals() {
-  if (entities_to_remove_.empty()) {
-    return;
-  }
-
+void Registry::GatherDescendantsForRemoval() {
   std::deque<Entity> queue;
 
   for (const auto& entity : entities_to_remove_) {
@@ -198,44 +194,56 @@ void Registry::UpdateProcessEntityRemovals() {
       }
     }
   }
+}
 
-  for (const auto& entity : entities_to_remove_) {
-    const int entityId = entity.GetId();
+void Registry::DestroyEntity(const std::set<Entity>::value_type& entity) {
+  const int entityId = entity.GetId();
 
-    auto parentIt = child_to_parent_map_.find(entityId);
-    if (parentIt != child_to_parent_map_.end()) {
-      const Entity& parent = parentIt->second;
-      if (entities_to_remove_.find(parent) == entities_to_remove_.end()) {
-        auto parentChildrenIt = parent_to_children_.find(parent.GetId());
-        if (parentChildrenIt != parent_to_children_.end()) {
-          Collections::SwapAndPop(parentChildrenIt->second, entity);
-          if (parentChildrenIt->second.empty()) {
-            parent_to_children_.erase(parentChildrenIt);
-          }
+  auto parentIt = child_to_parent_map_.find(entityId);
+  if (parentIt != child_to_parent_map_.end()) {
+    const Entity& parent = parentIt->second;
+    if (entities_to_remove_.find(parent) == entities_to_remove_.end()) {
+      auto parentChildrenIt = parent_to_children_.find(parent.GetId());
+      if (parentChildrenIt != parent_to_children_.end()) {
+        Collections::SwapAndPop(parentChildrenIt->second, entity);
+        if (parentChildrenIt->second.empty()) {
+          parent_to_children_.erase(parentChildrenIt);
         }
       }
     }
+  }
 
-    child_to_parent_map_.erase(entityId);
-    parent_to_children_.erase(entityId);
+  child_to_parent_map_.erase(entityId);
+  parent_to_children_.erase(entityId);
 
-    RemoveEntityFromSystems(entity);
-    free_ids_.push_front(entityId);
-    entity_component_signatures_[entityId].reset();
+  RemoveEntityFromSystems(entity);
+  free_ids_.push_front(entityId);
+  entity_component_signatures_[entityId].reset();
 
-    for (const auto& pool : component_pools_) {
-      if (pool) {
-        pool->Remove(entityId);
-      }
+  for (const auto& pool : component_pools_) {
+    if (pool) {
+      pool->Remove(entityId);
     }
+  }
 
-    RemoveEntityTag(entity);
-    RemoveEntityGroups(entity);
+  RemoveEntityTag(entity);
+  RemoveEntityGroups(entity);
 
-    Collections::SwapAndPop(root_entities_, entity);
-    Collections::SwapAndPop(entities_, entity);
+  Collections::SwapAndPop(root_entities_, entity);
+  Collections::SwapAndPop(entities_, entity);
 
-    Logger::Info("Entity destroyed: " + std::to_string(entityId));
+  Logger::Info("Entity destroyed: " + std::to_string(entityId));
+}
+
+void Registry::UpdateProcessEntityRemovals() {
+  if (entities_to_remove_.empty()) {
+    return;
+  }
+
+  GatherDescendantsForRemoval();
+
+  for (const auto& entity : entities_to_remove_) {
+    DestroyEntity(entity);
   }
 
   entities_to_remove_.clear();
