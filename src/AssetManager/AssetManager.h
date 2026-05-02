@@ -13,24 +13,20 @@ class AssetManager {
   std::map<std::string, SDL_Texture*> textures_;
   std::map<std::string, TTF_Font*> fonts_;
   std::optional<SDL_ScaleMode> default_scale_mode_;
-  std::string base_path_;
 
-public:
+ public:
   AssetManager() = default;
 
- AssetManager(const AssetManager&) = delete;
- AssetManager& operator=(const AssetManager&) = delete;
+  AssetManager(const AssetManager&) = delete;
+  AssetManager& operator=(const AssetManager&) = delete;
 
- AssetManager(AssetManager&&) = delete;
- AssetManager& operator=(AssetManager&&) = delete;
+  AssetManager(AssetManager&&) = delete;
+  AssetManager& operator=(AssetManager&&) = delete;
 
- ~AssetManager();
+  ~AssetManager();
 
- void SetGameConfig(const GameConfig& gameConfig);
-
- void ClearAssets();
- void AddTexture(SDL_Renderer* renderer, const std::string& assetId,
-                  const std::string& path);
+  void ClearAssets();
+  void AddTexture(SDL_Renderer* renderer, const std::string& assetId, const std::string& path);
   [[nodiscard]] SDL_Texture* GetTexture(const std::string& assetId) const;
   void AddFont(const std::string& assetId, const std::string& path, float fontSize);
   [[nodiscard]] TTF_Font* GetFont(const std::string& assetId) const;

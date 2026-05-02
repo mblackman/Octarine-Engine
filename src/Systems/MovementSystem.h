@@ -4,7 +4,6 @@
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
-#include "../General/Logger.h"
 
 class MovementSystem : public System {
  public:
@@ -71,10 +70,10 @@ class MovementSystem : public System {
     }
   }
 
-  static bool IsEntityOutsideMap(Entity entity) {
+  static bool IsEntityOutsideMap(const Entity entity) {
     const auto transform = entity.GetComponent<TransformComponent>();
-    bool isEntityOutsideMap = transform.position.x > static_cast<float>(Game::windowWidth) ||
-                              transform.position.y > static_cast<float>(Game::windowHeight);
+    bool isEntityOutsideMap = transform.position.x > static_cast<float>(GameConfig::GetInstance().windowWidth) ||
+                              transform.position.y > static_cast<float>(GameConfig::GetInstance().windowHeight);
 
     if (!isEntityOutsideMap) {
       if (entity.HasComponent<SpriteComponent>()) {
@@ -99,12 +98,14 @@ class MovementSystem : public System {
       transform.position.y = 0;
     }
 
-    if (transform.position.x + spriteComponent.width * transform.scale.x > Game::mapWidth) {
-      transform.position.x = Game::mapWidth - spriteComponent.width * transform.scale.x;
+    if (transform.position.x + spriteComponent.width * transform.scale.x >
+        GameConfig::GetInstance().playableAreaWidth) {
+      transform.position.x = GameConfig::GetInstance().playableAreaWidth - spriteComponent.width * transform.scale.x;
     }
 
-    if (transform.position.y + spriteComponent.height * transform.scale.y > Game::mapHeight) {
-      transform.position.y = Game::mapHeight - spriteComponent.height * transform.scale.y;
+    if (transform.position.y + spriteComponent.height * transform.scale.y >
+        GameConfig::GetInstance().playableAreaHeight) {
+      transform.position.y = GameConfig::GetInstance().playableAreaHeight - spriteComponent.height * transform.scale.y;
     }
   }
 };

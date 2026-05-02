@@ -33,15 +33,10 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 
-int Game::windowWidth;
-int Game::windowHeight;
-float Game::mapWidth;
-float Game::mapHeight;
-
 constexpr Uint8 GREY_COLOR = 24;
 
-inline void LoadGame(sol::state &lua, const AssetManager *assetManager, const GameConfig &gameConfig) {
-  const auto filePath = assetManager->GetFullPath(gameConfig.GetStartupScript());
+inline void LoadGame(sol::state &lua, const AssetManager *assetManager) {
+  const auto filePath = assetManager->GetFullPath(GameConfig::GetInstance().GetStartupScript());
 
   Logger::Info("Loading entry script: " + filePath);
   sol::protected_function_result result;
@@ -60,12 +55,11 @@ inline void LoadGame(sol::state &lua, const AssetManager *assetManager, const Ga
   Logger::Info("Just opened entry script: " + filePath);
 }
 
-Game::Game() : window_(nullptr), sdl_renderer_(nullptr), camera_(), show_colliders_(false) {
+Game::Game() : window_(nullptr), sdl_renderer_(nullptr), camera_() {
   registry_ = std::make_unique<Registry>();
   asset_manager_ = std::make_unique<AssetManager>();
   event_bus_ = std::make_unique<EventBus>();
   renderer_ = std::make_unique<Renderer>();
-  game_config_ = std::make_unique<GameConfig>();
   Logger::Info("Game Constructor called.");
 }
 
@@ -84,15 +78,15 @@ bool Game::Initialize(const std::string &assetPath) {
     return false;
   }
 
-  if (!game_config_->LoadConfigFromFile(assetPath)) {
+  if (!GameConfig::GetInstance().LoadConfigFromFile(assetPath)) {
     Logger::Error("Failed to load game config.");
     return false;
   }
 
-  windowWidth = game_config_->GetDefaultWidth();
-  windowHeight = game_config_->GetDefaultHeight();
-  SDL_CreateWindowAndRenderer(game_config_->GetGameTitle().c_str(), windowWidth, windowHeight, SDL_WINDOW_RESIZABLE,
-                              &window_, &sdl_renderer_);
+  GameConfig::GetInstance().windowWidth = GameConfig::GetInstance().GetDefaultWidth();
+  GameConfig::GetInstance().windowHeight = GameConfig::GetInstance().GetDefaultHeight();
+  SDL_CreateWindowAndRenderer(GameConfig::GetInstance().GetGameTitle().c_str(), GameConfig::GetInstance().windowWidth,
+                              GameConfig::GetInstance().windowHeight, SDL_WINDOW_RESIZABLE, &window_, &sdl_renderer_);
 
   if (!window_) {
     Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
@@ -116,11 +110,10 @@ bool Game::Initialize(const std::string &assetPath) {
 
   camera_.x = 0;
   camera_.y = 0;
-  camera_.w = static_cast<float>(windowWidth);
-  camera_.h = static_cast<float>(windowHeight);
+  camera_.w = static_cast<float>(GameConfig::GetInstance().windowWidth);
+  camera_.h = static_cast<float>(GameConfig::GetInstance().windowHeight);
 
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
-  asset_manager_->SetGameConfig(*game_config_);
   s_is_running_ = true;
   return true;
 }
@@ -172,10 +165,10 @@ void Game::Setup() {
 
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
   registry_->GetSystem<ScriptSystem>().CreateLuaBindings(lua, *this);
-  lua["game_window_width"] = windowWidth;
-  lua["game_window_height"] = windowHeight;
+  lua["game_window_width"] = GameConfig::GetInstance().windowWidth;
+  lua["game_window_height"] = GameConfig::GetInstance().windowHeight;
 
-  LoadGame(lua, asset_manager_.get(), *game_config_);
+  LoadGame(lua, asset_manager_.get());
 }
 
 void Game::ProcessInput() const {
@@ -263,10 +256,10 @@ void Game::Render() {
 
   render_queue_.Sort();
   renderer_->Render(render_queue_, sdl_renderer_, camera_, asset_manager_);
+  registry_->GetSystem<RenderDebugGUISystem>().Update(sdl_renderer_);
 
-  if (show_colliders_) {
+  if (GameConfig::GetInstance().GetEngineOptions().drawColliders) {
     registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
-    registry_->GetSystem<RenderDebugGUISystem>().Update(sdl_renderer_);
   }
 
   SDL_RenderPresent(sdl_renderer_);
@@ -285,8 +278,9 @@ void Game::OnKeyInputEvent(const KeyInputEvent &event) {
     case SDLK_ESCAPE:
       s_is_running_ = false;
       break;
-    case SDLK_F5:
-      show_colliders_ = !show_colliders_;
+    case SDLK_GRAVE:
+      GameConfig::GetInstance().GetEngineOptions().showDebugGUI =
+          !GameConfig::GetInstance().GetEngineOptions().showDebugGUI;
       break;
     default:
       break;

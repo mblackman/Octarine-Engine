@@ -69,8 +69,8 @@ inline std::vector<std::string> ReadFileLines(const std::string &filename) {
 }
 
 inline void SetGameMapDimensions(const double width, const double height) {
-  Game::mapHeight = static_cast<float>(height);
-  Game::mapWidth = static_cast<float>(width);
+  GameConfig::GetInstance().playableAreaHeight = static_cast<float>(height);
+  GameConfig::GetInstance().playableAreaWidth = static_cast<float>(width);
 }
 
 inline int LuaHandler(lua_State *lua_state, sol::optional<const std::exception &> exception,
