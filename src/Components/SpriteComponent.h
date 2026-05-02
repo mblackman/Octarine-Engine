@@ -3,6 +3,8 @@
 #include <SDL2/SDL.h>
 
 #include <string>
+#include <utility>
+#include <utility>
 
 struct SpriteComponent {
   std::string assetId;
@@ -10,13 +12,13 @@ struct SpriteComponent {
   int height;
   int layer;
   bool isFixed;
-  SDL_Rect srcRect;
+  SDL_Rect srcRect{};
   SDL_RendererFlip flip;
 
-  SpriteComponent(std::string assetId = "", int width = 0, int height = 0,
+  explicit SpriteComponent(std::string assetId = "", int width = 0, int height = 0,
                   int layer = 0, bool isFixed = false, int srcRectX = 0,
                   int srcRectY = 0)
-      : assetId(assetId),
+      : assetId(std::move(std::move(assetId))),
         width(width),
         height(height),
         layer(layer),

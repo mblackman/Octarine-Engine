@@ -25,7 +25,7 @@ class EventCallback : public IEventCallback {
 
   TOwner* owner_instance_;
   CallbackFunction callback_function_;
-  virtual void CallEvent(Event& e) override {
+  void CallEvent(Event& e) override {
     std::invoke(callback_function_, owner_instance_, static_cast<TEvent&>(e));
   }
 
@@ -35,7 +35,7 @@ class EventCallback : public IEventCallback {
     this->callback_function_ = callbackFunction;
   }
 
-  virtual ~EventCallback() override = default;
+  ~EventCallback() override = default;
 };
 
 typedef std::list<std::unique_ptr<IEventCallback>> HandlerList;
@@ -64,11 +64,11 @@ class EventBus {
 
   template <typename TEvent, typename... TArgs>
   void EmitEvent(TArgs&&... args) {
-    auto handlers = subscribers_[typeid(TEvent)].get();
+    const auto handlers = subscribers_[typeid(TEvent)].get();
 
     if (handlers) {
-      for (auto it = handlers->begin(); it != handlers->end(); it++) {
-        auto handler = it->get();
+      for (auto & it : *handlers) {
+        auto handler = it.get();
         TEvent event(std::forward<TArgs>(args)...);
         handler->Execute(event);
       }

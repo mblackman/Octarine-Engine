@@ -3,5 +3,5 @@
 struct KeyboardControlComponent {
   double velocity;
 
-  KeyboardControlComponent(double velocity = 0.0) : velocity(velocity) {}
+  explicit KeyboardControlComponent(double velocity = 0.0) : velocity(velocity) {}
 };

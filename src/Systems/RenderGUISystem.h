@@ -15,11 +15,11 @@
 
 class RenderGUISystem : public System {
  public:
-  RenderGUISystem() {}
+  RenderGUISystem() = default;
 
   ~RenderGUISystem() = default;
 
-  void Update(SDL_Renderer* renderer, std::unique_ptr<Registry>& registry) {
+  static void Update(SDL_Renderer* renderer, std::unique_ptr<Registry>& registry) {
     IMGUI_IMPL_API::ImGui::NewFrame();
     ImGui_ImplSDLRenderer2_NewFrame();
     ImGui_ImplSDL2_NewFrame();
@@ -32,7 +32,7 @@ class RenderGUISystem : public System {
   }
 
  private:
-  void SpawnEnemyWindow(std::unique_ptr<Registry>& registry) {
+  static void SpawnEnemyWindow(std::unique_ptr<Registry>& registry) {
     if (ImGui::Begin("Spawn enemy")) {
       static int xPos = 0, yPos = 0;
       static float scale = 1.0, rotation = 0.0;
@@ -84,7 +84,7 @@ class RenderGUISystem : public System {
 
       if (ImGui::Button("Spawn")) {
         auto sprite = std::string(sprites[spriteSelectedIndex]);
-        auto radians = glm::radians(projectileAngle);
+        const auto radians = glm::radians(projectileAngle);
         auto projectileVelocity =
             glm::vec2(glm::cos(radians), glm::sin(radians)) *
             (float)projectileSpeed;

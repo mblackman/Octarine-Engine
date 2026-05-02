@@ -21,7 +21,7 @@ class Pool : public IPool {
   std::unordered_map<int, int> id_to_indexes_;
 
  public:
-  Pool(size_t size = 100) : size_(0), index_to_ids_(), id_to_indexes_() {
+  explicit Pool(size_t size = 100) : size_(0), index_to_ids_(), id_to_indexes_() {
     Resize(size);
   }
 
@@ -57,7 +57,7 @@ class Pool : public IPool {
   }
 
   void Remove(int id) override {
-    auto index = id_to_indexes_.find(id);
+    const auto index = id_to_indexes_.find(id);
     if (index == id_to_indexes_.end()) {
       return;
     }
@@ -66,7 +66,7 @@ class Pool : public IPool {
     int indexOfLast = size_ - 1;
     data_[indexOfRemoved] = data_[indexOfLast];
 
-    int entityIdOfLastElement = index_to_ids_[indexOfLast];
+    const int entityIdOfLastElement = index_to_ids_[indexOfLast];
     id_to_indexes_[entityIdOfLastElement] = indexOfRemoved;
     index_to_ids_[indexOfRemoved] = entityIdOfLastElement;
 
@@ -77,7 +77,7 @@ class Pool : public IPool {
   }
 
   T& Get(int id) {
-    auto index = id_to_indexes_.find(id);
+    const auto index = id_to_indexes_.find(id);
     if (index == id_to_indexes_.end()) {
       throw std::runtime_error("Element not found with id: " +
                                std::to_string(id));

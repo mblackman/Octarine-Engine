@@ -1,3 +1,7 @@
+#include <utility>
+
+#include <utility>
+
 #pragma once
 
 struct UIButtonComponent {
@@ -6,10 +10,10 @@ struct UIButtonComponent {
   sol::optional<sol::table> buttonTable;
   sol::function clickFunction;
 
-  UIButtonComponent(bool isActive = true,
+  explicit UIButtonComponent(bool isActive = true,
                     sol::optional<sol::table> buttonTable = sol::nullopt,
                     sol::function clickFunction = sol::lua_nil)
       : isActive(isActive),
-        buttonTable(buttonTable),
-        clickFunction(clickFunction) {}
+        buttonTable(std::move(std::move(buttonTable))),
+        clickFunction(std::move(std::move(clickFunction))) {}
 };

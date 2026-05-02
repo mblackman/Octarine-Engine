@@ -9,12 +9,12 @@ struct AnimationComponent {
   bool shouldLoop;
   int startTime;
 
-  AnimationComponent(int numFrames = 1, int frameRateSpeed = 1,
-                     bool shouldLoop = true) {
-    this->numFrames = numFrames;
-    this->currentFrame = 1;
-    this->frameRateSpeed = frameRateSpeed;
-    this->shouldLoop = shouldLoop;
-    this->startTime = SDL_GetTicks();
+  explicit AnimationComponent(int numFrames = 1, int frameRateSpeed = 1,
+                     bool shouldLoop = true) : numFrames(numFrames), currentFrame(1), frameRateSpeed(frameRateSpeed), shouldLoop(shouldLoop), startTime(SDL_GetTicks()) {
+    
+    
+    
+    
+    
   }
 };

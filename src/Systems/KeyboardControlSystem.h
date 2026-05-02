@@ -29,7 +29,7 @@ class KeyboardControlSystem : public System {
 
   void OnKeyInput(KeyInputEvent& event) {
     for (auto entity : GetEntities()) {
-      auto& keyboardComponent = entity.GetComponent<KeyboardControlComponent>();
+      const auto& keyboardComponent = entity.GetComponent<KeyboardControlComponent>();
       auto& spriteComponent = entity.GetComponent<SpriteComponent>();
       auto& rigidBodyComponent = entity.GetComponent<RigidBodyComponent>();
 

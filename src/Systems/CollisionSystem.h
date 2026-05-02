@@ -28,7 +28,7 @@ class CollisionSystem : public System {
         auto entityB = *j;
         const auto& transformB = entityB.GetComponent<TransformComponent>();
         const auto& colliderB = entityB.GetComponent<BoxColliderComponent>();
-        bool isColliding =
+        const bool isColliding =
             CheckAABBCollision(transformA, colliderA, transformB, colliderB);
         if (isColliding) {
           eventBus->EmitEvent<CollisionEvent>(entityA, entityB);
@@ -37,7 +37,7 @@ class CollisionSystem : public System {
     }
   }
 
-  bool CheckAABBCollision(const TransformComponent& transformA,
+  static bool CheckAABBCollision(const TransformComponent& transformA,
                           const BoxColliderComponent& colliderA,
                           const TransformComponent& transformB,
                           const BoxColliderComponent& colliderB) {

@@ -16,7 +16,7 @@ class CameraFollowSystem : public System {
 
   void Update(SDL_Rect& camera) {
     for (auto entity : GetEntities()) {
-      auto transform = entity.GetComponent<TransformComponent>();
+      const auto transform = entity.GetComponent<TransformComponent>();
 
       if (transform.position.x + (camera.w / 2) < Game::mapWidth) {
         camera.x = transform.position.x - (Game::windowWidth / 2);

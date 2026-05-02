@@ -8,16 +8,16 @@
 
 class RenderPrimitiveSystem : public System {
  public:
-  RenderPrimitiveSystem() {}
+  RenderPrimitiveSystem() = default;
 
   ~RenderPrimitiveSystem() = default;
 
   void Update(RenderQueue& renderQueue) {
-    auto entities = GetEntities();
+    const auto entities = GetEntities();
 
     for (auto entity : entities) {
       if (entity.HasComponent<SquarePrimitiveComponent>()) {
-        auto square = entity.GetComponent<SquarePrimitiveComponent>();
+        const auto square = entity.GetComponent<SquarePrimitiveComponent>();
         RenderKey renderKey(square.layer, square.position.y,
                             RenderableType::SQUARE_PRIMITIVE, entity);
 

@@ -34,11 +34,11 @@ class UIButtonSystem : public System {
         continue;
       }
 
-      auto boxCollider = entity.GetComponent<BoxColliderComponent>();
-      auto transform = entity.GetComponent<TransformComponent>();
-      int mouseX = event.event.x;
-      int mouseY = event.event.y;
-      bool isClick =
+      const auto boxCollider = entity.GetComponent<BoxColliderComponent>();
+      const auto transform = entity.GetComponent<TransformComponent>();
+      const int mouseX = event.event.x;
+      const int mouseY = event.event.y;
+      const bool isClick =
           transform.position.x <= mouseX &&
           (transform.position.x + boxCollider.width * transform.scale.x) >=
               mouseX &&

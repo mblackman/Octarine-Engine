@@ -37,7 +37,7 @@ class Game {
   void Setup(bool isMapEditor);
   void SubscribeToEvents(std::unique_ptr<EventBus>& eventBus);
   void OnKeyInputEvent(KeyInputEvent& event);
-  KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);
+  static KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);
 
   SDL_Window* window_;
   SDL_Renderer* sdl_renderer_;

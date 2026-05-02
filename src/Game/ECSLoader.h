@@ -10,9 +10,9 @@ class ECSLoader {
   ECSLoader() = default;
   ~ECSLoader() = default;
 
-  void LoadEntity(sol::table entityTable,
+  static void LoadEntity(sol::table entityTable,
                   const std::unique_ptr<Registry>& registry);
-  void LoadAsset(sol::table assetTable,
+  static void LoadAsset(sol::table assetTable,
                  const std::unique_ptr<AssetManager>& assetManager,
                  SDL_Renderer* renderer);
 };
