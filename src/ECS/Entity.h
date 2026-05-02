@@ -15,7 +15,7 @@ struct Entity {
   EntityID id;
   std::uint32_t generation;
 
-  [[nodiscard]] int GetId() const;
+  [[nodiscard]] EntityID GetId() const { return id; }
 
   bool operator==(const Entity& other) const { return id == other.id && generation == other.generation; }
 
@@ -28,21 +28,6 @@ struct Entity {
   bool operator<=(const Entity& other) const { return id <= other.id && generation <= other.generation; }
 
   bool operator>=(const Entity& other) const { return id >= other.id && generation >= other.generation; }
-
-  template <class ComponentTypeToPass>
-  void AddComponent(ComponentTypeToPass&& component);
-
-  template <typename T, typename... TArgs>
-  void AddComponent(TArgs&&... args);
-
-  template <typename T>
-  void RemoveComponent() const;
-
-  template <typename T>
-  [[nodiscard]] bool HasComponent() const;
-
-  template <typename T>
-  T& GetComponent() const;
 
   void Tag(const std::string& tag) const;
   [[nodiscard]] bool HasTag(const std::string& tag) const;
@@ -69,6 +54,7 @@ class EntityManager {
     for (uint32_t i = 0; i < kStartingEntityPoolSize; ++i) {
       available_entities_.push(i);
     }
+    generations_.resize(kStartingEntityPoolSize);
   }
 
   Entity CreateEntity() {
