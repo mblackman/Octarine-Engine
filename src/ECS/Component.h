@@ -192,7 +192,7 @@ class Archetype {
   }
 
   [[nodiscard]] bool HasComponent(const ComponentID id) const {
-    return std::ranges::find(archetype_type_, id) != archetype_type_.end();
+    return component_type_to_index_.contains(id);
   }
 
   template <typename T>

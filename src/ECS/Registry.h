@@ -1,6 +1,7 @@
 #pragma once
 
 #include <any>
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <optional>
@@ -18,8 +19,6 @@
 #include "Entity.h"
 #include "General/Logger.h"
 #include "System.h"
-
-#include <atomic>
 
 class Query;
 
@@ -97,6 +96,8 @@ class Registry {
     if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity)) return false;
     return entity_locations_[id].archetype != nullptr;
   }
+
+  [[nodiscard]] std::uint64_t GetEntityCount() const { return entity_locations_.size(); }
 
   // Component management
   template <typename T>
@@ -330,6 +331,14 @@ class Registry {
 
   [[nodiscard]] float DeltaTime() const { return delta_time_; }
 
+  // Returns true if any entity has relationship pairs (e.g. ChildOf hierarchy).
+  // Used by TransformSystem to skip hierarchy resolution when no parents exist.
+  [[nodiscard]] bool HasAnyPairs() const { return !pairs_.empty(); }
+
+  // Incremented when a new archetype is created. Queries use this to skip re-matching
+  // when the archetype set hasn't changed since their last Update.
+  [[nodiscard]] uint64_t ArchetypeGeneration() const { return archetype_generation_; }
+
  private:
   EntityLocation TransitionAddComponent(Entity entity, ComponentID componentId);
   EntityLocation TransitionRemoveComponent(Entity entity, ComponentID componentId);
@@ -350,4 +359,5 @@ class Registry {
   std::unordered_map<EntityID, std::unordered_set<EcsId>> pairs_;
   std::vector<Entity> pending_blams_;
   float delta_time_{};
+  uint64_t archetype_generation_{0};
 };

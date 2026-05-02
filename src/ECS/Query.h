@@ -29,6 +29,11 @@ class ComponentQuery final : public Query {
   }
 
   void Update() override {
+    const uint64_t current_gen = registry_->ArchetypeGeneration();
+    if (current_gen == cached_generation_) {
+      return;  // Archetype set unchanged — skip the re-match.
+    }
+    cached_generation_ = current_gen;
     const auto matching_archetypes = registry_->GetMatchingArchetypes(sorted_type_);
     archetype_query_ = ArchetypeQuery<TComponents...>(type_, matching_archetypes);
   }
@@ -39,6 +44,7 @@ class ComponentQuery final : public Query {
   ComponentQuery& WithTag(const Entity tag) {
     extra_required_.push_back(tag.GetId());
     RebuildSorted();
+    cached_generation_ = UINT64_MAX;  // Force re-match on next Update.
     return *this;
   }
 
@@ -71,6 +77,14 @@ class ComponentQuery final : public Query {
         }, *it);
       }
     }
+  }
+
+  // Parallel version of ForEach — distributes chunks across CPU threads.
+  // Only safe for funcs that do per-entity independent writes (no shared mutable state).
+  // Func signature: void(Entity, TComponents&...) or void(TComponents&...).
+  template <typename Func>
+  void ParallelForEach(Func&& func) {
+    archetype_query_.ParallelForEach(std::forward<Func>(func));
   }
 
   template <typename Func>
@@ -107,4 +121,6 @@ class ComponentQuery final : public Query {
   ArchetypeType sorted_type_;     // sorted ascending — used for archetype matching
   ArchetypeType extra_required_;  // additional ComponentIDs required (e.g. tag filters)
   ArchetypeQuery<TComponents...> archetype_query_;
+  uint64_t cached_generation_{UINT64_MAX};  // Forces first Update to always match.
 };
+

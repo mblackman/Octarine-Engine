@@ -3,12 +3,17 @@
 #include <algorithm>
 
 #include "../General/Logger.h"
+#include "../General/PerfUtils.h"
 #include "Query.h"
 
 void Registry::Update(const float deltaTime) {
+  PROFILE_NAMED_SCOPE("Registry::Update (total)");
   delta_time_ = deltaTime;
-  for (const auto& system : systems_) {
-    system->Update(*this);
+  for (size_t i = 0; i < systems_.size(); ++i) {
+#ifdef OCTARINE_PROFILING
+    PerfUtils::ScopedTimer systemTimer("System[" + std::to_string(i) + "]");
+#endif
+    systems_[i]->Update(*this);
   }
   if (!pending_blams_.empty()) {
     auto pending = std::move(pending_blams_);
@@ -221,6 +226,7 @@ Archetype* Registry::GetOrCreateArchetype(std::vector<ComponentID> componentIDs,
   Archetype* newArchetypePtr = newArchetype.get();
   const auto newArchetypeId = newArchetype->GetID();
   archetypes_.emplace(newArchetypeId, std::move(newArchetype));
+  ++archetype_generation_;
 
   // Centralized component_index_ population — every archetype is registered here.
   for (const ComponentID id : newArchetypePtr->type()) {
@@ -273,6 +279,7 @@ Archetype* Registry::GetOrCreateArchetypeRemove(std::vector<ComponentID> compone
   Archetype* newArchetypePtr = newArchetype.get();
   const auto newArchetypeId = newArchetype->GetID();
   archetypes_.emplace(newArchetypeId, std::move(newArchetype));
+  ++archetype_generation_;
 
   for (const ComponentID id : newArchetypePtr->type()) {
     auto& list = component_index_[id];
