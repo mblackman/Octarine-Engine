@@ -115,10 +115,8 @@ class ComponentLuaFactory {
   static ProjectileEmitterComponent CreateProjectileEmitterComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;
     const glm::vec2 projectileVelocity = SafeGetVec2(data, "projectile_velocity");
-    const int repeatFrequency =
-        SafeGetOptionalValue<int>(data, "repeat_frequency", 5) * Constants::kMillisecondsPerSecond;
-    const float projectileDuration =
-        SafeGetOptionalValue<float>(data, "projectile_duration", 1.0f) * Constants::kMillisecondsPerSecond;
+    const auto repeatFrequency = SafeGetOptionalValue<float>(data, "repeat_frequency", 1.0f);
+    const auto projectileDuration = SafeGetOptionalValue<float>(data, "projectile_duration", 1.0f);
     const int projectileDamage = SafeGetOptionalValue<int>(data, "hit_damage", 10);
     const bool isFriendly = SafeGetOptionalValue<bool>(data, "friendly", false);
 
@@ -144,9 +142,8 @@ class ComponentLuaFactory {
   static UIButtonComponent CreateUIButtonComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;
     const bool isActive = SafeGetOptionalValue<bool>(data, "is_active", true);
-    const sol::optional<sol::table> btnTable = SafeGetOptionalTable(data, "button_table");
     const sol::protected_function clickFn = SafeGetProtectedFunction(data, "on_click");
-    return UIButtonComponent(isActive, btnTable, clickFn);
+    return UIButtonComponent(isActive, data, clickFn);
   }
 
   static TextLabelComponent CreateTextLabelComponent(const sol::table& data) {

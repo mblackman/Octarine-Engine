@@ -48,11 +48,11 @@ class ProjectileEmitSystem : public System {
       auto& emitter = entity.GetComponent<ProjectileEmitterComponent>();
 
       if (!emitter.isFriendly) {
-        emitter.countDownTimer -= deltaTime * Constants::kMillisecondsPerSecond;
+        emitter.countDownTimer -= deltaTime;
 
-        if (emitter.countDownTimer <= 0) {
+        if (emitter.countDownTimer <= 0.0f) {
           SpawnProjectile(transform, entity, registry, emitter);
-          emitter.countDownTimer = static_cast<double>(emitter.frequency);
+          emitter.countDownTimer = emitter.frequency;
         }
       } else if (emitter.isFriendly && spawnFriendlyProjectiles_) {
         SpawnProjectile(transform, entity, registry, emitter);
