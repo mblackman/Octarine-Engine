@@ -20,24 +20,29 @@
 #include "ECS/Registry.h"
 
 void Renderer::Render(const Registry* registry, SDL_Renderer* renderer) const {
-  const auto camera = registry->Get<CameraComponent>().viewport;
-  auto& assetManager = registry->Get<AssetManager>();
   auto& renderQueue = registry->Get<RenderQueue>();
 
   for (const RenderKey& renderKey : renderQueue) {
-    const Entity entity = renderKey.entity;
-    if (!registry->IsAlive(entity)) continue;
-
     switch (const RenderableType type = renderKey.type) {
       case SPRITE:
-        RenderSprite(registry, entity, renderer, assetManager, camera);
+        // Sprite data is pre-computed in the RenderKey — no GetComponent needed.
+        RenderSprite(renderKey, renderer);
         break;
-      case TEXT:
+      case TEXT: {
+        const Entity entity = renderKey.entity;
+        if (!registry->IsAlive(entity)) continue;
+        const auto camera = registry->Get<CameraComponent>().viewport;
+        auto& assetManager = registry->Get<AssetManager>();
         RenderText(entity, renderer, assetManager, camera);
         break;
-      case SQUARE_PRIMITIVE:
+      }
+      case SQUARE_PRIMITIVE: {
+        const Entity entity = renderKey.entity;
+        if (!registry->IsAlive(entity)) continue;
+        const auto camera = registry->Get<CameraComponent>().viewport;
         RenderSquare(entity, renderer, camera);
         break;
+      }
       default:
         Logger::Error("Unknown renderable type: " + std::to_string(type));
         break;
@@ -45,20 +50,9 @@ void Renderer::Render(const Registry* registry, SDL_Renderer* renderer) const {
   }
 }
 
-void Renderer::RenderSprite(const Registry* registry, const Entity& entity, SDL_Renderer* renderer,
-                            const AssetManager& assetManager, const SDL_FRect& camera) {
-  const auto transform = registry->GetComponent<TransformComponent>(entity);
-  const auto& sprite = registry->GetComponent<SpriteComponent>(entity);
-  if (!sprite.cachedTexture) {
-    sprite.cachedTexture = assetManager.GetTexture(sprite.assetId);
-  }
-  const auto texture = sprite.cachedTexture;
-  const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera.x;
-  const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera.y;
-
-  const SDL_FRect destRect = {x, y, sprite.width * transform.scale.x, sprite.height * transform.scale.y};
-
-  SDL_RenderTextureRotated(renderer, texture, &sprite.srcRect, &destRect, transform.rotation, nullptr, sprite.flip);
+void Renderer::RenderSprite(const RenderKey& key, SDL_Renderer* renderer) {
+  const SDL_FRect destRect = {key.destX, key.destY, key.destW, key.destH};
+  SDL_RenderTextureRotated(renderer, key.texture, &key.srcRect, &destRect, key.rotation, nullptr, key.flip);
 }
 
 void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer, const SDL_FRect& camera) {

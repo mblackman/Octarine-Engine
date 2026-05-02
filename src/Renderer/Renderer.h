@@ -24,8 +24,7 @@ class Renderer {
   void Render(const Registry* registry, SDL_Renderer* renderer) const;
 
  private:
-  static void RenderSprite(const Registry* registry, const Entity& entity, SDL_Renderer* renderer,
-                           const AssetManager& assetManager, const SDL_FRect& camera);
+  static void RenderSprite(const RenderKey& key, SDL_Renderer* renderer);
   static void RenderSquare(const Entity& entity, SDL_Renderer* renderer, const SDL_FRect& camera);
   static void RenderText(const Entity& entity, SDL_Renderer* renderer, const AssetManager& assetManager,
                          const SDL_FRect& camera);
