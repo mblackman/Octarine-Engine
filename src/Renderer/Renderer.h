@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <memory>
+
 #include "../AssetManager/AssetManager.h"
 #include "./RenderQueue.h"
 
@@ -18,12 +20,12 @@ class Renderer {
   ~Renderer() = default;
 
   void Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, const SDL_FRect& camera,
-              const std::unique_ptr<AssetManager>& assetManager) const;
+              const AssetManager& assetManager) const;
 
  private:
-  static void RenderSprite(const Entity& entity, SDL_Renderer* renderer,
-                           const std::unique_ptr<AssetManager>& assetManager, const SDL_FRect& camera);
+  static void RenderSprite(const Entity& entity, SDL_Renderer* renderer, const AssetManager& assetManager,
+                           const SDL_FRect& camera);
   static void RenderSquare(const Entity& entity, SDL_Renderer* renderer, const SDL_FRect& camera);
-  static void RenderText(const Entity& entity, SDL_Renderer* renderer,
-                         const std::unique_ptr<AssetManager>& assetManager, const SDL_FRect& camera);
+  static void RenderText(const Entity& entity, SDL_Renderer* renderer, const AssetManager& assetManager,
+                         const SDL_FRect& camera);
 };

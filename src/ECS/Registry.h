@@ -1,5 +1,7 @@
 #pragma once
 
+#include <any>
+
 #include "Component.h"
 #include "Entity.h"
 #include "Iter.h"
@@ -68,19 +70,21 @@ class Registry {
   T& GetComponent(const Entity entity) {
     const auto it = entity_locations_.find(entity.id);
     if (it == entity_locations_.end()) {
-      Logger::Warn("Could not find entity with ID: " + std::to_string(entity.id) + " to get component");
-      return static_cast<T&>(nullptr);
+      throw std::runtime_error("Failed to get required component " + std::string(typeid(T).name()) + " for entity " +
+                               std::to_string(entity.id));
     }
     const auto componentId = GetComponentTypeID<T>();
     const auto [archetype, chunkIndex, indexInChunk] = it->second;
 
     if (!archetype->GetSignature().test(componentId)) {
-      return static_cast<T&>(nullptr);
+      throw std::runtime_error("Failed to get required component " + std::string(typeid(T).name()) + " for entity " +
+                               std::to_string(entity.id));
     }
     const auto componentArray = archetype->GetComponentArray<T>(chunkIndex);
 
     if (componentArray == nullptr) {
-      return static_cast<T&>(nullptr);
+      throw std::runtime_error("Failed to get required component " + std::string(typeid(T).name()) + " for entity " +
+                               std::to_string(entity.id));
     }
 
     return componentArray[indexInChunk];
@@ -135,6 +139,29 @@ class Registry {
     systems_.push_back(std::make_unique<SystemWrapper>(this, std::forward<Func>(func)));
   }
 
+  // Misc
+  template <typename T>
+  T& Set(T value) {
+    const auto id = GetComponentTypeID<T>();
+    singleton_components_[id] = std::move(value);
+    return std::any_cast<T&>(singleton_components_.at(id));
+  }
+
+  template <typename T>
+  T& Get() {
+    const auto id = GetComponentTypeID<T>();
+    try {
+      return std::any_cast<T&>(singleton_components_.at(id));
+    } catch (const std::out_of_range& e) {
+      // Handle case where the component has not been set
+      // You could throw a more descriptive exception, log an error, or assert.
+      throw std::runtime_error("Attempted to Get a singleton component that has not been Set.");
+    } catch (const std::bad_any_cast& e) {
+      // This case is unlikely if your IDs are correct, but good practice.
+      throw std::runtime_error("Type mismatch in Get. This indicates a logic error.");
+    }
+  }
+
  private:
   Archetype* FindOrCreateArchetype(Signature signature);
 
@@ -145,6 +172,7 @@ class Registry {
   Archetype* root_archetype_ = nullptr;  // The root of the archetype graph. Empty signature.
   std::unordered_map<Signature, std::unique_ptr<Query>> queries_;
   std::vector<std::unique_ptr<ISystem>> systems_;
+  std::unordered_map<ComponentTypeID, std::any> singleton_components_;
 };
 
 template <typename... TComponents>

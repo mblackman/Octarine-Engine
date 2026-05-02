@@ -5,17 +5,24 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <filesystem>
+#include <ranges>
 
 #include "../Game/GameConfig.h"
 #include "../General/Logger.h"
 
 AssetManager::~AssetManager() { ClearAssets(); }
+void AssetManager::LoadGameConfig(const GameConfig &config) {
+  base_path_ = config.GetAssetPath();
+  if (config.GetDefaultScaleMode().has_value()) {
+    SetDefaultScaleMode(config.GetDefaultScaleMode().value());
+  }
+}
 
 void AssetManager::ClearAssets() {
-  for (const auto &[fst, snd] : textures_) {
+  for (const auto &snd : textures_ | std::views::values) {
     SDL_DestroyTexture(snd);
   }
-  for (const auto &[fst, snd] : fonts_) {
+  for (const auto &snd : fonts_ | std::views::values) {
     TTF_CloseFont(snd);
   }
 
@@ -30,10 +37,6 @@ void AssetManager::AddTexture(SDL_Renderer *renderer, const std::string &assetId
   if (!texture) {
     Logger::Error("Failed to create texture: " + std::string(SDL_GetError()));
     return;
-  }
-
-  if (!default_scale_mode_.has_value() && GameConfig::GetInstance().GetDefaultScaleMode().has_value()) {
-    SetDefaultScaleMode(GameConfig::GetInstance().GetDefaultScaleMode().value());
   }
 
   if (default_scale_mode_.has_value()) {
@@ -58,7 +61,7 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
 TTF_Font *AssetManager::GetFont(const std::string &assetId) const { return fonts_.at(assetId); }
 
 std::string AssetManager::GetFullPath(const std::string &relativePath) const {
-  const std::filesystem::path basePath = GameConfig::GetInstance().GetAssetPath();
+  const std::filesystem::path basePath = base_path_;
   const std::filesystem::path assetPath = basePath / relativePath;
   return assetPath.string();
 }

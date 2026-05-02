@@ -1,52 +1,35 @@
 #pragma once
 #include <bitset>
-#include <cstdint>
 #include <optional>
 #include <queue>
 
+#include "ECS.h"
+
 constexpr unsigned int kMaxEntityMasks = 32;
 constexpr unsigned int kStartingEntityPoolSize = 1000;
+constexpr unsigned int kEntityGenerationOffset = 32;
 
 // Used to determine which
 typedef std::bitset<kMaxEntityMasks> EntityMask;
-typedef std::uint32_t EntityID;
 typedef std::uint16_t EntityGeneration;
 
 struct Entity {
-  EntityID id;
-  EntityGeneration generation;
+  EcsId id;
 
-  [[nodiscard]] EntityID GetId() const { return id; }
+  [[nodiscard]] std::uint32_t GetId() const { return id; }
+  [[nodiscard]] std::uint16_t GetGeneration() const { return id >> kEntityGenerationOffset; }
 
-  bool operator==(const Entity& other) const { return id == other.id && generation == other.generation; }
+  bool operator==(const Entity& other) const { return id == other.id; }
 
-  bool operator!=(const Entity& other) const { return id != other.id || generation != other.generation; }
+  bool operator!=(const Entity& other) const { return id != other.id; }
 
-  bool operator<(const Entity& other) const { return id < other.id && generation < other.generation; }
+  bool operator<(const Entity& other) const { return id < other.id; }
 
-  bool operator>(const Entity& other) const { return id > other.id && generation > other.generation; }
+  bool operator>(const Entity& other) const { return id > other.id; }
 
-  bool operator<=(const Entity& other) const { return id <= other.id && generation <= other.generation; }
+  bool operator<=(const Entity& other) const { return id <= other.id; }
 
-  bool operator>=(const Entity& other) const { return id >= other.id && generation >= other.generation; }
-
-  void Tag(const std::string& tag) const;
-  [[nodiscard]] bool HasTag(const std::string& tag) const;
-  void Group(const std::string& group) const;
-  [[nodiscard]] bool InGroup(const std::string& group) const;
-
-  void SetEntityMask(EntityMask entityMask) const;
-  [[nodiscard]] EntityMask GetEntityMask() const;
-
-  void Blam() const;
-
-  void AddParent(const Entity& parent) const;
-
-  void RemoveParent() const;
-
-  [[nodiscard]] std::optional<Entity> GetParent() const;
-
-  [[nodiscard]] std::optional<std::vector<Entity>> GetChildren() const;
+  bool operator>=(const Entity& other) const { return id >= other.id; }
 };
 
 // TODO need to handle recycling entity generations
@@ -60,7 +43,7 @@ class EntityManager {
   }
 
   Entity CreateEntity() {
-    uint32_t id;
+    EcsId id;
     if (!available_entities_.empty()) {
       id = available_entities_.front();
       available_entities_.pop();
@@ -70,7 +53,8 @@ class EntityManager {
         generations_.resize(id + 1);
       }
     }
-    return {id, generations_[id]};
+    id += (generations_[id] << kEntityGenerationOffset);
+    return Entity(id);
   }
 
   void BlamEntity(const Entity entity) {
@@ -79,7 +63,7 @@ class EntityManager {
   }
 
   [[nodiscard]] bool IsValid(const Entity entity) const {
-    return entity.id < generations_.size() && generations_[entity.id] == entity.generation;
+    return entity.id < generations_.size() && generations_[entity.id] == entity.GetGeneration();
   }
 
  private:

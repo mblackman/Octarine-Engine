@@ -2,39 +2,31 @@
 #include <functional>
 #include <stack>
 
+#include "../Ecs/Registry.h"
 #include "ComponentLuaFactory.h"
-#include "Components/BoxColliderComponent.h"
-#include "Components/CameraFollowComponent.h"
-#include "Components/HealthComponent.h"
-#include "Components/KeyboardControlComponent.h"
-#include "Components/ProjectileEmitterComponent.h"
-#include "Components/RigidBodyComponent.h"
-#include "Components/ScriptComponent.h"
-#include "Components/TransformComponent.h"
-#include "Components/UIButtonComponent.h"
-#include "ECS/ECS.h"
 
 class LuaEntityLoader {
  public:
-  using ComponentCreationFunction = std::function<void(Entity, const sol::table&)>;
+  using ComponentCreationFunction = std::function<void(Registry*, Entity, const sol::table&)>;
 
+  // TODO Fix all this
   static void TagAndGroupEntity(const sol::table& currentData, const Entity& entity) {
     const sol::optional<std::string> tag = currentData["tag"];
     const sol::optional<std::string> group = currentData["group"];
     const int entityMask = currentData["mask"].get_or(Constants::kDefaultEntityMask);
 
     if (tag.has_value() && !tag.value().empty()) {
-      entity.Tag(tag.value());
+      // entity.Tag(tag.value());
     }
 
     if (group.has_value() && !group.value().empty()) {
-      entity.Group(group.value());
+      // entity.Group(group.value());
     }
 
-    entity.SetEntityMask(entityMask);
+    // entity.SetEntityMask(entityMask);
   }
 
-  static void LoadEntityComponents(const sol::table& currentData, const Entity& entity) {
+  static void LoadEntityComponents(const sol::table& currentData, Registry* registry, const Entity& entity) {
     sol::optional<sol::table> componentsTableOpt = currentData["components"];
     if (!componentsTableOpt || !componentsTableOpt.value().valid()) {
       std::cout << "LoadEntityFromLua: Entity has no 'components' table. Skipping." << std::endl;
@@ -53,7 +45,7 @@ class LuaEntityLoader {
       }
 
       if (auto it = GetComponentFactoryMap().find(componentName); it != GetComponentFactoryMap().end()) {
-        it->second(entity, componentDataTable);
+        it->second(registry, entity, componentDataTable);
       } else {
         std::cerr << "LoadEntityFromLua: Unknown component type '" << componentName << "' in Lua table." << std::endl;
       }
@@ -61,12 +53,12 @@ class LuaEntityLoader {
   }
 
   /**
-   * @brief Loads entities from a Lua table definition, creating them in the registry.
+   * @brief Loads entities from a Lua table definition, creating them in the registry->
    *
    * This function iteratively processes a tree-like structure of entities from a Lua
    * table. It uses a stack to manage parent-child relationships and avoid deep recursion.
    *
-   * @param registry A pointer to the game's entity-component-system registry.
+   * @param registry A pointer to the game's entity-component-system registry->
    * @param entityData The top-level sol::table containing the entity definition.
    */
   static void LoadEntityFromLua(Registry* registry, const sol::table& entityData) {
@@ -85,11 +77,12 @@ class LuaEntityLoader {
       // Create the entity and establish parentage
       const Entity entity = registry->CreateEntity();
       if (parentEntity) {
-        entity.AddParent(*parentEntity);
+        // TODO add back relationships
+        // entity.AddParent(*parentEntity);
       }
 
       TagAndGroupEntity(currentData, entity);
-      LoadEntityComponents(currentData, entity);
+      LoadEntityComponents(currentData, registry, entity);
 
       // Add any child entities to the stack to be processed.
       sol::optional<sol::table> childEntitiesOpt = currentData["entities"];
@@ -121,44 +114,44 @@ class LuaEntityLoader {
   static std::unordered_map<std::string, ComponentCreationFunction> InitializeFactories() {
     std::unordered_map<std::string, ComponentCreationFunction> factories;
 
-    factories["transform"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<TransformComponent>(ComponentLuaFactory::CreateTransformComponent(data));
+    factories["transform"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateTransformComponent(data));
     };
-    factories["rigidbody"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<RigidBodyComponent>(ComponentLuaFactory::CreateRigidBodyComponent(data));
+    factories["rigidbody"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateRigidBodyComponent(data));
     };
-    factories["sprite"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<SpriteComponent>(ComponentLuaFactory::CreateSpriteComponent(data));
+    factories["sprite"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateSpriteComponent(data));
     };
-    factories["square"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<SquarePrimitiveComponent>(ComponentLuaFactory::CreateSquarePrimitiveComponent(data));
+    factories["square"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateSquarePrimitiveComponent(data));
     };
-    factories["animation"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<AnimationComponent>(ComponentLuaFactory::CreateAnimationComponent(data));
+    factories["animation"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateAnimationComponent(data));
     };
-    factories["box_collider"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<BoxColliderComponent>(ComponentLuaFactory::CreateBoxColliderComponent(data));
+    factories["box_collider"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateBoxColliderComponent(data));
     };
-    factories["health"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<HealthComponent>(ComponentLuaFactory::CreateHealthComponent(data));
+    factories["health"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateHealthComponent(data));
     };
-    factories["projectile_emitter"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<ProjectileEmitterComponent>(ComponentLuaFactory::CreateProjectileEmitterComponent(data));
+    factories["projectile_emitter"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateProjectileEmitterComponent(data));
     };
-    factories["camera_follow"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<CameraFollowComponent>(ComponentLuaFactory::CreateCameraFollowComponent(data));
+    factories["camera_follow"] = [](Registry* registry, Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateCameraFollowComponent(data));
     };
-    factories["keyboard_controller"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<KeyboardControlComponent>(ComponentLuaFactory::CreateKeyboardControlledComponent(data));
+    factories["keyboard_controller"] = [](Registry* registry, Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateKeyboardControlledComponent(data));
     };
-    factories["script"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<ScriptComponent>(ComponentLuaFactory::CreateScriptComponent(data));
+    factories["script"] = [](Registry* registry, Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateScriptComponent(data));
     };
-    factories["ui_button"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<UIButtonComponent>(ComponentLuaFactory::CreateUIButtonComponent(data));
+    factories["ui_button"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateUIButtonComponent(data));
     };
-    factories["text_label"] = [](Entity ent, const sol::table& data) {
-      ent.AddComponent<TextLabelComponent>(ComponentLuaFactory::CreateTextLabelComponent(data));
+    factories["text_label"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateTextLabelComponent(data));
     };
 
     return factories;

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../ECS/ECS.h"
 #include "./RenderableType.h"
+#include "ECS/Entity.h"
 
 struct RenderKey {
   unsigned int layer;
@@ -13,8 +13,7 @@ struct RenderKey {
       : layer(layer), depth(depth), type(type), entity(entity) {}
 
   bool operator==(const RenderKey& other) const {
-    return layer == other.layer && depth == other.depth && type == other.type &&
-           entity.GetId() == other.entity.GetId();
+    return layer == other.layer && depth == other.depth && type == other.type && entity.GetId() == other.entity.GetId();
   }
 
   bool operator!=(const RenderKey& other) const { return !(*this == other); }

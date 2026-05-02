@@ -1,9 +1,11 @@
 #pragma once
 
+#include "Entity.h"
+
 class Registry;
 
 struct Iter {
-  const Registry* registry;
+  Registry* registry;
   float deltaTime;
   Entity entity;
 };
