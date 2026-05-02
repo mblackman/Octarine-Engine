@@ -18,34 +18,32 @@
 #include "./RenderQueue.h"
 #include "./RenderableType.h"
 
-void Renderer::Render(const RenderQueue& renderQueue, SDL_Renderer* renderer,
-                      SDL_Rect& camera,
-                      std::unique_ptr<AssetManager>& assetManager) {
+void Renderer::Render(const RenderQueue& renderQueue, SDL_Renderer* renderer, const SDL_Rect& camera,
+                      const std::unique_ptr<AssetManager>& assetManager) {
   for (const RenderKey& renderKey : renderQueue) {
     const Entity entity = renderKey.entity;
     const RenderableType type = renderKey.type;
 
     switch (type) {
-      case RenderableType::SPRITE:
+      case SPRITE:
         RenderSprite(entity, renderer, assetManager, camera);
         break;
-      case RenderableType::TEXT:
+      case TEXT:
         RenderText(entity, renderer, assetManager, camera);
         break;
-      case RenderableType::SQUARE_PRIMITIVE:
+      case SQUARE_PRIMITIVE:
         RenderSquare(entity, renderer, camera);
         break;
       default:
         Logger::Error("Unknown renderable type: " +
-                      std::to_string(static_cast<int>(type)));
+                      std::to_string(type));
         break;
     }
   }
 }
 
 void Renderer::RenderSprite(const Entity& entity, SDL_Renderer* renderer,
-                            std::unique_ptr<AssetManager>& assetManager,
-                            SDL_Rect& camera) {
+                            const std::unique_ptr<AssetManager>& assetManager, const SDL_Rect& camera) {
   const auto transform = entity.GetComponent<TransformComponent>();
   const auto sprite = entity.GetComponent<SpriteComponent>();
 
@@ -66,8 +64,7 @@ void Renderer::RenderSprite(const Entity& entity, SDL_Renderer* renderer,
                            transform.rotation, nullptr, sprite.flip);
 }
 
-void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer,
-                            SDL_Rect& camera) {
+void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer, const SDL_Rect& camera) {
   const auto square = entity.GetComponent<SquarePrimitiveComponent>();
   const float x = square.isFixed
                     ? square.position.x
@@ -84,8 +81,7 @@ void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer,
 }
 
 void Renderer::RenderText(const Entity& entity, SDL_Renderer* renderer,
-                          std::unique_ptr<AssetManager>& assetManager,
-                          SDL_Rect& camera) {
+                          const std::unique_ptr<AssetManager>& assetManager, const SDL_Rect& camera) {
   const auto textLabel = entity.GetComponent<TextLabelComponent>();
   const auto font = assetManager->GetFont(textLabel.fontId);
   SDL_Surface* surface =

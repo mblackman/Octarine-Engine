@@ -3,7 +3,6 @@
 #include <utility>
 
 struct UIButtonComponent {
- public:
   bool isActive;
   sol::optional<sol::table> buttonTable;
   sol::protected_function clickFunction;

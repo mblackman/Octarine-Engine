@@ -16,11 +16,11 @@ class UIButtonSystem : public System {
 
   ~UIButtonSystem() = default;
 
-  void SubscribeToEvents(std::unique_ptr<EventBus>& eventBus) {
+  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
     eventBus->SubscribeEvent<UIButtonSystem, MouseInputEvent>(this, &UIButtonSystem::OnMouseInput);
   }
 
-  void OnMouseInput(MouseInputEvent& event) {
+  void OnMouseInput(const MouseInputEvent& event) {
     if (event.event.type != SDL_EVENT_MOUSE_BUTTON_DOWN || event.event.button != 1) {
       return;
     }
@@ -34,11 +34,11 @@ class UIButtonSystem : public System {
 
       const auto boxCollider = entity.GetComponent<BoxColliderComponent>();
       const auto transform = entity.GetComponent<TransformComponent>();
-      const int mouseX = event.event.x;
-      const int mouseY = event.event.y;
+      const float mouseX = event.event.x;
+      const float mouseY = event.event.y;
       const bool isClick =
-          transform.position.x <= mouseX && (transform.position.x + boxCollider.width * transform.scale.x) >= mouseX &&
-          transform.position.y <= mouseY && (transform.position.y + boxCollider.height * transform.scale.y) >= mouseY;
+          transform.position.x <= mouseX && transform.position.x + boxCollider.width * transform.scale.x >= mouseX &&
+          transform.position.y <= mouseY && transform.position.y + boxCollider.height * transform.scale.y >= mouseY;
       if (isClick) {
         if (auto result = button.clickFunction(button.buttonTable, entity); !result.valid()) {
           sol::error err = result;

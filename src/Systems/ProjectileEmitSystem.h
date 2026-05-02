@@ -12,7 +12,6 @@
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
-#include "../General/Logger.h"
 
 class ProjectileEmitSystem : public System {
  public:
@@ -23,24 +22,22 @@ class ProjectileEmitSystem : public System {
 
   ~ProjectileEmitSystem() = default;
 
-  void SubscribeToEvents(std::unique_ptr<EventBus>& eventBus) {
+  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
     eventBus->SubscribeEvent<ProjectileEmitSystem, KeyInputEvent>(
         this, &ProjectileEmitSystem::OnKeyInput);
   }
 
-  void OnKeyInput(KeyInputEvent& event) {
+  void OnKeyInput(const KeyInputEvent& event) {
     if (!event.isPressed) {
       return;
     }
 
-    switch (event.inputKey) {
-      case SDLK_SPACE:
-        spawnFriendlyProjectiles_ = true;
-        break;
+    if (event.inputKey == SDLK_SPACE) {
+      spawnFriendlyProjectiles_ = true;
     }
   }
 
-  void Update(std::unique_ptr<Registry>& registry) {
+  void Update(const std::unique_ptr<Registry>& registry) {
     for (auto entity : GetEntities()) {
       auto transform = entity.GetComponent<TransformComponent>();
       auto& emitter = entity.GetComponent<ProjectileEmitterComponent>();
@@ -59,16 +56,15 @@ class ProjectileEmitSystem : public System {
  private:
   bool spawnFriendlyProjectiles_;
 
-  static void SpawnProjectile(TransformComponent& transform, Entity& entity,
-                       std::unique_ptr<Registry>& registry,
-                       ProjectileEmitterComponent& emitter) {
+  static void SpawnProjectile(const TransformComponent& transform, const Entity& entity,
+                              const std::unique_ptr<Registry>& registry, ProjectileEmitterComponent& emitter) {
     auto projectilePosition = transform.position;
     auto velocity = emitter.velocity;
 
     if (entity.HasComponent<SpriteComponent>()) {
       const auto sprite = entity.GetComponent<SpriteComponent>();
-      projectilePosition.x += (transform.scale.x * sprite.width / 2);
-      projectilePosition.y += (transform.scale.y * sprite.height / 2);
+      projectilePosition.x += transform.scale.x * sprite.width / 2;
+      projectilePosition.y += transform.scale.y * sprite.height / 2;
     }
 
     if (emitter.isFriendly && entity.HasComponent<RigidBodyComponent>()) {

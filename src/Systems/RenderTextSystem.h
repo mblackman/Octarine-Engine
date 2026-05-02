@@ -17,7 +17,7 @@ class RenderTextSystem : public System {
 
     for (auto entity : entities) {
       const auto text = entity.GetComponent<TextLabelComponent>();
-      RenderKey renderKey(text.layer, text.position.y, RenderableType::TEXT,
+      RenderKey renderKey(text.layer, text.position.y, TEXT,
                           entity);
 
       renderQueue.AddRenderKey(renderKey);

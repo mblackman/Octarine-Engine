@@ -1,5 +1,4 @@
 #include "AssetManager.h"
-#include "../Game/GameConfig.h"
 
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
@@ -7,11 +6,11 @@
 
 #include <filesystem>
 
+#include "../Game/GameConfig.h"
 #include "../General/Logger.h"
 
 void AssetManager::SetGameConfig(const GameConfig &gameConfig) {
-  if (const auto scaleMode = gameConfig.GetDefaultScaleMode();
-    scaleMode.has_value()) {
+  if (const auto scaleMode = gameConfig.GetDefaultScaleMode(); scaleMode.has_value()) {
     SetDefaultScaleMode(scaleMode.value());
   }
   base_path_ = gameConfig.GetAssetPath();
@@ -20,10 +19,10 @@ void AssetManager::SetGameConfig(const GameConfig &gameConfig) {
 AssetManager::~AssetManager() { ClearAssets(); }
 
 void AssetManager::ClearAssets() {
-  for (const auto &[fst, snd]: textures_) {
+  for (const auto &[fst, snd] : textures_) {
     SDL_DestroyTexture(snd);
   }
-  for (const auto &[fst, snd]: fonts_) {
+  for (const auto &[fst, snd] : fonts_) {
     TTF_CloseFont(snd);
   }
 
@@ -31,9 +30,7 @@ void AssetManager::ClearAssets() {
   fonts_.clear();
 }
 
-void AssetManager::AddTexture(SDL_Renderer *renderer,
-                              const std::string &assetId,
-                              const std::string &path) {
+void AssetManager::AddTexture(SDL_Renderer *renderer, const std::string &assetId, const std::string &path) {
   const std::string fullPath = GetFullPath(path);
 
   SDL_Texture *texture = IMG_LoadTexture(renderer, fullPath.c_str());
@@ -51,12 +48,9 @@ void AssetManager::AddTexture(SDL_Renderer *renderer,
   Logger::Info("Added texture: " + assetId + " from path: " + fullPath);
 }
 
-SDL_Texture *AssetManager::GetTexture(const std::string &assetId) const {
-  return textures_.at(assetId);
-}
+SDL_Texture *AssetManager::GetTexture(const std::string &assetId) const { return textures_.at(assetId); }
 
-void AssetManager::AddFont(const std::string &assetId, const std::string &path,
-                           const int fontSize) {
+void AssetManager::AddFont(const std::string &assetId, const std::string &path, const float fontSize) {
   const std::string fullPath = GetFullPath(path);
   TTF_Font *font = TTF_OpenFont(fullPath.c_str(), fontSize);
   fonts_.emplace(assetId, font);
@@ -64,9 +58,7 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path,
   Logger::Info("Added font: " + assetId + " from path: " + fullPath);
 }
 
-TTF_Font *AssetManager::GetFont(const std::string &assetId) const {
-  return fonts_.at(assetId);
-}
+TTF_Font *AssetManager::GetFont(const std::string &assetId) const { return fonts_.at(assetId); }
 
 std::string AssetManager::GetFullPath(const std::string &relativePath) const {
   const std::filesystem::path basePath = base_path_;

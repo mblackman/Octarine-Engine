@@ -2,8 +2,6 @@
 
 #include <SDL3/SDL_keycode.h>
 
-#include <string>
-
 struct KeyInputEvent : Event {
   SDL_Keycode inputKey;
   SDL_Keymod inputModifier;

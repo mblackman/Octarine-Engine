@@ -2,11 +2,8 @@
 
 #include <SDL3/SDL.h>
 
-#include <string>
-
-struct MouseInputEvent : public Event {
- public:
+struct MouseInputEvent : Event {
   SDL_MouseButtonEvent event;
 
-  explicit MouseInputEvent(SDL_MouseButtonEvent& event) : event(event) {}
+  explicit MouseInputEvent(const SDL_MouseButtonEvent& event) : event(event) {}
 };

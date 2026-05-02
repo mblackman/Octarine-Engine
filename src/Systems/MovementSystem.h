@@ -15,12 +15,12 @@ class MovementSystem : public System {
 
   ~MovementSystem() = default;
 
-  void SubscribeToEvents(std::unique_ptr<EventBus>& eventBus) {
+  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
     eventBus->SubscribeEvent<MovementSystem, CollisionEvent>(
         this, &MovementSystem::OnCollision);
   }
 
-  void OnCollision(CollisionEvent& event) {
+  void OnCollision(const CollisionEvent& event) {
     const auto a = event.entityA;
     const auto b = event.entityB;
     auto aId = std::to_string(event.entityA.GetId());
@@ -91,18 +91,15 @@ class MovementSystem : public System {
 
   static bool IsEntityOutsideMap(Entity entity) {
     const auto transform = entity.GetComponent<TransformComponent>();
-    bool isEntityOutsideMap = (transform.position.x > Game::windowWidth ||
-                               transform.position.y > Game::windowHeight);
+    bool isEntityOutsideMap = transform.position.x > Game::windowWidth || transform.position.y > Game::windowHeight;
 
     if (!isEntityOutsideMap) {
       if (entity.HasComponent<SpriteComponent>()) {
         const auto sprite = entity.GetComponent<SpriteComponent>();
-        isEntityOutsideMap =
-            (transform.position.x + sprite.width * transform.scale.x < 0 ||
-             transform.position.y + sprite.height * transform.scale.y < 0);
+        isEntityOutsideMap = transform.position.x + sprite.width * transform.scale.x < 0 ||
+                             transform.position.y + sprite.height * transform.scale.y < 0;
       } else {
-        isEntityOutsideMap =
-            (transform.position.x < 0 || transform.position.y < 0);
+        isEntityOutsideMap = transform.position.x < 0 || transform.position.y < 0;
       }
     }
 

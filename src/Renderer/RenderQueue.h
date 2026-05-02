@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <iterator>
 #include <vector>
 
 #include "./RenderKey.h"
@@ -9,7 +8,7 @@
 class RenderQueue {
  public:
   using value_type = RenderKey;
-  using const_iterator = typename std::vector<RenderKey>::const_iterator;
+  using const_iterator = std::vector<RenderKey>::const_iterator;
 
   explicit RenderQueue(size_t initial_capacity = 1024) {
     render_keys_.reserve(initial_capacity);
