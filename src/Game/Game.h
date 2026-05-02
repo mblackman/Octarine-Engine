@@ -10,6 +10,7 @@
 #include "../Events/KeyInputEvent.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
+#include "../Systems/UIButtonSystem.h"
 
 class Registry;
 
@@ -52,4 +53,5 @@ class Game {
   std::unique_ptr<Registry> registry_;
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
+  UIButtonSystem ui_button_system_;
 };

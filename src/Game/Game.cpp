@@ -14,8 +14,10 @@
 #include "Components/BoxColliderComponent.h"
 #include "Components/CameraComponents.h"
 #include "Components/CameraFollowComponent.h"
+#include "Components/KeyboardControlComponent.h"
 #include "Components/ProjectileComponent.h"
 #include "Components/ProjectileEmitterComponent.h"
+#include "Components/RigidBodyComponent.h"
 #include "Components/ScriptComponent.h"
 #include "Components/SpriteComponent.h"
 #include "Components/SquarePrimitiveComponent.h"
@@ -24,10 +26,12 @@
 #include "ECS/Iterable.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
+#include "Events/MouseInputEvent.h"
 #include "GameConfig.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/CameraFollowSystem.h"
 #include "Systems/DrawColliderSystem.h"
+#include "Systems/KeyboardControlSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
 #include "Systems/ProjectileLifecycleSystem.h"
 #include "Systems/RenderDebugGUISystem.h"
@@ -175,6 +179,8 @@ void Game::Setup() {
   auto &projectileEmitSystem =
       registry_->RegisterSystem<TransformComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
   registry_->RegisterSystem<ProjectileComponent>(ProjectileLifecycleSystem());
+  auto &keyboardControlSystem =
+      registry_->RegisterSystem<KeyboardControlComponent, RigidBodyComponent, SpriteComponent>(KeyboardControlSystem());
 
   // Camera follows after gameplay-driven transform updates
   registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
@@ -188,6 +194,8 @@ void Game::Setup() {
   event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
   scriptSystem.SubscribeToEvents(event_bus_);
   projectileEmitSystem.SubscribeToEvents(event_bus_);
+  keyboardControlSystem.SubscribeToEvents(event_bus_);
+  ui_button_system_.Init(registry_.get(), event_bus_);
 }
 
 void Game::ProcessInput() const {
@@ -216,7 +224,7 @@ void Game::ProcessInput() const {
       case SDL_EVENT_MOUSE_BUTTON_DOWN:
       case SDL_EVENT_MOUSE_BUTTON_UP: {
         SDL_MouseButtonEvent mouseButtonEvent = event.button;
-        // event_bus_->EmitEvent<MouseInputEvent>(mouseButtonEvent);
+        event_bus_->EmitEvent<MouseInputEvent>(mouseButtonEvent);
         break;
       }
       default:
