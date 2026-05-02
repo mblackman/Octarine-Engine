@@ -93,7 +93,6 @@ class ScriptSystem {
   void CreateLuaBindings(sol::state &lua, const Game &game) {
     // Configure bindings
     CreateLuaTypes(lua);
-    CreateLuaEntityBindings(lua);
     CreateLuaGameBindings(lua, game);
 
     // Set up logging
@@ -125,16 +124,9 @@ class ScriptSystem {
 
  private:
   void CreateLuaTypes(sol::state &lua) {
-    // lua.new_usertype<Entity>("entity", "get_id", &Entity::GetId, "blam", &Entity::Blam, "has_tag", &Entity::HasTag,
-    //                          "in_group", &Entity::InGroup);
+    lua.new_usertype<Entity>("entity", "get_id", &Entity::GetId);
     lua.new_usertype<glm::vec2>("vec2", sol::constructors<glm::vec2(float, float), glm::vec2()>(), "x", &glm::vec2::x,
                                 "y", &glm::vec2::y);
-  }
-
-  void CreateLuaEntityBindings(sol::state &lua) const {
-    lua.set_function("get_position", &GetEntityPosition);
-    lua.set_function("set_position", &SetEntityPosition);
-    lua.set_function("set_sprite_src_rect", &SetEntitySpriteSrcRect);
   }
 
   void CreateLuaGameBindings(sol::state &lua, const Game &game) {
@@ -142,6 +134,15 @@ class ScriptSystem {
     lua.set_function("is_key_pressed", &ScriptSystem::IsKeyPressed, this);
     lua.set_function("is_key_held", &ScriptSystem::IsKeyHeld, this);
     lua.set_function("quit_game", &Game::Quit);
+    lua.set_function("blam", [&game](const Entity entity) { game.GetRegistry()->BlamEntity(entity); });
+    lua.set_function("get_position",
+                     [&game](const Entity entity) { return GetEntityPosition(game.GetRegistry(), entity); });
+    lua.set_function("set_position", [&game](const Entity entity, const double x, const double y) {
+      SetEntityPosition(game.GetRegistry(), entity, x, y);
+    });
+    lua.set_function("set_sprite_src_rect", [&game](const Entity entity, const float x, const float y) {
+      SetEntitySpriteSrcRect(game.GetRegistry(), entity, x, y);
+    });
     lua.set_function("set_game_map_dimensions", [this, &game](const double width, const double height) {
       SetGameMapDimensions(width, height, game);
     });
