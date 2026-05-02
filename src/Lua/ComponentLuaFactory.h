@@ -7,6 +7,7 @@
 #include "Components/AnimationComponent.h"
 #include "Components/BoxColliderComponent.h"
 #include "Components/CameraFollowComponent.h"
+#include "Components/EntityMaskComponent.h"
 #include "Components/HealthComponent.h"
 #include "Components/KeyboardControlComponent.h"
 #include "Components/ProjectileEmitterComponent.h"
@@ -113,6 +114,12 @@ class ComponentLuaFactory {
     const auto collisionMask = SafeGetOptionalValue<int>(data, "collision_mask", Constants::kDefaultEntityMask);
     const auto entityMask = EntityMask(collisionMask);
     return BoxColliderComponent(width, height, offset, entityMask);
+  }
+
+  static EntityMaskComponent CreateEntityMaskComponent(const sol::table& data) {
+    using namespace LuaComponentHelpers;
+    const auto raw = SafeGetOptionalValue<int>(data, "value", Constants::kDefaultEntityMask);
+    return EntityMaskComponent(EntityMask(raw));
   }
 
   static HealthComponent CreateHealthComponent(const sol::table& data) {

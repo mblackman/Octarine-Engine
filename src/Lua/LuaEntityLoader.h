@@ -18,6 +18,26 @@ class LuaEntityLoader {
     ApplyTagField(currentData, "groups", registry, entity);
   }
 
+  // Reads top-level `mask` int from the entity table and attaches an EntityMaskComponent.
+  // Also attaches a default EntityMaskComponent when the entity declares a `box_collider`
+  // (CollisionSystem queries this component, so collider entities must have one).
+  static void ApplyEntityMask(const sol::table& currentData, Registry* registry, const Entity& entity) {
+    const sol::object maskValue = currentData["mask"];
+    const bool hasMask = maskValue.valid() && maskValue.is<int>();
+
+    bool hasCollider = false;
+    if (sol::optional<sol::table> componentsOpt = currentData["components"];
+        componentsOpt && componentsOpt.value().valid()) {
+      const sol::object boxCollider = componentsOpt.value()["box_collider"];
+      hasCollider = boxCollider.valid() && boxCollider.is<sol::table>();
+    }
+
+    if (!hasMask && !hasCollider) return;
+
+    const EntityMask mask = hasMask ? EntityMask(maskValue.as<int>()) : EntityMask(Constants::kDefaultEntityMask);
+    registry->AddComponent(entity, EntityMaskComponent(mask));
+  }
+
   static void LoadEntityComponents(const sol::table& currentData, Registry* registry, const Entity& entity) {
     sol::optional<sol::table> componentsTableOpt = currentData["components"];
     if (!componentsTableOpt || !componentsTableOpt.value().valid()) {
@@ -73,6 +93,7 @@ class LuaEntityLoader {
       }
 
       TagAndGroupEntity(currentData, registry, entity);
+      ApplyEntityMask(currentData, registry, entity);
       LoadEntityComponents(currentData, registry, entity);
 
       // Add any child entities to the stack to be processed.
@@ -141,6 +162,9 @@ class LuaEntityLoader {
     };
     factories["box_collider"] = [](Registry* registry, const Entity ent, const sol::table& data) {
       registry->AddComponent(ent, ComponentLuaFactory::CreateBoxColliderComponent(data));
+    };
+    factories["entity_mask"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateEntityMaskComponent(data));
     };
     factories["health"] = [](Registry* registry, const Entity ent, const sol::table& data) {
       registry->AddComponent(ent, ComponentLuaFactory::CreateHealthComponent(data));

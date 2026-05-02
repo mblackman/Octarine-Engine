@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "../Components/BoxColliderComponent.h"
+#include "../Components/EntityMaskComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../ECS/Entity.h"
 #include "../ECS/Iterable.h"
@@ -76,9 +77,9 @@ class CollisionSystem {
       const Entity entity = entityCtx.Entity();
       const auto& transform = entityCtx.Component<TransformComponent>();
       const auto& collider = entityCtx.Component<BoxColliderComponent>();
+      const auto& entityMask = entityCtx.Component<EntityMaskComponent>();
 
-      boxes.emplace_back(entity, collider.collisionMask, collider.collisionMask, transform.position.x,
-                         transform.position.y,
+      boxes.emplace_back(entity, entityMask.mask, collider.collisionMask, transform.position.x, transform.position.y,
                          transform.position.x + static_cast<float>(collider.width) * transform.scale.x,
                          transform.position.y + static_cast<float>(collider.height) * transform.scale.y);
     }

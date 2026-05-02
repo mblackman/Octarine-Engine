@@ -14,6 +14,7 @@
 #include "Components/BoxColliderComponent.h"
 #include "Components/CameraComponents.h"
 #include "Components/CameraFollowComponent.h"
+#include "Components/EntityMaskComponent.h"
 #include "Components/HealthComponent.h"
 #include "Components/KeyboardControlComponent.h"
 #include "Components/ProjectileComponent.h"
@@ -191,7 +192,7 @@ void Game::Setup() {
   auto &movementSystem = registry_->RegisterSystem<TransformComponent, RigidBodyComponent>(MovementSystem());
 
   // Collision after movement integrates positions; emits CollisionEvent for damage/movement subscribers
-  registry_->RegisterBulkSystem<TransformComponent, BoxColliderComponent>(CollisionSystem());
+  registry_->RegisterBulkSystem<TransformComponent, BoxColliderComponent, EntityMaskComponent>(CollisionSystem());
 
   // Transform hierarchy resolution — produces globalPosition/globalScale/globalRotation for downstream
   registry_->RegisterBulkSystem<TransformComponent>(TransformSystem());
@@ -210,8 +211,8 @@ void Game::Setup() {
   // Event subscriptions (one-time)
   event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
   scriptSystem.SubscribeToEvents(event_bus_);
-  projectileEmitSystem.SubscribeToEvents(event_bus_);
   keyboardControlSystem.SubscribeToEvents(event_bus_);
+  projectileEmitSystem.Init(event_bus_);
   ui_button_system_.Init(registry_.get(), event_bus_);
   damage_system_.Init(registry_.get(), event_bus_);
   movementSystem.Init(registry_.get(), event_bus_);
