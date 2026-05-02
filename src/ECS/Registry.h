@@ -192,7 +192,7 @@ class Registry {
   std::unordered_map<Signature, std::unique_ptr<Query>> queries_;
   std::vector<std::unique_ptr<ISystem>> systems_;
   std::unordered_map<ComponentTypeID, std::any> singleton_components_;
-  float delta_time_;
+  float delta_time_{};
 };
 
 template <typename... TComponents>
