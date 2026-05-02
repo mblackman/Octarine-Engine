@@ -45,6 +45,15 @@ class ComponentRegistry {
     component_infos_.try_emplace(id, std::move(info));
   }
 
+  // Zero-size component used as a tag/label. Move/destroy are no-ops so RemoveEntity and
+  // CopyComponents can call them unconditionally.
+  void RegisterTag(const ComponentID id, std::string name) {
+    ComponentInfo info{id, std::move(name), 0, 1};
+    info.move_construct = [](void*, void*) {};
+    info.destroy = [](void*) {};
+    component_infos_.try_emplace(id, std::move(info));
+  }
+
   [[nodiscard]] const ComponentInfo& GetInfo(const ComponentID id) const { return component_infos_.at(id); }
 
  private:
@@ -99,38 +108,17 @@ class Registry {
 
   template <typename T>
   void AddComponent(const Entity entity, T component) {
-    const EntityLocation oldLocation = entity_locations_[entity.id];
-    const auto componentEntity = Component<T>();
-    const ComponentID componentId = componentEntity.GetId();
-
-    Archetype* newArchetype = nullptr;
-    auto it = oldLocation.archetype->edges.find(componentId);
-    if (it != oldLocation.archetype->edges.end() && it->second.add != nullptr) {
-      newArchetype = it->second.add;
-    } else {
-      newArchetype = GetOrCreateArchetype(oldLocation.archetype->type(), componentId);
-
-      newArchetype->edges.insert(std::make_pair(componentId, ArchetypeEdge{nullptr, oldLocation.archetype}));
-      if (it != oldLocation.archetype->edges.end()) {
-        it->second.add = newArchetype;
-      } else {
-        oldLocation.archetype->edges.insert(std::make_pair(componentId, ArchetypeEdge{newArchetype, nullptr}));
-      }
-    }
-
-    const EntityLocation newLocation = newArchetype->AddEntity(entity);
-    newArchetype->AddComponent(newLocation, componentEntity, component);
-    newArchetype->CopyComponents(oldLocation, newLocation);
-
-    const auto swapped = oldLocation.archetype->RemoveEntity(oldLocation);
-    entity_locations_[entity.id] = newLocation;
-    if (swapped) {
-      entity_locations_[swapped->id] = oldLocation;
-    }
+    const Entity componentEntity = Component<T>();
+    const EntityLocation newLocation = TransitionAddComponent(entity, componentEntity.GetId());
+    newLocation.archetype->AddComponent(newLocation, componentEntity, component);
   }
 
-  // template <typename T>
-  // void RemoveComponent(Entity entity);
+  template <typename T>
+  void RemoveComponent(const Entity entity) {
+    const auto it = component_to_entity_.find(std::type_index(typeid(T)));
+    if (it == component_to_entity_.end()) return;
+    TransitionRemoveComponent(entity, it->second.GetId());
+  }
 
   template <typename T>
   T& GetComponent(const Entity entity) const {
@@ -266,6 +254,43 @@ class Registry {
     return const_cast<T&>(static_cast<const std::decay_t<decltype(*this)>&>(*this).Get<T>());
   }
 
+  // Tags / labels — zero-size component-entities. Each unique name maps to one Entity registered
+  // as a zero-size component, so AddTag/HasTag/RemoveTag are archetype transitions / membership
+  // checks. Lazy: TagId creates the Entity on first call.
+  Entity TagId(const std::string& name) {
+    if (const auto it = tag_to_entity_.find(name); it != tag_to_entity_.end()) {
+      return it->second;
+    }
+    const Entity tagEntity = CreateEntity();
+    component_registry_->RegisterTag(tagEntity.GetId(), name);
+    tag_to_entity_.emplace(name, tagEntity);
+    return tagEntity;
+  }
+
+  void AddTag(const Entity entity, const Entity tagEntity) { TransitionAddComponent(entity, tagEntity.GetId()); }
+
+  void AddTag(const Entity entity, const std::string& name) { AddTag(entity, TagId(name)); }
+
+  void RemoveTag(const Entity entity, const Entity tagEntity) { TransitionRemoveComponent(entity, tagEntity.GetId()); }
+
+  void RemoveTag(const Entity entity, const std::string& name) {
+    const auto it = tag_to_entity_.find(name);
+    if (it == tag_to_entity_.end()) return;
+    RemoveTag(entity, it->second);
+  }
+
+  [[nodiscard]] bool HasTag(const Entity entity, const Entity tagEntity) const {
+    const auto it = entity_locations_.find(entity.id);
+    if (it == entity_locations_.end()) return false;
+    return it->second.archetype->HasComponent(tagEntity.GetId());
+  }
+
+  [[nodiscard]] bool HasTag(const Entity entity, const std::string& name) const {
+    const auto tagIt = tag_to_entity_.find(name);
+    if (tagIt == tag_to_entity_.end()) return false;
+    return HasTag(entity, tagIt->second);
+  }
+
   // Relationships
   void AddPair(Entity entity, Entity relationship, Entity target);
 
@@ -285,7 +310,10 @@ class Registry {
   [[nodiscard]] float DeltaTime() const { return delta_time_; }
 
  private:
+  EntityLocation TransitionAddComponent(Entity entity, ComponentID componentId);
+  EntityLocation TransitionRemoveComponent(Entity entity, ComponentID componentId);
   Archetype* GetOrCreateArchetype(std::vector<ComponentID> componentIDs, ComponentID newComponentId);
+  Archetype* GetOrCreateArchetypeRemove(std::vector<ComponentID> componentIDs, ComponentID removeComponentId);
 
   std::unique_ptr<EntityManager> entity_manager_;
   std::unique_ptr<ComponentRegistry> component_registry_;
@@ -295,6 +323,7 @@ class Registry {
   std::vector<std::unique_ptr<ISystem>> systems_;
   std::unordered_map<ComponentID, std::any> singleton_components_;
   std::unordered_map<std::type_index, Entity> component_to_entity_;
+  std::unordered_map<std::string, Entity> tag_to_entity_;
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
   std::unordered_map<ComponentID, ArchetypeList> component_index_;
   std::unordered_map<EntityID, std::unordered_set<EcsId>> pairs_;

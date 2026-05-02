@@ -214,20 +214,23 @@ class Archetype {
 
   // Move-constructs each shared component from source slot into the (uninitialized) destination
   // slot. Source components are left in moved-from state; the caller is expected to RemoveEntity
-  // the source slot afterwards, which will destroy them.
+  // the source slot afterwards, which will destroy them. Components present in source but not
+  // destination are skipped — supports both add (dest is superset) and remove (dest is subset).
   void CopyComponents(const EntityLocation& sourceLocation, const EntityLocation& destinationLocation) const {
     assert(sourceLocation.archetype != this);
     assert(destinationLocation.archetype == this);
     const auto& sourceType = sourceLocation.archetype->type();
-    assert(ArchetypeTypeOverlaps(sourceType));
 
     const auto& sourceChunk = sourceLocation.archetype->chunks_[sourceLocation.chunkIndex];
     auto& destChunk = chunks_[destinationLocation.chunkIndex];
 
     for (const ComponentID id : sourceType) {
+      const auto destIt = this->component_type_to_index_.find(id);
+      if (destIt == this->component_type_to_index_.end()) continue;
+      const auto destTypeIndex = destIt->second;
       const auto sourceTypeIndex = sourceLocation.archetype->component_type_to_index_.at(id);
-      const auto destTypeIndex = this->component_type_to_index_.at(id);
       const auto& info = this->component_infos_[destTypeIndex];
+      if (info.size == 0) continue;  // tag — nothing to copy
 
       void* sourceArray = sourceChunk.GetComponentArray(sourceLocation.archetype->component_offsets_[sourceTypeIndex]);
       void* destArray = destChunk.GetComponentArray(this->component_offsets_[destTypeIndex]);

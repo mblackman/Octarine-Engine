@@ -1,111 +1,101 @@
 #pragma once
 
+#include <memory>
+
 #include "../Components/RigidBodyComponent.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
-#include "../ECS/ECS.h"
+#include "../ECS/Entity.h"
+#include "../ECS/Iterable.h"
+#include "../ECS/Registry.h"
+#include "../EventBus/EventBus.h"
+#include "../Events/CollisionEvent.h"
+#include "../Game/GameConfig.h"
 
-class MovementSystem : public System {
+class MovementSystem {
  public:
-  MovementSystem() {
-    RequireComponent<TransformComponent>();
-    RequireComponent<RigidBodyComponent>();
-  }
-
-  MovementSystem(const MovementSystem&) = delete;
-  MovementSystem& operator=(const MovementSystem&) = delete;
-
-  MovementSystem(MovementSystem&&) = delete;
-  MovementSystem& operator=(MovementSystem&&) = delete;
-
-  ~MovementSystem() = default;
-
-  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
+  void Init(Registry* registry, const std::unique_ptr<EventBus>& eventBus) {
+    registry_ = registry;
+    enemies_ = registry_->TagId("enemies");
+    obstacles_ = registry_->TagId("obstacles");
+    player_ = registry_->TagId("player");
     eventBus->SubscribeEvent<MovementSystem, CollisionEvent>(this, &MovementSystem::OnCollision);
   }
 
-  void OnCollision(const CollisionEvent& event) {
-    const auto a = event.entityA;
-    const auto b = event.entityB;
-    auto aId = std::to_string(event.entityA.GetId());
-    auto bId = std::to_string(event.entityB.GetId());
+  void operator()(const ContextFacade& ctx, const Entity entity, TransformComponent& transform,
+                  const RigidBodyComponent& rigidBody) const {
+    const float dt = ctx.DeltaTime();
+    const bool isPlayer = registry_->HasTag(entity, player_);
 
-    if (a.InGroup("enemies") && b.InGroup("obstacles")) {
-      OnObstacleCollision(a);
+    if (!isPlayer && IsEntityOutsideMap(entity, transform)) {
+      registry_->QueueBlamEntity(entity);
+      return;
     }
 
-    if (b.InGroup("enemies") && a.InGroup("obstacles")) {
+    transform.position.x += rigidBody.velocity.x * dt;
+    transform.position.y += rigidBody.velocity.y * dt;
+
+    if (isPlayer) {
+      ClampPlayerToPlayableArea(entity, transform);
+    }
+  }
+
+  void OnCollision(const CollisionEvent& event) {
+    const Entity a = event.entityA;
+    const Entity b = event.entityB;
+
+    if (registry_->HasTag(a, enemies_) && registry_->HasTag(b, obstacles_)) {
+      OnObstacleCollision(a);
+    }
+    if (registry_->HasTag(b, enemies_) && registry_->HasTag(a, obstacles_)) {
       OnObstacleCollision(b);
     }
   }
 
-  void Update(const float deltaTime) const {
-    for (auto entity : GetEntities()) {
-      auto& transform = entity.GetComponent<TransformComponent>();
-      const auto rigidBody = entity.GetComponent<RigidBodyComponent>();
-      const bool isPlayer = entity.HasTag("player");
-
-      if (!isPlayer && IsEntityOutsideMap(entity)) {
-        entity.Blam();
-      } else {
-        transform.position.x += rigidBody.velocity.x * static_cast<float>(deltaTime);
-        transform.position.y += rigidBody.velocity.y * static_cast<float>(deltaTime);
-
-        if (isPlayer) {
-          UpdatePlayerMovement(entity, transform);
-        }
-      }
-    }
-  }
-
  private:
-  static void OnObstacleCollision(const Entity enemy) {
-    auto& rigidBody = enemy.GetComponent<RigidBodyComponent>();
-
+  void OnObstacleCollision(const Entity enemy) const {
+    auto& rigidBody = registry_->GetComponent<RigidBodyComponent>(enemy);
     rigidBody.velocity = rigidBody.velocity * -1.0f;
 
-    if (enemy.HasComponent<SpriteComponent>()) {
-      auto& sprite = enemy.GetComponent<SpriteComponent>();
+    if (registry_->HasComponent<SpriteComponent>(enemy)) {
+      auto& sprite = registry_->GetComponent<SpriteComponent>(enemy);
       sprite.flip = sprite.flip == SDL_FLIP_NONE ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
     }
   }
 
-  static bool IsEntityOutsideMap(const Entity entity) {
-    const auto transform = entity.GetComponent<TransformComponent>();
-    bool isEntityOutsideMap = transform.position.x > static_cast<float>(GameConfig::GetInstance().windowWidth) ||
-                              transform.position.y > static_cast<float>(GameConfig::GetInstance().windowHeight);
+  [[nodiscard]] bool IsEntityOutsideMap(const Entity entity, const TransformComponent& transform) const {
+    const auto& gameConfig = registry_->Get<GameConfig>();
+    const bool pastFarEdges = transform.position.x > static_cast<float>(gameConfig.windowWidth) ||
+                              transform.position.y > static_cast<float>(gameConfig.windowHeight);
+    if (pastFarEdges) return true;
 
-    if (!isEntityOutsideMap) {
-      if (entity.HasComponent<SpriteComponent>()) {
-        const auto& sprite = entity.GetComponent<SpriteComponent>();
-        isEntityOutsideMap = transform.position.x + sprite.width * transform.scale.x < 0 ||
-                             transform.position.y + sprite.height * transform.scale.y < 0;
-      } else {
-        isEntityOutsideMap = transform.position.x < 0 || transform.position.y < 0;
-      }
+    if (registry_->HasComponent<SpriteComponent>(entity)) {
+      const auto& sprite = registry_->GetComponent<SpriteComponent>(entity);
+      return transform.position.x + sprite.width * transform.scale.x < 0 ||
+             transform.position.y + sprite.height * transform.scale.y < 0;
     }
-
-    return isEntityOutsideMap;
+    return transform.position.x < 0 || transform.position.y < 0;
   }
 
-  void UpdatePlayerMovement(const std::vector<Entity>::value_type entity, TransformComponent& transform) const {
-    const auto& spriteComponent = entity.GetComponent<SpriteComponent>();
-    if (transform.position.x < 0) {
-      transform.position.x = 0;
-    }
+  void ClampPlayerToPlayableArea(const Entity entity, TransformComponent& transform) const {
+    if (!registry_->HasComponent<SpriteComponent>(entity)) return;
 
-    if (transform.position.y < 0) {
-      transform.position.y = 0;
-    }
+    const auto& sprite = registry_->GetComponent<SpriteComponent>(entity);
+    const auto& gameConfig = registry_->Get<GameConfig>();
 
-    if (transform.position.x + spriteComponent.width * transform.scale.x >
-        GameConfig::GetInstance().playableAreaWidth) {
-      transform.position.x = GameConfig::GetInstance().playableAreaWidth - spriteComponent.width * transform.scale.x;
-    }
+    if (transform.position.x < 0) transform.position.x = 0;
+    if (transform.position.y < 0) transform.position.y = 0;
 
-    if (transform.position.y + spriteComponent.height * transform.scale.y >
-        GameConfig::GetInstance().playableAreaHeight) {
-      transform.position.y = GameConfig::GetInstance().playableAreaHeight - spriteComponent.height * transform.scale.y;
+    if (transform.position.x + sprite.width * transform.scale.x > gameConfig.playableAreaWidth) {
+      transform.position.x = gameConfig.playableAreaWidth - sprite.width * transform.scale.x;
+    }
+    if (transform.position.y + sprite.height * transform.scale.y > gameConfig.playableAreaHeight) {
+      transform.position.y = gameConfig.playableAreaHeight - sprite.height * transform.scale.y;
     }
   }
+
+  Registry* registry_ = nullptr;
+  Entity enemies_{};
+  Entity obstacles_{};
+  Entity player_{};
 };

@@ -25,8 +25,7 @@ class ComponentQuery final : public Query {
       : registry_(registry), type_({(registry->Component<TComponents>().GetId())...}) {
     // type_ stays in user-pack order so Iterator can map TComponents...[Is] to type_[Is].
     // sorted_type_ is the canonical form used for archetype matching (two-pointer superset check).
-    sorted_type_ = type_;
-    std::ranges::sort(sorted_type_);
+    RebuildSorted();
   }
 
   void Update() override {
@@ -34,10 +33,23 @@ class ComponentQuery final : public Query {
     archetype_query_ = ArchetypeQuery<TComponents...>(type_, matching_archetypes);
   }
 
+  // Add a tag/label as a query filter. Filtered tags are required for archetype matching but are
+  // not yielded to ForEach — type_ (template-pack order) stays untouched so Iterator's mapping
+  // from TComponents...[Is] to type_[Is] remains valid.
+  ComponentQuery& WithTag(const Entity tag) {
+    extra_required_.push_back(tag.GetId());
+    RebuildSorted();
+    return *this;
+  }
+
+  ComponentQuery& WithTag(const std::string& name) { return WithTag(registry_->TagId(name)); }
+
   template <typename Func>
   void ForEach(Func& func) {
     for (const auto iterable = CreateIterable(); auto&& context : iterable) {
-      if constexpr (std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
+      if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...>) {
+        func(context, context.Entity(), context.Component<TComponents>()...);
+      } else if constexpr (std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
         func(context, context.Component<TComponents>()...);
       } else if constexpr (std::is_invocable_v<Func, Entity, TComponents&...>) {
         func(context.Entity(), context.Component<TComponents>()...);
@@ -46,7 +58,8 @@ class ComponentQuery final : public Query {
       } else {
         static_assert(!std::is_same_v<Func, Func>,
                       "The function passed to ForEach does not match the required signatures. "
-                      "Expected one of: void(ContextFacade&, T&...), void(Entity, T&...), or void(T&...).");
+                      "Expected one of: void(ContextFacade&, Entity, T&...), void(ContextFacade&, T&...), "
+                      "void(Entity, T&...), or void(T&...).");
       }
     }
   }
@@ -57,6 +70,16 @@ class ComponentQuery final : public Query {
   }
 
  private:
+  void RebuildSorted() {
+    sorted_type_ = type_;
+    for (const ComponentID id : extra_required_) {
+      if (std::ranges::find(sorted_type_, id) == sorted_type_.end()) {
+        sorted_type_.push_back(id);
+      }
+    }
+    std::ranges::sort(sorted_type_);
+  }
+
   Iterable CreateIterable() {
     auto beginFunc = [&]() {
       return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.begin(), registry_,
@@ -71,7 +94,8 @@ class ComponentQuery final : public Query {
   }
 
   Registry* registry_;
-  ArchetypeType type_;         // user-pack order — used by ArchetypeQuery::Iterator
-  ArchetypeType sorted_type_;  // sorted ascending — used for archetype matching
+  ArchetypeType type_;            // user-pack order — used by ArchetypeQuery::Iterator
+  ArchetypeType sorted_type_;     // sorted ascending — used for archetype matching
+  ArchetypeType extra_required_;  // additional ComponentIDs required (e.g. tag filters)
   ArchetypeQuery<TComponents...> archetype_query_;
 };

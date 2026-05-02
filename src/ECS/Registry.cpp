@@ -89,6 +89,70 @@ std::vector<Archetype*> Registry::GetMatchingArchetypes(const ArchetypeType& typ
   return matching_archetypes;
 }
 
+EntityLocation Registry::TransitionAddComponent(const Entity entity, const ComponentID componentId) {
+  const EntityLocation oldLocation = entity_locations_[entity.id];
+  if (oldLocation.archetype->HasComponent(componentId)) {
+    return oldLocation;
+  }
+
+  Archetype* newArchetype = nullptr;
+  auto it = oldLocation.archetype->edges.find(componentId);
+  if (it != oldLocation.archetype->edges.end() && it->second.add != nullptr) {
+    newArchetype = it->second.add;
+  } else {
+    newArchetype = GetOrCreateArchetype(oldLocation.archetype->type(), componentId);
+
+    newArchetype->edges.insert(std::make_pair(componentId, ArchetypeEdge{nullptr, oldLocation.archetype}));
+    if (it != oldLocation.archetype->edges.end()) {
+      it->second.add = newArchetype;
+    } else {
+      oldLocation.archetype->edges.insert(std::make_pair(componentId, ArchetypeEdge{newArchetype, nullptr}));
+    }
+  }
+
+  const EntityLocation newLocation = newArchetype->AddEntity(entity);
+  newArchetype->CopyComponents(oldLocation, newLocation);
+
+  const auto swapped = oldLocation.archetype->RemoveEntity(oldLocation);
+  entity_locations_[entity.id] = newLocation;
+  if (swapped) {
+    entity_locations_[swapped->id] = oldLocation;
+  }
+  return newLocation;
+}
+
+EntityLocation Registry::TransitionRemoveComponent(const Entity entity, const ComponentID componentId) {
+  const EntityLocation oldLocation = entity_locations_[entity.id];
+  if (!oldLocation.archetype->HasComponent(componentId)) {
+    return oldLocation;
+  }
+
+  Archetype* newArchetype = nullptr;
+  auto it = oldLocation.archetype->edges.find(componentId);
+  if (it != oldLocation.archetype->edges.end() && it->second.remove != nullptr) {
+    newArchetype = it->second.remove;
+  } else {
+    newArchetype = GetOrCreateArchetypeRemove(oldLocation.archetype->type(), componentId);
+
+    newArchetype->edges.insert(std::make_pair(componentId, ArchetypeEdge{oldLocation.archetype, nullptr}));
+    if (it != oldLocation.archetype->edges.end()) {
+      it->second.remove = newArchetype;
+    } else {
+      oldLocation.archetype->edges.insert(std::make_pair(componentId, ArchetypeEdge{nullptr, newArchetype}));
+    }
+  }
+
+  const EntityLocation newLocation = newArchetype->AddEntity(entity);
+  newArchetype->CopyComponents(oldLocation, newLocation);
+
+  const auto swapped = oldLocation.archetype->RemoveEntity(oldLocation);
+  entity_locations_[entity.id] = newLocation;
+  if (swapped) {
+    entity_locations_[swapped->id] = oldLocation;
+  }
+  return newLocation;
+}
+
 Archetype* Registry::GetOrCreateArchetype(std::vector<ComponentID> componentIDs, const ComponentID newComponentId) {
   componentIDs.push_back(newComponentId);
   std::ranges::sort(componentIDs);
@@ -126,6 +190,57 @@ Archetype* Registry::GetOrCreateArchetype(std::vector<ComponentID> componentIDs,
   archetypes_.emplace(newArchetypeId, std::move(newArchetype));
 
   // Centralized component_index_ population — every archetype is registered here.
+  for (const ComponentID id : newArchetypePtr->type()) {
+    auto& list = component_index_[id];
+    if (std::ranges::find(list, newArchetypeId) == list.end()) {
+      list.push_back(newArchetypeId);
+    }
+  }
+
+  return newArchetypePtr;
+}
+
+Archetype* Registry::GetOrCreateArchetypeRemove(std::vector<ComponentID> componentIDs,
+                                                const ComponentID removeComponentId) {
+  std::erase(componentIDs, removeComponentId);
+  std::ranges::sort(componentIDs);
+
+  if (componentIDs.empty()) {
+    return root_archetype_.get();
+  }
+
+  if (const auto it = component_index_.find(componentIDs.front()); it != component_index_.end()) {
+    for (const auto archetypeId : it->second) {
+      const auto archetype = archetypes_.find(archetypeId);
+      if (archetype->second->type().size() != componentIDs.size()) {
+        continue;
+      }
+
+      bool match = true;
+      for (size_t i = 0; i < componentIDs.size(); ++i) {
+        if (archetype->second->type()[i] != componentIDs[i]) {
+          match = false;
+          break;
+        }
+      }
+
+      if (match) {
+        return archetype->second.get();
+      }
+    }
+  }
+
+  std::vector<ComponentInfo> componentInfos;
+  componentInfos.reserve(componentIDs.size());
+  for (const auto& id : componentIDs) {
+    componentInfos.push_back(component_registry_->GetInfo(id));
+  }
+
+  auto newArchetype = std::make_unique<Archetype>(std::move(componentInfos));
+  Archetype* newArchetypePtr = newArchetype.get();
+  const auto newArchetypeId = newArchetype->GetID();
+  archetypes_.emplace(newArchetypeId, std::move(newArchetype));
+
   for (const ComponentID id : newArchetypePtr->type()) {
     auto& list = component_index_[id];
     if (std::ranges::find(list, newArchetypeId) == list.end()) {

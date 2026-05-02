@@ -30,8 +30,10 @@
 #include "GameConfig.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/CameraFollowSystem.h"
+#include "Systems/DamageSystem.h"
 #include "Systems/DrawColliderSystem.h"
 #include "Systems/KeyboardControlSystem.h"
+#include "Systems/MovementSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
 #include "Systems/ProjectileLifecycleSystem.h"
 #include "Systems/RenderDebugGUISystem.h"
@@ -182,6 +184,8 @@ void Game::Setup() {
   auto &keyboardControlSystem =
       registry_->RegisterSystem<KeyboardControlComponent, RigidBodyComponent, SpriteComponent>(KeyboardControlSystem());
 
+  auto &movementSystem = registry_->RegisterSystem<TransformComponent, RigidBodyComponent>(MovementSystem());
+
   // Camera follows after gameplay-driven transform updates
   registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
 
@@ -196,6 +200,8 @@ void Game::Setup() {
   projectileEmitSystem.SubscribeToEvents(event_bus_);
   keyboardControlSystem.SubscribeToEvents(event_bus_);
   ui_button_system_.Init(registry_.get(), event_bus_);
+  damage_system_.Init(registry_.get(), event_bus_);
+  movementSystem.Init(registry_.get(), event_bus_);
 }
 
 void Game::ProcessInput() const {

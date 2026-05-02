@@ -11,6 +11,8 @@
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 #include "../Systems/UIButtonSystem.h"
+#include "Systems/DamageSystem.h"
+#include "Systems/MovementSystem.h"
 
 class Registry;
 
@@ -54,4 +56,5 @@ class Game {
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
   UIButtonSystem ui_button_system_;
+  DamageSystem damage_system_;
 };

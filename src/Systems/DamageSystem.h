@@ -1,45 +1,50 @@
 #pragma once
 
-#include "../Components/BoxColliderComponent.h"
 #include "../Components/HealthComponent.h"
 #include "../Components/ProjectileComponent.h"
-#include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
+#include "ECS/Iterable.h"
 
-class DamageSystem : public System {
+class DamageSystem {
  public:
-  DamageSystem() { RequireComponent<BoxColliderComponent>(); }
-
-  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
+  void Init(Registry* registry, const std::unique_ptr<EventBus>& eventBus) {
+    registry_ = registry;
+    projectiles_ = registry_->TagId("projectiles");
+    enemies_ = registry_->TagId("enemies");
+    player_ = registry_->TagId("player");
     eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(this, &DamageSystem::OnCollision);
   }
 
   void OnCollision(const CollisionEvent& event) {
     const auto a = event.entityA;
     const auto b = event.entityB;
-    auto aId = std::to_string(event.entityA.GetId());
-    auto bId = std::to_string(event.entityB.GetId());
 
-    if (a.InGroup("projectiles") && (b.HasTag("player") || b.InGroup("enemies"))) {
+    if (registry_->HasTag(a, projectiles_) && (registry_->HasTag(b, player_) || registry_->HasTag(b, enemies_))) {
       OnProjectileHit(a, b);
     }
 
-    if (b.InGroup("projectiles") && (a.HasTag("player") || a.InGroup("enemies"))) {
+    if (registry_->HasTag(b, projectiles_) && (registry_->HasTag(a, player_) || registry_->HasTag(a, enemies_))) {
       OnProjectileHit(b, a);
     }
   }
 
-  static void OnProjectileHit(const Entity projectile, const Entity target) {
-    const auto projectileComponent = projectile.GetComponent<ProjectileComponent>();
+  void OnProjectileHit(const Entity projectile, const Entity target) const {
+    const auto projectileComponent = registry_->GetComponent<ProjectileComponent>(projectile);
+    auto& targetComponent = registry_->GetComponent<HealthComponent>(target);
 
-    auto& targetComponent = target.GetComponent<HealthComponent>();
     targetComponent.currentHealth -= projectileComponent.damage;
 
     if (targetComponent.currentHealth <= 0) {
-      target.Blam();
+      registry_->QueueBlamEntity(target);
     }
 
-    projectile.Blam();
+    registry_->QueueBlamEntity(projectile);
   }
+
+ private:
+  Registry* registry_ = nullptr;
+  Entity projectiles_{};
+  Entity enemies_{};
+  Entity player_{};
 };

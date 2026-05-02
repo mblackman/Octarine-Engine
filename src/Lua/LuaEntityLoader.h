@@ -9,21 +9,13 @@ class LuaEntityLoader {
  public:
   using ComponentCreationFunction = std::function<void(Registry*, Entity, const sol::table&)>;
 
-  // TODO Fix all this
-  static void TagAndGroupEntity(const sol::table& currentData, const Entity& entity) {
-    const sol::optional<std::string> tag = currentData["tag"];
-    const sol::optional<std::string> group = currentData["group"];
-    const int entityMask = currentData["mask"].get_or(Constants::kDefaultEntityMask);
-
-    if (tag.has_value() && !tag.value().empty()) {
-      // entity.Tag(tag.value());
-    }
-
-    if (group.has_value() && !group.value().empty()) {
-      // entity.Group(group.value());
-    }
-
-    // entity.SetEntityMask(entityMask);
+  // Reads `tag`/`tags`/`group`/`groups` (string or list of strings) and applies each as a label
+  // tag on the entity. `group(s)` is a back-compat alias for `tag(s)`.
+  static void TagAndGroupEntity(const sol::table& currentData, Registry* registry, const Entity& entity) {
+    ApplyTagField(currentData, "tag", registry, entity);
+    ApplyTagField(currentData, "tags", registry, entity);
+    ApplyTagField(currentData, "group", registry, entity);
+    ApplyTagField(currentData, "groups", registry, entity);
   }
 
   static void LoadEntityComponents(const sol::table& currentData, Registry* registry, const Entity& entity) {
@@ -77,11 +69,10 @@ class LuaEntityLoader {
       // Create the entity and establish parentage
       const Entity entity = registry->CreateEntity();
       if (parentEntity) {
-        // TODO add back relationships
-        // entity.AddParent(*parentEntity);
+        registry->SetParent(entity, *parentEntity);
       }
 
-      TagAndGroupEntity(currentData, entity);
+      TagAndGroupEntity(currentData, registry, entity);
       LoadEntityComponents(currentData, registry, entity);
 
       // Add any child entities to the stack to be processed.
@@ -103,6 +94,25 @@ class LuaEntityLoader {
   }
 
  private:
+  static void ApplyTagField(const sol::table& currentData, const char* key, Registry* registry, const Entity& entity) {
+    const sol::object value = currentData[key];
+    if (!value.valid()) return;
+
+    if (value.is<std::string>()) {
+      const std::string name = value.as<std::string>();
+      if (!name.empty()) registry->AddTag(entity, name);
+      return;
+    }
+
+    if (value.is<sol::table>()) {
+      for (const auto& [_, inner] : value.as<sol::table>()) {
+        if (!inner.is<std::string>()) continue;
+        const std::string name = inner.as<std::string>();
+        if (!name.empty()) registry->AddTag(entity, name);
+      }
+    }
+  }
+
   static const std::unordered_map<std::string, ComponentCreationFunction>& GetComponentFactoryMap() {
     static std::unordered_map<std::string, ComponentCreationFunction> componentFactories;
     if (componentFactories.empty()) {
