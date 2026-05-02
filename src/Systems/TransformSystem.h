@@ -5,7 +5,9 @@
 
 #include "../Components/TransformComponent.h"
 #include "../ECS/Iterable.h"
+#include "../ECS/Query.h"
 #include "../ECS/Registry.h"
+#include "../General/Logger.h"
 
 struct TransformUpdateJob {
   Entity entity;
@@ -16,18 +18,41 @@ struct TransformUpdateJob {
 
 class TransformSystem {
  public:
-  void operator()(const ContextFacade& ctx, const Iterable& iter) const {
-    const auto* registry = ctx.Registry();
+  void operator()(const ContextFacade& ctx, const Iterable& /*iter*/) {
+    auto* registry = ctx.Registry();
 
+    if (!query_) {
+      query_ = registry->CreateQuery<TransformComponent>();
+    }
+    query_->Update();
+
+    // Fast path: when no parent-child relationships exist (the common case),
+    // just copy local → global in one tight loop. Skips all GetParent hash lookups.
+    if (!registry->HasAnyPairs()) {
+      if (!loggedPath_) {
+        Logger::Info("TransformSystem: FAST path (no hierarchy)");
+        loggedPath_ = true;
+      }
+      query_->ParallelForEach([](TransformComponent& transform) {
+        transform.globalPosition = transform.position;
+        transform.globalScale = transform.scale;
+        transform.globalRotation = transform.rotation;
+      });
+      return;
+    }
+    if (!loggedPath_) {
+      Logger::Info("TransformSystem: SLOW path (hierarchy detected)");
+      loggedPath_ = true;
+    }
+
+    // Slow path: hierarchy exists — identify roots and DFS-walk children.
     std::stack<TransformUpdateJob> jobs;
 
-    for (auto&& entityCtx : iter) {
-      const Entity entity = entityCtx.Entity();
-      if (registry->GetParent(entity).has_value()) {
-        continue;
+    query_->ForEach([&](const Entity entity, TransformComponent& /*transform*/) {
+      if (!registry->GetParent(entity).has_value()) {
+        jobs.push({entity, glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 1.0f), 0.0});
       }
-      jobs.push({entity, glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 1.0f), 0.0});
-    }
+    });
 
     while (!jobs.empty()) {
       const auto [entity, parentPos, parentScale, parentRot] = jobs.top();
@@ -52,4 +77,8 @@ class TransformSystem {
       }
     }
   }
+
+ private:
+  std::unique_ptr<ComponentQuery<TransformComponent>> query_;
+  bool loggedPath_ = false;
 };

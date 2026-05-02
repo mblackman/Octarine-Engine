@@ -7,6 +7,7 @@
 #include "../Components/TransformComponent.h"
 #include "../ECS/Entity.h"
 #include "../ECS/Iterable.h"
+#include "../ECS/Query.h"
 #include "../ECS/Registry.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
@@ -19,32 +20,46 @@ class MovementSystem {
     enemies_ = registry_->TagId("enemies");
     obstacles_ = registry_->TagId("obstacles");
     player_ = registry_->TagId("player");
+    // Query includes SpriteComponent so we get direct SoA access for bounds checking
+    // instead of per-entity random GetComponent lookups.
+    query_ = registry_->CreateQuery<TransformComponent, RigidBodyComponent, SpriteComponent>();
     eventBus->SubscribeEvent<MovementSystem, CollisionEvent>(this, &MovementSystem::OnCollision);
   }
 
-  void operator()(const ContextFacade& context, const Iterable& iterable) const {
+  void operator()(const ContextFacade& context, const Iterable& /*iterable*/) {
     const float dt = context.DeltaTime();
     const auto& gameConfig = registry_->Get<GameConfig>();
+    const auto windowWidth = static_cast<float>(gameConfig.windowWidth);
+    const auto windowHeight = static_cast<float>(gameConfig.windowHeight);
 
-    for (auto&& ctx : iterable) {
-      const Entity entity = ctx.Entity();
-      auto& transform = ctx.Component<TransformComponent>();
-      const auto& rigidBody = ctx.Component<RigidBodyComponent>();
-
+    query_->Update();
+    query_->ForEach([&](const Entity entity, TransformComponent& transform,
+                        const RigidBodyComponent& rigidBody, const SpriteComponent& sprite) {
       const bool isPlayer = registry_->HasTag(entity, player_);
 
-      if (!isPlayer && IsEntityOutsideMap(entity, transform, gameConfig)) {
-        registry_->QueueBlamEntity(entity);
-        continue;
+      if (!isPlayer) {
+        const float right = transform.position.x + sprite.width * transform.scale.x;
+        const float bottom = transform.position.y + sprite.height * transform.scale.y;
+        if (transform.position.x > windowWidth || transform.position.y > windowHeight || right < 0 || bottom < 0) {
+          registry_->QueueBlamEntity(entity);
+          return;
+        }
       }
 
       transform.position.x += rigidBody.velocity.x * dt;
       transform.position.y += rigidBody.velocity.y * dt;
 
       if (isPlayer) {
-        ClampPlayerToPlayableArea(entity, transform, gameConfig);
+        if (transform.position.x < 0) transform.position.x = 0;
+        if (transform.position.y < 0) transform.position.y = 0;
+        if (transform.position.x + sprite.width * transform.scale.x > gameConfig.playableAreaWidth) {
+          transform.position.x = gameConfig.playableAreaWidth - sprite.width * transform.scale.x;
+        }
+        if (transform.position.y + sprite.height * transform.scale.y > gameConfig.playableAreaHeight) {
+          transform.position.y = gameConfig.playableAreaHeight - sprite.height * transform.scale.y;
+        }
       }
-    }
+    });
   }
 
   void OnCollision(const CollisionEvent& event) {
@@ -70,39 +85,9 @@ class MovementSystem {
     }
   }
 
-  [[nodiscard]] bool IsEntityOutsideMap(const Entity entity, const TransformComponent& transform,
-                                        const GameConfig& gameConfig) const {
-    const bool pastFarEdges = transform.position.x > static_cast<float>(gameConfig.windowWidth) ||
-                              transform.position.y > static_cast<float>(gameConfig.windowHeight);
-    if (pastFarEdges) return true;
-
-    if (registry_->HasComponent<SpriteComponent>(entity)) {
-      const auto& sprite = registry_->GetComponent<SpriteComponent>(entity);
-      return transform.position.x + sprite.width * transform.scale.x < 0 ||
-             transform.position.y + sprite.height * transform.scale.y < 0;
-    }
-    return transform.position.x < 0 || transform.position.y < 0;
-  }
-
-  void ClampPlayerToPlayableArea(const Entity entity, TransformComponent& transform,
-                                 const GameConfig& gameConfig) const {
-    if (!registry_->HasComponent<SpriteComponent>(entity)) return;
-
-    const auto& sprite = registry_->GetComponent<SpriteComponent>(entity);
-
-    if (transform.position.x < 0) transform.position.x = 0;
-    if (transform.position.y < 0) transform.position.y = 0;
-
-    if (transform.position.x + sprite.width * transform.scale.x > gameConfig.playableAreaWidth) {
-      transform.position.x = gameConfig.playableAreaWidth - sprite.width * transform.scale.x;
-    }
-    if (transform.position.y + sprite.height * transform.scale.y > gameConfig.playableAreaHeight) {
-      transform.position.y = gameConfig.playableAreaHeight - sprite.height * transform.scale.y;
-    }
-  }
-
   Registry* registry_ = nullptr;
   Entity enemies_{};
   Entity obstacles_{};
   Entity player_{};
+  std::unique_ptr<ComponentQuery<TransformComponent, RigidBodyComponent, SpriteComponent>> query_;
 };
