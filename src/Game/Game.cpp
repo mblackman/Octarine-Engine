@@ -88,8 +88,10 @@ bool Game::Initialize(const std::string &assetPath) {
     return false;
   }
 
-  SDL_CreateWindowAndRenderer(game_config_->GetGameTitle().c_str(), game_config_->GetDefaultWidth(),
-                              game_config_->GetDefaultHeight(), SDL_WINDOW_RESIZABLE, &window_, &sdl_renderer_);
+  windowWidth = game_config_->GetDefaultWidth();
+  windowHeight = game_config_->GetDefaultHeight();
+  SDL_CreateWindowAndRenderer(game_config_->GetGameTitle().c_str(), windowWidth, windowHeight, SDL_WINDOW_RESIZABLE,
+                              &window_, &sdl_renderer_);
 
   if (!window_) {
     Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
