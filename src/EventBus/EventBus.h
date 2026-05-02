@@ -9,10 +9,10 @@
 #include "Event.h"
 
 class IEventCallback {
- private:
+private:
   virtual void CallEvent(Event& e) = 0;
 
- public:
+public:
   virtual ~IEventCallback() = default;
 
   void Execute(Event& e) { CallEvent(e); }
@@ -20,19 +20,20 @@ class IEventCallback {
 
 template <typename TOwner, typename TEvent>
 class EventCallback : public IEventCallback {
- private:
+private:
   typedef void (TOwner::*CallbackFunction)(TEvent&);
 
   TOwner* owner_instance_;
   CallbackFunction callback_function_;
+
   void CallEvent(Event& e) override {
     std::invoke(callback_function_, owner_instance_, static_cast<TEvent&>(e));
   }
 
- public:
-  EventCallback(TOwner* ownerInstance, CallbackFunction callbackFunction) {
-    this->owner_instance_ = ownerInstance;
-    this->callback_function_ = callbackFunction;
+public:
+  EventCallback(TOwner* ownerInstance,
+                const CallbackFunction callbackFunction) :
+    owner_instance_(ownerInstance), callback_function_(callbackFunction) {
   }
 
   ~EventCallback() override = default;
@@ -41,10 +42,10 @@ class EventCallback : public IEventCallback {
 typedef std::list<std::unique_ptr<IEventCallback>> HandlerList;
 
 class EventBus {
- private:
+private:
   std::map<std::type_index, std::unique_ptr<HandlerList>> subscribers_;
 
- public:
+public:
   EventBus() { Logger::Info("Event bus created"); }
 
   ~EventBus() { Logger::Info("Event bus destructed"); }
@@ -64,10 +65,8 @@ class EventBus {
 
   template <typename TEvent, typename... TArgs>
   void EmitEvent(TArgs&&... args) {
-    const auto handlers = subscribers_[typeid(TEvent)].get();
-
-    if (handlers) {
-      for (auto & it : *handlers) {
+    if (const auto handlers = subscribers_[typeid(TEvent)].get()) {
+      for (auto& it : *handlers) {
         auto handler = it.get();
         TEvent event(std::forward<TArgs>(args)...);
         handler->Execute(event);

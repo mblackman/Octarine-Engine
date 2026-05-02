@@ -12,29 +12,33 @@
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 
-const int kFps = 60;
-const int kMillisecondsPerFrame = 1000 / kFps;
+constexpr int kFps = 60;
+constexpr int kMillisecondsPerFrame = 1000 / kFps;
 
 class Game {
  public:
-  Game();
+  explicit Game(const std::string& assetPath);
   ~Game();
 
   void Initialize();
   void Destroy();
-  void Run(bool isMapEditor);
+  void Run();
   static void Quit() { s_is_running_ = false; }
+
+  SDL_Renderer* GetRenderer() const { return sdl_renderer_; }
+  AssetManager* GetAssetManager() const { return asset_manager_.get(); }
+  Registry* GetRegistry() const { return registry_.get(); }
 
   static int windowWidth;
   static int windowHeight;
-  static int mapWidth;
-  static int mapHeight;
+  static float mapWidth;
+  static float mapHeight;
 
- private:
+private:
   void ProcessInput();
   void Update();
   void Render();
-  void Setup(bool isMapEditor);
+  void Setup();
   void SubscribeToEvents(std::unique_ptr<EventBus>& eventBus);
   void OnKeyInputEvent(KeyInputEvent& event);
   static KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);

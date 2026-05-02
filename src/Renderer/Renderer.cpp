@@ -70,8 +70,12 @@ void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer,
   const float x = square.isFixed ? square.position.x : square.position.x - camera.x;
   const float y = square.isFixed ? square.position.y : square.position.y - camera.y;
 
-  const SDL_Rect rect = {static_cast<int>(x), static_cast<int>(y), square.width,
-                   square.height};
+  const SDL_Rect rect = {
+      static_cast<int>(x),
+      static_cast<int>(y),
+      static_cast<int>(square.width),
+      static_cast<int>(square.height)
+  };
 
   SDL_SetRenderDrawColor(renderer, square.color.r, square.color.g,
                          square.color.b, square.color.a);
