@@ -17,7 +17,7 @@ struct TransformUpdateJob {
 class TransformSystem {
  public:
   void operator()(const ContextFacade& ctx, const Iterable& iter) const {
-    auto* registry = ctx.Registry();
+    const auto* registry = ctx.Registry();
 
     std::stack<TransformUpdateJob> jobs;
 

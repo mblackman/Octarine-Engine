@@ -18,7 +18,7 @@ class RenderSpriteSystem {
                   const SpriteComponent& sprite) const {
     const auto& gameConfig = context.Registry()->Get<GameConfig>();
     auto& renderQueue = context.Registry()->Get<RenderQueue>();
-    const auto& camera = context.Registry()->Get<CameraComponent>().viewport;
+    const auto& [x, y, w, h] = context.Registry()->Get<CameraComponent>().viewport;
     bool isOutsideCamera = false;
 
     if (sprite.isFixed) {
@@ -29,10 +29,10 @@ class RenderSpriteSystem {
                         transform.globalPosition.y + sprite.height * transform.globalScale.y < 0 ||
                         transform.globalPosition.y > windowHeight;
     } else {
-      isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < camera.x ||
-                        transform.globalPosition.x > camera.x + camera.w ||
-                        transform.globalPosition.y + sprite.height * transform.globalScale.y < camera.y ||
-                        transform.globalPosition.y > camera.y + camera.h;
+      isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < x ||
+                        transform.globalPosition.x > x + w ||
+                        transform.globalPosition.y + sprite.height * transform.globalScale.y < y ||
+                        transform.globalPosition.y > y + h;
     }
 
     if (!isOutsideCamera) {
