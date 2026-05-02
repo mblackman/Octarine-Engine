@@ -1,7 +1,9 @@
 #pragma once
 
 #include <SDL2/SDL.h>
-#include <imgui/imgui.h>
+#include "imgui.h"
+#include "imgui_impl_sdl2.h"
+#include "imgui_impl_sdlrenderer2.h"
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/HealthComponent.h"
@@ -19,6 +21,7 @@ class RenderGUISystem : public System {
     ~RenderGUISystem() = default;
 
     void Update(SDL_Renderer* renderer, std::unique_ptr<Registry>& registry) {
+        IMGUI_IMPL_API::ImGui::NewFrame();
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
