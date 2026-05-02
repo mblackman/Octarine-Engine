@@ -40,7 +40,6 @@ class Game {
   void Render(float deltaTime);
   [[nodiscard]] float WaitTime();
   void Setup();
-  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus);
   void OnKeyInputEvent(const KeyInputEvent& event);
   static KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);
 

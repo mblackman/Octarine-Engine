@@ -12,17 +12,23 @@
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 #include "Components/CameraComponents.h"
-#include "Components/HealthComponent.h"
+#include "Components/CameraFollowComponent.h"
+#include "Components/ProjectileEmitterComponent.h"
 #include "Components/ScriptComponent.h"
 #include "Components/SpriteComponent.h"
+#include "Components/SquarePrimitiveComponent.h"
+#include "Components/TextLabelComponent.h"
 #include "Components/TransformComponent.h"
+#include "ECS/Iterable.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
 #include "GameConfig.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/CameraFollowSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
+#include "Systems/RenderPrimitiveSystem.h"
 #include "Systems/RenderSpriteSystem.h"
+#include "Systems/RenderTextSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
@@ -142,29 +148,10 @@ void Game::Setup() {
 
   registry_->Set<RenderQueue>(RenderQueue());
   registry_->Set<CameraComponent>(CameraComponent{camera});
-  registry_->Set<RenderQueue>(RenderQueue());
   registry_->Set<AssetManager>(AssetManager());
 
-  ScriptSystem scriptSystem;
-  // registry_->AddSystem<TransformSystem>();
-  // registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
-  // registry_->RegisterSystem<TransformComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
-  //  registry_->AddSystem<ProjectileEmitSystem>();
-  //  registry_->AddSystem<ProjectileLifecycleSystem>();
-  //  registry_->AddSystem<DisplayHealthSystem>();
-  //  registry_->AddSystem<DamageSystem>();
-  //  registry_->AddSystem<MovementSystem>();
-  //
-  registry_->RegisterSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
-  // registry_->AddSystem<RenderTextSystem>();
-  // registry_->AddSystem<RenderPrimitiveSystem>();
-  // registry_->AddSystem<RenderDebugGUISystem>();
-  // registry_->RegisterSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
-  // registry_->AddSystem<CollisionSystem>();
-  // registry_->AddSystem<DrawColliderSystem>();
-  // registry_->AddSystem<KeyboardControlSystem>();
-
-  // registry_->AddSystem<UIButtonSystem>();
+  // Gameplay
+  auto &scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
 
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
   scriptSystem.CreateLuaBindings(lua, *this);
@@ -175,7 +162,22 @@ void Game::Setup() {
   assetManager.LoadGameConfig(gameConfig);
   LoadGame(lua, assetManager, gameConfig);
 
-  registry_->RegisterSystem<ScriptComponent>(std::move(scriptSystem));
+  registry_->RegisterSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
+  auto &projectileEmitSystem =
+      registry_->RegisterSystem<TransformComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
+
+  // Camera follows after gameplay-driven transform updates
+  registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
+
+  // Render queue producers
+  registry_->RegisterSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
+  registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
+  registry_->RegisterSystem<SquarePrimitiveComponent>(RenderPrimitiveSystem());
+
+  // Event subscriptions (one-time)
+  event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
+  scriptSystem.SubscribeToEvents(event_bus_);
+  projectileEmitSystem.SubscribeToEvents(event_bus_);
 }
 
 void Game::ProcessInput() const {
@@ -213,37 +215,7 @@ void Game::ProcessInput() const {
   }
 }
 
-void Game::Update(const float deltaTime) {
-  // const auto query = registry_->CreateQuery<TransformComponent, HealthComponent>();
-  // query->ForEach([](TransformComponent &transform, HealthComponent &health) {
-  //   if (transform.position.x < 0) {
-  //     transform.position.x = 0;
-  //   }
-  // });
-  // Subscribe to events
-  event_bus_->Reset();
-  // registry_->GetSystem<DamageSystem>().SubscribeToEvents(event_bus_);
-  // registry_->GetSystem<KeyboardControlSystem>().SubscribeToEvents(event_bus_);
-  // registry_->GetSystem<ProjectileEmitSystem>().SubscribeToEvents(event_bus_);
-  // registry_->GetSystem<MovementSystem>().SubscribeToEvents(event_bus_);
-  // registry_->GetSystem<UIButtonSystem>().SubscribeToEvents(event_bus_);
-  // registry_->GetSystem<ScriptSystem>().SubscribeToEvents(event_bus_);
-  SubscribeToEvents(event_bus_);
-
-  // Update our systems and registry
-  // registry_->GetSystem<TransformSystem>().Update();  // Important to update first as it updates global positions.
-  // registry_->GetSystem<MovementSystem>().Update(deltaTime);
-  // registry_->GetSystem<AnimationSystem>().Update(deltaTime);
-  // registry_->GetSystem<CollisionSystem>().Update(event_bus_);
-  // registry_->GetSystem<KeyboardControlSystem>().Update();
-  // registry_->GetSystem<CameraFollowSystem>().Update(camera_);
-  // registry_->GetSystem<ProjectileEmitSystem>().Update(deltaTime, registry_);
-  // registry_->GetSystem<ProjectileLifecycleSystem>().Update(deltaTime);
-  // registry_->GetSystem<DisplayHealthSystem>().Update(registry_);
-  // registry_->GetSystem<ScriptSystem>().Update(deltaTime);
-
-  registry_->Update(deltaTime);
-}
+void Game::Update(const float deltaTime) { registry_->Update(deltaTime); }
 
 void Game::Render(const float deltaTime) {
   auto &renderQueue = registry_->Get<RenderQueue>();
@@ -285,10 +257,6 @@ float Game::WaitTime() {
   milliseconds_previous_frame_ = SDL_GetTicks();
 
   return deltaTime;
-}
-
-void Game::SubscribeToEvents(const std::unique_ptr<EventBus> &eventBus) {
-  eventBus->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
 }
 
 void Game::OnKeyInputEvent(const KeyInputEvent &event) {

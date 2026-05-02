@@ -168,7 +168,7 @@ class Registry {
 
   // System Management
   template <typename... TArgs, typename Func>
-  void RegisterSystem(Func&& func) {
+  std::decay_t<Func>& RegisterSystem(Func&& func) {
     using StoredFunc = std::decay_t<Func>;
     class SystemWrapper final : public ISystem {
      public:
@@ -181,12 +181,17 @@ class Registry {
         query_->ForEach(func_);
       }
 
+      StoredFunc& GetFunc() { return func_; }
+
      private:
       StoredFunc func_;
       std::unique_ptr<ComponentQuery<TArgs...>> query_;
     };
 
-    systems_.push_back(std::make_unique<SystemWrapper>(this, std::forward<Func>(func)));
+    auto wrapper = std::make_unique<SystemWrapper>(this, std::forward<Func>(func));
+    StoredFunc& ref = wrapper->GetFunc();
+    systems_.push_back(std::move(wrapper));
+    return ref;
   }
 
   // Singleton components

@@ -1,34 +1,17 @@
 #pragma once
 
 #include "../Components/SquarePrimitiveComponent.h"
-#include "../ECS/ECS.h"
 #include "../Renderer/RenderKey.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/RenderableType.h"
+#include "ECS/Iterable.h"
+#include "ECS/Registry.h"
 
-class RenderPrimitiveSystem : public System {
+class RenderPrimitiveSystem {
  public:
-  RenderPrimitiveSystem() = default;
-
-  RenderPrimitiveSystem(const RenderPrimitiveSystem&) = delete;
-  RenderPrimitiveSystem& operator=(const RenderPrimitiveSystem&) = delete;
-
-  RenderPrimitiveSystem(RenderPrimitiveSystem&&) = delete;
-  RenderPrimitiveSystem& operator=(RenderPrimitiveSystem&&) = delete;
-
-  ~RenderPrimitiveSystem() = default;
-
-  void Update(RenderQueue& renderQueue) const {
-    const auto entities = GetEntities();
-
-    for (auto entity : entities) {
-      if (entity.HasComponent<SquarePrimitiveComponent>()) {
-        const auto square = entity.GetComponent<SquarePrimitiveComponent>();
-        RenderKey renderKey(square.layer, square.position.y,
-                            SQUARE_PRIMITIVE, entity);
-
-        renderQueue.AddRenderKey(renderKey);
-      }
-    }
+  void operator()(const ContextFacade& context, const SquarePrimitiveComponent& square) const {
+    auto& renderQueue = context.Registry()->Get<RenderQueue>();
+    const RenderKey renderKey(square.layer, square.position.y, SQUARE_PRIMITIVE, context.Entity());
+    renderQueue.AddRenderKey(renderKey);
   }
 };

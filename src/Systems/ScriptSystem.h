@@ -107,17 +107,20 @@ class ScriptSystem {
     eventBus->SubscribeEvent<ScriptSystem, KeyInputEvent>(this, &ScriptSystem::OnKeyInput);
   }
 
-  void operator()(const ContextFacade &context, ScriptComponent &script) const {
-    // for (auto entity : GetEntities()) {
-    //   if (auto &script = entity.GetComponent<ScriptComponent>(); script.updateFunction != sol::lua_nil) {
-    //     if (auto result = script.updateFunction(script.scriptTable, entity, deltaTime); !result.valid()) {
-    //       sol::error err = result;
-    //       std::string what = err.what();
-    //       Logger::ErrorLua(what);
-    //     }
-    //   }
-    // }
-    // pressedKeys_.clear();
+  void operator()(const ContextFacade &context, ScriptComponent &script) {
+    if (script.updateFunction == sol::lua_nil) {
+      return;
+    }
+
+    if (auto result = script.updateFunction(script.scriptTable, context.Entity(), context.DeltaTime());
+        !result.valid()) {
+      const sol::error err = result;
+      Logger::ErrorLua(std::string(err.what()));
+    }
+
+    // Pressed-keys tracked per-frame; cleared after invoking the script so next frame starts fresh.
+    // Assumes one ScriptComponent entity per frame; revisit if multiple scripts must read pressed events.
+    pressedKeys_.clear();
   }
 
  private:

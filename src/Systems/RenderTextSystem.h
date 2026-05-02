@@ -1,31 +1,17 @@
 #pragma once
 
 #include "../Components/TextLabelComponent.h"
-#include "../ECS/ECS.h"
 #include "../Renderer/RenderKey.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/RenderableType.h"
+#include "ECS/Iterable.h"
+#include "ECS/Registry.h"
 
-class RenderTextSystem : public System {
+class RenderTextSystem {
  public:
-  RenderTextSystem() { RequireComponent<TextLabelComponent>(); }
-
-  RenderTextSystem(const RenderTextSystem&) = delete;
-  RenderTextSystem& operator=(const RenderTextSystem&) = delete;
-
-  RenderTextSystem(RenderTextSystem&&) = delete;
-  RenderTextSystem& operator=(RenderTextSystem&&) = delete;
-
-  ~RenderTextSystem() = default;
-
-  void Update(RenderQueue& renderQueue) const {
-    const auto entities = GetEntities();
-
-    for (auto entity : entities) {
-      const auto& text = entity.GetComponent<TextLabelComponent>();
-      RenderKey renderKey(text.layer, text.position.y, TEXT, entity);
-
-      renderQueue.AddRenderKey(renderKey);
-    }
+  void operator()(const ContextFacade& context, const TextLabelComponent& text) const {
+    auto& renderQueue = context.Registry()->Get<RenderQueue>();
+    const RenderKey renderKey(text.layer, text.position.y, TEXT, context.Entity());
+    renderQueue.AddRenderKey(renderKey);
   }
 };
