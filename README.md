@@ -5,9 +5,9 @@ Octarine Engine colors imagination as a lightweight 2D game engine that is prese
 This engine utilizes:
 
 -   GLM: <https://github.com/g-truc/glm>
--   ImGui: <https://github.com/ocornut/imgui> (version 1.91.8#2)
--   Lua: <https://www.lua.org/> (version 5.4.x)
--   SDL2: <https://www.libsdl.org/>
+-   ImGui: <https://github.com/ocornut/imgui>
+-   Lua: <https://www.lua.org/>
+-   SDL3: <https://www.libsdl.org/>
 -   spdlog: <https://github.com/gabime/spdlog>
 -   sol2: <https://github.com/ThePhD/sol2>
 
