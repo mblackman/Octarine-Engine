@@ -25,7 +25,7 @@ class ProjectileEmitSystem : public System {
 
   ProjectileEmitSystem(ProjectileEmitSystem&&) = delete;
   ProjectileEmitSystem& operator=(ProjectileEmitSystem&&) = delete;
-  
+
   ~ProjectileEmitSystem() = default;
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {

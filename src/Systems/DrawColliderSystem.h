@@ -18,7 +18,7 @@ class DrawColliderSystem : public System {
 
   DrawColliderSystem(DrawColliderSystem&&) = delete;
   DrawColliderSystem& operator=(DrawColliderSystem&&) = delete;
-  
+
   ~DrawColliderSystem() = default;
 
   void Update(SDL_Renderer* renderer, const SDL_FRect& camera) {

@@ -14,13 +14,13 @@ class GameConfig {
 public:
   GameConfig() = default;
 
-  GameConfig(const GameConfig&) = delete;
-  GameConfig& operator=(const GameConfig&) = delete;
+ GameConfig(const GameConfig&) = delete;
+ GameConfig& operator=(const GameConfig&) = delete;
 
-  GameConfig(GameConfig&&) = delete;
-  GameConfig& operator=(GameConfig&&) = delete;
+ GameConfig(GameConfig&&) = delete;
+ GameConfig& operator=(GameConfig&&) = delete;
 
-  ~GameConfig() = default;
+ ~GameConfig() = default;
 
   bool LoadConfig(const std::unordered_map<std::string, std::string>& settings);
 

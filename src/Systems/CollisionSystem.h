@@ -18,7 +18,7 @@ class CollisionSystem : public System {
 
   CollisionSystem(CollisionSystem&&) = delete;
   CollisionSystem& operator=(CollisionSystem&&) = delete;
-  
+
   ~CollisionSystem() = default;
 
   void Update(const std::unique_ptr<EventBus>& eventBus) {

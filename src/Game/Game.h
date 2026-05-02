@@ -21,13 +21,13 @@ class Game {
 public:
   Game();
 
-  Game(const Game&) = delete;
-  Game& operator=(const Game&) = delete;
+ Game(const Game&) = delete;
+ Game& operator=(const Game&) = delete;
 
-  Game(Game&&) = delete;
-  Game& operator=(Game&&) = delete;
+ Game(Game&&) = delete;
+ Game& operator=(Game&&) = delete;
 
-  ~Game();
+ ~Game();
 
   bool Initialize(const std::string& assetPath);
   void Destroy() const;

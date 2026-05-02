@@ -15,7 +15,7 @@ class RenderTextSystem : public System {
 
   RenderTextSystem(RenderTextSystem&&) = delete;
   RenderTextSystem& operator=(RenderTextSystem&&) = delete;
-  
+
   ~RenderTextSystem() = default;
 
   void Update(RenderQueue& renderQueue) {

@@ -19,7 +19,7 @@ class UIButtonSystem : public System {
 
   UIButtonSystem(UIButtonSystem&&) = delete;
   UIButtonSystem& operator=(UIButtonSystem&&) = delete;
-  
+
   ~UIButtonSystem() = default;
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
