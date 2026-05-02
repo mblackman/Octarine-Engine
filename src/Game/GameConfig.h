@@ -22,7 +22,7 @@ public:
 
  ~GameConfig() = default;
 
-  bool LoadConfig(const std::unordered_map<std::string, std::string>& settings);
+ bool LoadConfig(const std::unordered_map<std::string, std::string>& settings);
 
   bool LoadConfigFromFile(const std::string& assetPath);
 

@@ -29,7 +29,7 @@ public:
 
  ~Game();
 
-  bool Initialize(const std::string& assetPath);
+ bool Initialize(const std::string& assetPath);
   void Destroy() const;
   void Run();
   static void Quit() { s_is_running_ = false; }

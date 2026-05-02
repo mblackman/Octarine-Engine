@@ -26,7 +26,7 @@ public:
 
  ~AssetManager();
 
-  void SetGameConfig(const GameConfig& gameConfig);
+ void SetGameConfig(const GameConfig& gameConfig);
 
   void ClearAssets();
   void AddTexture(SDL_Renderer* renderer, const std::string& assetId,
