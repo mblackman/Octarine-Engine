@@ -80,8 +80,8 @@ bool Game::Initialize() {
     return false;
   }
 
-  windowWidth = 800;
-  windowHeight = 600;
+  windowWidth = 1920;
+  windowHeight = 1080;
 
   SDL_CreateWindowAndRenderer(
       "Potato Face",
@@ -115,7 +115,7 @@ bool Game::Initialize() {
   camera_.h = windowHeight;
 
   SDL_SetRenderDrawColor(sdl_renderer_, 21, 21, 21, 255);
-
+  asset_manager_->SetDefaultScaleMode(SDL_SCALEMODE_NEAREST); // TODO make this configurable with a game config.
   s_is_running_ = true;
   return true;
 }

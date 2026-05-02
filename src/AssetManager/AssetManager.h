@@ -4,6 +4,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <map>
+#include <optional>
 #include <string>
 
 class AssetManager {
@@ -11,6 +12,7 @@ class AssetManager {
   std::string base_path_;
   std::map<std::string, SDL_Texture*> textures_;
   std::map<std::string, TTF_Font*> fonts_;
+  std::optional<SDL_ScaleMode> default_scale_mode_;
 
  public:
   explicit AssetManager(std::string basePath);
@@ -25,4 +27,5 @@ class AssetManager {
   [[nodiscard]] TTF_Font* GetFont(const std::string& assetId) const;
   [[nodiscard]] std::string GetBasePath() const;
   [[nodiscard]] std::string GetFullPath(const std::string& relativePath) const;
+  void SetDefaultScaleMode(SDL_ScaleMode scaleMode);
 };
