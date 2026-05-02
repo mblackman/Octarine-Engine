@@ -46,16 +46,17 @@ class ProjectileEmitSystem : public System {
     for (auto entity : GetEntities()) {
       auto transform = entity.GetComponent<TransformComponent>();
       auto& emitter = entity.GetComponent<ProjectileEmitterComponent>();
+      const bool isPlayer = entity.HasTag("player");
 
-      if (!emitter.isFriendly) {
+      if (!isPlayer) {
         emitter.countDownTimer -= deltaTime;
 
         if (emitter.countDownTimer <= 0.0f) {
           SpawnProjectile(transform, entity, registry, emitter);
           emitter.countDownTimer = emitter.frequency;
         }
-      } else if (emitter.isFriendly && spawnFriendlyProjectiles_) {
-        SpawnProjectile(transform, entity, registry, emitter);
+      } else if (spawnFriendlyProjectiles_) {
+        SpawnProjectile(transform, entity, registry, emitter, true);
         spawnFriendlyProjectiles_ = false;
       }
     }
@@ -65,7 +66,8 @@ class ProjectileEmitSystem : public System {
   bool spawnFriendlyProjectiles_;
 
   static void SpawnProjectile(const TransformComponent& transform, const Entity& entity,
-                              const std::unique_ptr<Registry>& registry, ProjectileEmitterComponent& emitter) {
+                              const std::unique_ptr<Registry>& registry, ProjectileEmitterComponent& emitter,
+                              bool isPlayer = false) {
     auto projectilePosition = transform.position;
     auto velocity = emitter.velocity;
 
@@ -75,7 +77,7 @@ class ProjectileEmitSystem : public System {
       projectilePosition.y += transform.scale.y * static_cast<float>(sprite.height) / 2;
     }
 
-    if (emitter.isFriendly && entity.HasComponent<RigidBodyComponent>()) {
+    if (isPlayer && entity.HasComponent<RigidBodyComponent>()) {
       const auto rigidBody = entity.GetComponent<RigidBodyComponent>();
       const auto direction = glm::normalize(rigidBody.velocity);
       velocity = direction * emitter.velocity;
@@ -83,10 +85,11 @@ class ProjectileEmitSystem : public System {
 
     auto projectile = registry->CreateEntity();
     projectile.Group("projectiles");
+    projectile.SetEntityMask(entity.GetEntityMask());
     projectile.AddComponent<TransformComponent>(projectilePosition, glm::vec2(1.0, 1.0), 0.0);
     projectile.AddComponent<RigidBodyComponent>(velocity);
-    projectile.AddComponent<BoxColliderComponent>(4, 4);
+    projectile.AddComponent<BoxColliderComponent>(4, 4, glm::vec2(0, 0), emitter.collisionMask);
     projectile.AddComponent<SpriteComponent>("bullet-texture", 4.0f, 4.0f, 4);
-    projectile.AddComponent<ProjectileComponent>(emitter.damage, emitter.duration, emitter.isFriendly);
+    projectile.AddComponent<ProjectileComponent>(emitter.damage, emitter.duration);
   }
 };

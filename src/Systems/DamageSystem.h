@@ -12,8 +12,7 @@ class DamageSystem : public System {
   DamageSystem() { RequireComponent<BoxColliderComponent>(); }
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
-    eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(
-        this, &DamageSystem::OnCollision);
+    eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(this, &DamageSystem::OnCollision);
   }
 
   void OnCollision(const CollisionEvent& event) {
@@ -22,31 +21,25 @@ class DamageSystem : public System {
     auto aId = std::to_string(event.entityA.GetId());
     auto bId = std::to_string(event.entityB.GetId());
 
-    if (a.InGroup("projectiles") &&
-        (b.HasTag("player") || b.InGroup("enemies"))) {
+    if (a.InGroup("projectiles") && (b.HasTag("player") || b.InGroup("enemies"))) {
       OnProjectileHit(a, b);
     }
 
-    if (b.InGroup("projectiles") &&
-        (a.HasTag("player") || a.InGroup("enemies"))) {
+    if (b.InGroup("projectiles") && (a.HasTag("player") || a.InGroup("enemies"))) {
       OnProjectileHit(b, a);
     }
   }
 
-  static void OnProjectileHit(Entity projectile, Entity target) {
+  static void OnProjectileHit(const Entity projectile, const Entity target) {
     const auto projectileComponent = projectile.GetComponent<ProjectileComponent>();
-    const bool isHit = (target.HasTag("player") && !projectileComponent.isFriendly) ||
-                 (target.InGroup("enemies") && projectileComponent.isFriendly);
 
-    if (isHit) {
-      auto& targetComponent = target.GetComponent<HealthComponent>();
-      targetComponent.currentHealth -= projectileComponent.damage;
+    auto& targetComponent = target.GetComponent<HealthComponent>();
+    targetComponent.currentHealth -= projectileComponent.damage;
 
-      if (targetComponent.currentHealth <= 0) {
-        target.Blam();
-      }
-
-      projectile.Blam();
+    if (targetComponent.currentHealth <= 0) {
+      target.Blam();
     }
+
+    projectile.Blam();
   }
 };

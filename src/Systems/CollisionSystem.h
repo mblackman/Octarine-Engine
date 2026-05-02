@@ -5,6 +5,7 @@
 #include "../ECS/ECS.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
+#include "General/PerfUtils.h"
 
 class CollisionSystem : public System {
  public:
@@ -22,6 +23,8 @@ class CollisionSystem : public System {
   ~CollisionSystem() = default;
 
   void Update(const std::unique_ptr<EventBus>& eventBus) const {
+    PROFILE_NAMED_SCOPE("Collision System Update");
+
     auto entities = GetEntities();
 
     for (auto i = entities.begin(); i != entities.end(); ++i) {
@@ -31,8 +34,13 @@ class CollisionSystem : public System {
 
       for (auto j = i + 1; j != entities.end(); ++j) {
         auto entityB = *j;
-        const auto& transformB = entityB.GetComponent<TransformComponent>();
+        const auto entityMask = entityB.GetEntityMask();
+        if ((colliderA.collisionMask & entityMask).none()) {
+          continue;
+        }
         const auto& colliderB = entityB.GetComponent<BoxColliderComponent>();
+
+        const auto& transformB = entityB.GetComponent<TransformComponent>();
         const bool isColliding = CheckAABBCollision(transformA, colliderA, transformB, colliderB);
         if (isColliding) {
           eventBus->EmitEvent<CollisionEvent>(entityA, entityB);

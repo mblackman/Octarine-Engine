@@ -26,6 +26,10 @@ void Entity::Group(const std::string& group) const { registry_->GroupEntity(*thi
 
 bool Entity::InGroup(const std::string& group) const { return registry_->EntityInGroup(*this, group); }
 
+void Entity::SetEntityMask(const EntityMask entityMask) const { registry_->SetEntityMask(*this, entityMask); }
+
+EntityMask Entity::GetEntityMask() const { return registry_->GetEntityMask(*this); }
+
 void Entity::Blam() const { registry_->BlamEntity(*this); }
 
 void Entity::AddParent(const Entity& parent) const { registry_->SetParent(parent, *this); }
@@ -60,7 +64,7 @@ Entity Registry::CreateEntity() {
 
   entities_to_add_.insert(entity);
 
-  Logger::Info("Created entity: " + std::to_string(entityId));
+  // Logger::Info("Created entity: " + std::to_string(entityId));
 
   return entity;
 }
@@ -232,7 +236,7 @@ void Registry::DestroyEntity(const std::set<Entity>::value_type& entity) {
   Collections::SwapAndPop(root_entities_, entity);
   Collections::SwapAndPop(entities_, entity);
 
-  Logger::Info("Entity destroyed: " + std::to_string(entityId));
+  // Logger::Info("Entity destroyed: " + std::to_string(entityId));
 }
 
 void Registry::UpdateProcessEntityRemovals() {
@@ -347,4 +351,14 @@ void Registry::RemoveEntityGroups(const Entity& entity) {
     }
     groups_by_entity_.erase(entity.GetId());
   }
+}
+void Registry::SetEntityMask(const Entity& entity, const EntityMask entityMask) {
+  entity_masks_.emplace(entity.GetId(), entityMask);
+}
+
+EntityMask Registry::GetEntityMask(const Entity& entity) const {
+  if (const auto maskIt = entity_masks_.find(entity.GetId()); maskIt != entity_masks_.end()) {
+    return maskIt->second;
+  }
+  return 0;
 }
