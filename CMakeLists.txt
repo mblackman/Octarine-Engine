@@ -1,46 +1,69 @@
 # Minimum CMake version required
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.15)
 
-# Project name
-project(OctarineEngine LANGUAGES CXX)
+# Project name and language
+project(OctarineEngine
+        VERSION 0.1.0
+        DESCRIPTION "A lightweight 2D game engine of a yellowish-purple color"
+        LANGUAGES CXX
+)
 
-# Set C++ standard
+# Global settings
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED True)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
-
-# Set output dir
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-
-# Set export compile commands for clang-tidy
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# Gather source files
-file(GLOB_RECURSE SRC_FILES
-        "src/Main.cpp"
-        "src/Game/*.cpp"
-        "src/General/*.cpp"
-        "src/ECS/*.cpp"
-        "src/AssetManager/*.cpp"
-        "src/Renderer/*.cpp"
+# Set output directories for all build types
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin/debug")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin/release")
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin/relwithdebinfo")
+
+# Source files
+set(SRC_FILES
+        src/Main.cpp
+        src/AssetManager/AssetManager.cpp
+        src/ECS/ECS.cpp
+        src/Game/Game.cpp
+        src/Game/GameConfig.cpp
+        src/General/Logger.cpp
+        src/Renderer/Renderer.cpp
 )
 
-# Add executable target
-add_executable(OctarineEngine ${SRC_FILES})
+# Create the executable target
+add_executable(${PROJECT_NAME} ${SRC_FILES})
 
-# Include directories
-target_include_directories(OctarineEngine PRIVATE
-        "${CMAKE_CURRENT_SOURCE_DIR}/libs"
+# Set target properties
+set_target_properties(${PROJECT_NAME} PROPERTIES
+        CXX_STANDARD 17
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
 )
 
-# Compiler flags
-if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    target_compile_options(OctarineEngine PRIVATE -Wall -Wfatal-errors)
-elseif (CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    target_compile_options(OctarineEngine PRIVATE /W4 /WX)
+# Compiler-specific flags - Treat warnings as errors in prod builds
+if (MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+            /W3
+            /permissive-
+            /MP
+    )
+    target_compile_options(${PROJECT_NAME} PUBLIC
+            $<IF:$<CONFIG:Debug>,,-WX>
+    )
+else ()
+    target_compile_options(${PROJECT_NAME} PRIVATE
+            -Wall
+            -Wextra
+            -Wpedantic
+            -Wfatal-errors
+    )
+    target_compile_options(${PROJECT_NAME} PUBLIC
+            $<IF:$<CONFIG:Debug>,,-Werror>
+    )
+
 endif ()
 
-# Using find_package
+# Dependencies
 find_package(glm CONFIG REQUIRED)
 find_package(SDL3 CONFIG REQUIRED)
 find_package(SDL3_image CONFIG REQUIRED)
@@ -50,7 +73,16 @@ find_package(Sol2 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 
-target_link_libraries(OctarineEngine PRIVATE
+# Include directories
+target_include_directories(${PROJECT_NAME}
+        PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
+        ${LUA_INCLUDE_DIR}
+)
+
+# Link libraries
+target_link_libraries(${PROJECT_NAME}
+        PRIVATE
         glm::glm
         SDL3::SDL3
         SDL3_ttf::SDL3_ttf
@@ -60,4 +92,9 @@ target_link_libraries(OctarineEngine PRIVATE
         spdlog::spdlog
 )
 
-target_include_directories(OctarineEngine PRIVATE ${LUA_INCLUDE_DIR})
+# Install rules (optional)
+install(TARGETS ${PROJECT_NAME}
+        RUNTIME DESTINATION bin
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+)
