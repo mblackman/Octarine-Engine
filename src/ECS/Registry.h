@@ -3,6 +3,7 @@
 #include <any>
 #include <cstring>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
@@ -11,6 +12,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
+#include <vector>
 
 #include "Component.h"
 #include "Entity.h"
@@ -21,6 +23,12 @@ class Query;
 
 template <typename... TComponents>
 class ComponentQuery;
+
+class Iterable;
+class ContextFacade;
+namespace Internal {
+class BulkContextImpl;
+}
 
 class ComponentRegistry {
  public:
@@ -61,6 +69,9 @@ class Registry {
   Entity CreateEntity();
 
   void BlamEntity(Entity entity);
+
+  // Defer destroy until end of Registry::Update — safe to call during system iteration.
+  void QueueBlamEntity(const Entity entity) { pending_blams_.push_back(entity); }
 
   // Component management
   template <typename T>
@@ -194,6 +205,41 @@ class Registry {
     return ref;
   }
 
+  // Bulk system: wrapper invokes Func once per Update with the matching Iterable.
+  // Func signature: void(const ContextFacade&, const Iterable&). The ContextFacade
+  // exposes Registry/DeltaTime and a sentinel Entity (Entity{}); per-entity component
+  // access goes through iterating the Iterable.
+  template <typename... TArgs, typename Func>
+  std::decay_t<Func>& RegisterBulkSystem(Func&& func) {
+    using StoredFunc = std::decay_t<Func>;
+    class BulkSystemWrapper final : public ISystem {
+     public:
+      BulkSystemWrapper(Registry* registry, Func&& f)
+          : func_(std::forward<Func>(f)), query_(registry->CreateQuery<TArgs...>()) {}
+
+      void Update(const Registry& registry) override {
+        query_->Update();
+        auto* registryPtr = const_cast<Registry*>(&registry);
+        const float dt = registry.delta_time_;
+        query_->Iterate([this, registryPtr, dt](const Iterable& iter) {
+          ContextFacade ctx(std::make_unique<Internal::BulkContextImpl>(registryPtr, dt));
+          func_(ctx, iter);
+        });
+      }
+
+      StoredFunc& GetFunc() { return func_; }
+
+     private:
+      StoredFunc func_;
+      std::unique_ptr<ComponentQuery<TArgs...>> query_;
+    };
+
+    auto wrapper = std::make_unique<BulkSystemWrapper>(this, std::forward<Func>(func));
+    StoredFunc& ref = wrapper->GetFunc();
+    systems_.push_back(std::move(wrapper));
+    return ref;
+  }
+
   // Singleton components
   template <typename T>
   T& Set(T value) {
@@ -225,6 +271,19 @@ class Registry {
 
   bool HasPair(Entity entity, Entity relationship, Entity target);
 
+  // Hierarchy helpers — modeled as a Pair with the ChildOf relationship.
+  struct ChildOfRelation {};
+
+  Entity ChildOfEntity() { return Component<ChildOfRelation>(); }
+
+  void SetParent(Entity child, Entity parent);
+
+  [[nodiscard]] std::optional<Entity> GetParent(Entity child) const;
+
+  [[nodiscard]] std::vector<Entity> GetChildren(Entity parent) const;
+
+  [[nodiscard]] float DeltaTime() const { return delta_time_; }
+
  private:
   Archetype* GetOrCreateArchetype(std::vector<ComponentID> componentIDs, ComponentID newComponentId);
 
@@ -239,5 +298,6 @@ class Registry {
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
   std::unordered_map<ComponentID, ArchetypeList> component_index_;
   std::unordered_map<EntityID, std::unordered_set<EcsId>> pairs_;
+  std::vector<Entity> pending_blams_;
   float delta_time_{};
 };

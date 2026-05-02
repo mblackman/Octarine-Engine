@@ -11,8 +11,10 @@
 #include "../General/Logger.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
+#include "Components/BoxColliderComponent.h"
 #include "Components/CameraComponents.h"
 #include "Components/CameraFollowComponent.h"
+#include "Components/ProjectileComponent.h"
 #include "Components/ProjectileEmitterComponent.h"
 #include "Components/ScriptComponent.h"
 #include "Components/SpriteComponent.h"
@@ -25,7 +27,10 @@
 #include "GameConfig.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/CameraFollowSystem.h"
+#include "Systems/DrawColliderSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
+#include "Systems/ProjectileLifecycleSystem.h"
+#include "Systems/RenderDebugGUISystem.h"
 #include "Systems/RenderPrimitiveSystem.h"
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/RenderTextSystem.h"
@@ -112,6 +117,10 @@ bool Game::Initialize(const std::string &assetPath) {
   ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
 
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
+
+  registry_->Set<SDL_Renderer *>(sdl_renderer_);
+  registry_->Set<EventBus *>(event_bus_.get());
+
   s_is_running_ = true;
   return true;
 }
@@ -165,6 +174,7 @@ void Game::Setup() {
   registry_->RegisterSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
   auto &projectileEmitSystem =
       registry_->RegisterSystem<TransformComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
+  registry_->RegisterSystem<ProjectileComponent>(ProjectileLifecycleSystem());
 
   // Camera follows after gameplay-driven transform updates
   registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
@@ -233,10 +243,12 @@ void Game::Render(const float deltaTime) {
   renderer_->Render(registry_.get(), sdl_renderer_);
 
   if (gameConfig.GetEngineOptions().drawColliders) {
-    // registry_->GetSystem<DrawColliderSystem>().Update(sdl_renderer_, camera_);
+    auto colliderQuery = registry_->CreateQuery<TransformComponent, BoxColliderComponent>();
+    DrawColliderSystem drawColliderSystem;
+    colliderQuery->ForEach(drawColliderSystem);
   }
 
-  // registry_->GetSystem<RenderDebugGUISystem>().Update(deltaTime, sdl_renderer_);
+  RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, deltaTime);
 
   SDL_RenderPresent(sdl_renderer_);
   renderQueue.Clear();

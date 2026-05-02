@@ -1,28 +1,15 @@
 #pragma once
 
 #include "../Components/ProjectileComponent.h"
-#include "../ECS/ECS.h"
+#include "ECS/Iterable.h"
+#include "ECS/Registry.h"
 
-class ProjectileLifecycleSystem : public System {
+class ProjectileLifecycleSystem {
  public:
-  ProjectileLifecycleSystem() { RequireComponent<ProjectileComponent>(); }
-
-  ProjectileLifecycleSystem(const ProjectileLifecycleSystem&) = delete;
-  ProjectileLifecycleSystem& operator=(const ProjectileLifecycleSystem&) = delete;
-
-  ProjectileLifecycleSystem(ProjectileLifecycleSystem&&) = delete;
-  ProjectileLifecycleSystem& operator=(ProjectileLifecycleSystem&&) = delete;
-
-  ~ProjectileLifecycleSystem() = default;
-
-  void Update(const float deltaTime) const {
-    for (auto entity : GetEntities()) {
-      auto& projectile = entity.GetComponent<ProjectileComponent>();
-
-      projectile.timer += deltaTime;
-      if (projectile.timer > projectile.duration) {
-        entity.Blam();
-      }
+  void operator()(const ContextFacade& context, ProjectileComponent& projectile) const {
+    projectile.timer += context.DeltaTime();
+    if (projectile.timer > projectile.duration) {
+      context.Registry()->QueueBlamEntity(context.Entity());
     }
   }
 };

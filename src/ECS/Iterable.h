@@ -143,6 +143,20 @@ class ContextImpl final : public AnyContext {
   std::tuple<TComponents&...> components_;
 };
 
+class BulkContextImpl final : public AnyContext {
+ public:
+  BulkContextImpl(Registry* registry, const float dt) : registry_(registry), dt_(dt) {}
+
+  [[nodiscard]] Entity GetEntity() const override { return Entity{}; }
+  [[nodiscard]] Registry* GetRegistry() const override { return registry_; }
+  [[nodiscard]] float GetDeltaTime() const override { return dt_; }
+  void* GetComponentPtr(EntityID /*id*/) override { return nullptr; }
+
+ private:
+  Registry* registry_;
+  float dt_;
+};
+
 template <typename... TComponents>
 class IteratorImpl final : public AnyIteratorImpl {
   using UnderlyingIterator = typename ArchetypeQuery<TComponents...>::Iterator;

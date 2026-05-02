@@ -2,27 +2,30 @@
 
 #include <SDL3/SDL.h>
 
-#include "../ECS/ECS.h"
+#include "../General/Logger.h"
 #include "Components/ScriptComponent.h"
+#include "ECS/Iterable.h"
+#include "ECS/Registry.h"
+#include "Game/GameConfig.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 
-class RenderDebugGUISystem : public System {
+class RenderDebugGUISystem {
  public:
-  RenderDebugGUISystem() { RequireComponent<ScriptComponent>(); }
+  void operator()(const ContextFacade& context, ScriptComponent& script) const {
+    if (script.onDebugGUIFunction == sol::lua_nil) {
+      return;
+    }
+    if (auto result = script.onDebugGUIFunction(script.scriptTable, context.Entity()); !result.valid()) {
+      const sol::error err = result;
+      Logger::ErrorLua(std::string(err.what()));
+    }
+  }
 
-  RenderDebugGUISystem(const RenderDebugGUISystem&) = delete;
-  RenderDebugGUISystem& operator=(const RenderDebugGUISystem&) = delete;
-
-  RenderDebugGUISystem(RenderDebugGUISystem&&) = delete;
-  RenderDebugGUISystem& operator=(RenderDebugGUISystem&&) = delete;
-
-  ~RenderDebugGUISystem() = default;
-
-  void Update(const float deltaTime, SDL_Renderer* renderer) const {
-    if (!GameConfig::GetInstance().GetEngineOptions().showDebugGUI &&
-        !GameConfig::GetInstance().GetEngineOptions().showFpsCounter) {
+  static void Render(Registry* registry, SDL_Renderer* renderer, const float deltaTime) {
+    auto& engineOptions = registry->Get<GameConfig>().GetEngineOptions();
+    if (!engineOptions.showDebugGUI && !engineOptions.showFpsCounter) {
       return;
     }
 
@@ -30,25 +33,19 @@ class RenderDebugGUISystem : public System {
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
-    if (GameConfig::GetInstance().GetEngineOptions().showFpsCounter) {
+    if (engineOptions.showFpsCounter) {
       FPSWindow(deltaTime);
     }
-    if (GameConfig::GetInstance().GetEngineOptions().showDebugGUI) {
-      EngineOptionsWindow();
+    if (engineOptions.showDebugGUI) {
+      EngineOptionsWindow(engineOptions);
 
-      if (GameConfig::GetInstance().GetEngineOptions().showImGuiDemoWindow) {
+      if (engineOptions.showImGuiDemoWindow) {
         ImGui::ShowDemoWindow();
       }
 
-      for (auto entity : GetEntities()) {
-        if (auto& script = entity.GetComponent<ScriptComponent>(); script.onDebugGUIFunction != sol::lua_nil) {
-          if (auto result = script.onDebugGUIFunction(script.scriptTable, entity); !result.valid()) {
-            sol::error err = result;
-            std::string what = err.what();
-            Logger::ErrorLua(what);
-          }
-        }
-      }
+      auto query = registry->CreateQuery<ScriptComponent>();
+      RenderDebugGUISystem system;
+      query->ForEach(system);
     }
 
     ImGui::Render();
@@ -56,15 +53,15 @@ class RenderDebugGUISystem : public System {
   }
 
  private:
-  void EngineOptionsWindow() const {
+  static void EngineOptionsWindow(EngineOptions& options) {
     ImGui::Begin("Engine Options");
-    ImGui::Checkbox("Show ImGui Demo Window", &GameConfig::GetInstance().GetEngineOptions().showImGuiDemoWindow);
-    ImGui::Checkbox("Show FPS Counter", &GameConfig::GetInstance().GetEngineOptions().showFpsCounter);
-    ImGui::Checkbox("Draw Colliders", &GameConfig::GetInstance().GetEngineOptions().drawColliders);
+    ImGui::Checkbox("Show ImGui Demo Window", &options.showImGuiDemoWindow);
+    ImGui::Checkbox("Show FPS Counter", &options.showFpsCounter);
+    ImGui::Checkbox("Draw Colliders", &options.drawColliders);
     ImGui::End();
   }
 
-  void FPSWindow(const float deltaTime) const {
+  static void FPSWindow(const float deltaTime) {
     ImGui::Begin("FPS");
     ImGui::Text("FPS: %.2f", 1.0f / deltaTime);
     ImGui::End();

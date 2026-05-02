@@ -4,35 +4,28 @@
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/TransformComponent.h"
-#include "../ECS/ECS.h"
+#include "Components/CameraComponents.h"
+#include "ECS/Iterable.h"
+#include "ECS/Registry.h"
+#include "Game/GameConfig.h"
 
-class DrawColliderSystem : public System {
+class DrawColliderSystem {
  public:
-  DrawColliderSystem() {
-    RequireComponent<TransformComponent>();
-    RequireComponent<BoxColliderComponent>();
-  }
-
-  DrawColliderSystem(const DrawColliderSystem&) = delete;
-  DrawColliderSystem& operator=(const DrawColliderSystem&) = delete;
-
-  DrawColliderSystem(DrawColliderSystem&&) = delete;
-  DrawColliderSystem& operator=(DrawColliderSystem&&) = delete;
-
-  ~DrawColliderSystem() = default;
-
-  void Update(SDL_Renderer* renderer, const SDL_FRect& camera) const {
-    for (auto entity : GetEntities()) {
-      const auto& transform = entity.GetComponent<TransformComponent>();
-      const auto& collider = entity.GetComponent<BoxColliderComponent>();
-
-      const SDL_FRect rect = {transform.position.x - static_cast<float>(camera.x),
-                              transform.position.y - static_cast<float>(camera.y),
-                              static_cast<float>(collider.width) * transform.scale.x,
-                              static_cast<float>(collider.height) * transform.scale.y};
-
-      SDL_SetRenderDrawColor(renderer, Constants::kUnt8Max, 0, 0, Constants::kUnt8Max);
-      SDL_RenderRect(renderer, &rect);
+  void operator()(const ContextFacade& context, const TransformComponent& transform,
+                  const BoxColliderComponent& collider) const {
+    const auto& gameConfig = context.Registry()->Get<GameConfig>();
+    if (!gameConfig.GetEngineOptions().drawColliders) {
+      return;
     }
+
+    auto* renderer = context.Registry()->Get<SDL_Renderer*>();
+    const auto& camera = context.Registry()->Get<CameraComponent>().viewport;
+
+    const SDL_FRect rect = {transform.globalPosition.x - camera.x, transform.globalPosition.y - camera.y,
+                            static_cast<float>(collider.width) * transform.globalScale.x,
+                            static_cast<float>(collider.height) * transform.globalScale.y};
+
+    SDL_SetRenderDrawColor(renderer, Constants::kUnt8Max, 0, 0, Constants::kUnt8Max);
+    SDL_RenderRect(renderer, &rect);
   }
 };

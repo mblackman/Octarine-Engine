@@ -10,6 +10,13 @@ void Registry::Update(const float deltaTime) {
   for (const auto& system : systems_) {
     system->Update(*this);
   }
+  if (!pending_blams_.empty()) {
+    auto pending = std::move(pending_blams_);
+    pending_blams_.clear();
+    for (const Entity entity : pending) {
+      BlamEntity(entity);
+    }
+  }
 }
 
 Entity Registry::CreateEntity() {
@@ -141,4 +148,46 @@ bool Registry::HasPair(const Entity entity, const Entity relationship, const Ent
   const EcsId pairId =
       (static_cast<EcsId>(relationship.GetId()) << kPairRelationshipOffset) | static_cast<EcsId>(target.GetId());
   return it->second.contains(pairId);
+}
+
+void Registry::SetParent(const Entity child, const Entity parent) {
+  const Entity childOf = ChildOfEntity();
+  AddPair(child, childOf, parent);
+}
+
+std::optional<Entity> Registry::GetParent(const Entity child) const {
+  const auto it = pairs_.find(child.id);
+  if (it == pairs_.end()) return std::nullopt;
+
+  const auto childOfIt = component_to_entity_.find(std::type_index(typeid(ChildOfRelation)));
+  if (childOfIt == component_to_entity_.end()) return std::nullopt;
+  const auto childOfRelationId = static_cast<std::uint32_t>(childOfIt->second.GetId());
+
+  for (const EcsId rawPair : it->second) {
+    const Pair p(rawPair);
+    if (p.GetRelationship() == childOfRelationId) {
+      return Entity(static_cast<EcsId>(p.GetTarget()));
+    }
+  }
+  return std::nullopt;
+}
+
+std::vector<Entity> Registry::GetChildren(const Entity parent) const {
+  std::vector<Entity> children;
+
+  const auto childOfIt = component_to_entity_.find(std::type_index(typeid(ChildOfRelation)));
+  if (childOfIt == component_to_entity_.end()) return children;
+  const auto childOfRelationId = static_cast<std::uint32_t>(childOfIt->second.GetId());
+  const auto parentId = static_cast<std::uint32_t>(parent.GetId());
+
+  for (const auto& [entityId, pairSet] : pairs_) {
+    for (const EcsId rawPair : pairSet) {
+      const Pair p(rawPair);
+      if (p.GetRelationship() == childOfRelationId && p.GetTarget() == parentId) {
+        children.emplace_back(entityId);
+        break;
+      }
+    }
+  }
+  return children;
 }
