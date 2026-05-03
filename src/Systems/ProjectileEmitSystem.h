@@ -62,9 +62,13 @@ class ProjectileEmitSystem {
     }
 
     if (isPlayer && registry->HasComponent<RigidBodyComponent>(entity)) {
-      const auto rigidBody = registry->GetComponent<RigidBodyComponent>(entity);
-      const auto direction = glm::normalize(rigidBody.velocity);
-      velocity = direction * emitter.velocity;
+      const auto& rigidBody = registry->GetComponent<RigidBodyComponent>(entity);
+      // Skip normalize when the player is idle — glm::normalize((0,0)) returns NaN.
+      // Fall through with the emitter's default velocity vector.
+      if (glm::length(rigidBody.velocity) > 1e-4f) {
+        const auto direction = glm::normalize(rigidBody.velocity);
+        velocity = direction * emitter.velocity;
+      }
     }
 
     auto projectile = registry->CreateEntity();

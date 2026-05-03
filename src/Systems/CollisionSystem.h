@@ -79,16 +79,18 @@ class CollisionSystem {
     std::vector<Box> boxes = std::move(cachedBoxes_);
     {
       PROFILE_NAMED_SCOPE("Gather Boxes");
-      
+
       if (!query_) {
         query_ = ctx.Registry()->CreateQuery<TransformComponent, BoxColliderComponent, EntityMaskComponent>();
       }
       query_->Update();
 
-      query_->ForEach([&boxes](Entity entity, const TransformComponent& transform, const BoxColliderComponent& collider, const EntityMaskComponent& entityMask) {
-        boxes.emplace_back(entity, entityMask.mask, collider.collisionMask, transform.position.x, transform.position.y,
-                           transform.position.x + static_cast<float>(collider.width) * transform.scale.x,
-                           transform.position.y + static_cast<float>(collider.height) * transform.scale.y);
+      query_->ForEach([&boxes](Entity entity, const TransformComponent& transform, const BoxColliderComponent& collider,
+                               const EntityMaskComponent& entityMask) {
+        boxes.emplace_back(entity, entityMask.mask, collider.collisionMask, transform.globalPosition.x,
+                           transform.globalPosition.y,
+                           transform.globalPosition.x + static_cast<float>(collider.width) * transform.globalScale.x,
+                           transform.globalPosition.y + static_cast<float>(collider.height) * transform.globalScale.y);
       });
     }
 
@@ -174,11 +176,11 @@ class CollisionSystem {
   }
 
   // NOLINTNEXTLINE(misc-no-recursion)
-  void find_intersections_sweep_bipartite(std::vector<Box>& boxes, const int begin1, const int end1,
-                                          const int begin2, const int end2, const int dimension,
+  void find_intersections_sweep_bipartite(std::vector<Box>& boxes, const int begin1, const int end1, const int begin2,
+                                          const int end2, const int dimension,
                                           std::vector<std::pair<Entity, Entity>>& pairs) {
     ACCUMULATE_PROFILE_SCOPE("Sweep Bipartite");
-    
+
     if (end1 - begin1 == 0 || end2 - begin2 == 0) return;
 
     if ((end1 - begin1) * (end2 - begin2) <= kBruteforceCutoff * kBruteforceCutoff) {
@@ -187,8 +189,10 @@ class CollisionSystem {
     }
 
     if (dimension == 0) {
-      std::sort(boxes.begin() + begin1, boxes.begin() + end1, [](const Box& a, const Box& b) { return a.minX < b.minX; });
-      std::sort(boxes.begin() + begin2, boxes.begin() + end2, [](const Box& a, const Box& b) { return a.minX < b.minX; });
+      std::sort(boxes.begin() + begin1, boxes.begin() + end1,
+                [](const Box& a, const Box& b) { return a.minX < b.minX; });
+      std::sort(boxes.begin() + begin2, boxes.begin() + end2,
+                [](const Box& a, const Box& b) { return a.minX < b.minX; });
       int start_j = begin2;
       for (int i = begin1; i < end1; ++i) {
         const Box& a = boxes[i];
@@ -200,8 +204,10 @@ class CollisionSystem {
         }
       }
     } else {
-      std::sort(boxes.begin() + begin1, boxes.begin() + end1, [](const Box& a, const Box& b) { return a.minY < b.minY; });
-      std::sort(boxes.begin() + begin2, boxes.begin() + end2, [](const Box& a, const Box& b) { return a.minY < b.minY; });
+      std::sort(boxes.begin() + begin1, boxes.begin() + end1,
+                [](const Box& a, const Box& b) { return a.minY < b.minY; });
+      std::sort(boxes.begin() + begin2, boxes.begin() + end2,
+                [](const Box& a, const Box& b) { return a.minY < b.minY; });
       int start_j = begin2;
       for (int i = begin1; i < end1; ++i) {
         const Box& a = boxes[i];

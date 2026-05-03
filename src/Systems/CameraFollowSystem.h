@@ -2,6 +2,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
+
 #include "../Components/CameraFollowComponent.h"
 #include "../Components/TransformComponent.h"
 #include "Components/CameraComponents.h"
@@ -25,9 +27,9 @@ class CameraFollowSystem {
       viewport.y = transform.position.y - static_cast<float>(gameConfig.windowHeight) / Constants::kHalf;
     }
 
-    viewport.x = std::max(0.0f, viewport.x);
-    viewport.y = std::max(0.0f, viewport.y);
-    viewport.x = std::min(viewport.w, viewport.x);
-    viewport.y = std::min(viewport.h, viewport.y);
+    const float maxX = std::max(0.0f, gameConfig.playableAreaWidth - viewport.w);
+    const float maxY = std::max(0.0f, gameConfig.playableAreaHeight - viewport.h);
+    viewport.x = std::clamp(viewport.x, 0.0f, maxX);
+    viewport.y = std::clamp(viewport.y, 0.0f, maxY);
   }
 };

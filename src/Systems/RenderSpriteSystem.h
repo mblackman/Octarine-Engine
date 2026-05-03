@@ -58,8 +58,8 @@ class RenderSpriteSystem {
         const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera.y;
         renderKey.destX = x;
         renderKey.destY = y;
-        renderKey.destW = sprite.width * transform.scale.x;
-        renderKey.destH = sprite.height * transform.scale.y;
+        renderKey.destW = sprite.width * transform.globalScale.x;
+        renderKey.destH = sprite.height * transform.globalScale.y;
         renderKey.srcRect = sprite.srcRect;
         renderKey.rotation = transform.rotation;
         renderKey.flip = sprite.flip;

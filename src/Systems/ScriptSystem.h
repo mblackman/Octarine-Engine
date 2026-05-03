@@ -29,7 +29,7 @@ inline glm::vec2 GetEntityPosition(Registry *registry, const Entity entity) {
     return {0, 0};
   }
 
-  const auto transform = registry->GetComponent<TransformComponent>(entity);
+  const auto &transform = registry->GetComponent<TransformComponent>(entity);
   return transform.position;
 }
 
@@ -39,7 +39,7 @@ inline void SetEntityPosition(Registry *registry, const Entity entity, const dou
     return;
   }
 
-  auto transform = registry->GetComponent<TransformComponent>(entity);
+  auto &transform = registry->GetComponent<TransformComponent>(entity);
   transform.position = glm::vec2(static_cast<float>(x), static_cast<float>(y));
 }
 
@@ -50,7 +50,7 @@ inline void SetEntitySpriteSrcRect(Registry *registry, const Entity entity, cons
     return;
   }
 
-  auto sprite = registry->GetComponent<SpriteComponent>(entity);
+  auto &sprite = registry->GetComponent<SpriteComponent>(entity);
   sprite.srcRect.x = srcRectX;
   sprite.srcRect.y = srcRectY;
 }

@@ -18,6 +18,10 @@ class DisplayHealthSystem {
                   SquarePrimitiveComponent& square) const {
     const auto* registry = ctx.Registry();
 
+    if (health.maxHealth <= 0) {
+      return;
+    }
+
     const float healthPercentage = static_cast<float>(health.currentHealth) / static_cast<float>(health.maxHealth);
     const int healthAmount = static_cast<int>(healthPercentage * 100);
     textLabel.text = std::to_string(healthAmount) + "%";
