@@ -18,6 +18,7 @@ void Registry::Update(const float deltaTime) {
   if (!pending_blams_.empty()) {
     auto pending = std::move(pending_blams_);
     pending_blams_.clear();
+    pending_blam_ids_.clear();
     for (const Entity entity : pending) {
       BlamEntity(entity);
     }
@@ -32,6 +33,19 @@ Entity Registry::CreateEntity() {
     entity_locations_.resize(id + 1, EntityLocation{nullptr, 0, 0});
   }
   entity_locations_[id] = entityLocation;
+  ++user_entity_count_;
+  return entity;
+}
+
+Entity Registry::CreateInternalEntity() {
+  const Entity entity = entity_manager_->CreateEntity();
+  const auto entityLocation = root_archetype_->AddEntity(entity);
+  const std::uint32_t id = entity.GetId();
+  if (id >= entity_locations_.size()) {
+    entity_locations_.resize(id + 1, EntityLocation{nullptr, 0, 0});
+  }
+  entity_locations_[id] = entityLocation;
+  internal_entity_ids_.insert(entity.id);
   return entity;
 }
 
@@ -42,12 +56,35 @@ void Registry::BlamEntity(const Entity entity) {
     return;
   }
 
+  // Cascade-destroy children first. Take a copy so the recursive BlamEntity calls can mutate
+  // parent_to_children_ without invalidating our iteration.
+  if (const auto childIt = parent_to_children_.find(entity.id); childIt != parent_to_children_.end()) {
+    const auto childIds = childIt->second;
+    parent_to_children_.erase(childIt);
+    for (const EntityID childId : childIds) {
+      child_to_parent_.erase(childId);
+      BlamEntity(Entity(childId));
+    }
+  }
+
+  // Detach from own parent.
+  if (const auto parentIt = child_to_parent_.find(entity.id); parentIt != child_to_parent_.end()) {
+    if (const auto p = parent_to_children_.find(parentIt->second.id); p != parent_to_children_.end()) {
+      p->second.erase(entity.id);
+      if (p->second.empty()) parent_to_children_.erase(p);
+    }
+    child_to_parent_.erase(parentIt);
+  }
+
   const EntityLocation removedLocation = entity_locations_[id];
   const auto swapped = removedLocation.archetype->RemoveEntity(removedLocation);
   entity_manager_->BlamEntity(entity);
   entity_locations_[id] = EntityLocation{nullptr, 0, 0};
   if (swapped) {
     entity_locations_[swapped->GetId()] = removedLocation;
+  }
+  if (internal_entity_ids_.erase(entity.id) == 0 && user_entity_count_ > 0) {
+    --user_entity_count_;
   }
 
   // Drop relationship entries authored by this entity, and any pair targeting it.
@@ -291,6 +328,55 @@ Archetype* Registry::GetOrCreateArchetypeRemove(std::vector<ComponentID> compone
   return newArchetypePtr;
 }
 
+Archetype* Registry::GetOrCreateArchetypeFromSet(std::vector<ComponentID> componentIDs) {
+  std::ranges::sort(componentIDs);
+  componentIDs.erase(std::ranges::unique(componentIDs).begin(), componentIDs.end());
+
+  if (componentIDs.empty()) {
+    return root_archetype_.get();
+  }
+
+  if (const auto it = component_index_.find(componentIDs.front()); it != component_index_.end()) {
+    for (const auto archetypeId : it->second) {
+      const auto archetype = archetypes_.find(archetypeId);
+      if (archetype->second->type().size() != componentIDs.size()) {
+        continue;
+      }
+      bool match = true;
+      for (size_t i = 0; i < componentIDs.size(); ++i) {
+        if (archetype->second->type()[i] != componentIDs[i]) {
+          match = false;
+          break;
+        }
+      }
+      if (match) {
+        return archetype->second.get();
+      }
+    }
+  }
+
+  std::vector<ComponentInfo> componentInfos;
+  componentInfos.reserve(componentIDs.size());
+  for (const auto& cid : componentIDs) {
+    componentInfos.push_back(component_registry_->GetInfo(cid));
+  }
+
+  auto newArchetype = std::make_unique<Archetype>(std::move(componentInfos));
+  Archetype* newArchetypePtr = newArchetype.get();
+  const auto newArchetypeId = newArchetype->GetID();
+  archetypes_.emplace(newArchetypeId, std::move(newArchetype));
+  ++archetype_generation_;
+
+  for (const ComponentID id : newArchetypePtr->type()) {
+    auto& list = component_index_[id];
+    if (std::ranges::find(list, newArchetypeId) == list.end()) {
+      list.push_back(newArchetypeId);
+    }
+  }
+
+  return newArchetypePtr;
+}
+
 void Registry::AddPair(const Entity entity, const Entity relationship, const Entity target) {
   const EcsId pairId =
       (static_cast<EcsId>(relationship.GetId()) << kPairRelationshipOffset) | static_cast<EcsId>(target.GetId());
@@ -306,43 +392,34 @@ bool Registry::HasPair(const Entity entity, const Entity relationship, const Ent
 }
 
 void Registry::SetParent(const Entity child, const Entity parent) {
+  // Detach previous parent, if any.
+  if (const auto it = child_to_parent_.find(child.id); it != child_to_parent_.end()) {
+    if (const auto p = parent_to_children_.find(it->second.id); p != parent_to_children_.end()) {
+      p->second.erase(child.id);
+      if (p->second.empty()) parent_to_children_.erase(p);
+    }
+  }
+  child_to_parent_[child.id] = parent;
+  parent_to_children_[parent.id].insert(child.id);
+
+  // Maintain the legacy pair entry too so HasPair / generic relationship queries keep working.
   const Entity childOf = ChildOfEntity();
   AddPair(child, childOf, parent);
 }
 
 std::optional<Entity> Registry::GetParent(const Entity child) const {
-  const auto it = pairs_.find(child.id);
-  if (it == pairs_.end()) return std::nullopt;
-
-  const size_t type_idx = GetComponentTypeIndex<ChildOfRelation>();
-  if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) return std::nullopt;
-  const auto childOfRelationId = static_cast<std::uint32_t>(fast_component_to_entity_[type_idx].value().GetId());
-
-  for (const EcsId rawPair : it->second) {
-    const Pair p(rawPair);
-    if (p.GetRelationship() == childOfRelationId) {
-      return Entity(static_cast<EcsId>(p.GetTarget()));
-    }
-  }
-  return std::nullopt;
+  const auto it = child_to_parent_.find(child.id);
+  if (it == child_to_parent_.end()) return std::nullopt;
+  return it->second;
 }
 
 std::vector<Entity> Registry::GetChildren(const Entity parent) const {
   std::vector<Entity> children;
-
-  const size_t type_idx = GetComponentTypeIndex<ChildOfRelation>();
-  if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) return children;
-  const auto childOfRelationId = static_cast<std::uint32_t>(fast_component_to_entity_[type_idx].value().GetId());
-  const auto parentId = static_cast<std::uint32_t>(parent.GetId());
-
-  for (const auto& [entityId, pairSet] : pairs_) {
-    for (const EcsId rawPair : pairSet) {
-      const Pair p(rawPair);
-      if (p.GetRelationship() == childOfRelationId && p.GetTarget() == parentId) {
-        children.emplace_back(entityId);
-        break;
-      }
-    }
+  const auto it = parent_to_children_.find(parent.id);
+  if (it == parent_to_children_.end()) return children;
+  children.reserve(it->second.size());
+  for (const EntityID id : it->second) {
+    children.emplace_back(id);
   }
   return children;
 }

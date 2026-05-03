@@ -1,10 +1,12 @@
 #pragma once
 
+#include <cassert>
 #include <functional>
 #include <memory>
 #include <tuple>
 #include <type_traits>
 
+#include "../General/Logger.h"
 #include "ArchetypeQuery.h"
 #include "Entity.h"
 #include "Registry.h"
@@ -35,6 +37,10 @@ class ContextFacade {
   [[nodiscard]] Registry* Registry() const { return impl_->GetRegistry(); }
   [[nodiscard]] float DeltaTime() const { return impl_->GetDeltaTime(); }
 
+  // Per-entity component access. Only valid inside a per-entity (RegisterSystem) callback.
+  // RegisterBulkSystem callbacks receive a sentinel context — they must iterate the Iterable
+  // and read components off the inner ContextFacade. Calling Component<T>() on a bulk
+  // sentinel returns nullptr and trips an assert in BulkContextImpl::GetComponentPtr.
   template <typename T>
   T& Component() const {
     const auto componentEntity = impl_->GetRegistry()->template Component<T>();
@@ -157,7 +163,13 @@ class BulkContextImpl final : public AnyContext {
   [[nodiscard]] Entity GetEntity() const override { return Entity{}; }
   [[nodiscard]] Registry* GetRegistry() const override { return registry_; }
   [[nodiscard]] float GetDeltaTime() const override { return dt_; }
-  void* GetComponentPtr(EntityID /*id*/) override { return nullptr; }
+  void* GetComponentPtr(EntityID /*id*/) override {
+    Logger::Error(
+        "ContextFacade::Component<T>() called on a bulk-system context. Bulk callbacks must "
+        "iterate the Iterable and access components on the inner per-entity context.");
+    assert(false && "ContextFacade::Component<T>() not valid in a bulk system");
+    return nullptr;
+  }
 
  private:
   Registry* registry_;

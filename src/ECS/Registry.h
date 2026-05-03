@@ -1,14 +1,13 @@
 #pragma once
 
 #include <any>
+#include <array>
 #include <atomic>
-#include <cstring>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <type_traits>
-#include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
@@ -86,10 +85,48 @@ class Registry {
   // Entity management
   Entity CreateEntity();
 
+  // Create an entity already populated with a fixed bundle of components, landing in the
+  // destination archetype in a single transition. Avoids the per-component archetype churn
+  // that AddComponent does. Tags / pairs still need to be added separately.
+  template <typename... TComponents>
+  Entity CreateEntityWithBundle(TComponents... components) {
+    static_assert(sizeof...(TComponents) > 0, "CreateEntityWithBundle requires at least one component");
+    // Resolve component-type entities up front so each T is registered before archetype lookup.
+    std::array<Entity, sizeof...(TComponents)> componentEntities{Component<std::decay_t<TComponents>>()...};
+    std::vector<ComponentID> ids;
+    ids.reserve(sizeof...(TComponents));
+    for (const auto& e : componentEntities) ids.push_back(e.GetId());
+
+    Archetype* archetype = GetOrCreateArchetypeFromSet(ids);
+
+    const Entity entity = entity_manager_->CreateEntity();
+    const auto location = archetype->AddEntity(entity);
+    const std::uint32_t id = entity.GetId();
+    if (id >= entity_locations_.size()) {
+      entity_locations_.resize(id + 1, EntityLocation{nullptr, 0, 0});
+    }
+    entity_locations_[id] = location;
+    ++user_entity_count_;
+
+    // Place each component in its archetype slot. Order in `componentEntities` mirrors the
+    // template parameter pack — Archetype::AddComponent looks up the in-archetype index by id.
+    PlaceBundle(archetype, location, componentEntities, std::forward_as_tuple(components...),
+                std::index_sequence_for<TComponents...>{});
+    return entity;
+  }
+
   void BlamEntity(Entity entity);
 
+  // Count of user-visible entities (excludes internal component-type / tag entities).
+  [[nodiscard]] std::uint64_t GetUserEntityCount() const { return user_entity_count_; }
+
   // Defer destroy until end of Registry::Update — safe to call during system iteration.
-  void QueueBlamEntity(const Entity entity) { pending_blams_.push_back(entity); }
+  // Deduplicates within a frame: same projectile hitting two targets only blams once.
+  void QueueBlamEntity(const Entity entity) {
+    if (pending_blam_ids_.insert(entity.id).second) {
+      pending_blams_.push_back(entity);
+    }
+  }
 
   [[nodiscard]] bool IsAlive(const Entity entity) const {
     const std::uint32_t id = entity.GetId();
@@ -109,7 +146,7 @@ class Registry {
     if (fast_component_to_entity_[type_idx].has_value()) {
       return fast_component_to_entity_[type_idx].value();
     }
-    const auto entity = CreateEntity();
+    const auto entity = CreateInternalEntity();
     fast_component_to_entity_[type_idx] = entity;
     component_registry_->RegisterComponent<T>(entity);
     return entity;
@@ -305,7 +342,7 @@ class Registry {
     if (const auto it = tag_to_entity_.find(name); it != tag_to_entity_.end()) {
       return it->second;
     }
-    const Entity tagEntity = CreateEntity();
+    const Entity tagEntity = CreateInternalEntity();
     component_registry_->RegisterTag(tagEntity.GetId(), name);
     tag_to_entity_.emplace(name, tagEntity);
     return tagEntity;
@@ -364,10 +401,23 @@ class Registry {
   [[nodiscard]] uint64_t ArchetypeGeneration() const { return archetype_generation_; }
 
  private:
+  // Internal entities back component-type and tag registrations. They live in
+  // entity_locations_ but should not show up in GetUserEntityCount.
+  Entity CreateInternalEntity();
+
   EntityLocation TransitionAddComponent(Entity entity, ComponentID componentId);
   EntityLocation TransitionRemoveComponent(Entity entity, ComponentID componentId);
   Archetype* GetOrCreateArchetype(std::vector<ComponentID> componentIDs, ComponentID newComponentId);
   Archetype* GetOrCreateArchetypeRemove(std::vector<ComponentID> componentIDs, ComponentID removeComponentId);
+  Archetype* GetOrCreateArchetypeFromSet(std::vector<ComponentID> componentIDs);
+
+  // Helper for CreateEntityWithBundle: index-pack expansion to dispatch each component to
+  // Archetype::AddComponent at its corresponding location slot.
+  template <typename Tuple, size_t N, size_t... Is>
+  void PlaceBundle(Archetype* archetype, const EntityLocation& location, const std::array<Entity, N>& componentEntities,
+                   Tuple&& comps, std::index_sequence<Is...>) {
+    (archetype->AddComponent(location, componentEntities[Is], std::get<Is>(comps)), ...);
+  }
 
   std::unique_ptr<EntityManager> entity_manager_;
   std::unique_ptr<ComponentRegistry> component_registry_;
@@ -381,7 +431,14 @@ class Registry {
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
   std::unordered_map<ComponentID, ArchetypeList> component_index_;
   std::unordered_map<EntityID, std::unordered_set<EcsId>> pairs_;
+  // Hierarchy authoritative storage. Keys/values are full EntityIDs (generation in high 32),
+  // so recycled ids cannot alias old children — the legacy `pairs_` map drops generation.
+  std::unordered_map<EntityID, std::unordered_set<EntityID>> parent_to_children_;
+  std::unordered_map<EntityID, Entity> child_to_parent_;
   std::vector<Entity> pending_blams_;
+  std::unordered_set<EcsId> pending_blam_ids_;
   float delta_time_{};
   uint64_t archetype_generation_{0};
+  std::uint64_t user_entity_count_{0};
+  std::unordered_set<EcsId> internal_entity_ids_;
 };
