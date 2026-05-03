@@ -1,17 +1,19 @@
 #pragma once
 
-#include <SDL3/SDL.h>
 #include <SDL3/SDL_keycode.h>
 
 #include <glm/glm.hpp>
 
 #include "../Components/BoxColliderComponent.h"
+#include "../Components/EntityMaskComponent.h"
 #include "../Components/ProjectileComponent.h"
 #include "../Components/ProjectileEmitterComponent.h"
 #include "../Components/RigidBodyComponent.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
-#include "../ECS/ECS.h"
+#include "../ECS/Registry.h"
+#include "../EventBus/EventBus.h"
+#include "../Events/KeyInputEvent.h"
 
 class ProjectileEmitSystem {
  public:
@@ -71,14 +73,18 @@ class ProjectileEmitSystem {
       }
     }
 
-    auto projectile = registry->CreateEntity();
-    const auto entityMask = registry->GetComponent<EntityMaskComponent>(entity);
+    // Inherit the emitter's collision mask. Default-construct if the emitter has no mask
+    // component (e.g. a scene-authored emitter that doesn't participate in collision filtering).
+    EntityMaskComponent maskComponent =
+        registry->HasComponent<EntityMaskComponent>(entity)
+            ? EntityMaskComponent(registry->GetComponent<EntityMaskComponent>(entity).mask)
+            : EntityMaskComponent();
+
+    // One archetype transition for all components instead of six AddComponent calls.
+    auto projectile = registry->CreateEntityWithBundle(
+        maskComponent, TransformComponent(projectilePosition, glm::vec2(1.0, 1.0), 0.0), RigidBodyComponent(velocity),
+        BoxColliderComponent(4, 4, glm::vec2(0, 0), emitter.collisionMask),
+        ProjectileComponent(emitter.damage, emitter.duration), SpriteComponent("bullet-texture", 4.0f, 4.0f, 4));
     registry->AddTag(projectile, "projectiles");
-    registry->AddComponent(projectile, EntityMaskComponent(entityMask.mask));
-    registry->AddComponent(projectile, TransformComponent(projectilePosition, glm::vec2(1.0, 1.0), 0.0));
-    registry->AddComponent(projectile, RigidBodyComponent(velocity));
-    registry->AddComponent(projectile, BoxColliderComponent(4, 4, glm::vec2(0, 0), emitter.collisionMask));
-    registry->AddComponent(projectile, ProjectileComponent(emitter.damage, emitter.duration));
-    registry->AddComponent(projectile, SpriteComponent("bullet-texture", 4.0f, 4.0f, 4));
   }
 };

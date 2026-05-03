@@ -72,9 +72,9 @@ class RenderDebugGUISystem {
   }
 
   static void EntityInfoWindow(const Registry* registry) {
-    const auto count = registry->GetEntityCount();
+    const auto count = registry->GetUserEntityCount();
     ImGui::Begin("Entity Info");
-    ImGui::Text("Entity Count: %d", count);
+    ImGui::Text("Entity Count: %llu", static_cast<unsigned long long>(count));
     ImGui::End();
   }
 };
