@@ -24,7 +24,7 @@ class RenderQueue {
 
   void AddRenderKey(const RenderKey& key) { render_keys_.push_back(key); }
 
-  void AddRenderKey(RenderKey&& key) { render_keys_.push_back(key); }
+  void AddRenderKey(RenderKey&& key) { render_keys_.push_back(std::move(key)); }
 
   void Clear() { render_keys_.clear(); }
 

@@ -29,6 +29,9 @@ Renderer::~Renderer() {
 
 void Renderer::Render(const Registry* registry, SDL_Renderer* renderer) const {
   auto& renderQueue = registry->Get<RenderQueue>();
+  // Hoisted out of the per-key switch — these singletons are stable for the whole pass.
+  const SDL_FRect camera = registry->Get<CameraComponent>().viewport;
+  auto& assetManager = registry->Get<AssetManager>();
 
   for (const RenderKey& renderKey : renderQueue) {
     switch (const RenderableType type = renderKey.type) {
@@ -39,15 +42,12 @@ void Renderer::Render(const Registry* registry, SDL_Renderer* renderer) const {
       case TEXT: {
         const Entity entity = renderKey.entity;
         if (!registry->IsAlive(entity)) continue;
-        const auto camera = registry->Get<CameraComponent>().viewport;
-        auto& assetManager = registry->Get<AssetManager>();
         RenderText(entity, registry, renderer, assetManager, camera);
         break;
       }
       case SQUARE_PRIMITIVE: {
         const Entity entity = renderKey.entity;
         if (!registry->IsAlive(entity)) continue;
-        const auto camera = registry->Get<CameraComponent>().viewport;
         RenderSquare(entity, registry, renderer, camera);
         break;
       }
