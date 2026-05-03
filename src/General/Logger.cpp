@@ -12,7 +12,6 @@ void Logger::Init() {
   lua_logger_->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [lua] %v");
 }
 
-void Logger::Log(const std::string& message) { spdlog::info(message); }
 void Logger::Error(const std::string& message) { spdlog::error(message); }
 void Logger::Warn(const std::string& message) { spdlog::warn(message); }
 void Logger::Info(const std::string& message) { spdlog::info(message); }
