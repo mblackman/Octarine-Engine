@@ -19,6 +19,14 @@
 #include "Components/CameraComponents.h"
 #include "ECS/Registry.h"
 
+Renderer::~Renderer() {
+  for (auto& [key, entry] : text_cache_) {
+    if (entry.texture) {
+      SDL_DestroyTexture(entry.texture);
+    }
+  }
+}
+
 void Renderer::Render(const Registry* registry, SDL_Renderer* renderer) const {
   auto& renderQueue = registry->Get<RenderQueue>();
 
@@ -33,14 +41,14 @@ void Renderer::Render(const Registry* registry, SDL_Renderer* renderer) const {
         if (!registry->IsAlive(entity)) continue;
         const auto camera = registry->Get<CameraComponent>().viewport;
         auto& assetManager = registry->Get<AssetManager>();
-        RenderText(entity, renderer, assetManager, camera);
+        RenderText(entity, registry, renderer, assetManager, camera);
         break;
       }
       case SQUARE_PRIMITIVE: {
         const Entity entity = renderKey.entity;
         if (!registry->IsAlive(entity)) continue;
         const auto camera = registry->Get<CameraComponent>().viewport;
-        RenderSquare(entity, renderer, camera);
+        RenderSquare(entity, registry, renderer, camera);
         break;
       }
       default:
@@ -55,38 +63,65 @@ void Renderer::RenderSprite(const RenderKey& key, SDL_Renderer* renderer) {
   SDL_RenderTextureRotated(renderer, key.texture, &key.srcRect, &destRect, key.rotation, nullptr, key.flip);
 }
 
-void Renderer::RenderSquare(const Entity& entity, SDL_Renderer* renderer, const SDL_FRect& camera) {
-  // const auto& transform = entity.GetComponent<TransformComponent>();
-  // const auto square = entity.GetComponent<SquarePrimitiveComponent>();
-  // const float positionX = transform.globalPosition.x + square.position.x;
-  // const float positionY = transform.globalPosition.y + square.position.y;
-  // const float x = square.isFixed ? positionX : positionX - camera.x;
-  // const float y = square.isFixed ? positionY : positionY - camera.y;
-  //
-  // const SDL_FRect rect = {x, y, square.width, square.height};
-  //
-  // SDL_SetRenderDrawColor(renderer, square.color.r, square.color.g, square.color.b, square.color.a);
-  // SDL_RenderFillRect(renderer, &rect);
+void Renderer::RenderSquare(const Entity& entity, const Registry* registry, SDL_Renderer* renderer,
+                            const SDL_FRect& camera) {
+  const auto& square = registry->GetComponent<SquarePrimitiveComponent>(entity);
+
+  // Prefer global transform when present so squares parented to game entities track their parent.
+  glm::vec2 origin = square.position;
+  if (registry->HasComponent<TransformComponent>(entity)) {
+    const auto& transform = registry->GetComponent<TransformComponent>(entity);
+    origin += transform.globalPosition;
+  }
+
+  const float x = square.isFixed ? origin.x : origin.x - camera.x;
+  const float y = square.isFixed ? origin.y : origin.y - camera.y;
+
+  const SDL_FRect rect = {x, y, square.width, square.height};
+
+  SDL_SetRenderDrawColor(renderer, square.color.r, square.color.g, square.color.b, square.color.a);
+  SDL_RenderFillRect(renderer, &rect);
 }
 
-void Renderer::RenderText(const Entity& entity, SDL_Renderer* renderer, const AssetManager& assetManager,
-                          const SDL_FRect& camera) {
-  // const auto transform = entity.GetComponent<TransformComponent>();
-  // const auto& textLabel = entity.GetComponent<TextLabelComponent>();
-  // const auto font = assetManager->GetFont(textLabel.fontId);
-  // SDL_Surface* surface = TTF_RenderText_Blended(font, textLabel.text.c_str(), 0, textLabel.color);
-  // SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
-  // SDL_DestroySurface(surface);
-  //
-  // float labelWidth = 0;
-  // float labelHeight = 0;
-  // const float positionX = transform.globalPosition.x + textLabel.position.x;
-  // const float positionY = transform.globalPosition.y + textLabel.position.y;
-  //
-  // SDL_GetTextureSize(texture, &labelWidth, &labelHeight);
-  //
-  // const SDL_FRect destRect = {positionX - (textLabel.isFixed ? 0 : camera.x),
-  //                             positionY - (textLabel.isFixed ? 0 : camera.y), labelWidth, labelHeight};
-  //
-  // SDL_RenderTexture(renderer, texture, nullptr, &destRect);
+void Renderer::RenderText(const Entity& entity, const Registry* registry, SDL_Renderer* renderer,
+                          const AssetManager& assetManager, const SDL_FRect& camera) const {
+  const auto& textLabel = registry->GetComponent<TextLabelComponent>(entity);
+  if (textLabel.text.empty()) return;
+
+  TTF_Font* font = assetManager.GetFont(textLabel.fontId);
+  if (!font) return;
+
+  const auto packedColor = static_cast<Uint32>(textLabel.color.r) << 24 | static_cast<Uint32>(textLabel.color.g) << 16 |
+                           static_cast<Uint32>(textLabel.color.b) << 8 | static_cast<Uint32>(textLabel.color.a);
+  const std::string cacheKey = textLabel.fontId + "|" + textLabel.text + "|" + std::to_string(packedColor);
+
+  auto it = text_cache_.find(cacheKey);
+  if (it == text_cache_.end()) {
+    SDL_Surface* surface = TTF_RenderText_Blended(font, textLabel.text.c_str(), 0, textLabel.color);
+    if (!surface) {
+      Logger::Error("TTF_RenderText_Blended failed: " + std::string(SDL_GetError()));
+      return;
+    }
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_DestroySurface(surface);
+    if (!texture) {
+      Logger::Error("SDL_CreateTextureFromSurface failed: " + std::string(SDL_GetError()));
+      return;
+    }
+    float w = 0;
+    float h = 0;
+    SDL_GetTextureSize(texture, &w, &h);
+    it = text_cache_.emplace(cacheKey, TextCacheEntry{texture, w, h}).first;
+  }
+
+  glm::vec2 origin = textLabel.position;
+  if (registry->HasComponent<TransformComponent>(entity)) {
+    const auto& transform = registry->GetComponent<TransformComponent>(entity);
+    origin += transform.globalPosition;
+  }
+
+  const SDL_FRect destRect = {origin.x - (textLabel.isFixed ? 0 : camera.x),
+                              origin.y - (textLabel.isFixed ? 0 : camera.y), it->second.width, it->second.height};
+
+  SDL_RenderTexture(renderer, it->second.texture, nullptr, &destRect);
 }
