@@ -1,11 +1,11 @@
 #pragma once
 
 #include "../Components/ProjectileComponent.h"
-#include "ECS/EntityCommandBuffer.h"
+#include "ECS/CommandBuffer.h"
 
 class ProjectileLifecycleSystem {
  public:
-  EntityCommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
+  CommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
 
   void operator()(const Entity entity, const float deltaTime, ProjectileComponent& projectile) {
     projectile.timer += deltaTime;
@@ -15,5 +15,5 @@ class ProjectileLifecycleSystem {
   }
 
  private:
-  EntityCommandBuffer cmd_buffer_;
+  CommandBuffer cmd_buffer_;
 };

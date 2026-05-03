@@ -6,74 +6,68 @@
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../Renderer/RenderKey.h"
-#include "../Renderer/RenderQueue.h"
 #include "../Renderer/RenderableType.h"
-#include "Components/CameraComponents.h"
-#include "ECS/Iterable.h"
-#include "ECS/Query.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"
 
 class RenderSpriteSystem {
  public:
-  void operator()(const ContextFacade& context, const Iterable& /*iterable*/) {
-    auto* registry = context.Registry();
-    // Hoist all singleton lookups before the per-entity loop.
+  CommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
+
+  void Prepare(Registry* registry) {
     const auto& gameConfig = registry->Get<GameConfig>();
-    auto& renderQueue = registry->Get<RenderQueue>();
-    const auto& camera = registry->Get<CameraComponent>().viewport;
-    const auto& assetManager = registry->Get<AssetManager>();
-    const auto windowWidth = static_cast<float>(gameConfig.windowWidth);
-    const auto windowHeight = static_cast<float>(gameConfig.windowHeight);
+    camera_ = registry->Get<CameraComponent>().viewport;
+    assetManager_ = &registry->Get<AssetManager>();
+    windowWidth_ = static_cast<float>(gameConfig.windowWidth);
+    windowHeight_ = static_cast<float>(gameConfig.windowHeight);
+  }
 
-    if (!query_) {
-      query_ = registry->CreateQuery<TransformComponent, SpriteComponent>();
+  void operator()(const Entity entity, const TransformComponent& transform, const SpriteComponent& sprite) const {
+    bool isOutsideCamera = false;
+
+    if (sprite.isFixed) {
+      isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < 0 ||
+                        transform.globalPosition.x > windowWidth_ ||
+                        transform.globalPosition.y + sprite.height * transform.globalScale.y < 0 ||
+                        transform.globalPosition.y > windowHeight_;
+    } else {
+      isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < camera_.x ||
+                        transform.globalPosition.x > camera_.x + camera_.w ||
+                        transform.globalPosition.y + sprite.height * transform.globalScale.y < camera_.y ||
+                        transform.globalPosition.y > camera_.y + camera_.h;
     }
-    query_->Update();
 
-    query_->ForEach([&](const Entity entity, const TransformComponent& transform, SpriteComponent& sprite) {
-      bool isOutsideCamera = false;
-
-      if (sprite.isFixed) {
-        isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < 0 ||
-                          transform.globalPosition.x > windowWidth ||
-                          transform.globalPosition.y + sprite.height * transform.globalScale.y < 0 ||
-                          transform.globalPosition.y > windowHeight;
-      } else {
-        isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < camera.x ||
-                          transform.globalPosition.x > camera.x + camera.w ||
-                          transform.globalPosition.y + sprite.height * transform.globalScale.y < camera.y ||
-                          transform.globalPosition.y > camera.y + camera.h;
+    if (!isOutsideCamera) {
+      // Re-resolve when first seen or when AssetManager has loaded/replaced any texture
+      // since this sprite cached its pointer. Stale cache would draw a destroyed handle.
+      const auto assetGen = assetManager_->TextureGeneration();
+      if (!sprite.cachedTexture || sprite.cachedTextureGeneration != assetGen) {
+        sprite.cachedTexture = assetManager_->GetTexture(sprite.assetId);
+        sprite.cachedTextureGeneration = assetGen;
       }
 
-      if (!isOutsideCamera) {
-        // Re-resolve when first seen or when AssetManager has loaded/replaced any texture
-        // since this sprite cached its pointer. Stale cache would draw a destroyed handle.
-        const auto assetGen = assetManager.TextureGeneration();
-        if (!sprite.cachedTexture || sprite.cachedTextureGeneration != assetGen) {
-          sprite.cachedTexture = assetManager.GetTexture(sprite.assetId);
-          sprite.cachedTextureGeneration = assetGen;
-        }
+      RenderKey renderKey(sprite.layer, transform.globalPosition.y, SPRITE, entity);
+      // Pre-compute render data so Renderer doesn't need GetComponent lookups.
+      const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera_.x;
+      const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera_.y;
+      renderKey.destX = x;
+      renderKey.destY = y;
+      renderKey.destW = sprite.width * transform.globalScale.x;
+      renderKey.destH = sprite.height * transform.globalScale.y;
+      renderKey.srcRect = sprite.srcRect;
+      renderKey.rotation = transform.rotation;
+      renderKey.flip = sprite.flip;
+      renderKey.texture = sprite.cachedTexture;
+      renderKey.isFixed = sprite.isFixed;
 
-        RenderKey renderKey(sprite.layer, transform.globalPosition.y, SPRITE, entity);
-        // Pre-compute render data so Renderer doesn't need GetComponent lookups.
-        const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera.x;
-        const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera.y;
-        renderKey.destX = x;
-        renderKey.destY = y;
-        renderKey.destW = sprite.width * transform.globalScale.x;
-        renderKey.destH = sprite.height * transform.globalScale.y;
-        renderKey.srcRect = sprite.srcRect;
-        renderKey.rotation = transform.rotation;
-        renderKey.flip = sprite.flip;
-        renderKey.texture = sprite.cachedTexture;
-        renderKey.isFixed = sprite.isFixed;
-
-        renderQueue.AddRenderKey(renderKey);
-      }
-    });
+      cmd_buffer_.QueueAddRenderKey(renderKey);
+    }
   }
 
  private:
-  std::unique_ptr<ComponentQuery<TransformComponent, SpriteComponent>> query_;
+  CommandBuffer cmd_buffer_;
+  AssetManager* assetManager_ = nullptr;
+  float windowWidth_ = 0;
+  float windowHeight_ = 0;
+  SDL_FRect camera_{};
 };

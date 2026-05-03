@@ -23,6 +23,8 @@ struct RenderKey {
   SDL_Texture* texture{};
   bool isFixed{};
 
+  RenderKey() = default;
+
   RenderKey(unsigned int layer, float depth, RenderableType type, Entity entity)
       : layer(layer), depth(depth), type(type), entity(entity) {}
 

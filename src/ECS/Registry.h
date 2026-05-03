@@ -293,6 +293,10 @@ class Registry {
         query_->Update();
         const float dt = registry.delta_time_;
 
+        if constexpr (requires { func_.Prepare(registry_); }) {
+          func_.Prepare(registry_);
+        }
+
         if constexpr (std::is_invocable_v<StoredFunc, Entity, float, TArgs&...> ||
                       std::is_invocable_v<StoredFunc, Entity, TArgs&...>) {
           query_->ParallelForEach([this, dt](Entity entity, TArgs&... args) {

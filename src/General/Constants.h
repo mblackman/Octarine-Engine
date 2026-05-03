@@ -11,4 +11,8 @@ static constexpr int kDefaultWindowWidth = 1280;
 static constexpr int kDefaultWindowHeight = 720;
 
 static constexpr int kDefaultEntityMask = 1;
+
+static constexpr int kSystemCommandBufferSize = 1024;
+
+static constexpr int kDebugUIBaseLayer = 1000;
 }  // namespace Constants

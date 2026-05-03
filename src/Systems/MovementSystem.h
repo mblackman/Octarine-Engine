@@ -8,11 +8,11 @@
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
 #include "../Game/GameConfig.h"
-#include "ECS/EntityCommandBuffer.h"
+#include "ECS/CommandBuffer.h"
 
 class MovementSystem {
  public:
-  EntityCommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
+  CommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
 
   void Init(Registry* registry) {
     registry_ = registry;
@@ -33,7 +33,7 @@ class MovementSystem {
   }
 
   void operator()(const Entity entity, const float deltaTime, TransformComponent& transform,
-                  const RigidBodyComponent& rigidBody, const SpriteComponent& spriteComponent) {
+                  const RigidBodyComponent& rigidBody, const SpriteComponent& spriteComponent) const {
     const bool isPlayer = registry_->HasTag(entity, player_);
 
     if (!isPlayer) {
@@ -86,7 +86,7 @@ class MovementSystem {
   }
 
   Registry* registry_ = nullptr;
-  EntityCommandBuffer cmd_buffer_;
+  CommandBuffer cmd_buffer_;
   Entity enemies_{};
   Entity obstacles_{};
   Entity player_{};

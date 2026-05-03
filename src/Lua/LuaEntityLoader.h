@@ -15,8 +15,6 @@ class LuaEntityLoader {
   static void TagAndGroupEntity(const sol::table& currentData, Registry* registry, const Entity& entity) {
     ApplyTagField(currentData, "tag", registry, entity);
     ApplyTagField(currentData, "tags", registry, entity);
-    ApplyTagField(currentData, "group", registry, entity);
-    ApplyTagField(currentData, "groups", registry, entity);
   }
 
   // Reads top-level `mask` int from the entity table and attaches an EntityMaskComponent.

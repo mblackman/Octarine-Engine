@@ -209,9 +209,9 @@ void Game::Setup() {
   registry_->RegisterSystem<HealthComponent, TextLabelComponent, SquarePrimitiveComponent>(DisplayHealthSystem());
 
   // Render queue producers
-  registry_->RegisterBulkSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
-  registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
-  registry_->RegisterSystem<SquarePrimitiveComponent>(RenderPrimitiveSystem());
+  registry_->RegisterParallelSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
+  registry_->RegisterParallelSystem<TextLabelComponent>(RenderTextSystem());
+  registry_->RegisterParallelSystem<SquarePrimitiveComponent>(RenderPrimitiveSystem());
 
   // Event subscriptions (one-time)
   event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
