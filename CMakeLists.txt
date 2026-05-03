@@ -1,9 +1,14 @@
 cmake_minimum_required(VERSION 3.15)
 
 # Auto-detect vcpkg toolchain if not provided (fixes 'find_package' errors in new profiles)
-if (NOT CMAKE_TOOLCHAIN_FILE AND EXISTS "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake")
-    set(CMAKE_TOOLCHAIN_FILE "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
-    message(STATUS "Auto-detected vcpkg toolchain: ${CMAKE_TOOLCHAIN_FILE}")
+if (NOT CMAKE_TOOLCHAIN_FILE)
+    if (DEFINED ENV{VCPKG_ROOT} AND EXISTS "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
+        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
+        message(STATUS "Auto-detected vcpkg toolchain from VCPKG_ROOT: ${CMAKE_TOOLCHAIN_FILE}")
+    elseif (EXISTS "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake")
+        set(CMAKE_TOOLCHAIN_FILE "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
+        message(STATUS "Auto-detected vcpkg toolchain (fallback): ${CMAKE_TOOLCHAIN_FILE}")
+    endif ()
 endif ()
 
 # Project name and language
@@ -66,6 +71,7 @@ find_package(Lua REQUIRED)
 find_package(Sol2 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 
 # Include directories
 target_include_directories(${PROJECT_NAME}
@@ -87,6 +93,7 @@ target_link_libraries(${PROJECT_NAME}
         imgui::imgui
         spdlog::spdlog
         sol2_ImGui_Bindings
+        Threads::Threads
 )
 
 # Install rules (optional)
@@ -104,7 +111,7 @@ if (MSVC)
             /MP
             /bigobj
     )
-    target_compile_options(${PROJECT_NAME} PUBLIC
+    target_compile_options(${PROJECT_NAME} PRIVATE
             $<IF:$<CONFIG:Debug>,,-WX>
     )
 else ()
@@ -114,7 +121,7 @@ else ()
             -Wpedantic
             -Wfatal-errors
     )
-    target_compile_options(${PROJECT_NAME} PUBLIC
+    target_compile_options(${PROJECT_NAME} PRIVATE
             $<IF:$<CONFIG:Debug>,,-Werror>
     )
 endif ()

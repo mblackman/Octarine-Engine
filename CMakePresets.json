@@ -5,7 +5,7 @@
     {
       "name": "base",
       "hidden": true,
-      "generator": "NMake Makefiles",
+      "generator": "Ninja",
       "binaryDir": "${sourceDir}/cmake-build-${presetName}",
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake"
