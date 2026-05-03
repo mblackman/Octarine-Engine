@@ -47,11 +47,11 @@ inline ArchetypeID GetNextArchetypeID() {
 }
 }  // namespace Internal
 
-inline size_t usableSpace = kChunkSize - sizeof(ChunkHeader);
+constexpr size_t kUsableSpace = kChunkSize;
 
 class Chunk {
  public:
-  explicit Chunk() : header_(), buffer_(new unsigned char[usableSpace]) { header_.entity_count = 0; }
+  explicit Chunk() : header_(), buffer_(new unsigned char[kUsableSpace]) { header_.entity_count = 0; }
 
   ~Chunk() { delete[] buffer_; }
 
@@ -75,7 +75,7 @@ class Chunk {
   Chunk& operator=(const Chunk&) = delete;
 
   [[nodiscard]] void* GetComponentArray(const size_t offset) const {
-    assert(offset < usableSpace);
+    assert(offset < kUsableSpace);
     return buffer_ + offset;
   }
 
@@ -85,7 +85,7 @@ class Chunk {
 
   template <typename T>
   void AddComponent(const T& component, const size_t offset, const size_t index) {
-    assert(offset < usableSpace);
+    assert(offset < kUsableSpace);
     assert(index < header_.entity_count);
     ::new (buffer_ + offset + index * sizeof(T)) T(component);
   }
@@ -191,9 +191,7 @@ class Archetype {
     return swapped;
   }
 
-  [[nodiscard]] bool HasComponent(const ComponentID id) const {
-    return component_type_to_index_.contains(id);
-  }
+  [[nodiscard]] bool HasComponent(const ComponentID id) const { return component_type_to_index_.contains(id); }
 
   template <typename T>
   void AddComponent(const EntityLocation& location, const Entity& componentEntity, const T& component) {
@@ -263,7 +261,7 @@ class Archetype {
     }
 
     // Header lives outside the buffer, so layout starts at offset 0 with the entity array.
-    chunk_capacity_ = usableSpace / entityComponentSize;
+    chunk_capacity_ = kUsableSpace / entityComponentSize;
 
     size_t current_offset = chunk_capacity_ * sizeof(Entity);
 
@@ -278,8 +276,8 @@ class Archetype {
       current_offset += chunk_capacity_ * info.size;
     }
 
-    // Padding may push the last component array past usableSpace; shrink capacity until it fits.
-    while (chunk_capacity_ > 0 && current_offset > usableSpace) {
+    // Padding may push the last component array past kUsableSpace; shrink capacity until it fits.
+    while (chunk_capacity_ > 0 && current_offset > kUsableSpace) {
       --chunk_capacity_;
       current_offset = chunk_capacity_ * sizeof(Entity);
       for (size_t i = 0; i < component_infos_.size(); ++i) {
@@ -292,16 +290,6 @@ class Archetype {
       }
     }
     assert(chunk_capacity_ > 0);
-  }
-
-  bool ArchetypeTypeOverlaps(const ArchetypeType& inner) const {
-    for (auto& type : inner) {
-      if (std::ranges::find(archetype_type_, type) == archetype_type_.end()) {
-        return false;
-      }
-    }
-
-    return true;
   }
 
   void AssertLocation(const EntityLocation& location) const {

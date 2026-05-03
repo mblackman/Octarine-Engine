@@ -13,7 +13,7 @@ class IEventCallback {
   virtual void CallEvent(Event& e) = 0;
 
  public:
-  IEventCallback() = default;
+  explicit IEventCallback(void* owner = nullptr) : owner_(owner) {}
 
   IEventCallback(const IEventCallback&) = delete;
   IEventCallback& operator=(const IEventCallback&) = delete;
@@ -24,6 +24,11 @@ class IEventCallback {
   virtual ~IEventCallback() = default;
 
   void Execute(Event& e) { CallEvent(e); }
+
+  [[nodiscard]] void* Owner() const { return owner_; }
+
+ private:
+  void* owner_;
 };
 
 template <typename TOwner, typename TEvent>
@@ -32,13 +37,13 @@ class EventCallback final : public IEventCallback {
 
  public:
   EventCallback(TOwner* ownerInstance, void (TOwner::*callbackFunction)(TEvent&))
-      : invoker_([ownerInstance, callbackFunction](Event& e) {
+      : IEventCallback(static_cast<void*>(ownerInstance)), invoker_([ownerInstance, callbackFunction](Event& e) {
           std::invoke(callbackFunction, ownerInstance, static_cast<TEvent&>(e));
         }) {}
 
   // Constructor for const TEvent&
   EventCallback(TOwner* ownerInstance, void (TOwner::*callbackFunction)(const TEvent&))
-      : invoker_([ownerInstance, callbackFunction](Event& e) {
+      : IEventCallback(static_cast<void*>(ownerInstance)), invoker_([ownerInstance, callbackFunction](Event& e) {
           std::invoke(callbackFunction, ownerInstance, static_cast<const TEvent&>(e));
         }) {}
 
@@ -91,6 +96,17 @@ class EventBus {
     }
     auto subscriber = std::make_unique<EventCallback<TOwner, TEvent>>(ownerInstance, callbackFunction);
     subscribers_[eventTypeId]->push_back(std::move(subscriber));
+  }
+
+  // Drop every subscription whose owner pointer matches `owner`. Call from a system's
+  // destructor when its lifetime can end before the bus's, otherwise the bus would invoke
+  // a dangling callback on the next emit.
+  void UnsubscribeAll(void* owner) {
+    if (!owner) return;
+    for (auto& [_, handlers] : subscribers_) {
+      if (!handlers) continue;
+      handlers->remove_if([owner](const std::unique_ptr<IEventCallback>& cb) { return cb && cb->Owner() == owner; });
+    }
   }
 
   template <typename TEvent, typename... TArgs>

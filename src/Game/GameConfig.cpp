@@ -77,12 +77,22 @@ bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
 
   Uint64 dstLen = 0;
 
-  if (!SDL_GetStorageFileSize(storage, kConfigFileName, &dstLen) && dstLen > 0) {
-    Logger::Error(std::string(SDL_GetError()));
+  if (!SDL_GetStorageFileSize(storage, kConfigFileName, &dstLen)) {
+    Logger::Error("Failed to size config file: " + std::string(SDL_GetError()));
+    return false;
+  }
+
+  if (dstLen == 0) {
+    Logger::Error("Config file is empty: " + std::string(kConfigFileName));
     return false;
   }
 
   void *dst = SDL_malloc(dstLen);
+  if (!dst) {
+    Logger::Error("SDL_malloc failed for config buffer: " + std::string(SDL_GetError()));
+    return false;
+  }
+
   if (!SDL_ReadStorageFile(storage, kConfigFileName, dst, dstLen)) {
     Logger::Error(std::string(SDL_GetError()));
     SDL_free(dst);
