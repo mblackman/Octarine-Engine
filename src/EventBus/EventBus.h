@@ -55,6 +55,7 @@ class EventCallback final : public IEventCallback {
 
   ~EventCallback() override = default;
 
+ private:
   void CallEvent(Event& e) override {
     if (invoker_) {
       invoker_(e);

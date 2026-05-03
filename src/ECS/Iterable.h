@@ -40,10 +40,10 @@ class ContextFacade {
   // Per-entity component access. Only valid inside a per-entity (RegisterSystem) callback.
   // RegisterBulkSystem callbacks receive a sentinel context — they must iterate the Iterable
   // and read components off the inner ContextFacade. Calling Component<T>() on a bulk
-  // sentinel returns nullptr and trips an assert in BulkContextImpl::GetComponentPtr.
+  // sentinel returns nullptr and trips an assertion in BulkContextImpl::GetComponentPtr.
   template <typename T>
   T& Component() const {
-    const auto componentEntity = impl_->GetRegistry()->template Component<T>();
+    const auto componentEntity = impl_->GetRegistry()->Component<T>();
     void* ptr = impl_->GetComponentPtr(componentEntity.GetId());
     return *static_cast<T*>(ptr);
   }
@@ -120,14 +120,11 @@ template <typename... TComponents>
 class ContextImpl final : public AnyContext {
  public:
   ContextImpl(Registry* registry, const float dt)
-      : registry_(registry), dt_(dt),
-        ids_{registry->template Component<std::remove_reference_t<TComponents>>().GetId()...} {}
+      : registry_(registry), dt_(dt), ids_{registry->Component<std::remove_reference_t<TComponents>>().GetId()...} {}
 
   void Update(const Entity entity, std::tuple<TComponents&...> components) {
     entity_ = entity;
-    components_ = std::apply([](auto&... comps) {
-      return std::make_tuple(&comps...);
-    }, components);
+    components_ = std::apply([](auto&... comps) { return std::make_tuple(&comps...); }, components);
   }
 
   [[nodiscard]] Entity GetEntity() const override { return entity_; }
@@ -138,7 +135,10 @@ class ContextImpl final : public AnyContext {
     void* ptr = nullptr;
     size_t i = 0;
     auto check = [&]<typename T0>(T0* component) {
-      if (ptr) { ++i; return; }
+      if (ptr) {
+        ++i;
+        return;
+      }
       if (ids_[i] == id) {
         ptr = component;
       }
@@ -178,14 +178,18 @@ class BulkContextImpl final : public AnyContext {
 
 template <typename... TComponents>
 class IteratorImpl final : public AnyIteratorImpl {
-  using UnderlyingIterator = typename ArchetypeQuery<TComponents...>::Iterator;
+  using UnderlyingIterator = ArchetypeQuery<TComponents...>::Iterator;
 
  public:
-  IteratorImpl(UnderlyingIterator it, Registry* registry, const float dt) 
+  IteratorImpl(UnderlyingIterator it, Registry* registry, const float dt)
       : it_(it), registry_(registry), dt_(dt), context_(registry, dt) {}
 
   IteratorImpl(const IteratorImpl& other)
-      : AnyIteratorImpl(other), it_(other.it_), registry_(other.registry_), dt_(other.dt_), context_(other.registry_, other.dt_) {}
+      : AnyIteratorImpl(other),
+        it_(other.it_),
+        registry_(other.registry_),
+        dt_(other.dt_),
+        context_(other.registry_, other.dt_) {}
 
   void Increment() override { ++it_; }
 
@@ -195,11 +199,7 @@ class IteratorImpl final : public AnyIteratorImpl {
   }
 
   [[nodiscard]] AnyContext* Dereference() const override {
-    std::apply(
-        [&](Entity e, TComponents&... comps) {
-          context_.Update(e, std::tie(comps...));
-        },
-        *it_);
+    std::apply([&](Entity e, TComponents&... comps) { context_.Update(e, std::tie(comps...)); }, *it_);
     return &context_;
   }
 

@@ -39,7 +39,7 @@ class ComponentQuery final : public Query {
   }
 
   // Add a tag/label as a query filter. Filtered tags are required for archetype matching but are
-  // not yielded to ForEach — type_ (template-pack order) stays untouched so Iterator's mapping
+  // not yielded to ForEach — type_ (template-pack order) stays untouched, so Iterator's mapping
   // from TComponents...[Is] to type_[Is] remains valid.
   ComponentQuery& WithTag(const Entity tag) {
     extra_required_.push_back(tag.GetId());
@@ -63,25 +63,27 @@ class ComponentQuery final : public Query {
       }
     } else {
       for (auto it = archetype_query_.begin(); it != archetype_query_.end(); ++it) {
-        std::apply([&](Entity e, TComponents&... comps) {
-          if constexpr (std::is_invocable_v<Func, Entity, TComponents&...>) {
-            func(e, comps...);
-          } else if constexpr (std::is_invocable_v<Func, TComponents&...>) {
-            func(comps...);
-          } else {
-            static_assert(!std::is_same_v<Func, Func>,
-                          "The function passed to ForEach does not match the required signatures. "
-                          "Expected one of: void(ContextFacade&, Entity, T&...), void(ContextFacade&, T&...), "
-                          "void(Entity, T&...), or void(T&...).");
-          }
-        }, *it);
+        std::apply(
+            [&](Entity e, TComponents&... comps) {
+              if constexpr (std::is_invocable_v<Func, Entity, TComponents&...>) {
+                func(e, comps...);
+              } else if constexpr (std::is_invocable_v<Func, TComponents&...>) {
+                func(comps...);
+              } else {
+                static_assert(!std::is_same_v<Func, Func>,
+                              "The function passed to ForEach does not match the required signatures. "
+                              "Expected one of: void(ContextFacade&, Entity, T&...), void(ContextFacade&, T&...), "
+                              "void(Entity, T&...), or void(T&...).");
+              }
+            },
+            *it);
       }
     }
   }
 
   // Parallel version of ForEach — distributes chunks across CPU threads.
   // Only safe for funcs that do per-entity independent writes (no shared mutable state).
-  // Func signature: void(Entity, TComponents&...) or void(TComponents&...).
+  // Func signature: void (Entity, TComponents&...) or void(TComponents&...).
   template <typename Func>
   void ParallelForEach(Func&& func) {
     archetype_query_.ParallelForEach(std::forward<Func>(func));
@@ -104,11 +106,11 @@ class ComponentQuery final : public Query {
   }
 
   Iterable CreateIterable() {
-    auto beginFunc = [&]() {
+    auto beginFunc = [&] {
       return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.begin(), registry_,
                                                                                   registry_->delta_time_));
     };
-    auto endFunc = [&]() {
+    auto endFunc = [&] {
       return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.end(), registry_,
                                                                                   registry_->delta_time_));
     };
@@ -119,8 +121,7 @@ class ComponentQuery final : public Query {
   Registry* registry_;
   ArchetypeType type_;            // user-pack order — used by ArchetypeQuery::Iterator
   ArchetypeType sorted_type_;     // sorted ascending — used for archetype matching
-  ArchetypeType extra_required_;  // additional ComponentIDs required (e.g. tag filters)
+  ArchetypeType extra_required_;  // additional ComponentIDs required (e.g., tag filters)
   ArchetypeQuery<TComponents...> archetype_query_;
   uint64_t cached_generation_{UINT64_MAX};  // Forces first Update to always match.
 };
-

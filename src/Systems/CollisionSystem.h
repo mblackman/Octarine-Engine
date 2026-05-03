@@ -55,7 +55,7 @@ struct Partitions {
 
 class CollisionSystem {
  public:
-  void operator()(const ContextFacade& ctx, const Iterable& iter) {
+  void operator()(const ContextFacade& ctx, const Iterable& /*iter*/) {
     PROFILE_NAMED_SCOPE("Collision System Update");
 
     auto* registry = ctx.Registry();

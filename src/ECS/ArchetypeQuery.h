@@ -34,8 +34,9 @@ class ArchetypeQuery {
 
     Reference operator*() const {
       assert(sizeof...(TComponents) == type_.size());
-      return std::apply([&](auto*... arrays) { return std::tie(current_entities_[entity_idx_], arrays[entity_idx_]...); },
-                        current_arrays_);
+      return std::apply(
+          [&](auto*... arrays) { return std::tie(current_entities_[entity_idx_], arrays[entity_idx_]...); },
+          current_arrays_);
     }
 
     Iterator& operator++() {
@@ -54,7 +55,7 @@ class ArchetypeQuery {
     void UpdateChunkPointers() {
       Archetype* current_archetype = *archetype_it_;
       current_arrays_ = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return std::make_tuple(current_archetype->template GetComponentArray<TComponents>(chunk_idx_, type_[Is])...);
+        return std::make_tuple(current_archetype->GetComponentArray<TComponents>(chunk_idx_, type_[Is])...);
       }(std::index_sequence_for<TComponents...>{});
       current_entities_ = current_archetype->chunks_[chunk_idx_].GetEntityArray();
     }
@@ -143,9 +144,8 @@ class ArchetypeQuery {
       const size_t end = std::min(begin + items_per_thread, work.size());
       if (begin >= end) break;
 
-      futures.push_back(std::async(std::launch::async, [&work, &func, this, begin, end]() {
-        ProcessChunks(work, begin, end, func);
-      }));
+      futures.push_back(
+          std::async(std::launch::async, [&work, &func, this, begin, end] { ProcessChunks(work, begin, end, func); }));
     }
 
     for (auto& f : futures) f.get();
@@ -159,8 +159,7 @@ class ArchetypeQuery {
 
       // Get typed component arrays directly from the chunk — same as Iterator::UpdateChunkPointers.
       auto arrays = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return std::make_tuple(
-            w.archetype->template GetComponentArray<TComponents>(w.chunkIdx, type_[Is])...);
+        return std::make_tuple(w.archetype->template GetComponentArray<TComponents>(w.chunkIdx, type_[Is])...);
       }(std::index_sequence_for<TComponents...>{});
 
       const Entity* entities = w.archetype->chunks_[w.chunkIdx].GetEntityArray();

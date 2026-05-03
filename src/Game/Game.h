@@ -5,14 +5,11 @@
 #include <memory>
 #include <sol/sol.hpp>
 
-#include "../AssetManager/AssetManager.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
-#include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 #include "../Systems/UIButtonSystem.h"
 #include "Systems/DamageSystem.h"
-#include "Systems/MovementSystem.h"
 
 class ScriptSystem;
 

@@ -89,7 +89,7 @@ void Registry::BlamEntity(const Entity entity) {
 
   // Drop relationship entries authored by this entity, and any pair targeting it.
   pairs_.erase(entity.id);
-  const auto targetId = static_cast<std::uint32_t>(entity.GetId());
+  const auto targetId = entity.GetId();
   for (auto pairIt = pairs_.begin(); pairIt != pairs_.end();) {
     auto& pairSet = pairIt->second;
     for (auto setIt = pairSet.begin(); setIt != pairSet.end();) {

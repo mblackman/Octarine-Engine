@@ -2,11 +2,8 @@
 
 #include <algorithm>
 #include <cassert>
-#include <new>
 #include <optional>
-#include <set>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "Entity.h"

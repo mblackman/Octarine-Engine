@@ -2,7 +2,6 @@
 
 #include <SDL3/SDL.h>
 
-#include <glm/glm.hpp>
 #include <memory>
 #include <sol/sol.hpp>
 #include <string>
@@ -13,7 +12,6 @@
 #include "../Renderer/Renderer.h"
 #include "Components/BoxColliderComponent.h"
 #include "Components/CameraComponents.h"
-#include "Components/CameraFollowComponent.h"
 #include "Components/EntityMaskComponent.h"
 #include "Components/HealthComponent.h"
 #include "Components/KeyboardControlComponent.h"
@@ -30,6 +28,7 @@
 #include "ECS/Registry.h"
 #include "Events/MouseInputEvent.h"
 #include "GameConfig.h"
+#include "General/PerfUtils.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/CameraFollowSystem.h"
 #include "Systems/CollisionSystem.h"
@@ -46,7 +45,6 @@
 #include "Systems/RenderTextSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "Systems/TransformSystem.h"
-#include "General/PerfUtils.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -197,13 +195,13 @@ void Game::Setup() {
   auto &movementSystem = registry_->RegisterBulkSystem<TransformComponent, RigidBodyComponent>(MovementSystem());
 
   // Collision after movement integrates positions; emits CollisionEvent for damage/movement subscribers
-  registry_->RegisterBulkSystem<TransformComponent, BoxColliderComponent, EntityMaskComponent>(CollisionSystem());
+  registry_->RegisterBulkSystem(CollisionSystem());
 
   // Transform hierarchy resolution — produces globalPosition/globalScale/globalRotation for downstream
   registry_->RegisterBulkSystem<TransformComponent>(TransformSystem());
 
   // Camera follows after gameplay-driven transform updates
-  registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
+  registry_->RegisterSystem<TransformComponent>(CameraFollowSystem());
 
   // Health UI updates before render so values reflect current frame
   registry_->RegisterSystem<HealthComponent, TextLabelComponent, SquarePrimitiveComponent>(DisplayHealthSystem());

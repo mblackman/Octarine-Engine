@@ -4,7 +4,6 @@
 
 #include <algorithm>
 
-#include "../Components/CameraFollowComponent.h"
 #include "../Components/TransformComponent.h"
 #include "Components/CameraComponents.h"
 #include "ECS/Iterable.h"
@@ -14,8 +13,7 @@
 
 class CameraFollowSystem {
  public:
-  void operator()(const ContextFacade& context, const TransformComponent& transform,
-                  CameraFollowComponent& cameraFollow) const {
+  void operator()(const ContextFacade& context, const TransformComponent& transform) const {
     auto& [viewport] = context.Registry()->Get<CameraComponent>();
     const auto& gameConfig = context.Registry()->Get<GameConfig>();
 
