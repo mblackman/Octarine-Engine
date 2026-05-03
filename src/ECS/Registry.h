@@ -125,9 +125,27 @@ class Registry {
     return fast_component_to_entity_[type_idx].value();
   }
 
+  // Non-throwing equivalent of Component<T>() const. Returns nullopt when the type was never registered.
+  template <typename T>
+  [[nodiscard]] std::optional<Entity> TryComponent() const {
+    const size_t type_idx = GetComponentTypeIndex<T>();
+    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) {
+      return std::nullopt;
+    }
+    return fast_component_to_entity_[type_idx];
+  }
+
   template <typename T>
   void AddComponent(const Entity entity, T component) {
     const Entity componentEntity = Component<T>();
+    const std::uint32_t id = entity.GetId();
+    // Re-add path: archetype already holds T. Assign over the live slot so the previous
+    // value's destructor runs (placement-new would leak std::string / sol::table refs).
+    if (id < entity_locations_.size() && entity_locations_[id].archetype != nullptr &&
+        entity_manager_->IsValid(entity) && entity_locations_[id].archetype->HasComponent(componentEntity.GetId())) {
+      GetComponent<T>(entity) = std::move(component);
+      return;
+    }
     const EntityLocation newLocation = TransitionAddComponent(entity, componentEntity.GetId());
     if (newLocation.archetype == nullptr) return;
     newLocation.archetype->AddComponent(newLocation, componentEntity, component);
@@ -170,8 +188,9 @@ class Registry {
     if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity) || !entity_locations_[id].archetype) {
       return false;
     }
-    const auto componentEntity = Component<T>();
-    return entity_locations_[id].archetype->HasComponent(componentEntity.GetId());
+    const auto componentEntity = TryComponent<T>();
+    if (!componentEntity.has_value()) return false;
+    return entity_locations_[id].archetype->HasComponent(componentEntity->GetId());
   }
 
   [[nodiscard]] std::vector<Archetype*> GetMatchingArchetypes(const ArchetypeType& type) const;
@@ -248,20 +267,25 @@ class Registry {
     return ref;
   }
 
-  // Singleton components
+  // Singleton components. Stored as std::shared_ptr<T> inside std::any so that
+  // move-only resource owners (e.g. AssetManager) can be stashed — std::any itself
+  // requires CopyConstructible.
   template <typename T>
   T& Set(T value) {
     const auto entityComponent = Component<T>();
-    singleton_components_[entityComponent.GetId()] = std::move(value);
-    return std::any_cast<T&>(singleton_components_.at(entityComponent.GetId()));
+    auto ptr = std::make_shared<T>(std::move(value));
+    T& ref = *ptr;
+    singleton_components_[entityComponent.GetId()] = std::move(ptr);
+    return ref;
   }
 
   template <typename T>
   const T& Get() const {
     const auto entityComponent = Component<T>();
     try {
-      return std::any_cast<const T&>(singleton_components_.at(entityComponent.GetId()));
-
+      const auto& anyVal = singleton_components_.at(entityComponent.GetId());
+      const auto& ptr = std::any_cast<const std::shared_ptr<T>&>(anyVal);
+      return *ptr;
     } catch (const std::out_of_range&) {
       throw std::runtime_error("Attempted to Get a singleton component that has not been Set.");
     } catch (const std::bad_any_cast&) {

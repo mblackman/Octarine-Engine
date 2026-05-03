@@ -155,6 +155,9 @@ void Game::Destroy() const {
 void Game::Run() {
   Setup();
 
+  // Seed previous-frame tick so the first WaitTime call produces a sane delta.
+  milliseconds_previous_frame_ = SDL_GetTicks();
+
   while (s_is_running_) {
     ProcessInput();
     const float deltaTime = WaitTime();

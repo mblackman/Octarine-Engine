@@ -18,11 +18,11 @@ class AssetManager {
  public:
   AssetManager() = default;
 
-  AssetManager(const AssetManager&) = default;
-  AssetManager& operator=(const AssetManager&) = default;
+  AssetManager(const AssetManager&) = delete;
+  AssetManager& operator=(const AssetManager&) = delete;
 
   AssetManager(AssetManager&&) noexcept = default;
-  AssetManager& operator=(AssetManager&&) = default;
+  AssetManager& operator=(AssetManager&&) noexcept = default;
 
   ~AssetManager();
 
