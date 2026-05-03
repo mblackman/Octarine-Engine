@@ -16,13 +16,13 @@ struct TextLabelComponent {
 
   explicit TextLabelComponent(const glm::vec2 position = glm::vec2(0, 0), const int layer = 0, std::string text = "",
                               std::string fontId = "",
-                              const SDL_Color color = {Constants::kUnt8Max, Constants::kUnt8Max, Constants::kUnt8Max,
-                                                       Constants::kUnt8Max},
+                              const SDL_Color color = {Constants::kUint8Max, Constants::kUint8Max, Constants::kUint8Max,
+                                                       Constants::kUint8Max},
                               const bool isFixed = true)
       : position(position),
         layer(layer),
-        text(std::move(std::move(text))),
-        fontId(std::move(std::move(fontId))),
+        text(std::move(text)),
+        fontId(std::move(fontId)),
         color(color),
         isFixed(isFixed) {}
 };

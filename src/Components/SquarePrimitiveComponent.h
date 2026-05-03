@@ -16,8 +16,8 @@ struct SquarePrimitiveComponent {
 
   explicit SquarePrimitiveComponent(const glm::vec2 position = glm::vec2(0, 0), const int layer = 0,
                                     const float width = 0, const float height = 0,
-                                    const SDL_Color color = {Constants::kUnt8Max, Constants::kUnt8Max,
-                                                             Constants::kUnt8Max, Constants::kUnt8Max},
+                                    const SDL_Color color = {Constants::kUint8Max, Constants::kUint8Max,
+                                                             Constants::kUint8Max, Constants::kUint8Max},
                                     const bool isFixed = true)
       : position(position), layer(layer), width(width), height(height), color(color), isFixed(isFixed) {}
 };
