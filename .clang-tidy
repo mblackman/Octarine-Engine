@@ -65,7 +65,7 @@ clang-analyzer-core.DivideZero,
 clang-analyzer-core.NonNullParamChecker,
 clang-analyzer-core.NullDereference,
 clang-analyzer-optin.performance.Padding,
-clang-analyzer-security.insecureAPI.strcpy
+clang-analyzer-security.insecureAPI.strcpy,
 cppcoreguidelines-avoid-goto,
 cppcoreguidelines-prefer-member-initializer,
 cppcoreguidelines-special-member-functions,
