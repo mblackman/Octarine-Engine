@@ -5,11 +5,12 @@
 #include <memory>
 #include <sol/sol.hpp>
 
+#include "../Components/BoxColliderComponent.h"
+#include "../Components/TransformComponent.h"
+#include "../ECS/Query.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
 #include "../Renderer/Renderer.h"
-#include "../Systems/UIButtonSystem.h"
-#include "Systems/DamageSystem.h"
 
 class ScriptSystem;
 
@@ -54,7 +55,6 @@ class Game {
   std::unique_ptr<Registry> registry_;
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
-  UIButtonSystem ui_button_system_;
-  DamageSystem damage_system_;
   ScriptSystem* script_system_{nullptr};
+  std::unique_ptr<ComponentQuery<TransformComponent, BoxColliderComponent>> collider_query_;
 };

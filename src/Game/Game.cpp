@@ -45,6 +45,7 @@
 #include "Systems/RenderTextSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "Systems/TransformSystem.h"
+#include "Systems/UIButtonSystem.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -216,9 +217,16 @@ void Game::Setup() {
   scriptSystem.SubscribeToEvents(event_bus_);
   keyboardControlSystem.SubscribeToEvents(event_bus_);
   projectileEmitSystem.Init(event_bus_);
-  ui_button_system_.Init(registry_.get(), event_bus_);
-  damage_system_.Init(registry_.get(), event_bus_);
+  // Event-driven systems with no per-frame Update — owned by the Registry instead of
+  // living as parallel members on Game. Keeps the registry as the single source of truth.
+  auto &uiButtonSystem = registry_->OwnSystem(UIButtonSystem());
+  auto &damageSystem = registry_->OwnSystem(DamageSystem());
+  uiButtonSystem.Init(registry_.get(), event_bus_);
+  damageSystem.Init(registry_.get(), event_bus_);
   movementSystem.Init(registry_.get(), event_bus_);
+
+  // Pre-build the debug-collider query once so we don't allocate per render frame.
+  collider_query_ = registry_->CreateQuery<TransformComponent, BoxColliderComponent>();
 }
 
 void Game::ProcessInput() const {
@@ -287,10 +295,10 @@ void Game::Render(const float deltaTime) {
   renderer_->Render(registry_.get(), sdl_renderer_);
 #endif
 
-  if (gameConfig.GetEngineOptions().drawColliders) {
-    auto colliderQuery = registry_->CreateQuery<TransformComponent, BoxColliderComponent>();
+  if (gameConfig.GetEngineOptions().drawColliders && collider_query_) {
+    collider_query_->Update();
     DrawColliderSystem drawColliderSystem;
-    colliderQuery->ForEach(drawColliderSystem);
+    collider_query_->ForEach(drawColliderSystem);
   }
 
   RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, deltaTime);

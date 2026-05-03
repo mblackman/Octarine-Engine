@@ -38,9 +38,11 @@ class MovementSystem {
       const bool isPlayer = registry_->HasTag(entity, player_);
 
       if (!isPlayer) {
-        const float right = transform.position.x + sprite.width * transform.scale.x;
-        const float bottom = transform.position.y + sprite.height * transform.scale.y;
-        if (transform.position.x > windowWidth || transform.position.y > windowHeight || right < 0 || bottom < 0) {
+        // Use global position so children of moving parents respect off-screen bounds.
+        const float right = transform.globalPosition.x + sprite.width * transform.globalScale.x;
+        const float bottom = transform.globalPosition.y + sprite.height * transform.globalScale.y;
+        if (transform.globalPosition.x > windowWidth || transform.globalPosition.y > windowHeight || right < 0 ||
+            bottom < 0) {
           registry_->QueueBlamEntity(entity);
           return;
         }

@@ -1,11 +1,14 @@
 #pragma once
-#include <future>
+#include <atomic>
+#include <condition_variable>
 #include <iterator>
+#include <mutex>
 #include <thread>
 #include <tuple>
 #include <utility>
 #include <vector>
 
+#include "../General/ThreadPool.h"
 #include "Component.h"
 #include "Entity.h"
 
@@ -103,17 +106,67 @@ class ArchetypeQuery {
 
   // Process all matching entities in parallel across chunks. Each chunk is an independent
   // memory region, so concurrent processing is safe for per-entity writes.
-  // Func signature: void(Entity, TComponents&...) or void(TComponents&...).
-  // IMPORTANT: Func must not access shared mutable state (e.g. no pushing to shared vectors).
+  // Func signature: void (Entity, TComponents&...) or void (TComponents&...).
+  // IMPORTANT: Func must not access a shared mutable state (e.g. no pushing to shared vectors).
   template <typename Func>
   void ParallelForEach(Func&& func) {
-    // Collect work items: (archetype, chunkIdx, entityCount) for all non-empty chunks.
-    struct ChunkWork {
-      Archetype* archetype;
-      size_t chunkIdx;
-      size_t entityCount;
-    };
+    const auto work = CollectChunkWork();
+    if (work.empty()) return;
 
+    const size_t num_batches = std::min(work.size(), ThreadPool::Instance().Size());
+    if (num_batches <= 1) {
+      ProcessChunks(work, 0, work.size(), func);
+      return;
+    }
+
+    const size_t items_per_batch = (work.size() + num_batches - 1) / num_batches;
+    // Dispatch (num_batches - 1) batches to the pool; caller runs the last batch inline
+    // so the calling thread doesn't sit idle waiting on a worker.
+    BatchBarrier barrier(num_batches - 1);
+    for (size_t t = 0; t < num_batches - 1; ++t) {
+      const size_t begin = t * items_per_batch;
+      const size_t end = std::min(begin + items_per_batch, work.size());
+      DispatchBatch(work, begin, end, barrier, func);
+    }
+
+    const size_t inline_begin = (num_batches - 1) * items_per_batch;
+    const size_t inline_end = std::min(inline_begin + items_per_batch, work.size());
+    if (inline_begin < inline_end) {
+      ProcessChunks(work, inline_begin, inline_end, func);
+    }
+
+    barrier.Wait();
+  }
+
+ private:
+  struct ChunkWork {
+    Archetype* archetype;
+    size_t chunkIdx;
+    size_t entityCount;
+  };
+
+  // Counts down N expected completions and lets one waiter block on Wait().
+  struct BatchBarrier {
+    std::atomic<size_t> remaining;
+    std::mutex mutex;
+    std::condition_variable cv;
+
+    explicit BatchBarrier(size_t count) : remaining(count) {}
+
+    void Signal() {
+      if (remaining.fetch_sub(1) == 1) {
+        std::lock_guard<std::mutex> lk(mutex);
+        cv.notify_one();
+      }
+    }
+
+    void Wait() {
+      std::unique_lock<std::mutex> lk(mutex);
+      cv.wait(lk, [this] { return remaining.load() == 0; });
+    }
+  };
+
+  std::vector<ChunkWork> CollectChunkWork() const {
     std::vector<ChunkWork> work;
     for (auto* arch : matching_archetypes_) {
       for (size_t c = 0; c < arch->chunks_.size(); ++c) {
@@ -123,36 +176,22 @@ class ArchetypeQuery {
         }
       }
     }
-
-    if (work.empty()) return;
-
-    const size_t hw_threads = std::max(1u, std::thread::hardware_concurrency());
-    const size_t num_threads = std::min(work.size(), hw_threads);
-
-    if (num_threads <= 1) {
-      // Not enough work to justify threading — run sequentially.
-      ProcessChunks(work, 0, work.size(), func);
-      return;
-    }
-
-    const size_t items_per_thread = (work.size() + num_threads - 1) / num_threads;
-    std::vector<std::future<void>> futures;
-    futures.reserve(num_threads);
-
-    for (size_t t = 0; t < num_threads; ++t) {
-      const size_t begin = t * items_per_thread;
-      const size_t end = std::min(begin + items_per_thread, work.size());
-      if (begin >= end) break;
-
-      futures.push_back(
-          std::async(std::launch::async, [&work, &func, this, begin, end] { ProcessChunks(work, begin, end, func); }));
-    }
-
-    for (auto& f : futures) f.get();
+    return work;
   }
 
- private:
-  template <typename ChunkWork, typename Func>
+  template <typename Func>
+  void DispatchBatch(const std::vector<ChunkWork>& work, size_t begin, size_t end, BatchBarrier& barrier, Func& func) {
+    if (begin >= end) {
+      barrier.Signal();
+      return;
+    }
+    ThreadPool::Instance().Submit([&work, &func, this, begin, end, &barrier] {
+      ProcessChunks(work, begin, end, func);
+      barrier.Signal();
+    });
+  }
+
+  template <typename Func>
   void ProcessChunks(const std::vector<ChunkWork>& work, size_t begin, size_t end, Func& func) {
     for (size_t i = begin; i < end; ++i) {
       const auto& w = work[i];

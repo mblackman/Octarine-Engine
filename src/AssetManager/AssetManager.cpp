@@ -51,6 +51,7 @@ void AssetManager::AddTexture(SDL_Renderer *renderer, const std::string &assetId
   } else {
     textures_.emplace(assetId, texture);
   }
+  ++texture_generation_;
 
   Logger::Info("Added texture: " + assetId + " from path: " + fullPath);
 }

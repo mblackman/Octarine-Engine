@@ -14,6 +14,7 @@ struct SpriteComponent {
   SDL_FRect srcRect{};
   SDL_FlipMode flip;
   mutable SDL_Texture* cachedTexture = nullptr;
+  mutable std::uint64_t cachedTextureGeneration = 0;
 
   explicit SpriteComponent(std::string assetId = "", const float width = 0, const float height = 0, const int layer = 0,
                            const bool isFixed = false, const float srcRectX = 0, const float srcRectY = 0)

@@ -14,6 +14,9 @@ class AssetManager {
   std::map<std::string, SDL_Texture*> textures_;
   std::map<std::string, TTF_Font*> fonts_;
   std::optional<SDL_ScaleMode> default_scale_mode_;
+  // Bumped whenever a texture is added or replaced. Sprite renderers compare against
+  // their cached generation to know when to re-resolve a stale SDL_Texture* pointer.
+  std::uint64_t texture_generation_{0};
 
  public:
   AssetManager() = default;
@@ -35,4 +38,5 @@ class AssetManager {
   [[nodiscard]] TTF_Font* GetFont(const std::string& assetId) const;
   [[nodiscard]] std::string GetFullPath(const std::string& relativePath) const;
   void SetDefaultScaleMode(const std::string& scaleMode);
+  [[nodiscard]] std::uint64_t TextureGeneration() const { return texture_generation_; }
 };

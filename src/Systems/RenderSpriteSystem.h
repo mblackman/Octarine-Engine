@@ -47,9 +47,12 @@ class RenderSpriteSystem {
       }
 
       if (!isOutsideCamera) {
-        // Cache the texture pointer on the sprite if not yet resolved.
-        if (!sprite.cachedTexture) {
+        // Re-resolve when first seen or when AssetManager has loaded/replaced any texture
+        // since this sprite cached its pointer. Stale cache would draw a destroyed handle.
+        const auto assetGen = assetManager.TextureGeneration();
+        if (!sprite.cachedTexture || sprite.cachedTextureGeneration != assetGen) {
           sprite.cachedTexture = assetManager.GetTexture(sprite.assetId);
+          sprite.cachedTextureGeneration = assetGen;
         }
 
         RenderKey renderKey(sprite.layer, transform.globalPosition.y, SPRITE, entity);

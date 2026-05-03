@@ -56,6 +56,8 @@ void Registry::BlamEntity(const Entity entity) {
     return;
   }
 
+  bool hierarchyMutated = false;
+
   // Cascade-destroy children first. Take a copy so the recursive BlamEntity calls can mutate
   // parent_to_children_ without invalidating our iteration.
   if (const auto childIt = parent_to_children_.find(entity.id); childIt != parent_to_children_.end()) {
@@ -65,6 +67,7 @@ void Registry::BlamEntity(const Entity entity) {
       child_to_parent_.erase(childId);
       BlamEntity(Entity(childId));
     }
+    hierarchyMutated = true;
   }
 
   // Detach from own parent.
@@ -74,7 +77,10 @@ void Registry::BlamEntity(const Entity entity) {
       if (p->second.empty()) parent_to_children_.erase(p);
     }
     child_to_parent_.erase(parentIt);
+    hierarchyMutated = true;
   }
+
+  if (hierarchyMutated) ++hierarchy_generation_;
 
   const EntityLocation removedLocation = entity_locations_[id];
   const auto swapped = removedLocation.archetype->RemoveEntity(removedLocation);
@@ -401,6 +407,7 @@ void Registry::SetParent(const Entity child, const Entity parent) {
   }
   child_to_parent_[child.id] = parent;
   parent_to_children_[parent.id].insert(child.id);
+  ++hierarchy_generation_;
 
   // Maintain the legacy pair entry too so HasPair / generic relationship queries keep working.
   const Entity childOf = ChildOfEntity();

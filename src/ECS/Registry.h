@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <typeindex>
 #include <typeinfo>
 #include <unordered_map>
 #include <unordered_set>
@@ -304,6 +305,27 @@ class Registry {
     return ref;
   }
 
+  // Event-driven systems with no per-frame Update body. Owned by the Registry so the
+  // Game class doesn't need to keep parallel storage; subscriber lifetimes still match
+  // the Registry's lifetime. Look up via GetSystem<T>() when wiring events.
+  template <typename T>
+  T& OwnSystem(T system) {
+    auto ptr = std::make_shared<T>(std::move(system));
+    T& ref = *ptr;
+    owned_systems_[std::type_index(typeid(T))] = std::move(ptr);
+    return ref;
+  }
+
+  template <typename T>
+  T& GetSystem() {
+    const auto it = owned_systems_.find(std::type_index(typeid(T)));
+    if (it == owned_systems_.end()) {
+      throw std::runtime_error("System type " + std::string(typeid(T).name()) + " has not been registered.");
+    }
+    auto& ptr = std::any_cast<std::shared_ptr<T>&>(it->second);
+    return *ptr;
+  }
+
   // Singleton components. Stored as std::shared_ptr<T> inside std::any so that
   // move-only resource owners (e.g. AssetManager) can be stashed — std::any itself
   // requires CopyConstructible.
@@ -396,6 +418,14 @@ class Registry {
   // Used by TransformSystem to skip hierarchy resolution when no parents exist.
   [[nodiscard]] bool HasAnyPairs() const { return !pairs_.empty(); }
 
+  // True iff at least one ChildOf relationship is live. Distinct from HasAnyPairs so the
+  // TransformSystem fast path stays enabled when unrelated relationships exist.
+  [[nodiscard]] bool HasAnyChildPairs() const { return !child_to_parent_.empty(); }
+
+  // Bumped whenever the ChildOf hierarchy mutates (SetParent / detach / BlamEntity).
+  // Lets TransformSystem cache root sets and rebuild only when membership changes.
+  [[nodiscard]] uint64_t HierarchyGeneration() const { return hierarchy_generation_; }
+
   // Incremented when a new archetype is created. Queries use this to skip re-matching
   // when the archetype set hasn't changed since their last Update.
   [[nodiscard]] uint64_t ArchetypeGeneration() const { return archetype_generation_; }
@@ -426,6 +456,7 @@ class Registry {
   std::unique_ptr<Archetype> root_archetype_;  // The root of the archetype graph. Empty signature.
   std::vector<std::unique_ptr<ISystem>> systems_;
   std::unordered_map<ComponentID, std::any> singleton_components_;
+  std::unordered_map<std::type_index, std::any> owned_systems_;
   std::vector<std::optional<Entity>> fast_component_to_entity_;
   std::unordered_map<std::string, Entity> tag_to_entity_;
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
@@ -439,6 +470,7 @@ class Registry {
   std::unordered_set<EcsId> pending_blam_ids_;
   float delta_time_{};
   uint64_t archetype_generation_{0};
+  uint64_t hierarchy_generation_{0};
   std::uint64_t user_entity_count_{0};
   std::unordered_set<EcsId> internal_entity_ids_;
 };
