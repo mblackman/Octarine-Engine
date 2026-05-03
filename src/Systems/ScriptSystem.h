@@ -116,11 +116,11 @@ class ScriptSystem {
       const sol::error err = result;
       Logger::ErrorLua(std::string(err.what()));
     }
-
-    // Pressed-keys tracked per-frame; cleared after invoking the script so next frame starts fresh.
-    // Assumes one ScriptComponent entity per frame; revisit if multiple scripts must read pressed events.
-    pressedKeys_.clear();
   }
+
+  // Caller (Game) invokes this once after all systems have run so every script entity in
+  // the frame observes the same pressed-keys snapshot.
+  void ClearPerFrameInput() { pressedKeys_.clear(); }
 
  private:
   void CreateLuaTypes(sol::state &lua) {

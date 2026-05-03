@@ -14,6 +14,8 @@
 #include "Systems/DamageSystem.h"
 #include "Systems/MovementSystem.h"
 
+class ScriptSystem;
+
 class Registry;
 
 class Game {
@@ -57,4 +59,5 @@ class Game {
   std::unique_ptr<Renderer> renderer_;
   UIButtonSystem ui_button_system_;
   DamageSystem damage_system_;
+  ScriptSystem* script_system_{nullptr};
 };

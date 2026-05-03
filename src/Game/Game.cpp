@@ -176,6 +176,7 @@ void Game::Setup() {
 
   // Gameplay
   auto &scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
+  script_system_ = &scriptSystem;
 
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
   scriptSystem.CreateLuaBindings(lua, *this);
@@ -257,7 +258,14 @@ void Game::ProcessInput() const {
   }
 }
 
-void Game::Update(const float deltaTime) { registry_->Update(deltaTime); }
+void Game::Update(const float deltaTime) {
+  registry_->Update(deltaTime);
+  // Pressed-keys are a per-frame edge signal — clear after every script entity in this frame
+  // has had a chance to observe them.
+  if (script_system_) {
+    script_system_->ClearPerFrameInput();
+  }
+}
 
 void Game::Render(const float deltaTime) {
   PROFILE_NAMED_SCOPE("Game::Render (total)");
