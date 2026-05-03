@@ -186,14 +186,15 @@ void Game::Setup() {
   assetManager.LoadGameConfig(gameConfig);
   LoadGame(lua, assetManager, gameConfig);
 
-  registry_->RegisterSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
+  registry_->RegisterParallelSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
   auto &projectileEmitSystem =
       registry_->RegisterSystem<TransformComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
-  registry_->RegisterSystem<ProjectileComponent>(ProjectileLifecycleSystem());
+  registry_->RegisterParallelSystem<ProjectileComponent>(ProjectileLifecycleSystem());
   auto &keyboardControlSystem =
       registry_->RegisterSystem<KeyboardControlComponent, RigidBodyComponent, SpriteComponent>(KeyboardControlSystem());
 
-  auto &movementSystem = registry_->RegisterBulkSystem<TransformComponent, RigidBodyComponent>(MovementSystem());
+  auto &movementSystem =
+      registry_->RegisterParallelSystem<TransformComponent, RigidBodyComponent, SpriteComponent>(MovementSystem());
 
   // Resolve hierarchy after Movement mutates local positions, before Collision reads globals.
   registry_->RegisterBulkSystem<TransformComponent>(TransformSystem());
@@ -223,7 +224,7 @@ void Game::Setup() {
   auto &damageSystem = registry_->OwnSystem(DamageSystem());
   uiButtonSystem.Init(registry_.get(), event_bus_);
   damageSystem.Init(registry_.get(), event_bus_);
-  movementSystem.Init(registry_.get(), event_bus_);
+  movementSystem.Init(registry_.get());
 
   // Pre-build the debug-collider query once so we don't allocate per render frame.
   collider_query_ = registry_->CreateQuery<TransformComponent, BoxColliderComponent>();

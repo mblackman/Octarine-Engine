@@ -1,67 +1,65 @@
 #pragma once
 
-#include <memory>
-
 #include "../Components/RigidBodyComponent.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../ECS/Entity.h"
-#include "../ECS/Iterable.h"
-#include "../ECS/Query.h"
 #include "../ECS/Registry.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
 #include "../Game/GameConfig.h"
+#include "ECS/EntityCommandBuffer.h"
 
 class MovementSystem {
  public:
-  void Init(Registry* registry, const std::unique_ptr<EventBus>& eventBus) {
+  EntityCommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
+
+  void Init(Registry* registry) {
     registry_ = registry;
+    const auto& gameConfig = registry_->Get<GameConfig>();
+    const auto& eventBus = registry_->Get<EventBus*>();
+
     enemies_ = registry_->TagId("enemies");
     obstacles_ = registry_->TagId("obstacles");
     player_ = registry_->TagId("player");
-    // Query includes SpriteComponent so we get direct SoA access for bounds checking
-    // instead of per-entity random GetComponent lookups.
-    query_ = registry_->CreateQuery<TransformComponent, RigidBodyComponent, SpriteComponent>();
+
+    // TODO Fetch these again if the config changes.
+    windowWidth_ = static_cast<float>(gameConfig.windowWidth);
+    windowHeight_ = static_cast<float>(gameConfig.windowHeight);
+    playableAreaWidth_ = static_cast<float>(gameConfig.playableAreaWidth);
+    playableAreaHeight_ = static_cast<float>(gameConfig.playableAreaHeight);
+
     eventBus->SubscribeEvent<MovementSystem, CollisionEvent>(this, &MovementSystem::OnCollision);
   }
 
-  void operator()(const ContextFacade& context, const Iterable& /*iterable*/) {
-    const float dt = context.DeltaTime();
-    const auto& gameConfig = registry_->Get<GameConfig>();
-    const auto windowWidth = static_cast<float>(gameConfig.windowWidth);
-    const auto windowHeight = static_cast<float>(gameConfig.windowHeight);
+  void operator()(const Entity entity, const float deltaTime, TransformComponent& transform,
+                  const RigidBodyComponent& rigidBody, const SpriteComponent& spriteComponent) {
+    const bool isPlayer = registry_->HasTag(entity, player_);
 
-    query_->Update();
-    query_->ForEach([&](const Entity entity, TransformComponent& transform,
-                        const RigidBodyComponent& rigidBody, const SpriteComponent& sprite) {
-      const bool isPlayer = registry_->HasTag(entity, player_);
-
-      if (!isPlayer) {
-        // Use global position so children of moving parents respect off-screen bounds.
-        const float right = transform.globalPosition.x + sprite.width * transform.globalScale.x;
-        const float bottom = transform.globalPosition.y + sprite.height * transform.globalScale.y;
-        if (transform.globalPosition.x > windowWidth || transform.globalPosition.y > windowHeight || right < 0 ||
-            bottom < 0) {
-          registry_->QueueBlamEntity(entity);
-          return;
-        }
+    if (!isPlayer) {
+      // Use global position so children of moving parents respect off-screen bounds.
+      const float right = transform.globalPosition.x + spriteComponent.width * transform.globalScale.x;
+      const float bottom = transform.globalPosition.y + spriteComponent.height * transform.globalScale.y;
+      if (transform.globalPosition.x > windowWidth_ || transform.globalPosition.y > windowHeight_ || right < 0 ||
+          bottom < 0) {
+        cmd_buffer_.QueueBlam(entity);
+        return;
       }
+    }
 
-      transform.position.x += rigidBody.velocity.x * dt;
-      transform.position.y += rigidBody.velocity.y * dt;
+    transform.position.x += rigidBody.velocity.x * deltaTime;
+    transform.position.y += rigidBody.velocity.y * deltaTime;
 
-      if (isPlayer) {
-        if (transform.position.x < 0) transform.position.x = 0;
-        if (transform.position.y < 0) transform.position.y = 0;
-        if (transform.position.x + sprite.width * transform.scale.x > gameConfig.playableAreaWidth) {
-          transform.position.x = gameConfig.playableAreaWidth - sprite.width * transform.scale.x;
-        }
-        if (transform.position.y + sprite.height * transform.scale.y > gameConfig.playableAreaHeight) {
-          transform.position.y = gameConfig.playableAreaHeight - sprite.height * transform.scale.y;
-        }
+    if (isPlayer) {
+      if (transform.position.x < 0) transform.position.x = 0;
+      if (transform.position.y < 0) transform.position.y = 0;
+      if (transform.position.x + spriteComponent.width * transform.scale.x > playableAreaWidth_) {
+        transform.position.x = playableAreaWidth_ - spriteComponent.width * transform.scale.x;
       }
-    });
+      if (transform.position.y + spriteComponent.height * transform.scale.y > playableAreaHeight_) {
+        transform.position.y = playableAreaHeight_ - spriteComponent.height * transform.scale.y;
+      }
+    }
   }
 
   void OnCollision(const CollisionEvent& event) {
@@ -88,8 +86,12 @@ class MovementSystem {
   }
 
   Registry* registry_ = nullptr;
+  EntityCommandBuffer cmd_buffer_;
   Entity enemies_{};
   Entity obstacles_{};
   Entity player_{};
-  std::unique_ptr<ComponentQuery<TransformComponent, RigidBodyComponent, SpriteComponent>> query_;
+  float windowWidth_{};
+  float windowHeight_{};
+  float playableAreaWidth_{};
+  float playableAreaHeight_{};
 };

@@ -1,15 +1,19 @@
 #pragma once
 
 #include "../Components/ProjectileComponent.h"
-#include "ECS/Iterable.h"
-#include "ECS/Registry.h"
+#include "ECS/EntityCommandBuffer.h"
 
 class ProjectileLifecycleSystem {
  public:
-  void operator()(const ContextFacade& context, ProjectileComponent& projectile) const {
-    projectile.timer += context.DeltaTime();
+  EntityCommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
+
+  void operator()(const Entity entity, const float deltaTime, ProjectileComponent& projectile) {
+    projectile.timer += deltaTime;
     if (projectile.timer > projectile.duration) {
-      context.Registry()->QueueBlamEntity(context.Entity());
+      cmd_buffer_.QueueBlam(entity);
     }
   }
+
+ private:
+  EntityCommandBuffer cmd_buffer_;
 };

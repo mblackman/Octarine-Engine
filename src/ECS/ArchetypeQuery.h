@@ -3,7 +3,6 @@
 #include <condition_variable>
 #include <iterator>
 #include <mutex>
-#include <thread>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -23,9 +22,9 @@ class ArchetypeQuery {
     using Pointer = void;
     using DifferenceType = std::ptrdiff_t;
 
-    Iterator(const ArchetypeType& type, std::vector<Archetype*>::iterator archetype_it,
+    Iterator(ArchetypeType type, std::vector<Archetype*>::iterator archetype_it,
              std::vector<Archetype*>::iterator archetype_end_it)
-        : type_(type),
+        : type_(std::move(type)),
           archetype_it_(std::move(archetype_it)),
           archetype_end_it_(std::move(archetype_end_it)),
           chunk_idx_(0),

@@ -269,6 +269,82 @@ class Registry {
     return ref;
   }
 
+  // Parallel per-entity system. Same shape as RegisterSystem but the per-entity callback runs
+  // across chunks on the ThreadPool. Func signature: void (Entity, TComponents&...), void (Entity, float,
+  // TComponents&...), void (TComponents&...) or void (float, TComponents&...) — the ContextFacade signatures supported
+  // by RegisterSystem are not available here because the parallel path does not build a ContextImpl. Caller is
+  // responsible for thread-safety: expose an EntityCommandBuffer on your system to handle requests for registry state
+  // changes so they resolve on the calling thread all at once.
+  template <typename... TArgs, typename Func>
+  std::decay_t<Func>& RegisterParallelSystem(Func&& func) {
+    using StoredFunc = std::decay_t<Func>;
+    static_assert(std::is_invocable_v<StoredFunc, Entity, float, TArgs&...> ||
+                      std::is_invocable_v<StoredFunc, Entity, TArgs&...> ||
+                      std::is_invocable_v<StoredFunc, float, TArgs&...> || std::is_invocable_v<StoredFunc, TArgs&...>,
+                  "RegisterParallelSystem func must match void(Entity, float, TArgs&...), void(Entity, TArgs&...), "
+                  "void(float, TArgs&...), or void(TArgs&...). "
+                  "ContextFacade signatures are not supported on the parallel path.");
+    class ParallelSystemWrapper final : public ISystem {
+     public:
+      ParallelSystemWrapper(Registry* registry, Func&& f)
+          : registry_(registry), func_(std::forward<Func>(f)), query_(registry->CreateQuery<TArgs...>()) {}
+
+      void Update(const Registry& registry) override {
+        query_->Update();
+        const float dt = registry.delta_time_;
+
+        if constexpr (std::is_invocable_v<StoredFunc, Entity, float, TArgs&...> ||
+                      std::is_invocable_v<StoredFunc, Entity, TArgs&...>) {
+          query_->ParallelForEach([this, dt](Entity entity, TArgs&... args) {
+            if constexpr (std::is_invocable_v<StoredFunc, Entity, float, TArgs&...>) {
+              func_(entity, dt, args...);
+            } else if constexpr (std::is_invocable_v<StoredFunc, Entity, TArgs&...>) {
+              func_(entity, args...);
+            } else {
+              static_assert(!std::is_same_v<Func, Func>,
+                            "The function passed to ForEach does not match the required signatures. "
+                            "Expected one of: void(Entity, T&...), void(Entity, float, T&...).");
+            }
+          });
+        } else if constexpr (std::is_invocable_v<StoredFunc, float, TArgs&...> ||
+                             std::is_invocable_v<StoredFunc, TArgs&...>) {
+          query_->ParallelForEach([this, dt](TArgs&... args) {
+            if constexpr (std::is_invocable_v<StoredFunc, float, TArgs&...>) {
+              func_(dt, args...);
+            } else if constexpr (std::is_invocable_v<StoredFunc, TArgs&...>) {
+              func_(args...);
+            } else {
+              static_assert(!std::is_same_v<Func, Func>,
+                            "The function passed to ForEach does not match the required signatures. "
+                            "Expected one of: void(float, T&...), void(T&...).");
+            }
+          });
+        } else {
+          static_assert(
+              !std::is_same_v<Func, Func>,
+              "The function passed to ForEach does not match the required signatures. "
+              "Expected one of: void(Entity, T&...), void(Entity, float, T&...), void(float, T&...), void(T&...).");
+        }
+
+        if constexpr (requires { func_.GetCommandBuffer(); }) {
+          func_.GetCommandBuffer().Playback(registry_);
+        }
+      }
+
+      StoredFunc& GetFunc() { return func_; }
+
+     private:
+      Registry* registry_;
+      StoredFunc func_;
+      std::unique_ptr<ComponentQuery<TArgs...>> query_;
+    };
+
+    auto wrapper = std::make_unique<ParallelSystemWrapper>(this, std::forward<Func>(func));
+    StoredFunc& ref = wrapper->GetFunc();
+    systems_.push_back(std::move(wrapper));
+    return ref;
+  }
+
   // Bulk system: wrapper invokes Func once per Update with the matching Iterable.
   // Func signature: void(const ContextFacade&, const Iterable&). The ContextFacade
   // exposes Registry/DeltaTime and a sentinel Entity (Entity{}); per-entity component
