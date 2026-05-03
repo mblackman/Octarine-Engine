@@ -195,11 +195,11 @@ void Game::Setup() {
 
   auto &movementSystem = registry_->RegisterBulkSystem<TransformComponent, RigidBodyComponent>(MovementSystem());
 
-  // Collision after movement integrates positions; emits CollisionEvent for damage/movement subscribers
-  registry_->RegisterBulkSystem(CollisionSystem());
-
-  // Transform hierarchy resolution — produces globalPosition/globalScale/globalRotation for downstream
+  // Resolve hierarchy after Movement mutates local positions, before Collision reads globals.
   registry_->RegisterBulkSystem<TransformComponent>(TransformSystem());
+
+  // Collision reads transform.globalPosition / globalScale — must run after TransformSystem.
+  registry_->RegisterBulkSystem(CollisionSystem());
 
   // Camera follows after gameplay-driven transform updates
   registry_->RegisterSystem<TransformComponent>(CameraFollowSystem());
