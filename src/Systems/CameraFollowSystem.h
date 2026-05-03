@@ -17,12 +17,12 @@ class CameraFollowSystem {
     auto& [viewport] = context.Registry()->Get<CameraComponent>();
     const auto& gameConfig = context.Registry()->Get<GameConfig>();
 
-    if (transform.position.x + viewport.w / Constants::kHalf < gameConfig.playableAreaWidth) {
-      viewport.x = transform.position.x - static_cast<float>(gameConfig.windowWidth) / Constants::kHalf;
+    if (transform.position.x + viewport.w / Constants::kTwo < gameConfig.playableAreaWidth) {
+      viewport.x = transform.position.x - static_cast<float>(gameConfig.windowWidth) / Constants::kTwo;
     }
 
-    if (transform.position.y + viewport.h / Constants::kHalf < gameConfig.playableAreaHeight) {
-      viewport.y = transform.position.y - static_cast<float>(gameConfig.windowHeight) / Constants::kHalf;
+    if (transform.position.y + viewport.h / Constants::kTwo < gameConfig.playableAreaHeight) {
+      viewport.y = transform.position.y - static_cast<float>(gameConfig.windowHeight) / Constants::kTwo;
     }
 
     const float maxX = std::max(0.0f, gameConfig.playableAreaWidth - viewport.w);

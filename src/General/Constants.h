@@ -5,8 +5,8 @@ namespace Constants {
 static constexpr int kMillisecondsPerSecond = 1000;
 static constexpr int kFps = 60;
 static constexpr int kMillisecondsPerFrame = kMillisecondsPerSecond / kFps;
-static constexpr float kHalf = 2.0f;
-static constexpr Uint8 kUnt8Max = 255;
+static constexpr float kTwo = 2.0f;
+static constexpr Uint8 kUint8Max = 255;
 static constexpr int kDefaultWindowWidth = 1280;
 static constexpr int kDefaultWindowHeight = 720;
 

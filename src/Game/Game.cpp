@@ -127,7 +127,7 @@ bool Game::Initialize(const std::string &assetPath) {
   ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
   ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
 
-  SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
+  SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
 
   registry_->Set<SDL_Renderer *>(sdl_renderer_);
   registry_->Set<EventBus *>(event_bus_.get());
@@ -278,7 +278,7 @@ void Game::Render(const float deltaTime) {
   auto &renderQueue = registry_->Get<RenderQueue>();
   auto &gameConfig = registry_->Get<GameConfig>();
 
-  SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUnt8Max);
+  SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
   SDL_RenderClear(sdl_renderer_);
 
 #ifdef OCTARINE_PROFILING

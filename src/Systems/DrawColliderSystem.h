@@ -25,7 +25,7 @@ class DrawColliderSystem {
                             static_cast<float>(collider.width) * transform.globalScale.x,
                             static_cast<float>(collider.height) * transform.globalScale.y};
 
-    SDL_SetRenderDrawColor(renderer, Constants::kUnt8Max, 0, 0, Constants::kUnt8Max);
+    SDL_SetRenderDrawColor(renderer, Constants::kUint8Max, 0, 0, Constants::kUint8Max);
     SDL_RenderRect(renderer, &rect);
   }
 };
