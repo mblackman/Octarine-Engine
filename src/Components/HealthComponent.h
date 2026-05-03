@@ -4,7 +4,7 @@ struct HealthComponent {
   int currentHealth;
   int maxHealth;
 
-  HealthComponent() : currentHealth(), maxHealth() {}
+  HealthComponent() = delete;
 
   explicit HealthComponent(const int maxHealth) : currentHealth(maxHealth), maxHealth(maxHealth) {}
 
