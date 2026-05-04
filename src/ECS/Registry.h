@@ -248,7 +248,9 @@ class Registry {
     class SystemWrapper final : public ISystem {
      public:
       SystemWrapper(Registry* registry, Func&& f)
-          : func_(std::forward<Func>(f)), query_(registry->CreateQuery<TArgs...>()) {}
+          : ISystem(PrettifyTypeName(typeid(StoredFunc).name())),
+            func_(std::forward<Func>(f)),
+            query_(registry->CreateQuery<TArgs...>()) {}
 
       void Update(const Registry& registry) override {
         query_->Update();
@@ -287,7 +289,10 @@ class Registry {
     class ParallelSystemWrapper final : public ISystem {
      public:
       ParallelSystemWrapper(Registry* registry, Func&& f)
-          : registry_(registry), func_(std::forward<Func>(f)), query_(registry->CreateQuery<TArgs...>()) {}
+          : ISystem(PrettifyTypeName(typeid(StoredFunc).name())),
+            registry_(registry),
+            func_(std::forward<Func>(f)),
+            query_(registry->CreateQuery<TArgs...>()) {}
 
       void Update(const Registry& registry) override {
         query_->Update();
@@ -359,7 +364,9 @@ class Registry {
     class BulkSystemWrapper final : public ISystem {
      public:
       BulkSystemWrapper(Registry* registry, Func&& f)
-          : func_(std::forward<Func>(f)), query_(registry->CreateQuery<TArgs...>()) {}
+          : ISystem(PrettifyTypeName(typeid(StoredFunc).name())),
+            func_(std::forward<Func>(f)),
+            query_(registry->CreateQuery<TArgs...>()) {}
 
       void Update(const Registry& registry) override {
         query_->Update();
