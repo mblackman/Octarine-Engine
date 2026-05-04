@@ -42,7 +42,7 @@ class MovementSystem {
       const float bottom = transform.globalPosition.y + spriteComponent.height * transform.globalScale.y;
       if (transform.globalPosition.x > windowWidth_ || transform.globalPosition.y > windowHeight_ || right < 0 ||
           bottom < 0) {
-        cmd_buffer_.QueueBlam(entity);
+        cmd_buffer_.Emplace<Entity>(entity);
         return;
       }
     }

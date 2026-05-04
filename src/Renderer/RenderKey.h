@@ -1,37 +1,37 @@
 #pragma once
 
-#include <SDL3/SDL.h>
-
 #include <compare>
 #include <tuple>
 
+#include "./RenderCommands.h"
 #include "./RenderableType.h"
-#include "ECS/Entity.h"
 
+// Render entry — slim header (layer/depth/type) plus one of three POD payloads in
+// a union, selected by `type`. Inlining the payload here means a sorted iteration is
+// fully sequential reads through one vector instead of a random gather into per-type
+// command arrays. With ~100K entries per frame the random-access cost is the
+// bottleneck of Renderer::Render.
 struct RenderKey {
-  unsigned int layer;
-  float depth;
-  RenderableType type;
-  Entity entity;
+  unsigned int layer{};
+  float depth{};
+  RenderableType type{};
 
-  // Cached sprite render data — populated during RenderSpriteSystem to avoid
-  // per-entity GetComponent lookups in the Renderer.
-  float destX{}, destY{}, destW{}, destH{};
-  SDL_FRect srcRect{};
-  double rotation{};
-  SDL_FlipMode flip{};
-  SDL_Texture* texture{};
-  bool isFixed{};
+  union Payload {
+    SpriteCommand sprite;
+    SquareCommand square;
+    TextCommand text;
+
+    // Leaves union storage uninitialized — the producing system always overwrites the
+    // active member chosen by `type`. Skipping zero-init saves ~56 bytes of writes per
+    // emplace, which is meaningful at 100K+ keys per frame.
+    Payload() {}
+  } payload;
 
   RenderKey() = default;
 
-  RenderKey(unsigned int layer, float depth, RenderableType type, Entity entity)
-      : layer(layer), depth(depth), type(type), entity(entity) {}
+  RenderKey(unsigned int layer, float depth, RenderableType type) : layer(layer), depth(depth), type(type) {}
 
-  // Ordering uses (layer, depth, type, entityId) — the cached sprite fields are not
-  // identity-bearing, so we compare a tuple of the keying fields explicitly instead of
-  // defaulting <=> across all members (which would also drag in NaN-prone floats etc.).
-  [[nodiscard]] auto OrderingTuple() const { return std::tuple(layer, depth, static_cast<int>(type), entity.GetId()); }
+  [[nodiscard]] auto OrderingTuple() const { return std::tuple(layer, depth, static_cast<int>(type)); }
 
   bool operator==(const RenderKey& other) const { return OrderingTuple() == other.OrderingTuple(); }
 
@@ -39,7 +39,6 @@ struct RenderKey {
     if (auto c = layer <=> other.layer; c != 0) return c;
     if (depth < other.depth) return std::strong_ordering::less;
     if (depth > other.depth) return std::strong_ordering::greater;
-    if (auto c = static_cast<int>(type) <=> static_cast<int>(other.type); c != 0) return c;
-    return entity.GetId() <=> other.entity.GetId();
+    return static_cast<int>(type) <=> static_cast<int>(other.type);
   }
 };

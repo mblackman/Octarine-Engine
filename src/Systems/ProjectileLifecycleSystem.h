@@ -10,7 +10,7 @@ class ProjectileLifecycleSystem {
   void operator()(const Entity entity, const float deltaTime, ProjectileComponent& projectile) {
     projectile.timer += deltaTime;
     if (projectile.timer > projectile.duration) {
-      cmd_buffer_.QueueBlam(entity);
+      cmd_buffer_.Emplace<Entity>(entity);
     }
   }
 

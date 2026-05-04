@@ -4,20 +4,15 @@
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/TransformComponent.h"
+#include "../General/Constants.h"
 #include "Components/CameraComponents.h"
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
-#include "Game/GameConfig.h"
 
 class DrawColliderSystem {
  public:
   void operator()(const ContextFacade& context, const TransformComponent& transform,
                   const BoxColliderComponent& collider) const {
-    const auto& gameConfig = context.Registry()->Get<GameConfig>();
-    if (!gameConfig.GetEngineOptions().drawColliders) {
-      return;
-    }
-
     auto* renderer = context.Registry()->Get<SDL_Renderer*>();
     const auto& camera = context.Registry()->Get<CameraComponent>().viewport;
 

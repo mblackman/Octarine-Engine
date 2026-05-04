@@ -210,8 +210,8 @@ void Game::Setup() {
 
   // Render queue producers
   registry_->RegisterParallelSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
-  registry_->RegisterParallelSystem<TextLabelComponent>(RenderTextSystem());
-  registry_->RegisterParallelSystem<SquarePrimitiveComponent>(RenderPrimitiveSystem());
+  registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
+  registry_->RegisterParallelSystem<SquarePrimitiveComponent, TransformComponent>(RenderPrimitiveSystem());
 
   // Event subscriptions (one-time)
   event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
@@ -289,11 +289,11 @@ void Game::Render(const float deltaTime) {
   }
   {
     PerfUtils::ScopedTimer drawTimer("Render: Draw");
-    renderer_->Render(registry_.get(), sdl_renderer_);
+    renderer_->Render(renderQueue, sdl_renderer_);
   }
 #else
   renderQueue.Sort();
-  renderer_->Render(registry_.get(), sdl_renderer_);
+  renderer_->Render(renderQueue, sdl_renderer_);
 #endif
 
   if (gameConfig.GetEngineOptions().drawColliders && collider_query_) {

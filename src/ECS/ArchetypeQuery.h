@@ -145,23 +145,27 @@ class ArchetypeQuery {
   };
 
   // Counts down N expected completions and lets one waiter block on Wait().
+  // Decrement and notify happen under the mutex so Wait() cannot return — and
+  // therefore the BatchBarrier cannot be destroyed — until the last Signal()
+  // has fully released the lock. Signaling outside the lock would race the
+  // waiter's stack-destruction of the mutex.
   struct BatchBarrier {
-    std::atomic<size_t> remaining;
+    size_t remaining;
     std::mutex mutex;
     std::condition_variable cv;
 
     explicit BatchBarrier(size_t count) : remaining(count) {}
 
     void Signal() {
-      if (remaining.fetch_sub(1) == 1) {
-        std::lock_guard<std::mutex> lk(mutex);
+      std::lock_guard<std::mutex> lk(mutex);
+      if (--remaining == 0) {
         cv.notify_one();
       }
     }
 
     void Wait() {
       std::unique_lock<std::mutex> lk(mutex);
-      cv.wait(lk, [this] { return remaining.load() == 0; });
+      cv.wait(lk, [this] { return remaining == 0; });
     }
   };
 

@@ -5,24 +5,22 @@
 #include "../AssetManager/AssetManager.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
-#include "../Renderer/RenderKey.h"
-#include "../Renderer/RenderableType.h"
+#include "../Renderer/RenderQueue.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"
 
 class RenderSpriteSystem {
  public:
-  CommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
-
   void Prepare(Registry* registry) {
     const auto& gameConfig = registry->Get<GameConfig>();
     camera_ = registry->Get<CameraComponent>().viewport;
     assetManager_ = &registry->Get<AssetManager>();
+    renderQueue_ = &registry->Get<RenderQueue>();
     windowWidth_ = static_cast<float>(gameConfig.windowWidth);
     windowHeight_ = static_cast<float>(gameConfig.windowHeight);
   }
 
-  void operator()(const Entity entity, const TransformComponent& transform, const SpriteComponent& sprite) const {
+  void operator()(const TransformComponent& transform, const SpriteComponent& sprite) const {
     bool isOutsideCamera = false;
 
     if (sprite.isFixed) {
@@ -37,36 +35,33 @@ class RenderSpriteSystem {
                         transform.globalPosition.y > camera_.y + camera_.h;
     }
 
-    if (!isOutsideCamera) {
-      // Re-resolve when first seen or when AssetManager has loaded/replaced any texture
-      // since this sprite cached its pointer. Stale cache would draw a destroyed handle.
-      const auto assetGen = assetManager_->TextureGeneration();
-      if (!sprite.cachedTexture || sprite.cachedTextureGeneration != assetGen) {
-        sprite.cachedTexture = assetManager_->GetTexture(sprite.assetId);
-        sprite.cachedTextureGeneration = assetGen;
-      }
+    if (isOutsideCamera) return;
 
-      RenderKey renderKey(sprite.layer, transform.globalPosition.y, SPRITE, entity);
-      // Pre-compute render data so Renderer doesn't need GetComponent lookups.
-      const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera_.x;
-      const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera_.y;
-      renderKey.destX = x;
-      renderKey.destY = y;
-      renderKey.destW = sprite.width * transform.globalScale.x;
-      renderKey.destH = sprite.height * transform.globalScale.y;
-      renderKey.srcRect = sprite.srcRect;
-      renderKey.rotation = transform.rotation;
-      renderKey.flip = sprite.flip;
-      renderKey.texture = sprite.cachedTexture;
-      renderKey.isFixed = sprite.isFixed;
-
-      cmd_buffer_.QueueAddRenderKey(renderKey);
+    // Re-resolve when first seen or when AssetManager has loaded/replaced any texture
+    // since this sprite cached its pointer. Stale cache would draw a destroyed handle.
+    const auto assetGen = assetManager_->TextureGeneration();
+    if (!sprite.cachedTexture || sprite.cachedTextureGeneration != assetGen) {
+      sprite.cachedTexture = assetManager_->GetTexture(sprite.assetId);
+      sprite.cachedTextureGeneration = assetGen;
     }
+
+    const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera_.x;
+    const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera_.y;
+
+    auto& cmd = renderQueue_->EmplaceSprite(static_cast<unsigned int>(sprite.layer), transform.globalPosition.y);
+    cmd.destX = x;
+    cmd.destY = y;
+    cmd.destW = sprite.width * transform.globalScale.x;
+    cmd.destH = sprite.height * transform.globalScale.y;
+    cmd.srcRect = sprite.srcRect;
+    cmd.rotation = transform.rotation;
+    cmd.flip = sprite.flip;
+    cmd.texture = sprite.cachedTexture;
   }
 
  private:
-  CommandBuffer cmd_buffer_;
   AssetManager* assetManager_ = nullptr;
+  RenderQueue* renderQueue_ = nullptr;
   float windowWidth_ = 0;
   float windowHeight_ = 0;
   SDL_FRect camera_{};

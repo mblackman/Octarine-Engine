@@ -1,18 +1,32 @@
 #pragma once
 
+#include <SDL3/SDL.h>
+
 #include "../Components/SquarePrimitiveComponent.h"
-#include "../Renderer/RenderKey.h"
-#include "../Renderer/RenderableType.h"
+#include "../Components/TransformComponent.h"
+#include "../Renderer/RenderQueue.h"
+#include "Components/CameraComponents.h"
+#include "ECS/Registry.h"
 
 class RenderPrimitiveSystem {
  public:
-  CommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
+  void Prepare(Registry* registry) {
+    camera_ = registry->Get<CameraComponent>().viewport;
+    renderQueue_ = &registry->Get<RenderQueue>();
+  }
 
-  void operator()(const Entity entity, const SquarePrimitiveComponent& square) const {
-    const RenderKey renderKey(square.layer, square.position.y, SQUARE_PRIMITIVE, entity);
-    cmd_buffer_.QueueAddRenderKey(renderKey);
+  void operator()(const SquarePrimitiveComponent& square, const TransformComponent& transform) const {
+    const glm::vec2 origin = square.position + transform.globalPosition;
+
+    const float x = square.isFixed ? origin.x : origin.x - camera_.x;
+    const float y = square.isFixed ? origin.y : origin.y - camera_.y;
+
+    auto& cmd = renderQueue_->EmplaceSquare(static_cast<unsigned int>(square.layer), square.position.y);
+    cmd.destRect = {x, y, square.width, square.height};
+    cmd.color = square.color;
   }
 
  private:
-  CommandBuffer cmd_buffer_;
+  RenderQueue* renderQueue_ = nullptr;
+  SDL_FRect camera_{};
 };
