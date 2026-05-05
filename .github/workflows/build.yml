@@ -1,0 +1,119 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            os: ubuntu-latest
+            preset_arg: ""
+            artifact_name: OctarineEngine-linux-x64
+            artifact_path: build/bin/release
+          - name: Windows x64
+            os: windows-latest
+            preset_arg: ""
+            artifact_name: OctarineEngine-windows-x64
+            artifact_path: build/bin/release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Install Linux build deps (SDL3 / X11 / Wayland)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build \
+            pkg-config \
+            autoconf \
+            automake \
+            autoconf-archive \
+            libtool \
+            libltdl-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libxkbcommon-dev \
+            libxss-dev \
+            libwayland-dev \
+            wayland-protocols \
+            libegl1-mesa-dev \
+            libgl1-mesa-dev \
+            libgles2-mesa-dev \
+            libdbus-1-dev \
+            libibus-1.0-dev \
+            libpulse-dev \
+            libudev-dev \
+            libdrm-dev \
+            libgbm-dev \
+            libasound2-dev \
+            libpipewire-0.3-dev \
+            libsndio-dev \
+            libdecor-0-dev
+
+      - name: Install Ninja (Windows)
+        if: runner.os == 'Windows'
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Setup MSVC dev environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          cmake -S . -B build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DOCTARINE_ENABLE_PROFILING=OFF
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Stage runtime DLLs (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $out = "build/bin/release"
+          # Ninja single-config writes directly to bin/release; vcpkg dlls already copied next to exe by CMake.
+          Get-ChildItem $out
+
+      - name: List artifact contents
+        shell: bash
+        run: ls -la build/bin/release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+          if-no-files-found: error
