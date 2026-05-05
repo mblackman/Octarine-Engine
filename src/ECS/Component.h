@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cstring>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -87,7 +88,7 @@ class Chunk {
     ::new (buffer_ + offset + index * sizeof(T)) T(component);
   }
 
-  void AddEntity(const Entity entity, const size_t capacity) {
+  void AddEntity(const Entity entity, [[maybe_unused]] const size_t capacity) {
     assert(header_.entity_count < capacity);
     auto* entity_array = reinterpret_cast<Entity*>(buffer_);
     entity_array[header_.entity_count] = entity;
@@ -289,7 +290,7 @@ class Archetype {
     assert(chunk_capacity_ > 0);
   }
 
-  void AssertLocation(const EntityLocation& location) const {
+  void AssertLocation([[maybe_unused]] const EntityLocation& location) const {
     assert(location.archetype == this);
     assert(location.chunkIndex < chunks_.size());
     assert(location.indexInChunk < chunks_[location.chunkIndex].GetEntityCount());

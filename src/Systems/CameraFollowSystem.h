@@ -14,8 +14,8 @@
 class CameraFollowSystem {
  public:
   void operator()(const ContextFacade& context, const TransformComponent& transform) const {
-    auto& [viewport] = context.Registry()->Get<CameraComponent>();
-    const auto& gameConfig = context.Registry()->Get<GameConfig>();
+    auto& [viewport] = context.GetRegistry()->Get<CameraComponent>();
+    const auto& gameConfig = context.GetRegistry()->Get<GameConfig>();
 
     if (transform.position.x + viewport.w / Constants::kTwo < gameConfig.playableAreaWidth) {
       viewport.x = transform.position.x - static_cast<float>(gameConfig.windowWidth) / Constants::kTwo;

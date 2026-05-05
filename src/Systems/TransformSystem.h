@@ -20,7 +20,7 @@ struct TransformUpdateJob {
 class TransformSystem {
  public:
   void operator()(const ContextFacade& ctx, const Iterable& /*iter*/) {
-    auto* registry = ctx.Registry();
+    auto* registry = ctx.GetRegistry();
 
     if (!query_) {
       query_ = registry->CreateQuery<TransformComponent>();

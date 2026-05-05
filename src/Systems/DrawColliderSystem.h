@@ -13,8 +13,8 @@ class DrawColliderSystem {
  public:
   void operator()(const ContextFacade& context, const TransformComponent& transform,
                   const BoxColliderComponent& collider) const {
-    auto* renderer = context.Registry()->Get<SDL_Renderer*>();
-    const auto& camera = context.Registry()->Get<CameraComponent>().viewport;
+    auto* renderer = context.GetRegistry()->Get<SDL_Renderer*>();
+    const auto& camera = context.GetRegistry()->Get<CameraComponent>().viewport;
 
     const SDL_FRect rect = {transform.globalPosition.x - camera.x, transform.globalPosition.y - camera.y,
                             static_cast<float>(collider.width) * transform.globalScale.x,

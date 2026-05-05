@@ -3,6 +3,7 @@
 #include <any>
 #include <array>
 #include <atomic>
+#include <cstring>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -252,7 +253,7 @@ class Registry {
             func_(std::forward<Func>(f)),
             query_(registry->CreateQuery<TArgs...>()) {}
 
-      void Update(const Registry& registry) override {
+      void Update(const Registry& /*registry*/) override {
         query_->Update();
         // Pass by reference so captured state in the system lambda persists across invocations.
         query_->ForEach(func_);

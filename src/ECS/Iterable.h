@@ -33,9 +33,9 @@ class ContextFacade {
  public:
   explicit ContextFacade(AnyContext* impl) : impl_(impl) {}
 
-  [[nodiscard]] Entity Entity() const { return impl_->GetEntity(); }
-  [[nodiscard]] Registry* Registry() const { return impl_->GetRegistry(); }
-  [[nodiscard]] float DeltaTime() const { return impl_->GetDeltaTime(); }
+  [[nodiscard]] Entity GetEntity() const { return impl_->GetEntity(); }
+  [[nodiscard]] Registry* GetRegistry() const { return impl_->GetRegistry(); }
+  [[nodiscard]] float GetDeltaTime() const { return impl_->GetDeltaTime(); }
 
   // Per-entity component access. Only valid inside a per-entity (RegisterSystem) callback.
   // RegisterBulkSystem callbacks receive a sentinel context — they must iterate the Iterable

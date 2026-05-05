@@ -2,7 +2,7 @@
 #include <functional>
 #include <stack>
 
-#include "../Ecs/Registry.h"
+#include "../ECS/Registry.h"
 #include "../General/Logger.h"
 #include "ComponentLuaFactory.h"
 
@@ -25,7 +25,8 @@ class LuaEntityLoader {
     const bool hasMask = maskValue.valid() && maskValue.is<int>();
 
     bool hasCollider = false;
-    if (sol::optional<sol::table> componentsOpt = currentData["components"];
+    const std::string componentsKey = "components";
+    if (sol::optional<sol::table> componentsOpt = currentData[componentsKey];
         componentsOpt && componentsOpt.value().valid()) {
       const sol::object boxCollider = componentsOpt.value()["box_collider"];
       hasCollider = boxCollider.valid() && boxCollider.is<sol::table>();
@@ -38,7 +39,8 @@ class LuaEntityLoader {
   }
 
   static void LoadEntityComponents(const sol::table& currentData, Registry* registry, const Entity& entity) {
-    sol::optional<sol::table> componentsTableOpt = currentData["components"];
+    const std::string componentsKey = "components";
+    sol::optional<sol::table> componentsTableOpt = currentData[componentsKey];
     if (!componentsTableOpt || !componentsTableOpt.value().valid()) {
       Logger::Info("LoadEntityFromLua: Entity has no 'components' table. Skipping.");
       return;
@@ -96,7 +98,8 @@ class LuaEntityLoader {
       LoadEntityComponents(currentData, registry, entity);
 
       // Add any child entities to the stack to be processed.
-      sol::optional<sol::table> childEntitiesOpt = currentData["entities"];
+      const std::string entitiesKey = "entities";
+      sol::optional<sol::table> childEntitiesOpt = currentData[entitiesKey];
       if (childEntitiesOpt && childEntitiesOpt.value().valid()) {
         const sol::table& childEntitiesTable = childEntitiesOpt.value();
 

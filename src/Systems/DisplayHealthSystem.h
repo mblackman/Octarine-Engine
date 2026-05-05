@@ -16,7 +16,7 @@ class DisplayHealthSystem {
  public:
   void operator()(const ContextFacade& ctx, const HealthComponent& health, TextLabelComponent& textLabel,
                   SquarePrimitiveComponent& square) const {
-    const auto* registry = ctx.Registry();
+    const auto* registry = ctx.GetRegistry();
 
     if (health.maxHealth <= 0) {
       return;
@@ -29,7 +29,7 @@ class DisplayHealthSystem {
 
     int healthWidth = healthAmount;
 
-    if (const auto parent = registry->GetParent(ctx.Entity());
+    if (const auto parent = registry->GetParent(ctx.GetEntity());
         parent.has_value() && registry->HasComponent<SpriteComponent>(parent.value())) {
       const auto& sprite = registry->GetComponent<SpriteComponent>(parent.value());
       const auto& transform = registry->GetComponent<TransformComponent>(parent.value());

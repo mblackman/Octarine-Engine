@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
+#include <cstdint>
 #include <map>
 #include <optional>
 #include <string>

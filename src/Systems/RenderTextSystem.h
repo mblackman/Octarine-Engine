@@ -37,7 +37,7 @@ class RenderTextSystem {
   void operator()(const ContextFacade& ctx, const TextLabelComponent& text) const {
     if (text.text.empty()) return;
 
-    Registry* registry = ctx.Registry();
+    Registry* registry = ctx.GetRegistry();
     const auto& assetManager = registry->Get<AssetManager>();
     auto* sdlRenderer = registry->Get<SDL_Renderer*>();
     auto& renderQueue = registry->Get<RenderQueue>();
@@ -69,7 +69,7 @@ class RenderTextSystem {
       it = text_cache_.emplace(cacheKey, TextCacheEntry{texture, w, h}).first;
     }
 
-    const Entity entity = ctx.Entity();
+    const Entity entity = ctx.GetEntity();
     glm::vec2 origin = text.position;
     if (registry->HasComponent<TransformComponent>(entity)) {
       const auto& transform = registry->GetComponent<TransformComponent>(entity);

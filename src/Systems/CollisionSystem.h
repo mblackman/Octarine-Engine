@@ -58,7 +58,7 @@ class CollisionSystem {
   void operator()(const ContextFacade& ctx, const Iterable& /*iter*/) {
     PROFILE_NAMED_SCOPE("Collision System Update");
 
-    auto* registry = ctx.Registry();
+    auto* registry = ctx.GetRegistry();
     auto* eventBus = registry->Get<EventBus*>();
 
     if (collisionResult_.valid() &&
@@ -81,7 +81,7 @@ class CollisionSystem {
       PROFILE_NAMED_SCOPE("Gather Boxes");
 
       if (!query_) {
-        query_ = ctx.Registry()->CreateQuery<TransformComponent, BoxColliderComponent, EntityMaskComponent>();
+        query_ = ctx.GetRegistry()->CreateQuery<TransformComponent, BoxColliderComponent, EntityMaskComponent>();
       }
       query_->Update();
 

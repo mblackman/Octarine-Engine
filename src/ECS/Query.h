@@ -56,9 +56,9 @@ class ComponentQuery final : public Query {
                   std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
       for (const auto iterable = CreateIterable(); auto&& context : iterable) {
         if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...>) {
-          func(context, context.Entity(), context.Component<TComponents>()...);
+          func(context, context.GetEntity(), context.template Component<TComponents>()...);
         } else {
-          func(context, context.Component<TComponents>()...);
+          func(context, context.template Component<TComponents>()...);
         }
       }
     } else {

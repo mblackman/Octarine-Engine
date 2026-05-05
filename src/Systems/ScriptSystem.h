@@ -69,7 +69,7 @@ inline std::vector<std::string> ReadFileLines(const std::string &filename) {
   return lines;
 }
 
-inline int LuaHandler(lua_State *lua_state, sol::optional<const std::exception &> exception,
+inline int LuaHandler(lua_State * /*lua_state*/, sol::optional<const std::exception &> exception,
                       const sol::string_view string_view) {
   if (exception) {
     const std::exception &err = exception.value();
@@ -111,7 +111,7 @@ class ScriptSystem {
       return;
     }
 
-    if (auto result = script.updateFunction(script.scriptTable, context.Entity(), context.DeltaTime());
+    if (auto result = script.updateFunction(script.scriptTable, context.GetEntity(), context.GetDeltaTime());
         !result.valid()) {
       const sol::error err = result;
       Logger::ErrorLua(std::string(err.what()));

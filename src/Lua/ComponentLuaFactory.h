@@ -141,7 +141,7 @@ class ComponentLuaFactory {
                                       entityMask);
   }
 
-  static CameraFollowComponent CreateCameraFollowComponent(const sol::table& data) { return {}; }
+  static CameraFollowComponent CreateCameraFollowComponent(const sol::table& /*data*/) { return {}; }
 
   static KeyboardControlComponent CreateKeyboardControlledComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;

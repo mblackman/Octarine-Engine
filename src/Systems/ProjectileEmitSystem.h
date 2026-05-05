@@ -23,18 +23,18 @@ class ProjectileEmitSystem {
 
   void operator()(const ContextFacade& context, const TransformComponent& transform,
                   ProjectileEmitterComponent& emitter) {
-    const auto registry = context.Registry();
-    const bool isPlayer = registry->HasTag(context.Entity(), "player");
+    const auto registry = context.GetRegistry();
+    const bool isPlayer = registry->HasTag(context.GetEntity(), "player");
 
     if (!isPlayer) {
-      emitter.countDownTimer -= context.DeltaTime();
+      emitter.countDownTimer -= context.GetDeltaTime();
 
       if (emitter.countDownTimer <= 0.0f) {
-        SpawnProjectile(transform, context.Entity(), registry, emitter);
+        SpawnProjectile(transform, context.GetEntity(), registry, emitter);
         emitter.countDownTimer = emitter.frequency;
       }
     } else if (spawnFriendlyProjectiles_) {
-      SpawnProjectile(transform, context.Entity(), registry, emitter, true);
+      SpawnProjectile(transform, context.GetEntity(), registry, emitter, true);
       spawnFriendlyProjectiles_ = false;
     }
   }
