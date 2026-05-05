@@ -7,9 +7,7 @@
       "hidden": true,
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/cmake-build-${presetName}",
-      "cacheVariables": {
-        "CMAKE_TOOLCHAIN_FILE": "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake"
-      }
+      "toolchainFile": "${sourceDir}/cmake/vcpkg-toolchain.cmake"
     },
     {
       "name": "debug",

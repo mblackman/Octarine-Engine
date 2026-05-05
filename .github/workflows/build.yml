@@ -20,14 +20,12 @@ jobs:
         include:
           - name: Linux x64
             os: ubuntu-latest
-            preset_arg: ""
             artifact_name: OctarineEngine-linux-x64
-            artifact_path: build/bin/release
+            artifact_path: cmake-build-release/bin/release
           - name: Windows x64
             os: windows-latest
-            preset_arg: ""
             artifact_name: OctarineEngine-windows-x64
-            artifact_path: build/bin/release
+            artifact_path: cmake-build-release/bin/release
 
     steps:
       - name: Checkout
@@ -90,26 +88,22 @@ jobs:
 
       - name: Configure CMake
         shell: bash
-        run: |
-          cmake -S . -B build -G Ninja \
-            -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_INSTALLATION_ROOT/scripts/buildsystems/vcpkg.cmake" \
-            -DOCTARINE_ENABLE_PROFILING=OFF
+        run: cmake --preset release
 
       - name: Build
-        run: cmake --build build --config Release --parallel
+        run: cmake --build cmake-build-release --config Release --parallel
 
       - name: Stage runtime DLLs (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $out = "build/bin/release"
+          $out = "cmake-build-release/bin/release"
           # Ninja single-config writes directly to bin/release; vcpkg dlls already copied next to exe by CMake.
           Get-ChildItem $out
 
       - name: List artifact contents
         shell: bash
-        run: ls -la build/bin/release
+        run: ls -la cmake-build-release/bin/release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

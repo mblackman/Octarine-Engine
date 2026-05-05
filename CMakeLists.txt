@@ -1,15 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 
-# Auto-detect vcpkg toolchain if not provided (fixes 'find_package' errors in new profiles)
-if (NOT CMAKE_TOOLCHAIN_FILE)
-    if (DEFINED ENV{VCPKG_ROOT} AND EXISTS "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
-        set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
-        message(STATUS "Auto-detected vcpkg toolchain from VCPKG_ROOT: ${CMAKE_TOOLCHAIN_FILE}")
-    elseif (EXISTS "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake")
-        set(CMAKE_TOOLCHAIN_FILE "C:/Users/mateo/git/vcpkg/scripts/buildsystems/vcpkg.cmake" CACHE FILEPATH "")
-        message(STATUS "Auto-detected vcpkg toolchain (fallback): ${CMAKE_TOOLCHAIN_FILE}")
-    endif ()
-endif ()
+# cmake/vcpkg-toolchain.cmake (set via CMakePresets.json) handles toolchain discovery.
+# This block is a fallback for non-preset invocations only.
 
 # Project name and language
 project(OctarineEngine
@@ -17,6 +9,7 @@ project(OctarineEngine
         DESCRIPTION "A lightweight 2D game engine of a yellowish-purple color"
         LANGUAGES CXX
 )
+
 
 # Global settings
 set(CMAKE_CXX_STANDARD 20)
@@ -32,6 +25,17 @@ option(OCTARINE_ENABLE_PROFILING "Enable per-system performance instrumentation"
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin/debug")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_BINARY_DIR}/bin/release")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_RELWITHDEBINFO "${CMAKE_BINARY_DIR}/bin/relwithdebinfo")
+
+# Dependencies
+find_package(glm CONFIG REQUIRED)
+find_package(SDL3 CONFIG REQUIRED)
+find_package(SDL3_image CONFIG REQUIRED)
+find_package(SDL3_ttf CONFIG REQUIRED)
+find_package(Lua REQUIRED)
+find_package(Sol2 CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
+find_package(imgui CONFIG REQUIRED)
+find_package(Threads REQUIRED)
 
 # Source files
 set(SRC_FILES
@@ -62,19 +66,9 @@ if (OCTARINE_ENABLE_PROFILING)
     message(STATUS "Octarine: Profiling ENABLED")
 endif ()
 
-# Dependencies
-find_package(glm CONFIG REQUIRED)
-find_package(SDL3 CONFIG REQUIRED)
-find_package(SDL3_image CONFIG REQUIRED)
-find_package(SDL3_ttf CONFIG REQUIRED)
-find_package(Lua REQUIRED)
-find_package(Sol2 CONFIG REQUIRED)
-find_package(spdlog CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
-find_package(Threads REQUIRED)
-
 # Include directories
 target_include_directories(${PROJECT_NAME}
+
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/libs

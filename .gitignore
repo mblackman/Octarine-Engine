@@ -538,6 +538,9 @@ target_wrapper.*
 # QtCreator CMake
 CMakeLists.txt.user*
 
+# Machine-local CMake user presets (toolchain paths, etc.)
+CMakeUserPresets.json
+
 # QtCreator 4.8< compilation database 
 compile_commands.json
 
@@ -999,3 +1002,6 @@ dkms.conf
 *.uf2
 # Raspberry Pi Pico disassembler file
 *.dis
+
+#vcpkg install cache
+vcpkg_installed/
