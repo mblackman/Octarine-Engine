@@ -58,6 +58,9 @@ For detailed instructions on project structure and the complete Lua API, see:
 
 The engine uses an **Archetype-based ECS**. Entities with the same set of components are stored together in memory, maximizing CPU cache efficiency.
 
+For a deep dive into the design and implementation, see:
+👉 **[ECS Architectural Overview](docs/ecs-architecture.md)**
+
 - **Registry:** Manages all entities and components.
 - **Archetypes:** Groups of entities with identical component signatures.
 - **Queries:** Used by systems to iterate over entities matching specific component requirements.
