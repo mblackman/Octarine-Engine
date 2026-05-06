@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cmath>
 #include <glm/glm.hpp>
 #include <stack>
 #include <vector>
@@ -75,7 +76,12 @@ class TransformSystem {
 
       auto& transform = registry->GetComponent<TransformComponent>(entity);
 
-      const glm::vec2 globalPosition = parentPos + transform.position;
+      const float c = std::cos(static_cast<float>(parentRot));
+      const float s = std::sin(static_cast<float>(parentRot));
+      const glm::vec2 scaled = transform.position * parentScale;
+      const glm::vec2 rotated = {scaled.x * c - scaled.y * s, scaled.x * s + scaled.y * c};
+      const glm::vec2 globalPosition = parentPos + rotated;
+
       const glm::vec2 globalScale = parentScale * transform.scale;
       const double globalRotation = parentRot + transform.rotation;
 

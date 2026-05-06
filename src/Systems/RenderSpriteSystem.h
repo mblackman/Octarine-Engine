@@ -54,7 +54,8 @@ class RenderSpriteSystem {
     cmd.destW = sprite.width * transform.globalScale.x;
     cmd.destH = sprite.height * transform.globalScale.y;
     cmd.srcRect = sprite.srcRect;
-    cmd.rotation = transform.rotation;
+    cmd.rotation = transform.globalRotation;
+    cmd.pivot = {cmd.destW * 0.5f, cmd.destH * 0.5f};
     cmd.flip = sprite.flip;
     cmd.texture = sprite.cachedTexture;
   }

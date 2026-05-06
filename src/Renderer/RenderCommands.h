@@ -6,6 +6,7 @@ struct SpriteCommand {
   float destX{}, destY{}, destW{}, destH{};
   SDL_FRect srcRect{};
   double rotation{};
+  SDL_FPoint pivot{};
   SDL_FlipMode flip{};
   SDL_Texture* texture{};
 };
