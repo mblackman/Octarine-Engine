@@ -31,6 +31,7 @@ find_package(glm CONFIG REQUIRED)
 find_package(SDL3 CONFIG REQUIRED)
 find_package(SDL3_image CONFIG REQUIRED)
 find_package(SDL3_ttf CONFIG REQUIRED)
+find_package(SDL3_mixer CONFIG REQUIRED)
 find_package(Lua REQUIRED)
 find_package(Sol2 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
@@ -46,6 +47,7 @@ set(SRC_FILES
         src/Game/GameConfig.cpp
         src/General/Logger.cpp
         src/Renderer/Renderer.cpp
+        src/Systems/AudioSystem.cpp
 )
 
 # Add packaged libs
@@ -82,10 +84,12 @@ target_link_libraries(${PROJECT_NAME}
         glm::glm
         SDL3::SDL3
         SDL3_ttf::SDL3_ttf
+        $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
         $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
         ${LUA_LIBRARIES}
         imgui::imgui
         spdlog::spdlog
+        sol2::sol2
         sol2_ImGui_Bindings
         Threads::Threads
 )

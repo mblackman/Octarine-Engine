@@ -62,6 +62,8 @@ class RenderDebugGUISystem {
     ImGui::Checkbox("Show FPS Counter", &options.showFpsCounter);
     ImGui::Checkbox("Show Entity Info", &options.showEntityInfo);
     ImGui::Checkbox("Draw Colliders", &options.drawColliders);
+    ImGui::Checkbox("Audio Enabled", &options.audioEnabled);
+    ImGui::SliderFloat("Master Volume", &options.masterVolume, 0.0F, 1.0F);
     ImGui::End();
   }
 

@@ -30,6 +30,7 @@
 #include "GameConfig.h"
 #include "General/PerfUtils.h"
 #include "Systems/AnimationSystem.h"
+#include "Systems/AudioSystem.h"
 #include "Systems/CameraFollowSystem.h"
 #include "Systems/CollisionSystem.h"
 #include "Systems/DamageSystem.h"
@@ -136,7 +137,12 @@ bool Game::Initialize(const std::string &assetPath) {
   return true;
 }
 
-void Game::Destroy() const {
+void Game::Destroy() {
+  // Tear registry/event bus down BEFORE SDL_Quit so owned systems (AudioSystem -> MIX_Quit,
+  // AssetManager -> SDL_DestroyTexture) can still call into a live SDL.
+  registry_.reset();
+  event_bus_.reset();
+
   if (sdl_renderer_) {
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
@@ -184,6 +190,12 @@ void Game::Setup() {
 
   auto &assetManager = registry_->Get<AssetManager>();
   assetManager.LoadGameConfig(gameConfig);
+
+  // Audio must be live before LoadGame: the startup script may call load_asset for audio_clip
+  // entries, which need the mixer.
+  auto &audioSystem = registry_->Set<AudioSystem>(AudioSystem());
+  audioSystem.Init(registry_.get(), event_bus_);
+
   LoadGame(lua, assetManager, gameConfig);
 
   registry_->RegisterParallelSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
@@ -220,11 +232,10 @@ void Game::Setup() {
   projectileEmitSystem.Init(event_bus_);
   // Event-driven systems with no per-frame Update — owned by the Registry instead of
   // living as parallel members on Game. Keeps the registry as the single source of truth.
-  auto &uiButtonSystem = registry_->OwnSystem(UIButtonSystem());
-  auto &damageSystem = registry_->OwnSystem(DamageSystem());
+  auto &uiButtonSystem = registry_->Set<UIButtonSystem>(UIButtonSystem());
+  auto &damageSystem = registry_->Set<DamageSystem>(DamageSystem());
   uiButtonSystem.Init(registry_.get(), event_bus_);
   damageSystem.Init(registry_.get(), event_bus_);
-  movementSystem.Init(registry_.get());
 
   // Pre-build the debug-collider query once so we don't allocate per render frame.
   collider_query_ = registry_->CreateQuery<TransformComponent, BoxColliderComponent>();

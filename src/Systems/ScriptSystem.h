@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL3/SDL.h>
+#include <SDL3_mixer/SDL_mixer.h>
 
 #include <cctype>
 #include <filesystem>
@@ -16,6 +17,7 @@
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../EventBus/EventBus.h"
+#include "../Events/AudioPlayEvent.h"
 #include "../Events/KeyInputEvent.h"
 #include "../Game/Game.h"
 #include "../General/Logger.h"
@@ -106,7 +108,7 @@ class ScriptSystem {
     eventBus->SubscribeEvent<ScriptSystem, KeyInputEvent>(this, &ScriptSystem::OnKeyInput);
   }
 
-  void operator()(const ContextFacade &context, ScriptComponent &script) {
+  void operator()(const ContextFacade &context, ScriptComponent &script) const {
     if (script.updateFunction == sol::lua_nil) {
       return;
     }
@@ -147,13 +149,23 @@ class ScriptSystem {
       SetGameMapDimensions(width, height, game);
     });
     lua.set_function("load_asset", [this, &game](sol::table assetTable) {
-      this->LoadAsset(std::move(assetTable), game.GetRegistry()->Get<AssetManager>(), game.GetRenderer());
+      auto *registry = game.GetRegistry();
+      this->LoadAsset(std::move(assetTable), registry->Get<AssetManager>(), game.GetRenderer(),
+                      registry->Get<MIX_Mixer *>());
     });
     lua.set_function("load_entity", [this, &game](const sol::table &assetTable) {
       LuaEntityLoader::LoadEntityFromLua(game.GetRegistry(), assetTable);
     });
     lua.set_function("get_asset_path", [this, &game](const std::string &relativePath) {
       return this->GetAssetPath(relativePath, game.GetRegistry()->Get<AssetManager>());
+    });
+    lua.set_function("play_sound", [&game](const std::string &clipId, const sol::optional<float> volume) {
+      auto *eventBus = game.GetRegistry()->Get<EventBus *>();
+      if (!eventBus) {
+        Logger::Error("play_sound called before event bus is ready");
+        return;
+      }
+      eventBus->EmitEvent<AudioPlayEvent>(clipId, volume.value_or(1.0F));
     });
   }
 
@@ -219,12 +231,14 @@ class ScriptSystem {
     return lowerKey;
   }
 
-  void LoadAsset(sol::table assetTable, AssetManager &assetManager, SDL_Renderer *renderer) const {
+  void LoadAsset(sol::table assetTable, AssetManager &assetManager, SDL_Renderer *renderer, MIX_Mixer *mixer) const {
     if (const std::string assetType = assetTable["type"]; assetType == "texture") {
       assetManager.AddTexture(renderer, assetTable["id"], assetTable["file"]);
     } else if (assetType == "font") {
       const float fontSize = assetTable["font_size"];
       assetManager.AddFont(assetTable["id"], assetTable["file"], fontSize);
+    } else if (assetType == "audio_clip") {
+      assetManager.AddAudioClip(mixer, assetTable["id"], assetTable["file"]);
     } else {
       Logger::Error("Unknown asset type: " + assetType);
     }

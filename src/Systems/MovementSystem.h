@@ -14,7 +14,7 @@ class MovementSystem {
  public:
   CommandBuffer& GetCommandBuffer() { return cmd_buffer_; }
 
-  void Init(Registry* registry) {
+  void Prepare(Registry* registry) {
     registry_ = registry;
     const auto& gameConfig = registry_->Get<GameConfig>();
     const auto& eventBus = registry_->Get<EventBus*>();
@@ -23,13 +23,15 @@ class MovementSystem {
     obstacles_ = registry_->TagId("obstacles");
     player_ = registry_->TagId("player");
 
-    // TODO Fetch these again if the config changes.
     windowWidth_ = static_cast<float>(gameConfig.windowWidth);
     windowHeight_ = static_cast<float>(gameConfig.windowHeight);
     playableAreaWidth_ = static_cast<float>(gameConfig.playableAreaWidth);
     playableAreaHeight_ = static_cast<float>(gameConfig.playableAreaHeight);
 
-    eventBus->SubscribeEvent<MovementSystem, CollisionEvent>(this, &MovementSystem::OnCollision);
+    if (!subscribed_) {
+      eventBus->SubscribeEvent<MovementSystem, CollisionEvent>(this, &MovementSystem::OnCollision);
+      subscribed_ = true;
+    }
   }
 
   void operator()(const Entity entity, const float deltaTime, TransformComponent& transform,
@@ -40,8 +42,8 @@ class MovementSystem {
       // Use global position so children of moving parents respect off-screen bounds.
       const float right = transform.globalPosition.x + spriteComponent.width * transform.globalScale.x;
       const float bottom = transform.globalPosition.y + spriteComponent.height * transform.globalScale.y;
-      if (transform.globalPosition.x > windowWidth_ || transform.globalPosition.y > windowHeight_ || right < 0 ||
-          bottom < 0) {
+      if (transform.globalPosition.x > playableAreaWidth_ || transform.globalPosition.y > playableAreaHeight_ ||
+          right < 0 || bottom < 0) {
         cmd_buffer_.Emplace<Entity>(entity);
         return;
       }
@@ -90,6 +92,7 @@ class MovementSystem {
   Entity enemies_{};
   Entity obstacles_{};
   Entity player_{};
+  bool subscribed_ = false;
   float windowWidth_{};
   float windowHeight_{};
   float playableAreaWidth_{};

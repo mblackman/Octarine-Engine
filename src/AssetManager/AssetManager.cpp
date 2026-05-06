@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL.h>
 #include <SDL3_image/SDL_image.h>
+#include <SDL3_mixer/SDL_mixer.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <filesystem>
@@ -25,9 +26,13 @@ void AssetManager::ClearAssets() {
   for (const auto &snd : fonts_ | std::views::values) {
     TTF_CloseFont(snd);
   }
+  for (const auto &clip : audio_clips_ | std::views::values) {
+    MIX_DestroyAudio(clip);
+  }
 
   textures_.clear();
   fonts_.clear();
+  audio_clips_.clear();
 }
 
 void AssetManager::AddTexture(SDL_Renderer *renderer, const std::string &assetId, const std::string &path) {
@@ -82,6 +87,39 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
   }
 
   Logger::Info("Added font: " + assetId + " from path: " + fullPath);
+}
+
+void AssetManager::AddAudioClip(MIX_Mixer *mixer, const std::string &assetId, const std::string &path) {
+  if (!mixer) {
+    Logger::Error("AddAudioClip called with null mixer for: " + assetId);
+    return;
+  }
+
+  const std::string fullPath = GetFullPath(path);
+  MIX_Audio *clip = MIX_LoadAudio(mixer, fullPath.c_str(), true);
+  if (!clip) {
+    Logger::Error("Failed to load audio clip " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
+    return;
+  }
+
+  if (const auto it = audio_clips_.find(assetId); it != audio_clips_.end()) {
+    Logger::Warn("Replacing existing audio clip: " + assetId);
+    MIX_DestroyAudio(it->second);
+    it->second = clip;
+  } else {
+    audio_clips_.emplace(assetId, clip);
+  }
+
+  Logger::Info("Added audio clip: " + assetId + " from path: " + fullPath);
+}
+
+MIX_Audio *AssetManager::GetAudioClip(const std::string &assetId) const {
+  const auto it = audio_clips_.find(assetId);
+  if (it == audio_clips_.end()) {
+    Logger::Warn("Requested missing audio clip: " + assetId);
+    return nullptr;
+  }
+  return it->second;
 }
 
 TTF_Font *AssetManager::GetFont(const std::string &assetId) const {

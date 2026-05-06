@@ -393,27 +393,6 @@ class Registry {
     return ref;
   }
 
-  // Event-driven systems with no per-frame Update body. Owned by the Registry so the
-  // Game class doesn't need to keep parallel storage; subscriber lifetimes still match
-  // the Registry's lifetime. Look up via GetSystem<T>() when wiring events.
-  template <typename T>
-  T& OwnSystem(T system) {
-    auto ptr = std::make_shared<T>(std::move(system));
-    T& ref = *ptr;
-    owned_systems_[std::type_index(typeid(T))] = std::move(ptr);
-    return ref;
-  }
-
-  template <typename T>
-  T& GetSystem() {
-    const auto it = owned_systems_.find(std::type_index(typeid(T)));
-    if (it == owned_systems_.end()) {
-      throw std::runtime_error("System type " + std::string(typeid(T).name()) + " has not been registered.");
-    }
-    auto& ptr = std::any_cast<std::shared_ptr<T>&>(it->second);
-    return *ptr;
-  }
-
   // Singleton components. Stored as std::shared_ptr<T> inside std::any so that
   // move-only resource owners (e.g. AssetManager) can be stashed — std::any itself
   // requires CopyConstructible.
@@ -544,7 +523,6 @@ class Registry {
   std::unique_ptr<Archetype> root_archetype_;  // The root of the archetype graph. Empty signature.
   std::vector<std::unique_ptr<ISystem>> systems_;
   std::unordered_map<ComponentID, std::any> singleton_components_;
-  std::unordered_map<std::type_index, std::any> owned_systems_;
   std::vector<std::optional<Entity>> fast_component_to_entity_;
   std::unordered_map<std::string, Entity> tag_to_entity_;
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
