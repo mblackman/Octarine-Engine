@@ -21,14 +21,14 @@ class LuaEntityLoader {
   // Also attaches a default EntityMaskComponent when the entity declares a `box_collider`
   // (CollisionSystem queries this component, so collider entities must have one).
   static void ApplyEntityMask(const sol::table& currentData, Registry* registry, const Entity& entity) {
-    const sol::object maskValue = currentData["mask"];
+    const sol::object maskValue = currentData.get<sol::object>("mask");
     const bool hasMask = maskValue.valid() && maskValue.is<int>();
 
     bool hasCollider = false;
     const std::string componentsKey = "components";
     if (sol::optional<sol::table> componentsOpt = currentData[componentsKey];
         componentsOpt && componentsOpt.value().valid()) {
-      const sol::object boxCollider = componentsOpt.value()["box_collider"];
+      const sol::object boxCollider = componentsOpt.value().get<sol::object>("box_collider");
       hasCollider = boxCollider.valid() && boxCollider.is<sol::table>();
     }
 
@@ -118,7 +118,7 @@ class LuaEntityLoader {
 
  private:
   static void ApplyTagField(const sol::table& currentData, const char* key, Registry* registry, const Entity& entity) {
-    const sol::object value = currentData[key];
+    const sol::object value = currentData.get<sol::object>(key);
     if (!value.valid()) return;
 
     if (value.is<std::string>()) {

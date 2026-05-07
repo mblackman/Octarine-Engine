@@ -17,9 +17,15 @@ struct SpriteComponent {
   mutable SDL_Texture* cachedTexture = nullptr;
   mutable std::uint64_t cachedTextureGeneration = 0;
 
-  explicit SpriteComponent(std::string assetId = "", const float width = 0, const float height = 0, const int layer = 0,
-                           const bool isFixed = false, const float srcRectX = 0, const float srcRectY = 0)
-      : assetId(std::move(assetId)), width(width), height(height), layer(layer), isFixed(isFixed), flip(SDL_FLIP_NONE) {
-    this->srcRect = {srcRectX, srcRectY, width, height};
+  explicit SpriteComponent(std::string t_assetId = "", const float t_width = 0, const float t_height = 0,
+                           const int t_layer = 0, const bool t_isFixed = false, const float t_srcRectX = 0,
+                           const float t_srcRectY = 0)
+      : assetId(std::move(t_assetId)),
+        width(t_width),
+        height(t_height),
+        layer(t_layer),
+        isFixed(t_isFixed),
+        flip(SDL_FLIP_NONE) {
+    this->srcRect = {t_srcRectX, t_srcRectY, t_width, t_height};
   }
 };
