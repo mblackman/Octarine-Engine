@@ -110,6 +110,13 @@ if (MSVC)
             /permissive-
             /MP
             /bigobj
+            /w14242 # Conversion: possible loss of data
+            /w14244 # Conversion: possible loss of data (float/double/int)
+            /w14254 # Conversion: possible loss of data (larger to smaller type)
+            /w44456 # Shadowing: declaration hides previous local declaration
+            /w44457 # Shadowing: declaration hides function parameter
+            /w44458 # Shadowing: declaration hides class member
+            /w44459 # Shadowing: declaration hides global declaration
             /wd4201 # nonstandard extension used: nameless struct/union (common in GLM)
             /wd5321 # nonstandard extension used: encoding UTF-8 character (common in sol2 headers)
     )
@@ -128,4 +135,40 @@ else ()
     target_compile_options(${PROJECT_NAME} PRIVATE
             $<IF:$<CONFIG:Debug>,,-Werror>
     )
+endif ()
+
+# -----------------------------------------------------------------------------
+# Linting & Formatting Integration
+# -----------------------------------------------------------------------------
+
+option(OCTARINE_ENABLE_LINTING "Run clang-tidy during compilation" OFF)
+
+if (OCTARINE_ENABLE_LINTING)
+    find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
+    if (CLANG_TIDY_EXE)
+        set_target_properties(${PROJECT_NAME} PROPERTIES
+                CXX_CLANG_TIDY "${CLANG_TIDY_EXE}"
+        )
+        message(STATUS "Octarine: clang-tidy ENABLED (reading from .clang-tidy)")
+    else ()
+        message(WARNING "Octarine: Linting enabled but clang-tidy executable not found!")
+    endif ()
+endif ()
+
+find_program(CLANG_FORMAT_EXE NAMES "clang-format")
+if (CLANG_FORMAT_EXE)
+    # Gather all source files in the src/ directory
+    file(GLOB_RECURSE FORMAT_SOURCES
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/*.h"
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/*.hpp"
+    )
+
+    # Create the custom format target
+    add_custom_target(format
+            COMMAND ${CLANG_FORMAT_EXE} -i -style=file ${FORMAT_SOURCES}
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+            COMMENT "Formatting source code with clang-format"
+    )
+    message(STATUS "Octarine: clang-format target ADDED")
 endif ()
