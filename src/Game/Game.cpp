@@ -276,7 +276,18 @@ void Game::ProcessInput() const {
 }
 
 void Game::Update(const float deltaTime) {
-  registry_->Update(deltaTime);
+#ifdef OCTARINE_PROFILING
+  PerfUtils::ProfilingAccumulator::Clear();
+#endif
+
+  auto &options = registry_->Get<GameConfig>().GetEngineOptions();
+
+  if (!options.isPaused) {
+    registry_->Update(deltaTime * options.timeScale);
+  } else {
+    // If paused, we might still want to clear some per-frame signals so they don't get stuck.
+  }
+
   // Pressed-keys are a per-frame edge signal — clear after every script entity in this frame
   // has had a chance to observe them.
   if (script_system_) {

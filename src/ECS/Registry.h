@@ -138,6 +138,8 @@ class Registry {
 
   [[nodiscard]] std::uint64_t GetEntityCount() const { return entity_locations_.size(); }
 
+  [[nodiscard]] std::vector<Entity> GetUserEntities() const;
+
   // Component management
   template <typename T>
   Entity Component() {

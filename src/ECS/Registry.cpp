@@ -11,7 +11,7 @@ void Registry::Update(const float deltaTime) {
   delta_time_ = deltaTime;
   for (size_t i = 0; i < systems_.size(); ++i) {
 #ifdef OCTARINE_PROFILING
-    PerfUtils::ScopedTimer systemTimer(systems_[i]->GetName());
+    ACCUMULATE_PROFILE_SCOPE(systems_[i]->GetName());
 #endif
     systems_[i]->Update(*this);
   }
@@ -111,6 +111,24 @@ void Registry::BlamEntity(const Entity entity) {
       ++pairIt;
     }
   }
+}
+
+std::vector<Entity> Registry::GetUserEntities() const {
+  std::vector<Entity> entities;
+  entities.reserve(user_entity_count_);
+  for (std::uint32_t id = 0; id < entity_locations_.size(); ++id) {
+    if (entity_locations_[id].archetype != nullptr && !internal_entity_ids_.contains(id)) {
+      // We need the full Entity from the archetype.
+      // But archetype stores a packed chunk array of Entity IDs.
+      // Let's just create an entity with the correct generation by asking entity_manager_... wait.
+      // EntityManager doesn't expose getting a generation by ID easily.
+      // Let's get the Entity directly from the archetype.
+      const auto location = entity_locations_[id];
+      const Entity entity = location.archetype->GetEntity(location.chunkIndex, location.indexInChunk);
+      entities.push_back(entity);
+    }
+  }
+  return entities;
 }
 
 std::vector<Archetype*> Registry::GetMatchingArchetypes(const ArchetypeType& type) const {

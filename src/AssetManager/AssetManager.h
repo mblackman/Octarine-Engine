@@ -44,4 +44,8 @@ class AssetManager {
   [[nodiscard]] std::string GetFullPath(const std::string& relativePath) const;
   void SetDefaultScaleMode(const std::string& scaleMode);
   [[nodiscard]] std::uint64_t TextureGeneration() const { return texture_generation_; }
+
+  [[nodiscard]] const std::map<std::string, SDL_Texture*>& GetTextures() const { return textures_; }
+  [[nodiscard]] const std::map<std::string, TTF_Font*>& GetFonts() const { return fonts_; }
+  [[nodiscard]] const std::map<std::string, MIX_Audio*>& GetAudioClips() const { return audio_clips_; }
 };

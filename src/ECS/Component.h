@@ -160,6 +160,12 @@ class Archetype {
   [[nodiscard]] ArchetypeID GetID() const { return archetype_id_; }
   [[nodiscard]] const std::vector<ComponentInfo>& component_infos() const { return component_infos_; }
 
+  [[nodiscard]] Entity GetEntity(size_t chunkIndex, size_t indexInChunk) const {
+    assert(chunkIndex < chunks_.size());
+    assert(indexInChunk < chunks_[chunkIndex].GetEntityCount());
+    return chunks_[chunkIndex].GetEntityArray()[indexInChunk];
+  }
+
   EntityLocation AddEntity(const Entity entity) {
     // Cached first-non-full chunk index advances monotonically as earlier chunks fill.
     while (first_non_full_chunk_ < chunks_.size() &&

@@ -66,6 +66,20 @@ class ProfilingAccumulator {
     Logger::Info(std::string(header.size(), '-'));
   }
 
+  static std::map<std::string, long long> GetAccumulatedTimes() {
+    std::lock_guard lock(s_mutex);
+    std::map<std::string, long long> result;
+    for (const auto &[name, total_duration] : s_accumulated_times) {
+      result[name] = total_duration.load();
+    }
+    return result;
+  }
+
+  static void Clear() {
+    std::lock_guard lock(s_mutex);
+    s_accumulated_times.clear();
+  }
+
  private:
   inline static std::mutex s_mutex;
   inline static std::chrono::time_point<std::chrono::high_resolution_clock> s_start;
