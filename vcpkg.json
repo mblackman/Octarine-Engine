@@ -54,5 +54,11 @@
       "name": "spdlog",
       "version>=": "1.15.3"
     }
+  ],
+  "overrides": [
+    {
+      "name": "lua",
+      "version": "5.4.7"
+    }
   ]
 }
