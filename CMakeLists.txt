@@ -46,6 +46,7 @@ set(SRC_FILES
         src/Game/Game.cpp
         src/Game/GameConfig.cpp
         src/General/Logger.cpp
+        src/General/SDL3_Linux_Stubs.cpp
         src/Renderer/Renderer.cpp
         src/Systems/AudioSystem.cpp
 )

@@ -56,6 +56,8 @@ jobs:
             libxext-dev \
             libxrandr-dev \
             libxcursor-dev \
+            libxtst-dev \
+            libxfixes-dev \
             libxi-dev \
             libxinerama-dev \
             libxkbcommon-dev \
