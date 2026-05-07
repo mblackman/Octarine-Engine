@@ -33,7 +33,7 @@ find_package(SDL3_image CONFIG REQUIRED)
 find_package(SDL3_ttf CONFIG REQUIRED)
 find_package(SDL3_mixer CONFIG REQUIRED)
 find_package(Lua REQUIRED)
-find_package(Sol2 CONFIG REQUIRED)
+find_package(sol2 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 find_package(Threads REQUIRED)
@@ -46,10 +46,13 @@ set(SRC_FILES
         src/Game/Game.cpp
         src/Game/GameConfig.cpp
         src/General/Logger.cpp
-        src/General/SDL3_Linux_Stubs.cpp
         src/Renderer/Renderer.cpp
         src/Systems/AudioSystem.cpp
 )
+
+if (UNIX AND NOT APPLE)
+    list(APPEND SRC_FILES src/General/SDL3_Linux_Stubs.cpp)
+endif ()
 
 # Add packaged libs
 add_subdirectory(libs/sol2_ImGui_Bindings)
@@ -71,11 +74,9 @@ endif ()
 
 # Include directories
 target_include_directories(${PROJECT_NAME}
-
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/libs
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs/sol2_ImGui_Bindings
         ${LUA_INCLUDE_DIR}
 )
 
@@ -105,10 +106,12 @@ install(TARGETS ${PROJECT_NAME}
 # Compiler-specific flags - Treat warnings as errors in prod builds
 if (MSVC)
     target_compile_options(${PROJECT_NAME} PRIVATE
-            /W3
+            /W4
             /permissive-
             /MP
             /bigobj
+            /wd4201 # nonstandard extension used: nameless struct/union (common in GLM)
+            /wd5321 # nonstandard extension used: encoding UTF-8 character (common in sol2 headers)
     )
     target_compile_options(${PROJECT_NAME} PRIVATE
             $<IF:$<CONFIG:Debug>,,-WX>
@@ -118,6 +121,8 @@ else ()
             -Wall
             -Wextra
             -Wpedantic
+            -Wshadow
+            -Wconversion
             -Wfatal-errors
     )
     target_compile_options(${PROJECT_NAME} PRIVATE
