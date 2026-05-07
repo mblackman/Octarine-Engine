@@ -205,8 +205,7 @@ void Game::Setup() {
   auto &keyboardControlSystem =
       registry_->RegisterSystem<KeyboardControlComponent, RigidBodyComponent, SpriteComponent>(KeyboardControlSystem());
 
-  auto &movementSystem =
-      registry_->RegisterParallelSystem<TransformComponent, RigidBodyComponent, SpriteComponent>(MovementSystem());
+  registry_->RegisterParallelSystem<TransformComponent, RigidBodyComponent, SpriteComponent>(MovementSystem());
 
   // Resolve hierarchy after Movement mutates local positions, before Collision reads globals.
   registry_->RegisterBulkSystem<TransformComponent>(TransformSystem());
