@@ -42,9 +42,9 @@ class ScopedTimer {
 
 class ProfilingAccumulator {
  public:
-  static void Add(const std::string &name, const long long duration_microseconds) {
+  static void Add(const std::string &timerName, const long long duration_microseconds) {
     std::lock_guard lock(s_mutex);
-    s_accumulated_times[name] += duration_microseconds;
+    s_accumulated_times[timerName] += duration_microseconds;
   }
 
   static void Reset() {
@@ -53,9 +53,9 @@ class ProfilingAccumulator {
     s_start = std::chrono::high_resolution_clock::now();
   }
 
-  static void Report(const std::string &name) {
+  static void Report(const std::string &reportName) {
     std::lock_guard lock(s_mutex);
-    const std::string header = "--- Accumulated Performance Report: " + name + " ---";
+    const std::string header = "--- Accumulated Performance Report: " + reportName + " ---";
     Logger::Info(header);
     const auto end = std::chrono::high_resolution_clock::now();
     Logger::Info("ACCUM TOTAL: " + DurationToMs(s_start, end) + "ms");

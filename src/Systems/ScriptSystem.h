@@ -227,7 +227,8 @@ class ScriptSystem {
 
   static std::string makeKey(const std::string &key) {
     std::string lowerKey = key;
-    std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(), tolower);
+    std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(),
+                   [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
     return lowerKey;
   }
 

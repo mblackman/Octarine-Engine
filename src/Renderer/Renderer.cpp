@@ -10,7 +10,7 @@ void Renderer::Render(const RenderQueue& renderQueue, SDL_Renderer* renderer) co
       case SPRITE: {
         const auto& cmd = key.payload.sprite;
         const SDL_FRect destRect = {cmd.destX, cmd.destY, cmd.destW, cmd.destH};
-        const double deg = cmd.rotation * (180.0 / 3.14159265358979323846);
+        const auto deg = static_cast<float>(cmd.rotation * (180.0 / 3.14159265358979323846));
         SDL_RenderTextureRotated(renderer, cmd.texture, &cmd.srcRect, &destRect, deg, &cmd.pivot, cmd.flip);
         break;
       }
