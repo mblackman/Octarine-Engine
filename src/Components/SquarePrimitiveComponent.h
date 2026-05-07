@@ -14,10 +14,10 @@ struct SquarePrimitiveComponent {
   SDL_Color color;
   bool isFixed;
 
-  explicit SquarePrimitiveComponent(const glm::vec2 position = glm::vec2(0, 0), const int layer = 0,
-                                    const float width = 0, const float height = 0,
-                                    const SDL_Color color = {Constants::kUint8Max, Constants::kUint8Max,
-                                                             Constants::kUint8Max, Constants::kUint8Max},
-                                    const bool isFixed = true)
-      : position(position), layer(layer), width(width), height(height), color(color), isFixed(isFixed) {}
+  explicit SquarePrimitiveComponent(const glm::vec2 t_position = glm::vec2(0, 0), const int t_layer = 0,
+                                    const float t_width = 0, const float t_height = 0,
+                                    const SDL_Color t_color = {Constants::kUint8Max, Constants::kUint8Max,
+                                                               Constants::kUint8Max, Constants::kUint8Max},
+                                    const bool t_isFixed = true)
+      : position(t_position), layer(t_layer), width(t_width), height(t_height), color(t_color), isFixed(t_isFixed) {}
 };

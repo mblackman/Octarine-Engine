@@ -8,5 +8,5 @@ struct AudioPlayEvent : Event {
   std::string clipId;
   float volume;
 
-  AudioPlayEvent(std::string clipId, const float volume) : clipId(std::move(clipId)), volume(volume) {}
+  AudioPlayEvent(std::string t_clipId, const float t_volume) : clipId(std::move(t_clipId)), volume(t_volume) {}
 };

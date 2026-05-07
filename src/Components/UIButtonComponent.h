@@ -7,7 +7,7 @@ struct UIButtonComponent {
   sol::optional<sol::table> buttonTable;
   sol::protected_function clickFunction;
 
-  explicit UIButtonComponent(const bool isActive = true, sol::optional<sol::table> buttonTable = sol::nullopt,
-                             sol::protected_function clickFunction = sol::lua_nil)
-      : isActive(isActive), buttonTable(std::move(buttonTable)), clickFunction(std::move(clickFunction)) {}
+  explicit UIButtonComponent(const bool t_isActive = true, sol::optional<sol::table> t_buttonTable = sol::nullopt,
+                             sol::protected_function t_clickFunction = sol::lua_nil)
+      : isActive(t_isActive), buttonTable(std::move(t_buttonTable)), clickFunction(std::move(t_clickFunction)) {}
 };

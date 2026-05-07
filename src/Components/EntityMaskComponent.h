@@ -6,5 +6,5 @@
 struct EntityMaskComponent {
   EntityMask mask;
 
-  explicit EntityMaskComponent(const EntityMask mask = EntityMask(Constants::kDefaultEntityMask)) : mask(mask) {}
+  explicit EntityMaskComponent(const EntityMask t_mask = EntityMask(Constants::kDefaultEntityMask)) : mask(t_mask) {}
 };

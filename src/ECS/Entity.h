@@ -17,7 +17,7 @@ struct Entity {
 
   Entity() = default;
 
-  explicit Entity(const EcsId id) : id(id) {}
+  explicit Entity(const EcsId t_id) : id(t_id) {}
 
   [[nodiscard]] std::uint32_t GetId() const { return static_cast<std::uint32_t>(id); }
   [[nodiscard]] std::uint16_t GetGeneration() const {

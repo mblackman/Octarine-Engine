@@ -29,7 +29,8 @@ struct RenderKey {
 
   RenderKey() = default;
 
-  RenderKey(unsigned int layer, float depth, RenderableType type) : layer(layer), depth(depth), type(type) {}
+  RenderKey(unsigned int t_layer, float t_depth, RenderableType t_type)
+      : layer(t_layer), depth(t_depth), type(t_type) {}
 
   [[nodiscard]] auto OrderingTuple() const { return std::tuple(layer, depth, static_cast<int>(type)); }
 

@@ -10,12 +10,12 @@ struct TransformComponent {
   glm::vec2 globalScale;
   double globalRotation;
 
-  explicit TransformComponent(const glm::vec2 position = glm::vec2(0, 0), const glm::vec2 scale = glm::vec2(1, 1),
-                              const double rotation = 0.0)
-      : position(position),
-        scale(scale),
-        rotation(rotation),
-        globalPosition(position),
-        globalScale(scale),
-        globalRotation(rotation) {}
+  explicit TransformComponent(const glm::vec2 t_position = glm::vec2(0, 0), const glm::vec2 t_scale = glm::vec2(1, 1),
+                              const double t_rotation = 0.0)
+      : position(t_position),
+        scale(t_scale),
+        rotation(t_rotation),
+        globalPosition(t_position),
+        globalScale(t_scale),
+        globalRotation(t_rotation) {}
 };

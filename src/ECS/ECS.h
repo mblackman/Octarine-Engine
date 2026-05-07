@@ -19,7 +19,7 @@ typedef std::vector<ComponentID> ArchetypeType;
 struct Pair {
   EcsId id;
 
-  explicit Pair(const EcsId id) : id(id) {}
+  explicit Pair(const EcsId t_id) : id(t_id) {}
 
   [[nodiscard]] std::uint32_t GetTarget() const { return static_cast<std::uint32_t>(id); }
   [[nodiscard]] std::uint32_t GetRelationship() const {

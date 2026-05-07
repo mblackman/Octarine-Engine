@@ -5,5 +5,5 @@
 struct MouseInputEvent : Event {
   SDL_MouseButtonEvent event;
 
-  explicit MouseInputEvent(const SDL_MouseButtonEvent& event) : event(event) {}
+  explicit MouseInputEvent(const SDL_MouseButtonEvent& t_event) : event(t_event) {}
 };

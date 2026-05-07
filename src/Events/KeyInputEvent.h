@@ -7,9 +7,6 @@ struct KeyInputEvent : Event {
   SDL_Keymod inputModifier;
   bool isPressed;
 
-  KeyInputEvent(const SDL_Keycode inputKey, const SDL_Keymod inputModifier,
-                const bool isPressed)
-    : inputKey(inputKey),
-      inputModifier(inputModifier),
-      isPressed(isPressed) {}
+  KeyInputEvent(const SDL_Keycode t_inputKey, const SDL_Keymod t_inputModifier, const bool t_isPressed)
+      : inputKey(t_inputKey), inputModifier(t_inputModifier), isPressed(t_isPressed) {}
 };
