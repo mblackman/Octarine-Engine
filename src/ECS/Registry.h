@@ -52,15 +52,22 @@ class ComponentRegistry {
       info.move_construct = [](void* dst, void* src) { std::memcpy(dst, src, sizeof(T)); };
     }
     info.destroy = [](void* ptr) { static_cast<T*>(ptr)->~T(); };
+    if constexpr (std::is_swappable_v<T>) {
+      info.swap = [](void* a, void* b) {
+        using std::swap;
+        swap(*static_cast<T*>(a), *static_cast<T*>(b));
+      };
+    }
     component_infos_.try_emplace(id, std::move(info));
   }
 
-  // Zero-size component used as a tag/label. Move/destroy are no-ops so RemoveEntity and
-  // CopyComponents can call them unconditionally.
+  // Zero-size component used as a tag/label. Move/destroy/swap are no-ops so RemoveEntity,
+  // CopyComponents, and Chunk::Swap can call them unconditionally.
   void RegisterTag(const ComponentID id, std::string name) {
     ComponentInfo info{id, std::move(name), 0, 1};
     info.move_construct = [](void*, void*) {};
     info.destroy = [](void*) {};
+    info.swap = [](void*, void*) {};
     component_infos_.try_emplace(id, std::move(info));
   }
 
@@ -114,6 +121,9 @@ class Registry {
     // template parameter pack — Archetype::AddComponent looks up the in-archetype index by id.
     PlaceBundle(archetype, location, componentEntities, std::forward_as_tuple(components...),
                 std::index_sequence_for<TComponents...>{});
+    // New entities land active. Promote the slot we just filled into the active prefix; if
+    // the chunk had an inactive tail, this swaps the new entity past it.
+    PromoteToActive(location);
     return entity;
   }
 
@@ -130,6 +140,13 @@ class Registry {
     }
   }
 
+  // Defer despawn until end of Registry::Update
+  void QueueDespawnEntity(const Entity entity) {
+    if (pending_despawn_ids_.insert(entity.id).second) {
+      pending_despawns_.push_back(entity);
+    }
+  }
+
   [[nodiscard]] bool IsAlive(const Entity entity) const {
     const std::uint32_t id = entity.GetId();
     if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity)) return false;
@@ -139,6 +156,26 @@ class Registry {
   [[nodiscard]] std::uint64_t GetEntityCount() const { return entity_locations_.size(); }
 
   [[nodiscard]] std::vector<Entity> GetUserEntities() const;
+
+  // Returns the entity's current archetype id, including any tags currently on it. Used by the
+  // pool to bucket parked entities by shape so that Spawn pulls back like-shaped entities.
+  [[nodiscard]] ArchetypeID GetArchetypeID(const Entity entity) const {
+    const std::uint32_t id = entity.GetId();
+    if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity) || !entity_locations_[id].archetype) {
+      throw std::runtime_error("GetArchetypeID called on a destroyed, stale, or never-allocated entity.");
+    }
+    return entity_locations_[id].archetype->GetID();
+  }
+
+  // Activate / Deactivate move an entity across the active/inactive partition of its archetype's
+  // chunk without ever crossing archetypes. Default queries see only the active prefix, so a
+  // deactivated entity becomes invisible to gameplay systems while its components stay in place
+  // and ready to reuse. Used by EntityPoolManager for park/unpark.
+  void Activate(Entity entity);
+  void Deactivate(Entity entity);
+
+  // True iff the entity is alive AND in the active prefix of its chunk.
+  [[nodiscard]] bool IsActive(Entity entity) const;
 
   // Component management
   template <typename T>
@@ -426,6 +463,18 @@ class Registry {
     return const_cast<T&>(static_cast<const std::decay_t<decltype(*this)>&>(*this).Get<T>());
   }
 
+  // Non-throwing singleton lookup. Returns nullptr if T has never been Set, or if the type
+  // entity has not been resolved yet (i.e., Component<T>() was never called).
+  template <typename T>
+  [[nodiscard]] T* TryGet() {
+    const auto entityComponent = TryComponent<T>();
+    if (!entityComponent.has_value()) return nullptr;
+    const auto it = singleton_components_.find(entityComponent->GetId());
+    if (it == singleton_components_.end()) return nullptr;
+    if (const auto* ptr = std::any_cast<std::shared_ptr<T>>(&it->second)) return ptr->get();
+    return nullptr;
+  }
+
   // Tags / labels — zero-size component-entities. Each unique name maps to one Entity registered
   // as a zero-size component, so AddTag/HasTag/RemoveTag are archetype transitions / membership
   // checks. Lazy: TagId creates the Entity on first call.
@@ -439,9 +488,33 @@ class Registry {
     return tagEntity;
   }
 
+  // Typed tag — empty struct routed through fast_component_to_entity_, so resolution is one array
+  // lookup instead of a hash-table find on a string. Storage is zero bytes per entity (registered
+  // via RegisterTag). Use this for engine-internal tags; reserve string tags for data-driven ones.
+  template <typename T>
+  Entity Tag() {
+    static_assert(std::is_empty_v<T>, "Tag<T>() requires an empty struct type");
+    const size_t type_idx = GetComponentTypeIndex<T>();
+    if (type_idx >= fast_component_to_entity_.size()) {
+      fast_component_to_entity_.resize(type_idx + 1);
+    }
+    if (fast_component_to_entity_[type_idx].has_value()) {
+      return fast_component_to_entity_[type_idx].value();
+    }
+    const auto entity = CreateInternalEntity();
+    fast_component_to_entity_[type_idx] = entity;
+    component_registry_->RegisterTag(entity.GetId(), typeid(T).name());
+    return entity;
+  }
+
   void AddTag(const Entity entity, const Entity tagEntity) { TransitionAddComponent(entity, tagEntity.GetId()); }
 
   void AddTag(const Entity entity, const std::string& name) { AddTag(entity, TagId(name)); }
+
+  template <typename T>
+  void AddTag(const Entity entity) {
+    TransitionAddComponent(entity, Tag<T>().GetId());
+  }
 
   void RemoveTag(const Entity entity, const Entity tagEntity) { TransitionRemoveComponent(entity, tagEntity.GetId()); }
 
@@ -449,6 +522,15 @@ class Registry {
     const auto it = tag_to_entity_.find(name);
     if (it == tag_to_entity_.end()) return;
     RemoveTag(entity, it->second);
+  }
+
+  template <typename T>
+  void RemoveTag(const Entity entity) {
+    const size_t type_idx = GetComponentTypeIndex<T>();
+    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) {
+      return;
+    }
+    TransitionRemoveComponent(entity, fast_component_to_entity_[type_idx].value().GetId());
   }
 
   [[nodiscard]] bool HasTag(const Entity entity, const Entity tagEntity) const {
@@ -463,6 +545,15 @@ class Registry {
     const auto tagIt = tag_to_entity_.find(name);
     if (tagIt == tag_to_entity_.end()) return false;
     return HasTag(entity, tagIt->second);
+  }
+
+  template <typename T>
+  [[nodiscard]] bool HasTag(const Entity entity) const {
+    const size_t type_idx = GetComponentTypeIndex<T>();
+    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) {
+      return false;
+    }
+    return HasTag(entity, fast_component_to_entity_[type_idx].value());
   }
 
   // Relationships
@@ -506,6 +597,10 @@ class Registry {
 
   EntityLocation TransitionAddComponent(Entity entity, ComponentID componentId);
   EntityLocation TransitionRemoveComponent(Entity entity, ComponentID componentId);
+  // Move a freshly-added entity (whose components are placed but is sitting at entity_count - 1
+  // in its chunk's inactive tail) into the active prefix. Idempotent for archetypes that have
+  // no inactive tail — just bumps active_count.
+  void PromoteToActive(const EntityLocation& location);
   Archetype* GetOrCreateArchetype(std::vector<ComponentID> componentIDs, ComponentID newComponentId);
   Archetype* GetOrCreateArchetypeRemove(std::vector<ComponentID> componentIDs, ComponentID removeComponentId);
   Archetype* GetOrCreateArchetypeFromSet(std::vector<ComponentID> componentIDs);
@@ -536,6 +631,8 @@ class Registry {
   std::unordered_map<EntityID, Entity> child_to_parent_;
   std::vector<Entity> pending_blams_;
   std::unordered_set<EcsId> pending_blam_ids_;
+  std::vector<Entity> pending_despawns_;
+  std::unordered_set<EcsId> pending_despawn_ids_;
   float delta_time_{};
   uint64_t archetype_generation_{0};
   uint64_t hierarchy_generation_{0};

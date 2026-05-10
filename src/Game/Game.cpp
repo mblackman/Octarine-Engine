@@ -36,6 +36,7 @@
 #include "Systems/DamageSystem.h"
 #include "Systems/DisplayHealthSystem.h"
 #include "Systems/DrawColliderSystem.h"
+#include "Systems/EntityPoolSystem.h"
 #include "Systems/KeyboardControlSystem.h"
 #include "Systems/MovementSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
@@ -196,6 +197,8 @@ void Game::Setup() {
   auto &audioSystem = registry_->Set<AudioSystem>(AudioSystem());
   audioSystem.Init(registry_.get(), event_bus_);
 
+  registry_->Set<EntityPoolManager>(EntityPoolManager());
+
   LoadGame(lua, assetManager, gameConfig);
 
   registry_->RegisterParallelSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
@@ -228,7 +231,7 @@ void Game::Setup() {
   event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
   scriptSystem.SubscribeToEvents(event_bus_);
   keyboardControlSystem.SubscribeToEvents(event_bus_);
-  projectileEmitSystem.Init(event_bus_);
+  projectileEmitSystem.Init(event_bus_, *registry_);
   // Event-driven systems with no per-frame Update — owned by the Registry instead of
   // living as parallel members on Game. Keeps the registry as the single source of truth.
   auto &uiButtonSystem = registry_->Set<UIButtonSystem>(UIButtonSystem());

@@ -23,13 +23,14 @@ class ArchetypeQuery {
     using DifferenceType = std::ptrdiff_t;
 
     Iterator(ArchetypeType type, std::vector<Archetype*>::iterator archetype_it,
-             std::vector<Archetype*>::iterator archetype_end_it)
+             std::vector<Archetype*>::iterator archetype_end_it, bool include_inactive = false)
         : type_(std::move(type)),
           archetype_it_(std::move(archetype_it)),
           archetype_end_it_(std::move(archetype_end_it)),
           chunk_idx_(0),
           entity_idx_(0),
-          current_entities_(nullptr) {
+          current_entities_(nullptr),
+          include_inactive_(include_inactive) {
       assert(sizeof...(TComponents) == type_.size());
       AdvanceToValid();
     }
@@ -66,7 +67,9 @@ class ArchetypeQuery {
       while (archetype_it_ != archetype_end_it_) {
         Archetype* current_archetype = *archetype_it_;
         while (chunk_idx_ < current_archetype->chunks_.size()) {
-          if (entity_idx_ < current_archetype->chunks_[chunk_idx_].GetEntityCount()) {
+          const size_t bound = include_inactive_ ? current_archetype->chunks_[chunk_idx_].GetEntityCount()
+                                                 : current_archetype->chunks_[chunk_idx_].GetActiveCount();
+          if (entity_idx_ < bound) {
             if (entity_idx_ == 0) {
               UpdateChunkPointers();
             }
@@ -91,17 +94,21 @@ class ArchetypeQuery {
     size_t entity_idx_;
     std::tuple<TComponents*...> current_arrays_;
     const Entity* current_entities_;
+    bool include_inactive_ = false;
   };
 
   ArchetypeQuery() = default;
 
-  explicit ArchetypeQuery(const ArchetypeType& type, std::vector<Archetype*> matching_archetypes)
-      : type_(type), matching_archetypes_(std::move(matching_archetypes)) {
+  explicit ArchetypeQuery(const ArchetypeType& type, std::vector<Archetype*> matching_archetypes,
+                          bool include_inactive = false)
+      : type_(type), matching_archetypes_(std::move(matching_archetypes)), include_inactive_(include_inactive) {
     assert(sizeof...(TComponents) == type_.size());
   }
 
-  Iterator begin() { return Iterator(type_, matching_archetypes_.begin(), matching_archetypes_.end()); }
-  Iterator end() { return Iterator(type_, matching_archetypes_.end(), matching_archetypes_.end()); }
+  Iterator begin() {
+    return Iterator(type_, matching_archetypes_.begin(), matching_archetypes_.end(), include_inactive_);
+  }
+  Iterator end() { return Iterator(type_, matching_archetypes_.end(), matching_archetypes_.end(), include_inactive_); }
 
   // Process all matching entities in parallel across chunks. Each chunk is an independent
   // memory region, so concurrent processing is safe for per-entity writes.
@@ -173,7 +180,7 @@ class ArchetypeQuery {
     std::vector<ChunkWork> work;
     for (auto* arch : matching_archetypes_) {
       for (size_t c = 0; c < arch->chunks_.size(); ++c) {
-        const size_t count = arch->chunks_[c].GetEntityCount();
+        const size_t count = include_inactive_ ? arch->chunks_[c].GetEntityCount() : arch->chunks_[c].GetActiveCount();
         if (count > 0) {
           work.push_back({arch, c, count});
         }
@@ -222,4 +229,5 @@ class ArchetypeQuery {
 
   ArchetypeType type_;
   std::vector<Archetype*> matching_archetypes_;
+  bool include_inactive_ = false;
 };

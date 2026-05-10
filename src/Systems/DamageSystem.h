@@ -36,10 +36,10 @@ class DamageSystem {
     targetComponent.currentHealth -= projectileComponent.damage;
 
     if (targetComponent.currentHealth <= 0) {
-      registry_->QueueBlamEntity(target);
+      registry_->QueueDespawnEntity(target);
     }
 
-    registry_->QueueBlamEntity(projectile);
+    registry_->QueueDespawnEntity(projectile);
   }
 
  private:

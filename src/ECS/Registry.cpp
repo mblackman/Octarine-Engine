@@ -4,6 +4,8 @@
 
 #include "../General/Logger.h"
 #include "../General/PerfUtils.h"
+#include "../Systems/EntityPoolSystem.h"
+#include "CommandBuffer.h"
 #include "Query.h"
 
 void Registry::Update(const float deltaTime) {
@@ -15,12 +17,31 @@ void Registry::Update(const float deltaTime) {
 #endif
     systems_[i]->Update(*this);
   }
-  if (!pending_blams_.empty()) {
+  if (!pending_blams_.empty() || !pending_despawns_.empty()) {
     auto pending = std::move(pending_blams_);
+    auto despawns = std::move(pending_despawns_);
     pending_blams_.clear();
     pending_blam_ids_.clear();
+    pending_despawns_.clear();
+    pending_despawn_ids_.clear();
+
     for (const Entity entity : pending) {
       BlamEntity(entity);
+    }
+
+    // PoolableTag-bearing entities are routed straight into the pool's free list — Deactivate
+    // collapses them into the chunk's inactive tail without crossing archetypes. Non-pooled
+    // entities are blammed outright.
+    if (!despawns.empty()) {
+      auto* pool = TryGet<EntityPoolManager>();
+      for (const Entity entity : despawns) {
+        if (!IsAlive(entity)) continue;
+        if (pool && HasTag<PoolableTag>(entity)) {
+          pool->Park(*this, entity);
+        } else {
+          BlamEntity(entity);
+        }
+      }
     }
   }
 }
@@ -34,6 +55,7 @@ Entity Registry::CreateEntity() {
   }
   entity_locations_[id] = entityLocation;
   ++user_entity_count_;
+  PromoteToActive(entity_locations_[id]);
   return entity;
 }
 
@@ -46,6 +68,7 @@ Entity Registry::CreateInternalEntity() {
   }
   entity_locations_[id] = entityLocation;
   internal_entity_ids_.insert(entity.id);
+  PromoteToActive(entity_locations_[id]);
   return entity;
 }
 
@@ -83,11 +106,12 @@ void Registry::BlamEntity(const Entity entity) {
   if (hierarchyMutated) ++hierarchy_generation_;
 
   const EntityLocation removedLocation = entity_locations_[id];
-  const auto swapped = removedLocation.archetype->RemoveEntity(removedLocation);
+  const auto swaps = removedLocation.archetype->RemoveEntity(removedLocation);
   entity_manager_->BlamEntity(entity);
   entity_locations_[id] = EntityLocation{nullptr, 0, 0};
-  if (swapped) {
-    entity_locations_[swapped->GetId()] = removedLocation;
+  for (const auto& swap : swaps) {
+    entity_locations_[swap.entity.GetId()] =
+        EntityLocation{removedLocation.archetype, removedLocation.chunkIndex, swap.indexInChunk};
   }
   if (internal_entity_ids_.erase(entity.id) == 0 && user_entity_count_ > 0) {
     --user_entity_count_;
@@ -207,12 +231,14 @@ EntityLocation Registry::TransitionAddComponent(const Entity entity, const Compo
   const EntityLocation newLocation = newArchetype->AddEntity(entity);
   newArchetype->CopyComponents(oldLocation, newLocation);
 
-  const auto swapped = oldLocation.archetype->RemoveEntity(oldLocation);
+  const auto swaps = oldLocation.archetype->RemoveEntity(oldLocation);
   entity_locations_[id] = newLocation;
-  if (swapped) {
-    entity_locations_[swapped->GetId()] = oldLocation;
+  for (const auto& swap : swaps) {
+    entity_locations_[swap.entity.GetId()] =
+        EntityLocation{oldLocation.archetype, oldLocation.chunkIndex, swap.indexInChunk};
   }
-  return newLocation;
+  PromoteToActive(entity_locations_[id]);
+  return entity_locations_[id];
 }
 
 EntityLocation Registry::TransitionRemoveComponent(const Entity entity, const ComponentID componentId) {
@@ -244,12 +270,71 @@ EntityLocation Registry::TransitionRemoveComponent(const Entity entity, const Co
   const EntityLocation newLocation = newArchetype->AddEntity(entity);
   newArchetype->CopyComponents(oldLocation, newLocation);
 
-  const auto swapped = oldLocation.archetype->RemoveEntity(oldLocation);
+  const auto swaps = oldLocation.archetype->RemoveEntity(oldLocation);
   entity_locations_[id] = newLocation;
-  if (swapped) {
-    entity_locations_[swapped->GetId()] = oldLocation;
+  for (const auto& swap : swaps) {
+    entity_locations_[swap.entity.GetId()] =
+        EntityLocation{oldLocation.archetype, oldLocation.chunkIndex, swap.indexInChunk};
   }
-  return newLocation;
+  PromoteToActive(entity_locations_[id]);
+  return entity_locations_[id];
+}
+
+void Registry::PromoteToActive(const EntityLocation& location) {
+  if (!location.archetype) return;
+  // Activate is no-op-equivalent when the slot is already at the active boundary (no swap, just
+  // ++active_count). When the chunk has an inactive tail, this swaps the new entity past it.
+  const auto result = location.archetype->Activate(location);
+  // Patch entity_locations_ for both the entity that just became active and (if the boundary
+  // was occupied by an inactive entity) the displaced inactive entity now sitting at `location`.
+  const Entity activated = location.archetype->GetEntity(location.chunkIndex, result.newSlot);
+  entity_locations_[activated.GetId()] = EntityLocation{location.archetype, location.chunkIndex, result.newSlot};
+  if (result.displaced) {
+    entity_locations_[result.displaced->GetId()] = location;
+  }
+}
+
+void Registry::Activate(const Entity entity) {
+  const std::uint32_t id = entity.GetId();
+  if (id >= entity_locations_.size() || !entity_locations_[id].archetype || !entity_manager_->IsValid(entity)) {
+    return;
+  }
+  const EntityLocation oldLocation = entity_locations_[id];
+  // Already in the active prefix? Nothing to do.
+  if (oldLocation.indexInChunk < oldLocation.archetype->GetActiveCountInChunk(oldLocation.chunkIndex)) {
+    return;
+  }
+  const auto result = oldLocation.archetype->Activate(oldLocation);
+  entity_locations_[id] = EntityLocation{oldLocation.archetype, oldLocation.chunkIndex, result.newSlot};
+  if (result.displaced) {
+    entity_locations_[result.displaced->GetId()] = oldLocation;
+  }
+}
+
+void Registry::Deactivate(const Entity entity) {
+  const std::uint32_t id = entity.GetId();
+  if (id >= entity_locations_.size() || !entity_locations_[id].archetype || !entity_manager_->IsValid(entity)) {
+    return;
+  }
+  const EntityLocation oldLocation = entity_locations_[id];
+  // Already in the inactive tail? Nothing to do.
+  if (oldLocation.indexInChunk >= oldLocation.archetype->GetActiveCountInChunk(oldLocation.chunkIndex)) {
+    return;
+  }
+  const auto result = oldLocation.archetype->Deactivate(oldLocation);
+  entity_locations_[id] = EntityLocation{oldLocation.archetype, oldLocation.chunkIndex, result.newSlot};
+  if (result.displaced) {
+    entity_locations_[result.displaced->GetId()] = oldLocation;
+  }
+}
+
+bool Registry::IsActive(const Entity entity) const {
+  const std::uint32_t id = entity.GetId();
+  if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity) || !entity_locations_[id].archetype) {
+    return false;
+  }
+  const auto& loc = entity_locations_[id];
+  return loc.indexInChunk < loc.archetype->GetActiveCountInChunk(loc.chunkIndex);
 }
 
 Archetype* Registry::GetOrCreateArchetype(std::vector<ComponentID> componentIDs, const ComponentID newComponentId) {
@@ -447,4 +532,24 @@ std::vector<Entity> Registry::GetChildren(const Entity parent) const {
     children.emplace_back(id);
   }
   return children;
+}
+
+void CommandBuffer::Playback(Registry* registry) const {
+  auto& chan = state_->commands;
+  const size_t total = std::min(chan.count.load(std::memory_order_relaxed), chan.buffer.size());
+  for (size_t i = 0; i < total; ++i) {
+    if (chan.buffer[i].type == CommandType::Blam) {
+      registry->QueueBlamEntity(chan.buffer[i].entity);
+    } else {
+      registry->QueueDespawnEntity(chan.buffer[i].entity);
+    }
+  }
+  for (const Command& cmd : chan.overflow_buffer) {
+    if (cmd.type == CommandType::Blam) {
+      registry->QueueBlamEntity(cmd.entity);
+    } else {
+      registry->QueueDespawnEntity(cmd.entity);
+    }
+  }
+  chan.Clear();
 }

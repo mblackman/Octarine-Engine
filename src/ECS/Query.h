@@ -34,8 +34,18 @@ class ComponentQuery final : public Query {
       return;  // Archetype set unchanged — skip the re-match.
     }
     cached_generation_ = current_gen;
-    const auto matching_archetypes = registry_->GetMatchingArchetypes(sorted_type_);
-    archetype_query_ = ArchetypeQuery<TComponents...>(type_, matching_archetypes);
+    auto matching_archetypes = registry_->GetMatchingArchetypes(sorted_type_);
+
+    if (!excluded_.empty()) {
+      std::erase_if(matching_archetypes, [&](Archetype* arch) {
+        for (const ComponentID id : excluded_) {
+          if (arch->HasComponent(id)) return true;
+        }
+        return false;
+      });
+    }
+
+    archetype_query_ = ArchetypeQuery<TComponents...>(type_, matching_archetypes, include_inactive_);
   }
 
   // Add a tag/label as a query filter. Filtered tags are required for archetype matching but are
@@ -49,6 +59,35 @@ class ComponentQuery final : public Query {
   }
 
   ComponentQuery& WithTag(const std::string& name) { return WithTag(registry_->TagId(name)); }
+
+  ComponentQuery& WithoutTag(const Entity tag) {
+    excluded_.push_back(tag.GetId());
+    cached_generation_ = UINT64_MAX;
+    return *this;
+  }
+
+  ComponentQuery& WithoutTag(const std::string& name) { return WithoutTag(registry_->TagId(name)); }
+
+  // Typed tag filters — resolve through Registry::Tag<T>() for an array-indexed lookup rather
+  // than a string hash. Same semantics as WithTag/WithoutTag; use these for engine-internal tags.
+  template <typename T>
+  ComponentQuery& With() {
+    return WithTag(registry_->template Tag<T>());
+  }
+
+  template <typename T>
+  ComponentQuery& Without() {
+    return WithoutTag(registry_->template Tag<T>());
+  }
+
+  // Opt-in to iterating parked/inactive entities. Default queries see only the active prefix
+  // of each chunk; this is the escape hatch for diagnostics/pool internals that explicitly
+  // want both regions. Forces a re-build of the underlying ArchetypeQuery on next Update().
+  ComponentQuery& IncludeInactive() {
+    include_inactive_ = true;
+    cached_generation_ = UINT64_MAX;
+    return *this;
+  }
 
   template <typename Func>
   void ForEach(Func&& func) {
@@ -122,6 +161,8 @@ class ComponentQuery final : public Query {
   ArchetypeType type_;            // user-pack order — used by ArchetypeQuery::Iterator
   ArchetypeType sorted_type_;     // sorted ascending — used for archetype matching
   ArchetypeType extra_required_;  // additional ComponentIDs required (e.g., tag filters)
+  ArchetypeType excluded_;        // ComponentIDs that disqualify an archetype
   ArchetypeQuery<TComponents...> archetype_query_;
   uint64_t cached_generation_{UINT64_MAX};  // Forces first Update to always match.
+  bool include_inactive_ = false;
 };

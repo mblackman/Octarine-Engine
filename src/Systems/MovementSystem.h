@@ -28,6 +28,14 @@ class MovementSystem {
     playableAreaWidth_ = static_cast<float>(gameConfig.playableAreaWidth);
     playableAreaHeight_ = static_cast<float>(gameConfig.playableAreaHeight);
 
+    if (playableAreaWidth_ <= 0) {
+      playableAreaWidth_ = windowWidth_;
+    }
+
+    if (playableAreaHeight_ <= 0) {
+      playableAreaHeight_ = windowHeight_;
+    }
+
     if (!subscribed_) {
       eventBus->SubscribeEvent<MovementSystem, CollisionEvent>(this, &MovementSystem::OnCollision);
       subscribed_ = true;
@@ -44,7 +52,7 @@ class MovementSystem {
       const float bottom = transform.globalPosition.y + spriteComponent.height * transform.globalScale.y;
       if (transform.globalPosition.x > playableAreaWidth_ || transform.globalPosition.y > playableAreaHeight_ ||
           right < 0 || bottom < 0) {
-        cmd_buffer_.Emplace<Entity>(entity);
+        cmd_buffer_.EmplaceDespawn(entity);
         return;
       }
     }

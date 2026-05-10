@@ -11,13 +11,25 @@
 #include "../Components/RigidBodyComponent.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
+#include "../ECS/ECS.h"
 #include "../ECS/Registry.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
+#include "EntityPoolSystem.h"
 
 class ProjectileEmitSystem {
  public:
-  void Init(const std::unique_ptr<EventBus>& eventBus) {
+  void Init(const std::unique_ptr<EventBus>& eventBus, Registry& registry) {
+    projectile_pool_id_ =
+        registry.Get<EntityPoolManager>().RegisterPool<ProjectileComponent>(registry, [](Registry& reg) {
+          const auto entity =
+              reg.CreateEntityWithBundle(EntityMaskComponent(), TransformComponent(), RigidBodyComponent(),
+                                         BoxColliderComponent(4, 4, glm::vec2(0, 0), EntityMask{}),
+                                         ProjectileComponent(), SpriteComponent("bullet-texture", 4.0f, 4.0f, 4));
+          reg.AddTag<PoolableTag>(entity);
+          reg.AddTag(entity, "projectiles");
+          return entity;
+        });
     eventBus->SubscribeEvent<ProjectileEmitSystem, KeyInputEvent>(this, &ProjectileEmitSystem::OnKeyInput);
   }
 
@@ -50,10 +62,11 @@ class ProjectileEmitSystem {
   }
 
  private:
+  ArchetypeID projectile_pool_id_{};
   bool spawnFriendlyProjectiles_ = false;
 
-  static void SpawnProjectile(const TransformComponent& transform, const Entity& entity, Registry* registry,
-                              ProjectileEmitterComponent& emitter, bool isPlayer = false) {
+  void SpawnProjectile(const TransformComponent& transform, const Entity& entity, Registry* registry,
+                       ProjectileEmitterComponent& emitter, bool isPlayer = false) const {
     auto projectilePosition = transform.position;
     auto velocity = emitter.velocity;
 
@@ -75,16 +88,23 @@ class ProjectileEmitSystem {
 
     // Inherit the emitter's collision mask. Default-construct if the emitter has no mask
     // component (e.g. a scene-authored emitter that doesn't participate in collision filtering).
-    EntityMaskComponent maskComponent =
-        registry->HasComponent<EntityMaskComponent>(entity)
-            ? EntityMaskComponent(registry->GetComponent<EntityMaskComponent>(entity).mask)
-            : EntityMaskComponent();
+    const EntityMask emitterMask = registry->HasComponent<EntityMaskComponent>(entity)
+                                       ? registry->GetComponent<EntityMaskComponent>(entity).mask
+                                       : EntityMask();
 
-    // One archetype transition for all components instead of six AddComponent calls.
-    auto projectile = registry->CreateEntityWithBundle(
-        maskComponent, TransformComponent(projectilePosition, glm::vec2(1.0, 1.0), 0.0), RigidBodyComponent(velocity),
-        BoxColliderComponent(4, 4, glm::vec2(0, 0), emitter.collisionMask),
-        ProjectileComponent(emitter.damage, emitter.duration), SpriteComponent("bullet-texture", 4.0f, 4.0f, 4));
-    registry->AddTag(projectile, "projectiles");
+    // Pool returns either a recycled entity (timer reset, shape intact) or a freshly built one
+    // from the factory registered in Init. Either way we rewrite the per-spawn fields. Use the
+    // TransformComponent constructor so globalPosition/globalScale/globalRotation are reset too —
+    // a recycled projectile would otherwise carry stale globals from its prior life, and
+    // MovementSystem's out-of-bounds check reads globalPosition and would despawn it instantly.
+    const Entity projectile = registry->Get<EntityPoolManager>().Spawn(*registry, projectile_pool_id_);
+    registry->GetComponent<EntityMaskComponent>(projectile).mask = emitterMask;
+    registry->GetComponent<TransformComponent>(projectile) =
+        TransformComponent(projectilePosition, glm::vec2(1.0f, 1.0f), 0.0);
+    registry->GetComponent<RigidBodyComponent>(projectile).velocity = velocity;
+    registry->GetComponent<BoxColliderComponent>(projectile).collisionMask = emitter.collisionMask;
+    auto& projectileComponent = registry->GetComponent<ProjectileComponent>(projectile);
+    projectileComponent.damage = emitter.damage;
+    projectileComponent.duration = emitter.duration;
   }
 };

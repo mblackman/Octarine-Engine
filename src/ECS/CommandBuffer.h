@@ -43,6 +43,12 @@ struct Channel {
 // buffer narrow avoids the channel + playback copy that dominated render perf.
 class CommandBuffer {
  public:
+  enum class CommandType { Blam, Despawn };
+  struct Command {
+    CommandType type;
+    Entity entity;
+  };
+
   explicit CommandBuffer(size_t capacity = Constants::kSystemCommandBufferSize)
       : state_(std::make_unique<State>(capacity)) {}
 
@@ -51,24 +57,16 @@ class CommandBuffer {
   CommandBuffer(const CommandBuffer&) = delete;
   CommandBuffer& operator=(const CommandBuffer&) = delete;
 
-  template <typename T, typename... Args>
-  T& Emplace(Args&&... args) const {
-    static_assert(std::is_same_v<T, Entity>, "CommandBuffer currently only buffers Entity blam requests");
-    return state_->blams.Emplace(std::forward<Args>(args)...);
-  }
+  void EmplaceBlam(Entity entity) const { state_->commands.Emplace(Command{CommandType::Blam, entity}); }
 
-  void Playback(Registry* registry) const {
-    auto& chan = state_->blams;
-    const size_t total = std::min(chan.count.load(std::memory_order_relaxed), chan.buffer.size());
-    for (size_t i = 0; i < total; ++i) registry->QueueBlamEntity(chan.buffer[i]);
-    for (const Entity& e : chan.overflow_buffer) registry->QueueBlamEntity(e);
-    chan.Clear();
-  }
+  void EmplaceDespawn(Entity entity) const { state_->commands.Emplace(Command{CommandType::Despawn, entity}); }
+
+  void Playback(Registry* registry) const;
 
  private:
   struct State {
-    Channel<Entity> blams;
-    explicit State(const size_t capacity) : blams(capacity) {}
+    Channel<Command> commands;
+    explicit State(const size_t capacity) : commands(capacity) {}
   };
 
   std::unique_ptr<State> state_;

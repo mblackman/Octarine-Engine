@@ -15,6 +15,18 @@ class Archetype;
 
 struct ChunkHeader {
   uint32_t entity_count;
+  // Active prefix of the chunk: slots [0, active_count) are visible to default queries; slots
+  // [active_count, entity_count) hold parked/inactive entities that share storage with the active
+  // ones. Invariant: active_count <= entity_count.
+  uint32_t active_count;
+};
+
+// Outcome of Chunk::RemoveEntity: up to two entities may have been moved into different slots
+// (one when crossing the active/inactive boundary, one for the standard swap-with-end). The
+// caller patches entity_locations_ for each.
+struct ChunkRemoveSwap {
+  Entity entity;
+  size_t indexInChunk;
 };
 
 struct ComponentInfo {
@@ -25,6 +37,9 @@ struct ComponentInfo {
   // Lifecycle ops — needed so non-trivially-copyable components survive archetype transitions.
   void (*move_construct)(void* dst, void* src) = nullptr;
   void (*destroy)(void* ptr) = nullptr;
+  // In-chunk swap of two slots. Used by Archetype::Activate/Deactivate to shuffle entities across
+  // the active/inactive partition without crossing chunks. Tags (size 0) leave this as a no-op.
+  void (*swap)(void* a, void* b) = nullptr;
 };
 
 struct EntityLocation {
@@ -49,13 +64,17 @@ constexpr size_t kUsableSpace = kChunkSize;
 
 class Chunk {
  public:
-  explicit Chunk() : header_(), buffer_(new unsigned char[kUsableSpace]) { header_.entity_count = 0; }
+  explicit Chunk() : header_(), buffer_(new unsigned char[kUsableSpace]) {
+    header_.entity_count = 0;
+    header_.active_count = 0;
+  }
 
   ~Chunk() { delete[] buffer_; }
 
   Chunk(Chunk&& other) noexcept : header_(other.header_), buffer_(other.buffer_) {
     other.buffer_ = nullptr;
     other.header_.entity_count = 0;
+    other.header_.active_count = 0;
   }
 
   Chunk& operator=(Chunk&& other) noexcept {
@@ -65,6 +84,7 @@ class Chunk {
       buffer_ = other.buffer_;
       other.buffer_ = nullptr;
       other.header_.entity_count = 0;
+      other.header_.active_count = 0;
     }
     return *this;
   }
@@ -78,6 +98,7 @@ class Chunk {
   }
 
   [[nodiscard]] size_t GetEntityCount() const { return header_.entity_count; }
+  [[nodiscard]] size_t GetActiveCount() const { return header_.active_count; }
 
   [[nodiscard]] const Entity* GetEntityArray() const { return reinterpret_cast<const Entity*>(buffer_); }
 
@@ -88,6 +109,9 @@ class Chunk {
     ::new (buffer_ + offset + index * sizeof(T)) T(component);
   }
 
+  // Append the entity record. Components are not yet placed; the caller does that next, and
+  // then must call Archetype::Activate (or Archetype::FinalizeAdd, same thing) to move the new
+  // entity into the active region.
   void AddEntity(const Entity entity, [[maybe_unused]] const size_t capacity) {
     assert(header_.entity_count < capacity);
     auto* entity_array = reinterpret_cast<Entity*>(buffer_);
@@ -95,40 +119,92 @@ class Chunk {
     header_.entity_count++;
   }
 
-  // Removes the entity at `index` via swap-with-last. Returns the entity that got moved into
-  // the vacated slot (so the caller can update external location maps), or nullopt if the
-  // removed entity was already last.
-  std::optional<Entity> RemoveEntity(const size_t index, const std::vector<size_t>& componentOffsets,
-                                     const std::vector<ComponentInfo>& componentInfos) {
+  void IncrementActive() {
+    assert(header_.active_count < header_.entity_count);
+    ++header_.active_count;
+  }
+
+  void DecrementActive() {
+    assert(header_.active_count > 0);
+    --header_.active_count;
+  }
+
+  // Swap two slots (entity record + every component array). Both slots must be constructed.
+  // Caller is responsible for patching entity_locations_ for the two swapped entities.
+  void Swap(const size_t i, const size_t j, const std::vector<size_t>& componentOffsets,
+            const std::vector<ComponentInfo>& componentInfos) {
     assert(componentOffsets.size() == componentInfos.size());
-    if (index >= header_.entity_count) return std::nullopt;
-
-    const size_t lastIndex = header_.entity_count - 1;
+    assert(i < header_.entity_count && j < header_.entity_count);
+    if (i == j) return;
     auto* entity_array = reinterpret_cast<Entity*>(buffer_);
+    std::swap(entity_array[i], entity_array[j]);
+    for (size_t c = 0; c < componentOffsets.size(); ++c) {
+      const auto& info = componentInfos[c];
+      if (info.size == 0 || !info.swap) continue;
+      unsigned char* a = buffer_ + componentOffsets[c] + i * info.size;
+      unsigned char* b = buffer_ + componentOffsets[c] + j * info.size;
+      info.swap(a, b);
+    }
+  }
 
-    // Destroy components at the removed slot first (may already be moved-from — destroy is still required).
-    for (size_t i = 0; i < componentOffsets.size(); ++i) {
-      const auto& info = componentInfos[i];
-      unsigned char* slot_ptr = buffer_ + componentOffsets[i] + index * info.size;
+  // Remove the entity at `index`. Handles entries in either the active region [0, active_count)
+  // or the inactive tail [active_count, entity_count). Returns up to two relocations: the first
+  // for the active-boundary collapse (if the removed entity was active and not at the boundary),
+  // the second for the standard swap-with-last fill. Caller patches entity_locations_ for each.
+  std::vector<ChunkRemoveSwap> RemoveEntity(const size_t index, const std::vector<size_t>& componentOffsets,
+                                            const std::vector<ComponentInfo>& componentInfos) {
+    assert(componentOffsets.size() == componentInfos.size());
+    std::vector<ChunkRemoveSwap> swaps;
+    if (index >= header_.entity_count) return swaps;
+
+    auto* entity_array = reinterpret_cast<Entity*>(buffer_);
+    const bool wasActive = index < header_.active_count;
+
+    // Destroy components at the removed slot.
+    for (size_t c = 0; c < componentOffsets.size(); ++c) {
+      const auto& info = componentInfos[c];
+      unsigned char* slot_ptr = buffer_ + componentOffsets[c] + index * info.size;
       if (info.destroy) info.destroy(slot_ptr);
     }
 
-    std::optional<Entity> swapped;
-    if (index != lastIndex) {
-      // Move last into vacated slot, then destroy the last slot.
-      for (size_t i = 0; i < componentOffsets.size(); ++i) {
-        const auto& info = componentInfos[i];
-        unsigned char* dest_ptr = buffer_ + componentOffsets[i] + index * info.size;
-        unsigned char* source_ptr = buffer_ + componentOffsets[i] + lastIndex * info.size;
+    // Active-region collapse: pull the last active entity into the freed slot so the active
+    // prefix stays dense. Skip when the removed entity was already at the boundary.
+    if (wasActive && index + 1 < header_.active_count) {
+      const size_t srcIdx = header_.active_count - 1;
+      for (size_t c = 0; c < componentOffsets.size(); ++c) {
+        const auto& info = componentInfos[c];
+        unsigned char* dest_ptr = buffer_ + componentOffsets[c] + index * info.size;
+        unsigned char* source_ptr = buffer_ + componentOffsets[c] + srcIdx * info.size;
         if (info.move_construct) info.move_construct(dest_ptr, source_ptr);
         if (info.destroy) info.destroy(source_ptr);
       }
-      entity_array[index] = entity_array[lastIndex];
-      swapped = entity_array[index];
+      entity_array[index] = entity_array[srcIdx];
+      swaps.push_back({entity_array[index], index});
     }
 
-    header_.entity_count--;
-    return swapped;
+    if (wasActive) --header_.active_count;
+
+    // The freed slot after the active collapse is either `index` (inactive removal) or the
+    // post-decrement active_count (active removal — the slot that was the active boundary).
+    const size_t freedSlot = wasActive ? header_.active_count : index;
+    const size_t lastSlot = header_.entity_count - 1;
+
+    // Standard swap-with-end: pull the last entity (always inactive at this point) into the
+    // freed slot. Skip when there's nothing to pull.
+    if (freedSlot != lastSlot) {
+      for (size_t c = 0; c < componentOffsets.size(); ++c) {
+        const auto& info = componentInfos[c];
+        unsigned char* dest_ptr = buffer_ + componentOffsets[c] + freedSlot * info.size;
+        unsigned char* source_ptr = buffer_ + componentOffsets[c] + lastSlot * info.size;
+        if (info.move_construct) info.move_construct(dest_ptr, source_ptr);
+        if (info.destroy) info.destroy(source_ptr);
+      }
+      entity_array[freedSlot] = entity_array[lastSlot];
+      swaps.push_back({entity_array[freedSlot], freedSlot});
+    }
+
+    --header_.entity_count;
+    return swaps;
   }
 
  private:
@@ -166,6 +242,11 @@ class Archetype {
     return chunks_[chunkIndex].GetEntityArray()[indexInChunk];
   }
 
+  [[nodiscard]] size_t GetActiveCountInChunk(size_t chunkIndex) const {
+    assert(chunkIndex < chunks_.size());
+    return chunks_[chunkIndex].GetActiveCount();
+  }
+
   EntityLocation AddEntity(const Entity entity) {
     // Cached first-non-full chunk index advances monotonically as earlier chunks fill.
     while (first_non_full_chunk_ < chunks_.size() &&
@@ -184,15 +265,57 @@ class Archetype {
     return {this, chunks_.size() - 1, 0};
   }
 
-  // Returns the entity that was swapped into the vacated slot (or nullopt if no swap).
-  std::optional<Entity> RemoveEntity(const EntityLocation& location) {
+  // Returns up to two relocations (active-boundary collapse + swap-with-end). Caller patches
+  // entity_locations_ for each returned entity using the recorded slot.
+  std::vector<ChunkRemoveSwap> RemoveEntity(const EntityLocation& location) {
     AssertLocation(location);
-    auto swapped =
-        chunks_[location.chunkIndex].RemoveEntity(location.indexInChunk, component_offsets_, component_infos_);
+    auto swaps = chunks_[location.chunkIndex].RemoveEntity(location.indexInChunk, component_offsets_, component_infos_);
     if (location.chunkIndex < first_non_full_chunk_) {
       first_non_full_chunk_ = location.chunkIndex;
     }
-    return swapped;
+    return swaps;
+  }
+
+  // Result of a partition transition: the entity that was being toggled is now at `newSlot` in
+  // the same chunk; if a swap happened, `displaced` is the entity that previously occupied
+  // `newSlot` and now sits at the caller's original slot.
+  struct PartitionResult {
+    size_t newSlot;
+    std::optional<Entity> displaced;
+  };
+
+  // Move an entity from the inactive tail into the active prefix. The entity must currently sit
+  // at or beyond `active_count`. After this call, it occupies the slot at the previous active
+  // boundary and `active_count` has grown by one.
+  PartitionResult Activate(const EntityLocation& location) {
+    AssertLocation(location);
+    auto& chunk = chunks_[location.chunkIndex];
+    assert(location.indexInChunk >= chunk.GetActiveCount());
+    const size_t boundary = chunk.GetActiveCount();
+    PartitionResult result{boundary, std::nullopt};
+    if (location.indexInChunk != boundary) {
+      chunk.Swap(location.indexInChunk, boundary, component_offsets_, component_infos_);
+      result.displaced = chunk.GetEntityArray()[location.indexInChunk];
+    }
+    chunk.IncrementActive();
+    return result;
+  }
+
+  // Move an entity from the active prefix into the inactive tail. The entity must currently be
+  // active. After this call, it occupies the slot at the new active boundary (active_count - 1
+  // post-decrement, which is the first inactive slot).
+  PartitionResult Deactivate(const EntityLocation& location) {
+    AssertLocation(location);
+    auto& chunk = chunks_[location.chunkIndex];
+    assert(location.indexInChunk < chunk.GetActiveCount());
+    chunk.DecrementActive();
+    const size_t boundary = chunk.GetActiveCount();  // post-decrement: new first inactive slot
+    PartitionResult result{boundary, std::nullopt};
+    if (location.indexInChunk != boundary) {
+      chunk.Swap(location.indexInChunk, boundary, component_offsets_, component_infos_);
+      result.displaced = chunk.GetEntityArray()[location.indexInChunk];
+    }
+    return result;
   }
 
   [[nodiscard]] bool HasComponent(const ComponentID id) const { return component_type_to_index_.contains(id); }
