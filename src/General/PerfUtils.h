@@ -143,8 +143,8 @@ auto LogTime(const std::string &name, Func &&func) -> std::invoke_result_t<Func>
 #define OCT_CONCAT_INNER(a, b) a##b
 #define OCT_CONCAT(a, b) OCT_CONCAT_INNER(a, b)
 #ifdef OCTARINE_PROFILING
-#define PROFILE_SCOPE PerfUtils::ScopedTimer timer(__FUNCTION__)
-#define PROFILE_NAMED_SCOPE(name) PerfUtils::ScopedTimer timer(name)
+#define PROFILE_SCOPE PerfUtils::ScopedTimer OCT_CONCAT(timer_, __LINE__)(__FUNCTION__)
+#define PROFILE_NAMED_SCOPE(name) PerfUtils::ScopedTimer OCT_CONCAT(timer_, __LINE__)(name)
 #define ACCUMULATE_PROFILE_SCOPE(name) PerfUtils::AccumulatingScopedTimer OCT_CONCAT(accTimer_, __LINE__)(name)
 #define AGGREGATE_PROFILE_SESSION(name) PerfUtils::AggregateProfilingSession OCT_CONCAT(aggSession_, __LINE__)(name)
 #else
