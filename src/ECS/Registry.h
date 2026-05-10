@@ -26,7 +26,7 @@ class Query;
 template <typename... TComponents>
 class ComponentQuery;
 
-static inline std::atomic<size_t> s_component_type_counter{0};
+inline std::atomic<size_t> s_component_type_counter{0};
 
 template <typename T>
 size_t GetComponentTypeIndex() {
