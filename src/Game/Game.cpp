@@ -298,6 +298,7 @@ void Game::ProcessInput() const {
 void Game::Update(const float deltaTime) {
 #ifdef OCTARINE_PROFILING
   PerfUtils::ProfilingAccumulator::Clear();
+  PerfUtils::PerfCounters::ResetValues();
 #endif
   PROFILE_NAMED_SCOPE("Game::Update (total)");
 
@@ -320,6 +321,9 @@ void Game::Render(const float deltaTime) {
   PROFILE_NAMED_SCOPE("Game::Render (total)");
   auto &renderQueue = registry_->Get<RenderQueue>();
   auto &gameConfig = registry_->Get<GameConfig>();
+
+  PROFILE_COUNTER_SET("RenderQueue: Size", static_cast<long long>(renderQueue.Size()));
+  PROFILE_COUNTER_SET("Entities: User", static_cast<long long>(registry_->GetUserEntityCount()));
 
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
   SDL_RenderClear(sdl_renderer_);
@@ -356,6 +360,9 @@ void Game::Render(const float deltaTime) {
 #else
   SDL_RenderPresent(sdl_renderer_);
 #endif
+  // Emit per-frame counters as COUNTER lines so headless bench runs can capture them
+  // alongside TIMER lines. All systems for this frame have already written their values.
+  PROFILE_COUNTERS_REPORT();
   renderQueue.Clear();
 }
 

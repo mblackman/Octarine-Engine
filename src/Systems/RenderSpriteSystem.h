@@ -2,9 +2,12 @@
 
 #include <SDL3/SDL.h>
 
+#include <atomic>
+
 #include "../AssetManager/AssetManager.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
+#include "../General/PerfUtils.h"
 #include "../Renderer/RenderQueue.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"
@@ -18,6 +21,10 @@ class RenderSpriteSystem {
     renderQueue_ = &registry->Get<RenderQueue>();
     windowWidth_ = static_cast<float>(gameConfig.windowWidth);
     windowHeight_ = static_cast<float>(gameConfig.windowHeight);
+#ifdef OCTARINE_PROFILING
+    if (!culledCounter_) culledCounter_ = PROFILE_COUNTER_HANDLE("RenderSprite: Culled");
+    if (!emplacedCounter_) emplacedCounter_ = PROFILE_COUNTER_HANDLE("RenderSprite: Emplaced");
+#endif
   }
 
   void operator()(const TransformComponent& transform, const SpriteComponent& sprite) const {
@@ -35,7 +42,12 @@ class RenderSpriteSystem {
                         transform.globalPosition.y > camera_.y + camera_.h;
     }
 
-    if (isOutsideCamera) return;
+    if (isOutsideCamera) {
+      PROFILE_COUNTER_INC(culledCounter_);
+      return;
+    }
+
+    PROFILE_COUNTER_INC(emplacedCounter_);
 
     // Re-resolve when first seen or when AssetManager has loaded/replaced any texture
     // since this sprite cached its pointer. Stale cache would draw a destroyed handle.
@@ -67,4 +79,11 @@ class RenderSpriteSystem {
   float windowWidth_ = 0;
   float windowHeight_ = 0;
   SDL_FRect camera_{};
+#ifdef OCTARINE_PROFILING
+  // Cached counter handles — pointer is stable across frames because PerfCounters never
+  // erases slots; ResetValues() only zeroes the atomic. operator() is called per-entity in
+  // parallel chunks, so the only hot-path cost is an atomic fetch_add.
+  std::atomic<long long>* culledCounter_ = nullptr;
+  std::atomic<long long>* emplacedCounter_ = nullptr;
+#endif
 };

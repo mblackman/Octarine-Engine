@@ -9,6 +9,7 @@
 
 #include "../ECS/ECS.h"
 #include "../ECS/Registry.h"
+#include "../General/PerfUtils.h"
 
 // Pool manager that recycles entities of a registered archetype shape via the active/inactive
 // chunk partition — entities never cross archetypes when parked or unparked. Storage stays in
@@ -56,9 +57,11 @@ class EntityPoolManager {
         if (!registry.IsAlive(entity)) continue;
         registry.Activate(entity);
         pool_it->second.resetter(registry, entity);
+        PROFILE_COUNTER_ADD("Pool: Spawn (reused)", 1);
         return entity;
       }
     }
+    PROFILE_COUNTER_ADD("Pool: Spawn (factory)", 1);
     return pool_it->second.factory(registry);
   }
 
@@ -70,6 +73,7 @@ class EntityPoolManager {
     const ArchetypeID arch_id = registry.GetArchetypeID(entity);
     registry.Deactivate(entity);
     free_lists_[arch_id].push_back(entity);
+    PROFILE_COUNTER_ADD("Pool: Park", 1);
   }
 
  private:

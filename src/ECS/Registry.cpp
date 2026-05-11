@@ -18,6 +18,7 @@ void Registry::Update(const float deltaTime) {
     systems_[i]->Update(*this);
   }
   if (!pending_blams_.empty() || !pending_despawns_.empty()) {
+    PROFILE_NAMED_SCOPE("Registry::Update (pending blam/despawn)");
     auto pending = std::move(pending_blams_);
     auto despawns = std::move(pending_despawns_);
     pending_blams_.clear();
@@ -156,6 +157,7 @@ std::vector<Entity> Registry::GetUserEntities() const {
 }
 
 std::vector<Archetype*> Registry::GetMatchingArchetypes(const ArchetypeType& type) const {
+  ACCUMULATE_PROFILE_SCOPE("Registry::GetMatchingArchetypes");
   if (type.empty()) {
     return {};
   }
@@ -213,6 +215,7 @@ EntityLocation Registry::TransitionAddComponent(const Entity entity, const Compo
     return oldLocation;
   }
 
+  PROFILE_COUNTER_ADD("Archetype: Transition Add", 1);
   Archetype* newArchetype = nullptr;
   auto it = oldLocation.archetype->edges.find(componentId);
   if (it != oldLocation.archetype->edges.end() && it->second.add != nullptr) {
@@ -252,6 +255,7 @@ EntityLocation Registry::TransitionRemoveComponent(const Entity entity, const Co
     return oldLocation;
   }
 
+  PROFILE_COUNTER_ADD("Archetype: Transition Remove", 1);
   Archetype* newArchetype = nullptr;
   auto it = oldLocation.archetype->edges.find(componentId);
   if (it != oldLocation.archetype->edges.end() && it->second.remove != nullptr) {

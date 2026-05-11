@@ -1,6 +1,7 @@
 #pragma once
 #include <algorithm>
 
+#include "../General/PerfUtils.h"
 #include "Iterable.h"
 #include "Registry.h"
 
@@ -29,10 +30,12 @@ class ComponentQuery final : public Query {
   }
 
   void Update() override {
+    ACCUMULATE_PROFILE_SCOPE("Query::Update");
     const uint64_t current_gen = registry_->ArchetypeGeneration();
     if (current_gen == cached_generation_) {
       return;  // Archetype set unchanged — skip the re-match.
     }
+    ACCUMULATE_PROFILE_SCOPE("Query::Update (rematch)");
     cached_generation_ = current_gen;
     auto matching_archetypes = registry_->GetMatchingArchetypes(sorted_type_);
 

@@ -118,6 +118,23 @@ class RenderDebugGUISystem {
       }
       ImGui::EndTable();
     }
+
+    ImGui::Separator();
+    const auto counters = PerfUtils::PerfCounters::GetCounters();
+    if (!counters.empty() && ImGui::BeginTable("counters_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+      ImGui::TableSetupColumn("Counter");
+      ImGui::TableSetupColumn("Value");
+      ImGui::TableHeadersRow();
+
+      for (const auto& [name, value] : counters) {
+        ImGui::TableNextRow();
+        ImGui::TableSetColumnIndex(0);
+        ImGui::Text("%s", name.c_str());
+        ImGui::TableSetColumnIndex(1);
+        ImGui::Text("%lld", value);
+      }
+      ImGui::EndTable();
+    }
     ImGui::End();
   }
 

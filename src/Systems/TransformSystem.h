@@ -10,6 +10,7 @@
 #include "../ECS/Query.h"
 #include "../ECS/Registry.h"
 #include "../General/Logger.h"
+#include "../General/PerfUtils.h"
 
 struct TransformUpdateJob {
   Entity entity;
@@ -30,6 +31,7 @@ class TransformSystem {
 
     // Fast path: no ChildOf hierarchy live. Unrelated relationship pairs do not disable it.
     if (!registry->HasAnyChildPairs()) {
+      PROFILE_NAMED_SCOPE("TransformSystem: Fast");
       if (!loggedPath_) {
         Logger::Info("TransformSystem: FAST path (no hierarchy)");
         loggedPath_ = true;
@@ -41,6 +43,7 @@ class TransformSystem {
       });
       return;
     }
+    PROFILE_NAMED_SCOPE("TransformSystem: Slow");
     if (!loggedPath_) {
       Logger::Info("TransformSystem: SLOW path (hierarchy detected)");
       loggedPath_ = true;
@@ -51,6 +54,7 @@ class TransformSystem {
     const uint64_t archGen = registry->ArchetypeGeneration();
     const uint64_t hierGen = registry->HierarchyGeneration();
     if (archGen != cachedArchetypeGen_ || hierGen != cachedHierarchyGen_) {
+      PROFILE_NAMED_SCOPE("TransformSystem: Slow (roots rebuild)");
       cachedRoots_.clear();
       query_->ForEach([&](const Entity entity, TransformComponent& /*transform*/) {
         if (!registry->GetParent(entity).has_value()) {
@@ -61,6 +65,7 @@ class TransformSystem {
       cachedHierarchyGen_ = hierGen;
     }
 
+    PROFILE_NAMED_SCOPE("TransformSystem: Slow (walk)");
     std::stack<TransformUpdateJob> jobs;
     for (const Entity root : cachedRoots_) {
       jobs.push({root, glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 1.0f), 0.0});

@@ -69,6 +69,7 @@ class CollisionSystem {
     if (collisionResult_.valid()) {
       PROFILE_NAMED_SCOPE("Emit Events");
       CollisionResult result = collisionResult_.get();
+      PROFILE_COUNTER_SET("Collision: Intersecting pairs", static_cast<long long>(result.intersectingPairs.size()));
       for (const auto& [fst, snd] : result.intersectingPairs) {
         eventBus->EmitEvent<CollisionEvent>(fst, snd);
       }
@@ -93,6 +94,8 @@ class CollisionSystem {
                            transform.globalPosition.y + static_cast<float>(collider.height) * transform.globalScale.y);
       });
     }
+
+    PROFILE_COUNTER_SET("Collision: Box count", static_cast<long long>(boxes.size()));
 
     if (boxes.empty()) {
       return;

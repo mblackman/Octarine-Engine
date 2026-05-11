@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "../General/PerfUtils.h"
 #include "../General/ThreadPool.h"
 #include "Component.h"
 #include "Entity.h"
@@ -120,6 +121,8 @@ class ArchetypeQuery {
     if (work.empty()) return;
 
     const size_t num_batches = std::min(work.size(), ThreadPool::Instance().Size());
+    PROFILE_COUNTER_ADD("ParallelForEach: Batches", static_cast<long long>(num_batches));
+    PROFILE_COUNTER_ADD("ParallelForEach: Chunks", static_cast<long long>(work.size()));
     if (num_batches <= 1) {
       ProcessChunks(work, 0, work.size(), func);
       return;
