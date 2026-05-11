@@ -1,4 +1,6 @@
 #include <benchmark/benchmark.h>
+#include <thread>
+#include <chrono>
 
 #include "ECS/Registry.h"
 #include "Systems/EntityPoolSystem.h"
@@ -15,12 +17,15 @@ struct Velocity {
 
 // Benchmark standard Create/Blam without pooling
 static void BM_EntityCreateAndBlam(benchmark::State& state) {
-  for (auto _ : state) {
-    state.PauseTiming();
-    Registry registry;
-    state.ResumeTiming();
-
-    for (int i = 0; i < state.range(0); ++i) {
+    for (auto _ : state) {
+        state.PauseTiming();
+        Registry registry;
+        state.ResumeTiming();
+        
+        // INTENTIONAL REGRESSION to test GitHub Actions
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
+        
+        for (int i = 0; i < state.range(0); ++i) {
       Entity e = registry.CreateEntity();
       registry.AddComponent(e, Position{1.0f, 1.0f});
       registry.AddComponent(e, Velocity{1.0f, 1.0f});
