@@ -260,6 +260,7 @@ void Game::Setup() {
 }
 
 void Game::ProcessInput() const {
+  PROFILE_NAMED_SCOPE("Game::ProcessInput");
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
@@ -298,6 +299,7 @@ void Game::Update(const float deltaTime) {
 #ifdef OCTARINE_PROFILING
   PerfUtils::ProfilingAccumulator::Clear();
 #endif
+  PROFILE_NAMED_SCOPE("Game::Update (total)");
 
   auto &options = registry_->Get<GameConfig>().GetEngineOptions();
 
@@ -346,11 +348,19 @@ void Game::Render(const float deltaTime) {
     RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, deltaTime);
   }
 
+#ifdef OCTARINE_PROFILING
+  {
+    PerfUtils::ScopedTimer presentTimer("Render: Present");
+    SDL_RenderPresent(sdl_renderer_);
+  }
+#else
   SDL_RenderPresent(sdl_renderer_);
+#endif
   renderQueue.Clear();
 }
 
 float Game::WaitTime() {
+  PROFILE_NAMED_SCOPE("Game::WaitTime");
   const Uint64 elapsedTime = SDL_GetTicks() - milliseconds_previous_frame_;
   if (elapsedTime < Constants::kMillisecondsPerFrame) {
     const Uint32 timeToWait = Constants::kMillisecondsPerFrame - static_cast<Uint32>(elapsedTime);
