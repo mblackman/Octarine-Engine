@@ -172,3 +172,43 @@ if (CLANG_FORMAT_EXE)
     )
     message(STATUS "Octarine: clang-format target ADDED")
 endif ()
+
+# -----------------------------------------------------------------------------
+# Benchmarks
+# -----------------------------------------------------------------------------
+
+option(OCTARINE_ENABLE_BENCHMARKS "Build benchmarks" OFF)
+
+if (OCTARINE_ENABLE_BENCHMARKS)
+    find_package(benchmark CONFIG REQUIRED)
+
+    set(BENCHMARK_SRC_FILES
+            tests/benchmarks/EntityPoolBenchmark.cpp
+            src/ECS/Registry.cpp
+            src/General/Logger.cpp
+    )
+
+    add_executable(OctarineBenchmarks ${BENCHMARK_SRC_FILES})
+
+    # Always compile in Release mode flags for the benchmark where possible,
+    # though it will inherit CMake build type
+    target_include_directories(OctarineBenchmarks PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs
+    )
+
+    target_link_libraries(OctarineBenchmarks PRIVATE
+            benchmark::benchmark
+            benchmark::benchmark_main
+            spdlog::spdlog
+            Threads::Threads
+    )
+
+    if (MSVC)
+        target_compile_options(OctarineBenchmarks PRIVATE /W4 /permissive- /MP /bigobj)
+    else ()
+        target_compile_options(OctarineBenchmarks PRIVATE -Wall -Wextra -Wpedantic)
+    endif ()
+
+    message(STATUS "Octarine: Benchmarks ENABLED")
+endif ()

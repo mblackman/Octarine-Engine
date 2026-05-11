@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "dependencies": [
     {
+      "name": "benchmark",
+      "version>=": "1.9.1"
+    },
+    {
       "name": "glm",
       "version>=": "1.0.1#3"
     },
