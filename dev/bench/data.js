@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778538471427,
+  "lastUpdate": 1778538494453,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Benchmarks": [
@@ -590,6 +590,90 @@ window.BENCHMARK_DATA = {
             "value": 547571.442188044,
             "unit": "ns/iter",
             "extra": "iterations: 1280\ncpu: 547401.7710937917 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "4653b8750e0c08b3e70dbd6f82cb5572bab49057",
+          "message": "Perf: Add automated continuous performance benchmarking\n\n- Integrated Google Benchmark for ECS micro-benchmarking.\n- Created scripts/parse_bench_output.py to aggregate macro-benchmark timers (P95, P99, Max).\n- Updated scripts/bench.sh to auto-clone the example game repository for headless execution.\n- Added GitHub Actions workflow to run both benchmark suites on push and pull_request.\n- Automatically publishes historical data to a live GitHub Pages dashboard via github-action-benchmark.",
+          "timestamp": "2026-05-11T16:23:28-06:00",
+          "tree_id": "89dd0027f3837c624b127fdf5ec0d197f77aa84c",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/4653b8750e0c08b3e70dbd6f82cb5572bab49057"
+        },
+        "date": 1778538494165,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4674.255188312889,
+            "unit": "ns/iter",
+            "extra": "iterations: 142338\ncpu: 4708.151456392764 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 20204.375908457358,
+            "unit": "ns/iter",
+            "extra": "iterations: 34668\ncpu: 20239.08059305627 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 139166.0392506574,
+            "unit": "ns/iter",
+            "extra": "iterations: 5019\ncpu: 139284.53377166763 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 1190495.8279391243,
+            "unit": "ns/iter",
+            "extra": "iterations: 587\ncpu: 1190589.0664395373 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 2421427.806896269,
+            "unit": "ns/iter",
+            "extra": "iterations: 290\ncpu: 2421614.1793103404 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2471.225245714313,
+            "unit": "ns/iter",
+            "extra": "iterations: 286687\ncpu: 2442.89381450767 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6092.859692689835,
+            "unit": "ns/iter",
+            "extra": "iterations: 115019\ncpu: 6074.489049634396 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 32998.84113425383,
+            "unit": "ns/iter",
+            "extra": "iterations: 21301\ncpu: 32836.11971269416 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 244888.75218142755,
+            "unit": "ns/iter",
+            "extra": "iterations: 2865\ncpu: 244550.48726004298 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 533038.8438665068,
+            "unit": "ns/iter",
+            "extra": "iterations: 1345\ncpu: 532670.4654275039 ns\nthreads: 1"
           }
         ]
       }
