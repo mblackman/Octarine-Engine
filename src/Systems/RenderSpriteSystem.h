@@ -48,7 +48,8 @@ class RenderSpriteSystem {
     const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera_.x;
     const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera_.y;
 
-    auto& cmd = renderQueue_->EmplaceSprite(static_cast<unsigned int>(sprite.layer), transform.globalPosition.y);
+    auto& cmd = renderQueue_->EmplaceSprite(static_cast<unsigned int>(sprite.layer), transform.globalPosition.y,
+                                            sprite.cachedTexture);
     cmd.destX = x;
     cmd.destY = y;
     cmd.destW = sprite.width * transform.globalScale.x;

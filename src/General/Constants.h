@@ -24,4 +24,12 @@ static constexpr size_t kRenderCommandBufferSize = 256 * 1024;
 constexpr static size_t kInitialRenderQueueCapacity = 256 * 1024;
 
 static constexpr int kDebugUIBaseLayer = 1000;
+
+// Y-band size (world pixels) for grouping render keys before secondary sort by texture.
+// Within a band, sprites sharing a texture sort adjacent so SDL3's internal renderer
+// can coalesce them into a single batched draw. Larger bands batch harder but allow
+// painter's-order swaps between sprites of different textures inside the band — pick
+// a value close to one tile/character height for top-down scenes. Set to 0.0f to
+// disable banding and restore strict per-pixel painter's order.
+static constexpr float kRenderBatchYBandPx = 32.0f;
 }  // namespace Constants

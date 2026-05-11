@@ -79,7 +79,7 @@ class RenderTextSystem {
     const float x = text.isFixed ? origin.x : origin.x - camera.x;
     const float y = text.isFixed ? origin.y : origin.y - camera.y;
 
-    auto& cmd = renderQueue.EmplaceText(static_cast<unsigned int>(text.layer), text.position.y);
+    auto& cmd = renderQueue.EmplaceText(static_cast<unsigned int>(text.layer), text.position.y, it->second.texture);
     cmd.destRect = {x, y, it->second.width, it->second.height};
     cmd.texture = it->second.texture;
   }
