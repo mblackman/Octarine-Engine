@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778538739664,
+  "lastUpdate": 1778539908214,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Benchmarks": [
@@ -674,6 +674,90 @@ window.BENCHMARK_DATA = {
             "value": 533038.8438665068,
             "unit": "ns/iter",
             "extra": "iterations: 1345\ncpu: 532670.4654275039 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "16be260cc1c56753992a8b2424a1db3643dd356e",
+          "message": "Add timers, per-frame counters, and bench capture\n\nTimers (PROFILE_NAMED_SCOPE / ACCUMULATE_PROFILE_SCOPE):\n  - Query::Update accumulates per-system-frame; a nested \"rematch\" scope\n    fires only when archetype_generation_ changes.\n  - Registry::GetMatchingArchetypes accumulates alongside Query::Update.\n  - Registry::Update (pending blam/despawn) scoped independently so bulk\n    despawn spikes are visible in both bench output and the ImGui profiler.\n  - TransformSystem: Fast / Slow path scopes; Slow path further split into\n    \"roots rebuild\" and \"walk\" to isolate hierarchy overhead.\n  - CommandBuffer::Playback and RenderDebugGUISystem::Render were already\n    present; no change.\n\n  Counter system (PerfCounters in PerfUtils.h):\n  - Named atomic counters with stable slot addresses; hot-path callers\n    cache std::atomic<long long>* via PROFILE_COUNTER_HANDLE so the\n    per-entity increment is just a fetch_add, no lock.\n  - ResetValues() zeroes slots each frame (in Game::Update beside\n    ProfilingAccumulator::Clear) without invalidating cached pointers.\n  - Report() emits COUNTER: <name>: <value> lines each frame\n    (from Game::Render, after all systems have written) so headless bench\n    runs capture them alongside TIMER: lines.\n  - ImGui Performance Profiler window gains a second table for counters.\n\n  Wired counters:\n  - RenderQueue: Size, Entities: User (snapshots, start of render)\n  - Collision: Box count, Collision: Intersecting pairs\n  - ParallelForEach: Batches, ParallelForEach: Chunks\n  - RenderSprite: Culled, RenderSprite: Emplaced (cached handles in\n    Prepare(), atomic increment per entity on the parallel hot path)\n  - Archetype: Transition Add / Remove (actual transitions only; no-op\n    early-returns not counted)\n  - Pool: Park, Pool: Spawn (reused), Pool: Spawn (factory) (distinguishes\n    pool hits from factory fallbacks to verify pool effectiveness)",
+          "timestamp": "2026-05-11T16:46:53-06:00",
+          "tree_id": "408c1d43a3cd641b9d94594cecbf066ce3dda7ab",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/16be260cc1c56753992a8b2424a1db3643dd356e"
+        },
+        "date": 1778539907705,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 3819.1904087925377,
+            "unit": "ns/iter",
+            "extra": "iterations: 175160\ncpu: 3832.491601964195 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16711.34234600736,
+            "unit": "ns/iter",
+            "extra": "iterations: 42162\ncpu: 16726.310303117607 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 111106.30310740435,
+            "unit": "ns/iter",
+            "extra": "iterations: 6308\ncpu: 111146.84575142615 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 915320.5712427171,
+            "unit": "ns/iter",
+            "extra": "iterations: 765\ncpu: 915337.054901965 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1868921.9177722598,
+            "unit": "ns/iter",
+            "extra": "iterations: 377\ncpu: 1868889.2042440365 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 1867.969937251682,
+            "unit": "ns/iter",
+            "extra": "iterations: 374750\ncpu: 1860.4529472974007 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 4829.752071380258,
+            "unit": "ns/iter",
+            "extra": "iterations: 144590\ncpu: 4822.538695623453 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 29806.153728034373,
+            "unit": "ns/iter",
+            "extra": "iterations: 23457\ncpu: 29788.104318544403 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 221835.34239580977,
+            "unit": "ns/iter",
+            "extra": "iterations: 3163\ncpu: 221788.4306038315 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 457732.54076961783,
+            "unit": "ns/iter",
+            "extra": "iterations: 1533\ncpu: 457590.517286371 ns\nthreads: 1"
           }
         ]
       }
