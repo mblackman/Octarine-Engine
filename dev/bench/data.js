@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778538348433,
+  "lastUpdate": 1778538350361,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Benchmarks": [
@@ -770,6 +770,471 @@ window.BENCHMARK_DATA = {
             "range": "0.4596",
             "unit": "ms",
             "extra": "Samples: 2 | Min: 0.331ms | Max: 0.981ms"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "9dfe8084b00c22cdae669df2d03071444199f680",
+          "message": "Perf: Update macro-benchmarks to track P95, P99, and Max times",
+          "timestamp": "2026-05-11T16:16:54-06:00",
+          "tree_id": "2de76060135740b960089543ccc537df23039362",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/9dfe8084b00c22cdae669df2d03071444199f680"
+        },
+        "date": 1778538347999,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Game::ProcessInput [p95]",
+            "value": 0.02,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::ProcessInput [p99]",
+            "value": 0.026,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::ProcessInput [max]",
+            "value": 0.034,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::WaitTime [p95]",
+            "value": 12.078,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::WaitTime [p99]",
+            "value": 14.106,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::WaitTime [max]",
+            "value": 16.099,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "CommandBuffer::Playback [p95]",
+            "value": 0.019,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 584"
+          },
+          {
+            "name": "CommandBuffer::Playback [p99]",
+            "value": 0.095,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 584"
+          },
+          {
+            "name": "CommandBuffer::Playback [max]",
+            "value": 0.121,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 584"
+          },
+          {
+            "name": "Gather Boxes [p95]",
+            "value": 1.593,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Gather Boxes [p99]",
+            "value": 1.653,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Gather Boxes [max]",
+            "value": 1.671,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Collision System Update [p95]",
+            "value": 1.685,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Collision System Update [p99]",
+            "value": 1.753,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Collision System Update [max]",
+            "value": 1.787,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Registry::Update (total) [p95]",
+            "value": 6.357,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Registry::Update (total) [p99]",
+            "value": 7.485,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Registry::Update (total) [max]",
+            "value": 8.196,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::Update (total) [p95]",
+            "value": 6.369,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::Update (total) [p99]",
+            "value": 7.498,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::Update (total) [max]",
+            "value": 8.205,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Render: Sort [p95]",
+            "value": 3.098,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Render: Sort [p99]",
+            "value": 3.795,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Render: Sort [max]",
+            "value": 4.123,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Render: Draw [p95]",
+            "value": 6.364,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Render: Draw [p99]",
+            "value": 8.642,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Render: Draw [max]",
+            "value": 8.758,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Render: Present [p95]",
+            "value": 8.143,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Render: Present [p99]",
+            "value": 8.947,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Render: Present [max]",
+            "value": 9.84,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::Render (total) [p95]",
+            "value": 16.221,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::Render (total) [p99]",
+            "value": 20.252,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "Game::Render (total) [max]",
+            "value": 22.152,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 292"
+          },
+          {
+            "name": "16RenderTextSystem [p95]",
+            "value": 0.005,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "16RenderTextSystem [p99]",
+            "value": 0.009,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "16RenderTextSystem [max]",
+            "value": 0.012,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "18CameraFollowSystem [p95]",
+            "value": 1.3,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "18CameraFollowSystem [p99]",
+            "value": 1.391,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "18CameraFollowSystem [max]",
+            "value": 1.452,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "18RenderSpriteSystem [p95]",
+            "value": 2.335,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "18RenderSpriteSystem [p99]",
+            "value": 2.544,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "18RenderSpriteSystem [max]",
+            "value": 2.693,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "19DisplayHealthSystem [p95]",
+            "value": 0.003,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "19DisplayHealthSystem [p99]",
+            "value": 0.008,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "19DisplayHealthSystem [max]",
+            "value": 0.012,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "21RenderPrimitiveSystem [p95]",
+            "value": 0.001,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "21RenderPrimitiveSystem [p99]",
+            "value": 0.008,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "21RenderPrimitiveSystem [max]",
+            "value": 0.011,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Brute Force Bipartite [p95]",
+            "value": 0.083,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Brute Force Bipartite [p99]",
+            "value": 0.163,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Brute Force Bipartite [max]",
+            "value": 0.213,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Brute Force Intersection [p95]",
+            "value": 0.065,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Brute Force Intersection [p99]",
+            "value": 1.616,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Brute Force Intersection [max]",
+            "value": 2.211,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Partition Boxes [p95]",
+            "value": 0.422,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Partition Boxes [p99]",
+            "value": 0.496,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Partition Boxes [max]",
+            "value": 1.028,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Sweep Bipartite [p95]",
+            "value": 9.146,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Sweep Bipartite [p99]",
+            "value": 10.206,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Sweep Bipartite [max]",
+            "value": 11.014,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 286"
+          },
+          {
+            "name": "Emit Events [p95]",
+            "value": 0.008,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 285"
+          },
+          {
+            "name": "Emit Events [p99]",
+            "value": 0.012,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 285"
+          },
+          {
+            "name": "Emit Events [max]",
+            "value": 0.013,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 285"
           }
         ]
       }
