@@ -1004,4 +1004,6 @@ dkms.conf
 *.dis
 
 #vcpkg install cache
-vcpkg_installed/
+vcpkg_installed
+
+imgui.ini

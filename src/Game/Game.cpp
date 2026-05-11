@@ -188,6 +188,22 @@ void Game::Setup() {
   scriptSystem.CreateLuaBindings(lua, *this);
   lua["game_window_width"] = gameConfig.windowWidth;
   lua["game_window_height"] = gameConfig.windowHeight;
+  lua["oct_startup_mode"] = startup_mode_;
+
+  if (IsBenchMode()) {
+    // Bench runs shouldn't pay for debug overlays. Force-zero every toggle that would
+    // kick the per-frame ImGui pipeline; the render-side gate below also short-circuits
+    // the whole RenderDebugGUISystem call.
+    auto &options = gameConfig.GetEngineOptions();
+    options.showDebugGUI = false;
+    options.showFpsCounter = false;
+    options.showEntityInfo = false;
+    options.showProfiler = false;
+    options.showHierarchy = false;
+    options.showAssetBrowser = false;
+    options.showImGuiDemoWindow = false;
+    options.drawColliders = false;
+  }
 
   auto &assetManager = registry_->Get<AssetManager>();
   assetManager.LoadGameConfig(gameConfig);
@@ -326,7 +342,9 @@ void Game::Render(const float deltaTime) {
     collider_query_->ForEach(drawColliderSystem);
   }
 
-  RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, deltaTime);
+  if (!IsBenchMode()) {
+    RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, deltaTime);
+  }
 
   SDL_RenderPresent(sdl_renderer_);
   renderQueue.Clear();

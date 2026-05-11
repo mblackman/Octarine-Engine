@@ -5,6 +5,7 @@ int main(const int argc, char *argv[]) {
   Logger::Init();
 
   std::string gamePath;
+  std::string startupMode;
 
   // Parse command-line arguments
   for (int i = 1; i < argc; ++i) {
@@ -15,8 +16,15 @@ int main(const int argc, char *argv[]) {
         gamePath = argv[++i];
         Logger::Info("Game path set to: " + gamePath);
       } else {
-        Logger::Error(
-          "Error: " + currentArg + " flag requires a path argument.");
+        Logger::Error("Error: " + currentArg + " flag requires a path argument.");
+        return 1;
+      }
+    } else if (currentArg == "-m" || currentArg == "--startup-mode") {
+      if (i + 1 < argc) {
+        startupMode = argv[++i];
+        Logger::Info("Startup mode set to: " + startupMode);
+      } else {
+        Logger::Error("Error: " + currentArg + " flag requires a mode argument.");
         return 1;
       }
     } else {
@@ -25,6 +33,7 @@ int main(const int argc, char *argv[]) {
   }
 
   Game game{};
+  game.SetStartupMode(startupMode);
 
   if (game.Initialize(gamePath)) {
     game.Run();
