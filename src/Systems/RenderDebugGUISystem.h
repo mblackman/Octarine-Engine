@@ -33,6 +33,7 @@ class RenderDebugGUISystem {
     if (!engineOptions.showDebugGUI && !engineOptions.showFpsCounter) {
       return;
     }
+    PROFILE_NAMED_SCOPE("RenderDebugGUISystem::Render");
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();

@@ -535,6 +535,7 @@ std::vector<Entity> Registry::GetChildren(const Entity parent) const {
 }
 
 void CommandBuffer::Playback(Registry* registry) const {
+  PROFILE_NAMED_SCOPE("CommandBuffer::Playback");
   auto& chan = state_->commands;
   const size_t total = std::min(chan.count.load(std::memory_order_relaxed), chan.buffer.size());
   for (size_t i = 0; i < total; ++i) {

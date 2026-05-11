@@ -40,9 +40,17 @@ binary="$build_dir/bin/$config_dir/OctarineEngine"
 
 game_path="${OCT_BENCH_GAME:-$repo_root/../Octarine-Engine-Example}"
 if [[ ! -d "$game_path" ]]; then
-  echo "error: game path does not exist: $game_path" >&2
-  echo "       set OCT_BENCH_GAME to a directory containing config.ini." >&2
-  exit 2
+  echo "Notice: Example game not found at $game_path." >&2
+  echo "Auto-cloning Octarine-Engine-Example for benchmarking..." >&2
+  
+  auto_clone_dir="$repo_root/.benchmark_game"
+  if [[ ! -d "$auto_clone_dir" ]]; then
+    git clone --depth 1 https://github.com/mblackman/Octarine-Engine-Example.git "$auto_clone_dir" >&2
+  else
+    # Ensure it's up to date if it already exists
+    git -C "$auto_clone_dir" pull >&2
+  fi
+  game_path="$auto_clone_dir"
 fi
 game_path="$(cd "$game_path" && pwd)"
 if [[ ! -f "$game_path/config.ini" ]]; then
