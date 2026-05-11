@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778538106257,
+  "lastUpdate": 1778538122679,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Benchmarks": [
@@ -422,6 +422,186 @@ window.BENCHMARK_DATA = {
             "value": 454673.3856121538,
             "unit": "ns/iter",
             "extra": "iterations: 1543\ncpu: 454587.734283838 ns\nthreads: 1"
+          }
+        ]
+      }
+    ],
+    "Octarine Engine Macro-Benchmarks": [
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "a33a82674cfb0a7c93cbd3cff95f74f3b0a87901",
+          "message": "Perf: Add macro-benchmarks to GitHub Actions",
+          "timestamp": "2026-05-11T16:12:56-06:00",
+          "tree_id": "48e8fe5bc78c66b75501e379b60b90d746524acd",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/a33a82674cfb0a7c93cbd3cff95f74f3b0a87901"
+        },
+        "date": 1778538122237,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Game::ProcessInput",
+            "value": 0.014,
+            "range": "0.0024",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 0.01ms | Max: 0.032ms"
+          },
+          {
+            "name": "Game::WaitTime",
+            "value": 1.065,
+            "range": "4.1413",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 0.0ms | Max: 16.169ms"
+          },
+          {
+            "name": "CommandBuffer::Playback",
+            "value": 0.002,
+            "range": "0.0145",
+            "unit": "ms",
+            "extra": "Samples: 600 | Min: 0.0ms | Max: 0.105ms"
+          },
+          {
+            "name": "Gather Boxes",
+            "value": 0.9525,
+            "range": "0.3083",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 0.0ms | Max: 1.521ms"
+          },
+          {
+            "name": "Collision System Update",
+            "value": 1.0195,
+            "range": "0.3128",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 0.005ms | Max: 1.585ms"
+          },
+          {
+            "name": "Registry::Update (total)",
+            "value": 4.1995,
+            "range": "1.2397",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 0.388ms | Max: 6.208ms"
+          },
+          {
+            "name": "Game::Update (total)",
+            "value": 4.215,
+            "range": "1.2407",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 0.394ms | Max: 6.221ms"
+          },
+          {
+            "name": "Render: Sort",
+            "value": 2.1095,
+            "range": "0.7461",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 0.082ms | Max: 3.046ms"
+          },
+          {
+            "name": "Render: Draw",
+            "value": 2.9035,
+            "range": "1.41",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 0.174ms | Max: 6.309ms"
+          },
+          {
+            "name": "Render: Present",
+            "value": 5.975,
+            "range": "1.4922",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 1.535ms | Max: 8.699ms"
+          },
+          {
+            "name": "Game::Render (total)",
+            "value": 11.09,
+            "range": "3.5424",
+            "unit": "ms",
+            "extra": "Samples: 300 | Min: 1.84ms | Max: 17.85ms"
+          },
+          {
+            "name": "16RenderTextSystem",
+            "value": 0.002,
+            "range": "0.0012",
+            "unit": "ms",
+            "extra": "Samples: 294 | Min: 0.001ms | Max: 0.009ms"
+          },
+          {
+            "name": "18CameraFollowSystem",
+            "value": 0.8525,
+            "range": "0.2671",
+            "unit": "ms",
+            "extra": "Samples: 294 | Min: 0.104ms | Max: 1.813ms"
+          },
+          {
+            "name": "18RenderSpriteSystem",
+            "value": 1.4845,
+            "range": "0.4342",
+            "unit": "ms",
+            "extra": "Samples: 294 | Min: 0.203ms | Max: 1.875ms"
+          },
+          {
+            "name": "19DisplayHealthSystem",
+            "value": 0.002,
+            "range": "0.0014",
+            "unit": "ms",
+            "extra": "Samples: 294 | Min: 0.001ms | Max: 0.018ms"
+          },
+          {
+            "name": "21RenderPrimitiveSystem",
+            "value": 0,
+            "range": "0.0009",
+            "unit": "ms",
+            "extra": "Samples: 294 | Min: 0.0ms | Max: 0.011ms"
+          },
+          {
+            "name": "Brute Force Bipartite",
+            "value": 0.015,
+            "range": "0.1083",
+            "unit": "ms",
+            "extra": "Samples: 294 | Min: 0.0ms | Max: 1.105ms"
+          },
+          {
+            "name": "Brute Force Intersection",
+            "value": 0.008,
+            "range": "0.1089",
+            "unit": "ms",
+            "extra": "Samples: 294 | Min: 0.0ms | Max: 1.188ms"
+          },
+          {
+            "name": "Partition Boxes",
+            "value": 0.223,
+            "range": "0.1433",
+            "unit": "ms",
+            "extra": "Samples: 294 | Min: 0.002ms | Max: 1.332ms"
+          },
+          {
+            "name": "Sweep Bipartite",
+            "value": 5.3365,
+            "range": "2.419",
+            "unit": "ms",
+            "extra": "Samples: 294 | Min: 0.093ms | Max: 10.031ms"
+          },
+          {
+            "name": "Emit Events",
+            "value": 0.003,
+            "range": "0.0013",
+            "unit": "ms",
+            "extra": "Samples: 293 | Min: 0.002ms | Max: 0.011ms"
+          },
+          {
+            "name": "15CollisionSystem",
+            "value": 0.656,
+            "range": "0.4596",
+            "unit": "ms",
+            "extra": "Samples: 2 | Min: 0.331ms | Max: 0.981ms"
           }
         ]
       }
