@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778561321707,
+  "lastUpdate": 1778562363714,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -336,6 +336,90 @@ window.BENCHMARK_DATA = {
             "value": 678086.4162551977,
             "unit": "ns/iter",
             "extra": "iterations: 1037\ncpu: 677934.2748313035 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "de5709d23833ca5d9c6cbad913de7525f07e84b2",
+          "message": "Render walking optimizations\n\nSingle-pass histogram — Build all 8 byte-histograms in one scan instead of 8 separate scans, eliminating ~3.5MB of redundant reads per sort\nSkip-uniform-byte passes — Detect bytes that are identical across all entries (e.g., shared layer) and skip those radix passes entirely. Cuts 8 passes to ~4 in the stress scene\nGather-based permutation — Replace the cycle-walk (random pointer chasing through 80-byte objects) with a sequential-write gather into a scratch buffer",
+          "timestamp": "2026-05-11T22:59:01-06:00",
+          "tree_id": "916e67143d9fcf476eb9317af1c9a56c4bdc2ea3",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/de5709d23833ca5d9c6cbad913de7525f07e84b2"
+        },
+        "date": 1778562354628,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 3788.0753768039935,
+            "unit": "ns/iter",
+            "extra": "iterations: 183300\ncpu: 3827.5823349699567 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 15348.905067644971,
+            "unit": "ns/iter",
+            "extra": "iterations: 45568\ncpu: 15393.833699087792 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 102655.79103891738,
+            "unit": "ns/iter",
+            "extra": "iterations: 6669\ncpu: 102719.63547757993 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 859713.6838588773,
+            "unit": "ns/iter",
+            "extra": "iterations: 820\ncpu: 859814.3341463477 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1740621.3041534298,
+            "unit": "ns/iter",
+            "extra": "iterations: 401\ncpu: 1740683.4488778133 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2250.3189991363733,
+            "unit": "ns/iter",
+            "extra": "iterations: 316921\ncpu: 2208.437998744909 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6475.797324603175,
+            "unit": "ns/iter",
+            "extra": "iterations: 108091\ncpu: 6431.413919751903 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 40906.116104617526,
+            "unit": "ns/iter",
+            "extra": "iterations: 17049\ncpu: 40843.14692944409 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 316219.2182000618,
+            "unit": "ns/iter",
+            "extra": "iterations: 2239\ncpu: 316080.52612775756 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 655022.1498813273,
+            "unit": "ns/iter",
+            "extra": "iterations: 1076\ncpu: 654858.7908921909 ns\nthreads: 1"
           }
         ]
       }
