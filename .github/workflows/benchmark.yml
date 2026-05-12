@@ -17,7 +17,7 @@ permissions:
 jobs:
   benchmark:
     name: Run Benchmarks
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
 
     steps:
       - name: Checkout
@@ -67,7 +67,20 @@ jobs:
             libasound2-dev \
             libpipewire-0.3-dev \
             libsndio-dev \
-            libdecor-0-dev
+            libdecor-0-dev \
+            cmake \
+            build-essential \
+            python3 \
+            curl \
+            zip \
+            unzip \
+            tar
+
+      - name: Setup vcpkg
+        run: |
+          git clone https://github.com/Microsoft/vcpkg.git $GITHUB_WORKSPACE/vcpkg
+          $GITHUB_WORKSPACE/vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          echo "VCPKG_ROOT=$GITHUB_WORKSPACE/vcpkg" >> $GITHUB_ENV
 
       - name: Configure CMake
         shell: bash
