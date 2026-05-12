@@ -10,7 +10,7 @@ class DamageSystem {
  public:
   void Init(Registry* registry, const std::unique_ptr<EventBus>& eventBus) {
     registry_ = registry;
-    projectiles_ = registry_->TagId("projectiles");
+    projectiles_ = registry_->Tag<ProjectileTag>();
     enemies_ = registry_->TagId("enemies");
     player_ = registry_->TagId("player");
     eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(this, &DamageSystem::OnCollision);
