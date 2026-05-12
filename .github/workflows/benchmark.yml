@@ -99,7 +99,7 @@ jobs:
           tool: 'googlecpp'
           output-file-path: benchmark_result.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: ${{ github.event_name == 'push' }} # Only push to gh-pages on main branch pushes
+          auto-push: false
           alert-threshold: '200%'
           comment-on-alert: true
           fail-on-alert: true
@@ -124,6 +124,7 @@ jobs:
           tool: 'customSmallerIsBetter'
           output-file-path: macro_bench.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
+          skip-fetch-gh-pages: true
           auto-push: ${{ github.event_name == 'push' }}
           alert-threshold: '200%'
           comment-on-alert: true
