@@ -14,6 +14,7 @@ void Registry::Update(const float deltaTime) {
   for (size_t i = 0; i < systems_.size(); ++i) {
 #ifdef OCTARINE_PROFILING
     ACCUMULATE_PROFILE_SCOPE(systems_[i]->GetName());
+    PROFILE_NAMED_SCOPE(systems_[i]->GetName());
 #endif
     systems_[i]->Update(*this);
   }
