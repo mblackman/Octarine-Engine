@@ -86,12 +86,20 @@ class CollisionSystem {
       }
       query_->Update();
 
-      query_->ForEach([&boxes](Entity entity, const TransformComponent& transform, const BoxColliderComponent& collider,
-                               const EntityMaskComponent& entityMask) {
-        boxes.emplace_back(entity, entityMask.mask, collider.collisionMask, transform.globalPosition.x,
-                           transform.globalPosition.y,
-                           transform.globalPosition.x + static_cast<float>(collider.width) * transform.globalScale.x,
-                           transform.globalPosition.y + static_cast<float>(collider.height) * transform.globalScale.y);
+      const size_t count = query_->GetCount();
+      boxes.resize(count);
+      std::atomic<size_t> nextIndex{0};
+
+      query_->ParallelForEach([&](Entity entity, const TransformComponent& transform,
+                                  const BoxColliderComponent& collider, const EntityMaskComponent& entityMask) {
+        const size_t idx = nextIndex.fetch_add(1, std::memory_order_relaxed);
+        boxes[idx] = {entity,
+                      entityMask.mask,
+                      collider.collisionMask,
+                      transform.globalPosition.x,
+                      transform.globalPosition.y,
+                      transform.globalPosition.x + static_cast<float>(collider.width) * transform.globalScale.x,
+                      transform.globalPosition.y + static_cast<float>(collider.height) * transform.globalScale.y};
       });
     }
 

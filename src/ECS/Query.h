@@ -136,6 +136,8 @@ class ComponentQuery final : public Query {
     func(CreateIterable());
   }
 
+  [[nodiscard]] size_t GetCount() const { return archetype_query_.GetTotalEntityCount(); }
+
  private:
   void RebuildSorted() {
     sorted_type_ = type_;

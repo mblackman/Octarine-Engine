@@ -233,7 +233,7 @@ void Game::Setup() {
   registry_->RegisterBulkSystem(CollisionSystem());
 
   // Camera follows after gameplay-driven transform updates
-  registry_->RegisterSystem<TransformComponent>(CameraFollowSystem());
+  registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
 
   // Health UI updates before render so values reflect current frame
   registry_->RegisterSystem<HealthComponent, TextLabelComponent, SquarePrimitiveComponent>(DisplayHealthSystem());

@@ -106,6 +106,16 @@ class ArchetypeQuery {
     assert(sizeof...(TComponents) == type_.size());
   }
 
+  [[nodiscard]] size_t GetTotalEntityCount() const {
+    size_t total = 0;
+    for (const auto* arch : matching_archetypes_) {
+      for (const auto& chunk : arch->chunks_) {
+        total += include_inactive_ ? chunk.GetEntityCount() : chunk.GetActiveCount();
+      }
+    }
+    return total;
+  }
+
   Iterator begin() {
     return Iterator(type_, matching_archetypes_.begin(), matching_archetypes_.end(), include_inactive_);
   }
