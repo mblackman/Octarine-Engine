@@ -5,8 +5,9 @@
 #   preset:   debug-profile | release-profile  (default: release-profile)
 #   duration: integer seconds                  (default: 8)
 #
-# The stress scene reaches steady state in ~2s, so the default 8s gives ~6s
-# of plateau data after the ramp. Bump the duration if you want more signal.
+# The stress scene reaches steady state in ~2s. The default 8s run combined
+# with the parser's --warmup 2 flag gives ~6s of pure plateau data.
+# Bump the duration if you want more signal.
 #
 # Env:
 #   OCT_BENCH_GAME   Path to a game dir containing config.ini.

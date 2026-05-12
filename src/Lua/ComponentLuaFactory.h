@@ -139,8 +139,15 @@ class ComponentLuaFactory {
     const auto projectileMask = SafeGetOptionalValue<int>(data, "projectile_mask", 0);
     const auto projectileMaskBits = EntityMask(projectileMask);
 
-    return ProjectileEmitterComponent(projectileVelocity, projectileDuration, repeatFrequency, projectileDamage,
-                                      collisionMaskBits, projectileMaskBits);
+    auto component = ProjectileEmitterComponent(projectileVelocity, projectileDuration, repeatFrequency,
+                                                projectileDamage, collisionMaskBits, projectileMaskBits);
+
+    // Optional override for the initial countdown timer. Defaults to repeat_frequency
+    // (the C++ constructor default). Stress tests use this to stagger emitter fire times
+    // so they don't all spawn projectiles on the same frame (thundering-herd).
+    component.countDownTimer = SafeGetOptionalValue<float>(data, "countdown_timer", repeatFrequency);
+
+    return component;
   }
 
   static CameraFollowComponent CreateCameraFollowComponent(const sol::table& /*data*/) { return {}; }
