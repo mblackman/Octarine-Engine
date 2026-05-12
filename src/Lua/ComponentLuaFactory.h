@@ -112,8 +112,8 @@ class ComponentLuaFactory {
     const int height = SafeGetOptionalValue<int>(data, "height", 1);
     const glm::vec2 offset = SafeGetVec2(data, "offset");
     const auto collisionMask = SafeGetOptionalValue<int>(data, "collision_mask", Constants::kDefaultEntityMask);
-    const auto entityMask = EntityMask(collisionMask);
-    return BoxColliderComponent(width, height, offset, entityMask);
+    const auto collisionMaskBits = EntityMask(collisionMask);
+    return BoxColliderComponent(width, height, offset, collisionMaskBits);
   }
 
   static EntityMaskComponent CreateEntityMaskComponent(const sol::table& data) {
@@ -135,10 +135,12 @@ class ComponentLuaFactory {
     const auto projectileDuration = SafeGetOptionalValue<float>(data, "projectile_duration", 1.0f);
     const int projectileDamage = SafeGetOptionalValue<int>(data, "hit_damage", 10);
     const auto collisionMask = SafeGetOptionalValue<int>(data, "collision_mask", Constants::kDefaultEntityMask);
-    const auto entityMask = EntityMask(collisionMask);
+    const auto collisionMaskBits = EntityMask(collisionMask);
+    const auto projectileMask = SafeGetOptionalValue<int>(data, "projectile_mask", 0);
+    const auto projectileMaskBits = EntityMask(projectileMask);
 
     return ProjectileEmitterComponent(projectileVelocity, projectileDuration, repeatFrequency, projectileDamage,
-                                      entityMask);
+                                      collisionMaskBits, projectileMaskBits);
   }
 
   static CameraFollowComponent CreateCameraFollowComponent(const sol::table& /*data*/) { return {}; }

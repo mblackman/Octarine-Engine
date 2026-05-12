@@ -85,19 +85,11 @@ class ProjectileEmitSystem {
       }
     }
 
-    // Inherit the emitter's collision mask. Default-construct if the emitter has no mask
-    // component (e.g. a scene-authored emitter that doesn't participate in collision filtering).
-    const EntityMask emitterMask = registry->HasComponent<EntityMaskComponent>(entity)
-                                       ? registry->GetComponent<EntityMaskComponent>(entity).mask
-                                       : EntityMask();
-
-    // Pool returns either a recycled entity (timer reset, shape intact) or a freshly built one
-    // from the factory registered in Init. Either way we rewrite the per-spawn fields. Use the
-    // TransformComponent constructor so globalPosition/globalScale/globalRotation are reset too —
-    // a recycled projectile would otherwise carry stale globals from its prior life, and
-    // MovementSystem's out-of-bounds check reads globalPosition and would despawn it instantly.
+    // Use the emitter's dedicated projectile mask — NOT the emitter entity's own
+    // EntityMaskComponent.  Inheriting the emitter's identity caused projectiles
+    // to be "seen" by the emitter's own collision mask, destroying themselves.
     const Entity projectile = registry->Get<EntityPoolManager>().Spawn(*registry, projectile_pool_id_);
-    registry->GetComponent<EntityMaskComponent>(projectile).mask = emitterMask;
+    registry->GetComponent<EntityMaskComponent>(projectile).mask = emitter.projectileMask;
     registry->GetComponent<TransformComponent>(projectile) =
         TransformComponent(projectilePosition, glm::vec2(1.0f, 1.0f), 0.0);
     registry->GetComponent<RigidBodyComponent>(projectile).velocity = velocity;
