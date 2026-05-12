@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778562532102,
+  "lastUpdate": 1778563522928,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -420,6 +420,90 @@ window.BENCHMARK_DATA = {
             "value": 655022.1498813273,
             "unit": "ns/iter",
             "extra": "iterations: 1076\ncpu: 654858.7908921909 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "2a557375ca25b71ebc508e7a1e694b1a64bf2631",
+          "message": "Optimize Registry::Update and system instrumentation\n\nCameraFollowSystem — Scoped to CameraFollowComponent to avoid O(N) execution (fixed ~4.7ms bottleneck)\n\nGather Boxes — Parallelized collision data gathering using ParallelForEach\n\nQuery Counting — Added GetCount() to ComponentQuery for pre-allocating result vectors\n\nType Prettifying — Improved PrettifyTypeName to trim GCC/Clang leading length prefixes",
+          "timestamp": "2026-05-11T23:18:23-06:00",
+          "tree_id": "f9e6e49d9442b2255075ee70d57f80d7da9bd485",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/2a557375ca25b71ebc508e7a1e694b1a64bf2631"
+        },
+        "date": 1778563513803,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 3794.658491014893,
+            "unit": "ns/iter",
+            "extra": "iterations: 181811\ncpu: 3826.0031791257106 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 15147.188883997018,
+            "unit": "ns/iter",
+            "extra": "iterations: 45159\ncpu: 15187.851170309064 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 101024.00431233429,
+            "unit": "ns/iter",
+            "extra": "iterations: 6856\ncpu: 101069.0689906671 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 855859.8107915636,
+            "unit": "ns/iter",
+            "extra": "iterations: 818\ncpu: 855840.7665036592 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1731923.6884353464,
+            "unit": "ns/iter",
+            "extra": "iterations: 401\ncpu: 1731987.2443889813 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2247.4643449060436,
+            "unit": "ns/iter",
+            "extra": "iterations: 317489\ncpu: 2214.678335313486 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6496.071067302138,
+            "unit": "ns/iter",
+            "extra": "iterations: 108051\ncpu: 6459.897816769269 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 40860.93843188749,
+            "unit": "ns/iter",
+            "extra": "iterations: 17040\ncpu: 40828.28926056052 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 313982.13541545125,
+            "unit": "ns/iter",
+            "extra": "iterations: 2231\ncpu: 313895.8946660788 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 653873.5875101001,
+            "unit": "ns/iter",
+            "extra": "iterations: 1080\ncpu: 653707.862037124 ns\nthreads: 1"
           }
         ]
       }
