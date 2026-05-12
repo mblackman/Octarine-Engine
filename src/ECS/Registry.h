@@ -26,13 +26,6 @@ class Query;
 template <typename... TComponents>
 class ComponentQuery;
 
-inline std::atomic<size_t> s_component_type_counter{0};
-
-template <typename T>
-size_t GetComponentTypeIndex() {
-  static size_t type_id = s_component_type_counter++;
-  return type_id;
-}
 
 class Iterable;
 class ContextFacade;
@@ -58,17 +51,23 @@ class ComponentRegistry {
         swap(*static_cast<T*>(a), *static_cast<T*>(b));
       };
     }
-    component_infos_.try_emplace(id, std::move(info));
+    auto [it, inserted] = component_infos_.try_emplace(id, std::move(info));
+    if (!inserted && it->second.name != typeid(T).name()) {
+      throw std::runtime_error("Component ID collision: " + it->second.name + " and " + typeid(T).name());
+    }
   }
 
   // Zero-size component used as a tag/label. Move/destroy/swap are no-ops so RemoveEntity,
   // CopyComponents, and Chunk::Swap can call them unconditionally.
   void RegisterTag(const ComponentID id, std::string name) {
-    ComponentInfo info{id, std::move(name), 0, 1};
+    ComponentInfo info{id, name, 0, 1};
     info.move_construct = [](void*, void*) {};
     info.destroy = [](void*) {};
     info.swap = [](void*, void*) {};
-    component_infos_.try_emplace(id, std::move(info));
+    auto [it, inserted] = component_infos_.try_emplace(id, std::move(info));
+    if (!inserted && it->second.name != name) {
+      throw std::runtime_error("Tag ID collision: " + it->second.name + " and " + name);
+    }
   }
 
   [[nodiscard]] const ComponentInfo& GetInfo(const ComponentID id) const { return component_infos_.at(id); }
@@ -180,37 +179,34 @@ class Registry {
   // Component management
   template <typename T>
   Entity Component() {
-    const size_t type_idx = GetComponentTypeIndex<T>();
-    if (type_idx >= fast_component_to_entity_.size()) {
-      fast_component_to_entity_.resize(type_idx + 1);
-    }
-    if (fast_component_to_entity_[type_idx].has_value()) {
-      return fast_component_to_entity_[type_idx].value();
+    std::type_index type_idx(typeid(T));
+    if (auto it = type_to_entity_.find(type_idx); it != type_to_entity_.end()) {
+      return it->second;
     }
     const auto entity = CreateInternalEntity();
-    fast_component_to_entity_[type_idx] = entity;
+    type_to_entity_[type_idx] = entity;
     component_registry_->RegisterComponent<T>(entity);
     return entity;
   }
 
   template <typename T>
   Entity Component() const {
-    const size_t type_idx = GetComponentTypeIndex<T>();
-    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) {
-      throw std::runtime_error("Component type " + std::string(typeid(T).name()) +
-                               " has not been used yet. Cannot get component.");
+    std::type_index type_idx(typeid(T));
+    if (auto it = type_to_entity_.find(type_idx); it != type_to_entity_.end()) {
+      return it->second;
     }
-    return fast_component_to_entity_[type_idx].value();
+    throw std::runtime_error("Component type " + std::string(typeid(T).name()) +
+                             " has not been used yet. Cannot get component.");
   }
 
   // Non-throwing equivalent of Component<T>() const. Returns nullopt when the type was never registered.
   template <typename T>
   [[nodiscard]] std::optional<Entity> TryComponent() const {
-    const size_t type_idx = GetComponentTypeIndex<T>();
-    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) {
-      return std::nullopt;
+    std::type_index type_idx(typeid(T));
+    if (auto it = type_to_entity_.find(type_idx); it != type_to_entity_.end()) {
+      return it->second;
     }
-    return fast_component_to_entity_[type_idx];
+    return std::nullopt;
   }
 
   template <typename T>
@@ -231,9 +227,10 @@ class Registry {
 
   template <typename T>
   void RemoveComponent(const Entity entity) {
-    const size_t type_idx = GetComponentTypeIndex<T>();
-    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) return;
-    TransitionRemoveComponent(entity, fast_component_to_entity_[type_idx].value().GetId());
+    std::type_index type_idx(typeid(T));
+    if (auto it = type_to_entity_.find(type_idx); it != type_to_entity_.end()) {
+      TransitionRemoveComponent(entity, it->second.GetId());
+    }
   }
 
   template <typename T>
@@ -494,15 +491,12 @@ class Registry {
   template <typename T>
   Entity Tag() {
     static_assert(std::is_empty_v<T>, "Tag<T>() requires an empty struct type");
-    const size_t type_idx = GetComponentTypeIndex<T>();
-    if (type_idx >= fast_component_to_entity_.size()) {
-      fast_component_to_entity_.resize(type_idx + 1);
-    }
-    if (fast_component_to_entity_[type_idx].has_value()) {
-      return fast_component_to_entity_[type_idx].value();
+    std::type_index type_idx(typeid(T));
+    if (auto it = type_to_entity_.find(type_idx); it != type_to_entity_.end()) {
+      return it->second;
     }
     const auto entity = CreateInternalEntity();
-    fast_component_to_entity_[type_idx] = entity;
+    type_to_entity_[type_idx] = entity;
     component_registry_->RegisterTag(entity.GetId(), typeid(T).name());
     return entity;
   }
@@ -526,11 +520,10 @@ class Registry {
 
   template <typename T>
   void RemoveTag(const Entity entity) {
-    const size_t type_idx = GetComponentTypeIndex<T>();
-    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) {
-      return;
+    std::type_index type_idx(typeid(T));
+    if (auto it = type_to_entity_.find(type_idx); it != type_to_entity_.end()) {
+      TransitionRemoveComponent(entity, it->second.GetId());
     }
-    TransitionRemoveComponent(entity, fast_component_to_entity_[type_idx].value().GetId());
   }
 
   [[nodiscard]] bool HasTag(const Entity entity, const Entity tagEntity) const {
@@ -549,11 +542,11 @@ class Registry {
 
   template <typename T>
   [[nodiscard]] bool HasTag(const Entity entity) const {
-    const size_t type_idx = GetComponentTypeIndex<T>();
-    if (type_idx >= fast_component_to_entity_.size() || !fast_component_to_entity_[type_idx].has_value()) {
-      return false;
+    std::type_index type_idx(typeid(T));
+    if (auto it = type_to_entity_.find(type_idx); it != type_to_entity_.end()) {
+      return HasTag(entity, it->second);
     }
-    return HasTag(entity, fast_component_to_entity_[type_idx].value());
+    return false;
   }
 
   // Relationships
@@ -620,7 +613,7 @@ class Registry {
   std::unique_ptr<Archetype> root_archetype_;  // The root of the archetype graph. Empty signature.
   std::vector<std::unique_ptr<ISystem>> systems_;
   std::unordered_map<ComponentID, std::any> singleton_components_;
-  std::vector<std::optional<Entity>> fast_component_to_entity_;
+  std::unordered_map<std::type_index, Entity> type_to_entity_;
   std::unordered_map<std::string, Entity> tag_to_entity_;
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
   std::unordered_map<ComponentID, ArchetypeList> component_index_;
