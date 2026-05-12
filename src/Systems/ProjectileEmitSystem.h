@@ -22,13 +22,12 @@ class ProjectileEmitSystem {
   void Init(const std::unique_ptr<EventBus>& eventBus, Registry& registry) {
     projectile_pool_id_ =
         registry.Get<EntityPoolManager>().RegisterPool<ProjectileComponent>(registry, [](Registry& reg) {
-          const auto entity =
-              reg.CreateEntityWithBundle(EntityMaskComponent(), TransformComponent(), RigidBodyComponent(),
-                                         BoxColliderComponent(4, 4, glm::vec2(0, 0), EntityMask{}),
-                                         ProjectileComponent(), SpriteComponent("bullet-texture", 4.0f, 4.0f, 4));
-          reg.AddTag<PoolableTag>(entity);
-          reg.AddTag(entity, "projectiles");
-          return entity;
+          reg.Tag<PoolableTag>();
+          reg.Tag<ProjectileTag>();
+          return reg.CreateEntityWithBundle(EntityMaskComponent(), TransformComponent(), RigidBodyComponent(),
+                                            BoxColliderComponent(4, 4, glm::vec2(0, 0), EntityMask{}),
+                                            ProjectileComponent(), SpriteComponent("bullet-texture", 4.0f, 4.0f, 4),
+                                            PoolableTag{}, ProjectileTag{});
         });
     eventBus->SubscribeEvent<ProjectileEmitSystem, KeyInputEvent>(this, &ProjectileEmitSystem::OnKeyInput);
   }
