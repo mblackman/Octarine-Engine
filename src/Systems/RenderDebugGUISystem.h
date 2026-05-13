@@ -440,7 +440,26 @@ class RenderDebugGUISystem {
     ImGui::Begin("Scene");
     ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
     if (gameTexture) {
-      ImGui::Image(reinterpret_cast<ImTextureID>(gameTexture), viewportPanelSize);
+      float texW = 0, texH = 0;
+      SDL_GetTextureSize(gameTexture, &texW, &texH);
+
+      if (texW > 0 && texH > 0) {
+        float aspectRatio = texW / texH;
+        float targetW = viewportPanelSize.x;
+        float targetH = targetW / aspectRatio;
+
+        if (targetH > viewportPanelSize.y) {
+          targetH = viewportPanelSize.y;
+          targetW = targetH * aspectRatio;
+        }
+
+        ImVec2 imageSize(targetW, targetH);
+        ImVec2 imagePos =
+            ImVec2((viewportPanelSize.x - imageSize.x) * 0.5f, (viewportPanelSize.y - imageSize.y) * 0.5f);
+
+        ImGui::SetCursorPos(imagePos);
+        ImGui::Image(reinterpret_cast<ImTextureID>(gameTexture), imageSize);
+      }
     }
     ImGui::End();
     ImGui::PopStyleVar();
