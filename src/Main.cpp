@@ -27,6 +27,9 @@ int main(const int argc, char *argv[]) {
         Logger::Error("Error: " + currentArg + " flag requires a mode argument.");
         return 1;
       }
+    } else if (currentArg == "--editor") {
+      startupMode = "editor";
+      Logger::Info("Editor mode enabled.");
     } else {
       Logger::Warn("Unknown command-line argument: " + currentArg);
     }

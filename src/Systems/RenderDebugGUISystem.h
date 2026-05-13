@@ -66,52 +66,102 @@ class RenderDebugGUISystem {
 
   static void Render(Registry* registry, SDL_Renderer* renderer, SDL_Texture* gameTexture, sol::state& lua,
                      const float deltaTime) {
-    auto& engineOptions = registry->Get<GameConfig>().GetEngineOptions();
-    if (!engineOptions.showDebugGUI && !engineOptions.showFpsCounter) {
+    auto& gameConfig = registry->Get<GameConfig>();
+    auto& engineOptions = gameConfig.GetEngineOptions();
+    const bool projectLoaded = gameConfig.HasLoadedConfig();
+    const bool editorSession = gameConfig.IsEditorMode() || !projectLoaded;
+
+    // Visibility logic:
+    // 1. Editor windows: Always show in Editor Mode, never in Play Mode.
+    // 2. Game overlays (Lua UI, FPS, Entity Info): Toggle with showDebugGUI in both modes?
+    //    User said: "When in play mode, use the grave key to toggle game debug menus... fps counter... entity counter"
+    //    In editor mode, we probably want them as windows or toggles too.
+
+    const bool showEditorUI = editorSession;                   // Editor windows always show in Editor session
+    const bool showGameOverlays = engineOptions.showDebugGUI;  // Toggled by Grave key
+
+    if (!showEditorUI && !showGameOverlays && !engineOptions.showFpsCounter) {
+      // Small optimization: FPS counter can be on without showDebugGUI if user manually set it,
+      // but usually showDebugGUI toggles it.
       return;
     }
+
     PROFILE_NAMED_SCOPE("RenderDebugGUISystem::Render");
 
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
-    if (engineOptions.showDebugGUI) {
+    static bool showProjectSelector = false;
+
+    if (showEditorUI) {
       ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
       ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
       ImGui::PopStyleColor();
-      SceneWindow(gameTexture);
-    }
 
-    if (engineOptions.showFpsCounter) {
-      FPSWindow(deltaTime);
-    }
-    if (engineOptions.showEntityInfo) {
-      EntityInfoWindow(registry);
-    }
-    if (engineOptions.showProfiler) {
-      PerformanceProfilerWindow();
-    }
-    if (engineOptions.showHierarchy) {
-      HierarchyWindow(registry);
-    }
-    if (engineOptions.showAssetBrowser) {
-      AssetBrowserWindow(registry);
-    }
-    if (engineOptions.showLuaConsole) {
-      LuaConsoleWindow(lua);
-    }
-    if (engineOptions.showDebugGUI) {
+      if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("File")) {
+          if (ImGui::MenuItem("Open Project...", "Ctrl+O")) {
+            showProjectSelector = true;
+          }
+          if (ImGui::MenuItem("Save Preferences", "Ctrl+S")) {
+            gameConfig.SaveUserPreferences();
+            gameConfig.SaveGlobalPreferences();
+          }
+          ImGui::Separator();
+          if (ImGui::MenuItem("Quit", "Alt+F4")) {
+            Game::Quit();
+          }
+          ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Windows")) {
+          ImGui::MenuItem("Scene", nullptr, nullptr, false);
+          ImGui::MenuItem("Hierarchy", nullptr, &engineOptions.showHierarchy);
+          ImGui::MenuItem("Asset Browser", nullptr, &engineOptions.showAssetBrowser);
+          ImGui::MenuItem("Lua Console", nullptr, &engineOptions.showLuaConsole);
+          ImGui::MenuItem("Performance Profiler", nullptr, &engineOptions.showProfiler);
+          ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI);
+          ImGui::Separator();
+          ImGui::MenuItem("FPS Counter", nullptr, &engineOptions.showFpsCounter);
+          ImGui::MenuItem("ImGui Demo Window", nullptr, &engineOptions.showImGuiDemoWindow);
+          ImGui::EndMenu();
+        }
+        ImGui::EndMainMenuBar();
+      }
+
+      SceneWindow(gameTexture);
+
+      // --- Editor Mode Windows ---
+      if (engineOptions.showHierarchy) HierarchyWindow(registry);
+      if (engineOptions.showAssetBrowser) AssetBrowserWindow(registry);
+      if (engineOptions.showLuaConsole) LuaConsoleWindow(lua);
+      if (engineOptions.showProfiler) PerformanceProfilerWindow();
       EngineOptionsWindow(engineOptions);
       EditorSettingsWindow(engineOptions);
 
       if (engineOptions.showImGuiDemoWindow) {
         ImGui::ShowDemoWindow();
       }
+    }
 
-      auto query = registry->CreateQuery<ScriptComponent>();
-      RenderDebugGUISystem system;
-      query->ForEach(system);
+    // --- Game Overlays (Lua UI, FPS, Entity Info) ---
+    // User requested these be toggled by the Grave key in Play mode.
+    // In Editor mode, they can also be shown if toggled.
+    if (showGameOverlays) {
+      if (projectLoaded) {
+        auto query = registry->CreateQuery<ScriptComponent>();
+        RenderDebugGUISystem system;
+        query->ForEach(system);
+      }
+      EntityInfoWindow(registry);
+      FPSWindow(deltaTime);
+    } else if (showEditorUI && engineOptions.showFpsCounter) {
+      // In editor mode, if showDebugGUI is OFF, we might still want FPS if its specific flag is ON
+      FPSWindow(deltaTime);
+    }
+
+    if (!projectLoaded || showProjectSelector) {
+      ProjectSelectorWindow(registry, &showProjectSelector);
     }
 
     ImGui::Render();
@@ -436,6 +486,56 @@ class RenderDebugGUISystem {
       ImGui::Text("No entity selected or entity destroyed.");
     }
     ImGui::EndChild();
+
+    ImGui::End();
+  }
+
+  static void ProjectSelectorWindow(Registry* registry, bool* p_open) {
+    ImGui::SetNextWindowSize(ImVec2(400, 200), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Project Selector", p_open, ImGuiWindowFlags_NoDocking)) {
+      ImGui::End();
+      return;
+    }
+
+    auto& gameConfig = registry->Get<GameConfig>();
+    auto& options = gameConfig.GetEngineOptions();
+
+    static char projectPath[256] = "";
+    if (projectPath[0] == '\0' && !options.lastProjectPath.empty()) {
+      strncpy(projectPath, options.lastProjectPath.c_str(), sizeof(projectPath));
+    }
+
+    ImGui::Text("Enter Project Path:");
+    ImGui::InputText("##path", projectPath, sizeof(projectPath));
+
+    if (ImGui::Button("Open Project")) {
+      Logger::Info("Opening project: " + std::string(projectPath));
+      // For now, we'll just set lastProjectPath and tell the user to restart,
+      // or we can try to implement a reload.
+      options.lastProjectPath = projectPath;
+      gameConfig.SaveGlobalPreferences();
+      *p_open = false;
+
+      // Hint: To truly switch projects at runtime, we'd need to clear the registry,
+      // reload assets, and re-run Setup().
+      ImGui::OpenPopup("Restart Required");
+    }
+
+    if (ImGui::BeginPopupModal("Restart Required", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      ImGui::Text("Project path saved. Please restart the engine to load the new project.");
+      if (ImGui::Button("OK", ImVec2(120, 0))) {
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndPopup();
+    }
+
+    if (!options.lastProjectPath.empty()) {
+      ImGui::Separator();
+      ImGui::Text("Last Project: %s", options.lastProjectPath.c_str());
+      if (ImGui::Button("Load Last Project")) {
+        strncpy(projectPath, options.lastProjectPath.c_str(), sizeof(projectPath));
+      }
+    }
 
     ImGui::End();
   }

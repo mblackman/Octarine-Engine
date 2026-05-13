@@ -4,6 +4,7 @@
 
 #include "GameConfig.h"
 
+#include <SDL3/SDL_filesystem.h>
 #include <SDL3/SDL_storage.h>
 #include <SDL3/SDL_timer.h>
 
@@ -15,6 +16,7 @@
 
 inline constexpr auto kConfigFileName = "config.ini";
 inline constexpr auto kPreferencesFileName = "preferences.ini";
+inline constexpr auto kGlobalPreferencesFileName = "editor_settings.ini";
 inline constexpr auto kWhiteSpaceSymbols = " \t\n\r\f\v";
 
 std::string TrimRight(const std::string &s) {
@@ -62,6 +64,48 @@ inline auto ReadConfigFile(void *dst, const Uint64 dstLen) -> std::unordered_map
   }
 
   return config;
+}
+
+void GameConfig::SaveGlobalPreferences() {
+  char *prefPath = SDL_GetPrefPath("Octarine", "Engine");
+  if (!prefPath) {
+    Logger::Error("Failed to get global pref path: " + std::string(SDL_GetError()));
+    return;
+  }
+
+  std::ofstream file(std::string(prefPath) + kGlobalPreferencesFileName);
+  SDL_free(prefPath);
+
+  if (!file.is_open()) {
+    Logger::Error("Failed to open global preferences file for writing.");
+    return;
+  }
+
+  file << "lastProjectPath=" << engine_options_.lastProjectPath << "\n";
+  file.close();
+}
+
+void GameConfig::LoadGlobalPreferences() {
+  char *prefPath = SDL_GetPrefPath("Octarine", "Engine");
+  if (!prefPath) return;
+
+  std::ifstream file(std::string(prefPath) + kGlobalPreferencesFileName);
+  SDL_free(prefPath);
+
+  if (!file.is_open()) return;
+
+  std::string line;
+  while (std::getline(file, line)) {
+    const auto keyValue = line.find('=');
+    if (keyValue == std::string::npos) continue;
+
+    const auto key = line.substr(0, keyValue);
+    const auto value = line.substr(keyValue + 1);
+
+    if (key == "lastProjectPath") {
+      engine_options_.lastProjectPath = value;
+    }
+  }
 }
 
 bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
@@ -116,6 +160,8 @@ bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
 }
 
 void GameConfig::SaveUserPreferences() {
+  if (!has_loaded_config_) return;
+
   std::ofstream file(asset_path_ + "/" + kPreferencesFileName);
   if (!file.is_open()) {
     Logger::Error("Failed to open preferences file for writing: " + asset_path_ + "/" + kPreferencesFileName);
@@ -138,6 +184,8 @@ void GameConfig::SaveUserPreferences() {
 }
 
 void GameConfig::LoadUserPreferences() {
+  if (!has_loaded_config_) return;
+
   std::ifstream file(asset_path_ + "/" + kPreferencesFileName);
   if (!file.is_open()) {
     return;  // Silent because it's okay if preferences don't exist yet

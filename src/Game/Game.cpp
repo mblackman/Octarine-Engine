@@ -100,16 +100,38 @@ bool Game::Initialize(const std::string &assetPath) {
   registry_->Set<GameConfig>(GameConfig());
   auto &gameConfig = registry_->Get<GameConfig>();
 
-  if (!gameConfig.LoadConfigFromFile(assetPath)) {
-    Logger::Error("Failed to load game config.");
-    return false;
+  gameConfig.LoadGlobalPreferences();
+  std::string effectivePath = assetPath;
+  if (effectivePath.empty()) {
+    effectivePath = gameConfig.GetEngineOptions().lastProjectPath;
+    if (!effectivePath.empty()) {
+      Logger::Info("No project path provided, attempting to load last project: " + effectivePath);
+    }
   }
-  gameConfig.LoadUserPreferences();
 
-  gameConfig.windowWidth = gameConfig.GetDefaultWidth();
-  gameConfig.windowHeight = gameConfig.GetDefaultHeight();
-  SDL_CreateWindowAndRenderer(gameConfig.GetGameTitle().c_str(), gameConfig.windowWidth, gameConfig.windowHeight,
-                              SDL_WINDOW_RESIZABLE, &window_, &sdl_renderer_);
+  bool projectLoaded = false;
+  if (!effectivePath.empty()) {
+    if (gameConfig.LoadConfigFromFile(effectivePath)) {
+      gameConfig.LoadUserPreferences();
+      gameConfig.GetEngineOptions().lastProjectPath = effectivePath;
+      gameConfig.SaveGlobalPreferences();
+      projectLoaded = true;
+    } else {
+      Logger::Warn("Failed to load project from path: " + effectivePath);
+    }
+  }
+
+  if (!projectLoaded) {
+    Logger::Info("Starting in Editor Mode with no project loaded.");
+    gameConfig.SetIsEditorMode(true);
+  }
+
+  gameConfig.windowWidth = projectLoaded ? gameConfig.GetDefaultWidth() : Constants::kDefaultWindowWidth;
+  gameConfig.windowHeight = projectLoaded ? gameConfig.GetDefaultHeight() : Constants::kDefaultWindowHeight;
+  std::string title = projectLoaded ? gameConfig.GetGameTitle() : "Octarine Engine - Editor";
+
+  SDL_CreateWindowAndRenderer(title.c_str(), gameConfig.windowWidth, gameConfig.windowHeight, SDL_WINDOW_RESIZABLE,
+                              &window_, &sdl_renderer_);
 
   if (!window_) {
     Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
@@ -134,8 +156,20 @@ bool Game::Initialize(const std::string &assetPath) {
   ImGuiIO &io = ImGui::GetIO();
   (void)io;
 
-  static std::string imguiIniPath = gameConfig.GetAssetPath() + "/imgui.ini";
-  io.IniFilename = imguiIniPath.c_str();
+  static std::string imguiIniPath;
+  if (gameConfig.HasLoadedConfig()) {
+    imguiIniPath = gameConfig.GetAssetPath() + "/imgui.ini";
+    io.IniFilename = imguiIniPath.c_str();
+  } else {
+    char *prefPath = SDL_GetPrefPath("Octarine", "Engine");
+    if (prefPath) {
+      imguiIniPath = std::string(prefPath) + "imgui_editor.ini";
+      io.IniFilename = imguiIniPath.c_str();
+      SDL_free(prefPath);
+    } else {
+      io.IniFilename = "imgui_editor.ini";
+    }
+  }
 
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
@@ -183,6 +217,7 @@ bool Game::Initialize(const std::string &assetPath) {
 void Game::Destroy() {
   if (registry_) {
     registry_->Get<GameConfig>().SaveUserPreferences();
+    registry_->Get<GameConfig>().SaveGlobalPreferences();
   }
 
   // Tear registry/event bus down BEFORE SDL_Quit so owned systems (AudioSystem -> MIX_Quit,
@@ -239,10 +274,12 @@ void Game::Setup() {
   lua["game_window_height"] = gameConfig.windowHeight;
   lua["oct_startup_mode"] = startup_mode_;
 
-  if (IsBenchMode()) {
+  if (startup_mode_ == "editor") {
+    gameConfig.SetIsEditorMode(true);
+  }
+
+  if (IsBenchMode() && startup_mode_ != "editor") {
     // Bench runs shouldn't pay for debug overlays. Force-zero every toggle that would
-    // kick the per-frame ImGui pipeline; the render-side gate below also short-circuits
-    // the whole RenderDebugGUISystem call.
     auto &options = gameConfig.GetEngineOptions();
     options.showDebugGUI = false;
     options.showFpsCounter = false;
@@ -255,7 +292,9 @@ void Game::Setup() {
   }
 
   auto &assetManager = registry_->Get<AssetManager>();
-  assetManager.LoadGameConfig(gameConfig);
+  if (gameConfig.HasLoadedConfig()) {
+    assetManager.LoadGameConfig(gameConfig);
+  }
 
   // Audio must be live before LoadGame: the startup script may call load_asset for audio_clip
   // entries, which need the mixer.
@@ -264,7 +303,9 @@ void Game::Setup() {
 
   registry_->Set<EntityPoolManager>(EntityPoolManager());
 
-  LoadGame(lua, assetManager, gameConfig);
+  if (gameConfig.HasLoadedConfig()) {
+    LoadGame(lua, assetManager, gameConfig);
+  }
 
   registry_->RegisterParallelSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
   auto &projectileEmitSystem =

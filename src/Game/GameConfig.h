@@ -26,6 +26,13 @@ class GameConfig {
   void SaveUserPreferences();
   void LoadUserPreferences();
 
+  void SaveGlobalPreferences();
+  void LoadGlobalPreferences();
+
+  [[nodiscard]] bool HasLoadedConfig() const { return has_loaded_config_; }
+  [[nodiscard]] bool IsEditorMode() const { return is_editor_mode_; }
+  void SetIsEditorMode(bool isEditorMode) { is_editor_mode_ = isEditorMode; }
+
   [[nodiscard]] const EngineOptions& GetEngineOptions() const;
   [[nodiscard]] EngineOptions& GetEngineOptions();
 
@@ -103,4 +110,5 @@ class GameConfig {
   std::optional<std::string> default_scaling_mode_;
   int default_width_ = Constants::kDefaultWindowWidth;
   int default_height_ = Constants::kDefaultWindowHeight;
+  bool is_editor_mode_ = false;
 };
