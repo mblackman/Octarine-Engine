@@ -53,6 +53,7 @@
 #include "imgui_impl_sdlrenderer3.h"
 
 constexpr Uint8 GREY_COLOR = 24;
+constexpr Uint8 BLACK_COLOR = 0;
 
 inline void LoadGame(sol::state &lua, const AssetManager &assetManager, const GameConfig &gameConfig) {
   const auto filePath = assetManager.GetFullPath(gameConfig.GetStartupScript());
@@ -103,6 +104,7 @@ bool Game::Initialize(const std::string &assetPath) {
     Logger::Error("Failed to load game config.");
     return false;
   }
+  gameConfig.LoadUserPreferences();
 
   gameConfig.windowWidth = gameConfig.GetDefaultWidth();
   gameConfig.windowHeight = gameConfig.GetDefaultHeight();
@@ -119,12 +121,25 @@ bool Game::Initialize(const std::string &assetPath) {
     return false;
   }
 
+  game_render_texture_ = SDL_CreateTexture(sdl_renderer_, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
+                                           gameConfig.windowWidth, gameConfig.windowHeight);
+
+  if (!game_render_texture_) {
+    Logger::Error("SDL_CreateTexture Error: " + std::string(SDL_GetError()));
+    return false;
+  }
+
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
   (void)io;
+
+  static std::string imguiIniPath = gameConfig.GetAssetPath() + "/imgui.ini";
+  io.IniFilename = imguiIniPath.c_str();
+
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
   io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
+  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
   ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
   ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
@@ -139,12 +154,19 @@ bool Game::Initialize(const std::string &assetPath) {
 }
 
 void Game::Destroy() {
+  if (registry_) {
+    registry_->Get<GameConfig>().SaveUserPreferences();
+  }
+
   // Tear registry/event bus down BEFORE SDL_Quit so owned systems (AudioSystem -> MIX_Quit,
   // AssetManager -> SDL_DestroyTexture) can still call into a live SDL.
   registry_.reset();
   event_bus_.reset();
 
   if (sdl_renderer_) {
+    if (game_render_texture_) {
+      SDL_DestroyTexture(game_render_texture_);
+    }
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
@@ -304,8 +326,9 @@ void Game::Update(const float deltaTime) {
 
   auto &options = registry_->Get<GameConfig>().GetEngineOptions();
 
-  if (!options.isPaused) {
+  if (!options.isPaused || options.stepFrame) {
     registry_->Update(deltaTime * options.timeScale);
+    options.stepFrame = false;
   } else {
     // If paused, we might still want to clear some per-frame signals so they don't get stuck.
   }
@@ -325,6 +348,7 @@ void Game::Render(const float deltaTime) {
   PROFILE_COUNTER_SET("RenderQueue: Size", static_cast<long long>(renderQueue.Size()));
   PROFILE_COUNTER_SET("Entities: User", static_cast<long long>(registry_->GetUserEntityCount()));
 
+  SDL_SetRenderTarget(sdl_renderer_, game_render_texture_);
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
   SDL_RenderClear(sdl_renderer_);
 
@@ -348,8 +372,16 @@ void Game::Render(const float deltaTime) {
     collider_query_->ForEach(drawColliderSystem);
   }
 
+  SDL_SetRenderTarget(sdl_renderer_, nullptr);
+  SDL_SetRenderDrawColor(sdl_renderer_, BLACK_COLOR, BLACK_COLOR, BLACK_COLOR, Constants::kUint8Max);
+  SDL_RenderClear(sdl_renderer_);
+
+  auto &options = gameConfig.GetEngineOptions();
   if (!IsBenchMode()) {
-    RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, deltaTime);
+    if (!options.showDebugGUI) {
+      SDL_RenderTexture(sdl_renderer_, game_render_texture_, nullptr, nullptr);
+    }
+    RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, game_render_texture_, deltaTime);
   }
 
 #ifdef OCTARINE_PROFILING

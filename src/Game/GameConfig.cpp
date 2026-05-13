@@ -7,12 +7,14 @@
 #include <SDL3/SDL_storage.h>
 #include <SDL3/SDL_timer.h>
 
+#include <fstream>
 #include <sstream>
 #include <unordered_map>
 
 #include "../General/Logger.h"
 
 inline constexpr auto kConfigFileName = "config.ini";
+inline constexpr auto kPreferencesFileName = "preferences.ini";
 inline constexpr auto kWhiteSpaceSymbols = " \t\n\r\f\v";
 
 std::string TrimRight(const std::string &s) {
@@ -111,6 +113,58 @@ bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
   SetAssetPath(assetPath);
   has_loaded_config_ = true;
   return LoadConfig(config);
+}
+
+void GameConfig::SaveUserPreferences() {
+  std::ofstream file(asset_path_ + "/" + kPreferencesFileName);
+  if (!file.is_open()) {
+    Logger::Error("Failed to open preferences file for writing: " + asset_path_ + "/" + kPreferencesFileName);
+    return;
+  }
+
+  file << "showDebugGUI=" << (engine_options_.showDebugGUI ? "true" : "false") << "\n";
+  file << "drawColliders=" << (engine_options_.drawColliders ? "true" : "false") << "\n";
+  file << "showFpsCounter=" << (engine_options_.showFpsCounter ? "true" : "false") << "\n";
+  file << "showEntityInfo=" << (engine_options_.showEntityInfo ? "true" : "false") << "\n";
+  file << "showProfiler=" << (engine_options_.showProfiler ? "true" : "false") << "\n";
+  file << "showHierarchy=" << (engine_options_.showHierarchy ? "true" : "false") << "\n";
+  file << "showAssetBrowser=" << (engine_options_.showAssetBrowser ? "true" : "false") << "\n";
+  file << "masterVolume=" << engine_options_.masterVolume << "\n";
+
+  file.close();
+}
+
+void GameConfig::LoadUserPreferences() {
+  std::ifstream file(asset_path_ + "/" + kPreferencesFileName);
+  if (!file.is_open()) {
+    return;  // Silent because it's okay if preferences don't exist yet
+  }
+
+  std::string line;
+  while (std::getline(file, line)) {
+    const auto keyValue = line.find('=');
+    if (keyValue == std::string::npos) continue;
+
+    const auto key = line.substr(0, keyValue);
+    const auto value = line.substr(keyValue + 1);
+
+    if (key == "showDebugGUI")
+      engine_options_.showDebugGUI = (value == "true");
+    else if (key == "drawColliders")
+      engine_options_.drawColliders = (value == "true");
+    else if (key == "showFpsCounter")
+      engine_options_.showFpsCounter = (value == "true");
+    else if (key == "showEntityInfo")
+      engine_options_.showEntityInfo = (value == "true");
+    else if (key == "showProfiler")
+      engine_options_.showProfiler = (value == "true");
+    else if (key == "showHierarchy")
+      engine_options_.showHierarchy = (value == "true");
+    else if (key == "showAssetBrowser")
+      engine_options_.showAssetBrowser = (value == "true");
+    else if (key == "masterVolume")
+      engine_options_.masterVolume = std::stof(value);
+  }
 }
 
 bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string> &settings) {

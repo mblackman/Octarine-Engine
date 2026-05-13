@@ -55,6 +55,7 @@ class Game {
 
   SDL_Window* window_;
   SDL_Renderer* sdl_renderer_;
+  SDL_Texture* game_render_texture_{nullptr};
   static inline bool s_is_running_{false};
   Uint64 milliseconds_previous_frame_ = 0;
 

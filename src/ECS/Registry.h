@@ -26,7 +26,6 @@ class Query;
 template <typename... TComponents>
 class ComponentQuery;
 
-
 class Iterable;
 class ContextFacade;
 namespace Internal {

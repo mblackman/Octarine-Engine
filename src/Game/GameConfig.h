@@ -23,6 +23,9 @@ class GameConfig {
 
   bool LoadConfigFromFile(const std::string& assetPath);
 
+  void SaveUserPreferences();
+  void LoadUserPreferences();
+
   [[nodiscard]] const EngineOptions& GetEngineOptions() const;
   [[nodiscard]] EngineOptions& GetEngineOptions();
 

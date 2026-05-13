@@ -13,4 +13,5 @@ struct EngineOptions {
   float masterVolume = 1.0F;
   bool isPaused = false;
   float timeScale = 1.0F;
+  bool stepFrame = false;
 };

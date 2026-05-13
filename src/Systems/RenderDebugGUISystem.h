@@ -5,10 +5,21 @@
 #include "../AssetManager/AssetManager.h"
 #include "../General/Logger.h"
 #include "../General/PerfUtils.h"
+#include "Components/AnimationComponent.h"
+#include "Components/BoxColliderComponent.h"
+#include "Components/CameraFollowComponent.h"
+#include "Components/EntityMaskComponent.h"
 #include "Components/HealthComponent.h"
+#include "Components/KeyboardControlComponent.h"
+#include "Components/ProjectileComponent.h"
+#include "Components/ProjectileEmitterComponent.h"
+#include "Components/RigidBodyComponent.h"
 #include "Components/ScriptComponent.h"
 #include "Components/SpriteComponent.h"
+#include "Components/SquarePrimitiveComponent.h"
+#include "Components/TextLabelComponent.h"
 #include "Components/TransformComponent.h"
+#include "Components/UIButtonComponent.h"
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"
@@ -28,7 +39,7 @@ class RenderDebugGUISystem {
     }
   }
 
-  static void Render(Registry* registry, SDL_Renderer* renderer, const float deltaTime) {
+  static void Render(Registry* registry, SDL_Renderer* renderer, SDL_Texture* gameTexture, const float deltaTime) {
     auto& engineOptions = registry->Get<GameConfig>().GetEngineOptions();
     if (!engineOptions.showDebugGUI && !engineOptions.showFpsCounter) {
       return;
@@ -38,6 +49,13 @@ class RenderDebugGUISystem {
     ImGui_ImplSDLRenderer3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
+
+    if (engineOptions.showDebugGUI) {
+      ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
+      ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
+      ImGui::PopStyleColor();
+      SceneWindow(gameTexture);
+    }
 
     if (engineOptions.showFpsCounter) {
       FPSWindow(deltaTime);
@@ -89,8 +107,16 @@ class RenderDebugGUISystem {
   }
 
   static void FPSWindow(const float deltaTime) {
+    static float fpsHistory[120] = {};
+    static int fpsOffset = 0;
+    const float fps = (deltaTime > 0.0f) ? 1.0f / deltaTime : 0.0f;
+    fpsHistory[fpsOffset] = fps;
+    fpsOffset = (fpsOffset + 1) % 120;
+
     ImGui::Begin("FPS");
-    ImGui::Text("FPS: %.2f", 1.0f / deltaTime);
+    char overlay[32];
+    snprintf(overlay, sizeof(overlay), "%.1f FPS", fps);
+    ImGui::PlotLines("##fps", fpsHistory, 120, fpsOffset, overlay, 0.0f, 120.0f, ImVec2(0, 50));
     ImGui::End();
   }
 
@@ -142,12 +168,18 @@ class RenderDebugGUISystem {
     ImGui::Begin("Hierarchy / Entity Inspector");
     const auto entities = registry->GetUserEntities();
     ImGui::Text("Total User Entities: %zu", entities.size());
+    if (ImGui::Button("Create Entity")) {
+      registry->CreateEntity();
+    }
 
-    static Entity selectedEntity;
+    static Entity selectedEntity{UINT64_MAX};
+    static ImGuiTextFilter entityFilter;
+    entityFilter.Draw("##filter", 140);
 
     ImGui::BeginChild("EntityList", ImVec2(150, 0), true);
     for (const auto& entity : entities) {
       std::string label = "Entity " + std::to_string(entity.id);
+      if (!entityFilter.PassFilter(label.c_str())) continue;
       if (ImGui::Selectable(label.c_str(), selectedEntity == entity)) {
         selectedEntity = entity;
       }
@@ -159,6 +191,11 @@ class RenderDebugGUISystem {
     ImGui::BeginChild("EntityDetails", ImVec2(0, 0), true);
     if (registry->IsAlive(selectedEntity)) {
       ImGui::Text("Selected Entity ID: %u", selectedEntity.GetId());
+      ImGui::SameLine();
+      if (ImGui::Button("Destroy Entity")) {
+        registry->BlamEntity(selectedEntity);
+        selectedEntity = Entity{UINT64_MAX};
+      }
       ImGui::Separator();
 
       if (registry->HasComponent<TransformComponent>(selectedEntity)) {
@@ -181,8 +218,145 @@ class RenderDebugGUISystem {
       if (registry->HasComponent<SpriteComponent>(selectedEntity)) {
         if (ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen)) {
           auto& sprite = registry->GetComponent<SpriteComponent>(selectedEntity);
-          ImGui::Text("Layer: %d", sprite.layer);
+          ImGui::DragInt("Layer", &sprite.layer);
+          ImGui::Text("Asset ID: %s", sprite.assetId.c_str());
+          ImGui::DragFloat("Width", &sprite.width);
+          ImGui::DragFloat("Height", &sprite.height);
+          ImGui::Checkbox("Fixed", &sprite.isFixed);
+          // Sprite texture preview
+          auto& assetManager = registry->Get<AssetManager>();
+          if (auto* tex = assetManager.GetTexture(sprite.assetId); tex != nullptr) {
+            ImGui::Image(reinterpret_cast<ImTextureID>(tex), ImVec2(64, 64));
+          }
         }
+      }
+      if (registry->HasComponent<RigidBodyComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("RigidBody", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& rb = registry->GetComponent<RigidBodyComponent>(selectedEntity);
+          ImGui::DragFloat2("Velocity", &rb.velocity.x, 1.0f);
+        }
+      }
+      if (registry->HasComponent<BoxColliderComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("BoxCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& bc = registry->GetComponent<BoxColliderComponent>(selectedEntity);
+          ImGui::DragInt("Width", &bc.width);
+          ImGui::DragInt("Height", &bc.height);
+          ImGui::DragFloat2("Offset", &bc.offset.x, 1.0f);
+        }
+      }
+      if (registry->HasComponent<AnimationComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("Animation", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& anim = registry->GetComponent<AnimationComponent>(selectedEntity);
+          ImGui::Text("Num Frames: %d", anim.numFrames);
+          ImGui::SliderInt("Current Frame", &anim.currentFrame, 1, anim.numFrames);
+          ImGui::DragInt("Frame Speed (ms)", &anim.frameRateSpeed);
+          ImGui::Checkbox("Looping", &anim.shouldLoop);
+        }
+      }
+      if (registry->HasComponent<ProjectileEmitterComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("ProjectileEmitter", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& pe = registry->GetComponent<ProjectileEmitterComponent>(selectedEntity);
+          ImGui::DragFloat2("Velocity", &pe.velocity.x, 1.0f);
+          ImGui::DragFloat("Frequency (s)", &pe.frequency, 0.1f);
+          ImGui::DragFloat("Duration (s)", &pe.duration, 0.1f);
+          ImGui::DragInt("Damage", &pe.damage);
+        }
+      }
+      if (registry->HasComponent<TextLabelComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("TextLabel", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& tl = registry->GetComponent<TextLabelComponent>(selectedEntity);
+          ImGui::Text("Text: %s", tl.text.c_str());
+          ImGui::Text("Font ID: %s", tl.fontId.c_str());
+          float col[4] = {tl.color.r / 255.0f, tl.color.g / 255.0f, tl.color.b / 255.0f, tl.color.a / 255.0f};
+          if (ImGui::ColorEdit4("Color", col)) {
+            tl.color = {static_cast<Uint8>(col[0] * 255), static_cast<Uint8>(col[1] * 255),
+                        static_cast<Uint8>(col[2] * 255), static_cast<Uint8>(col[3] * 255)};
+          }
+          ImGui::Checkbox("Fixed", &tl.isFixed);
+        }
+      }
+      if (registry->HasComponent<ScriptComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("Script", ImGuiTreeNodeFlags_DefaultOpen)) {
+          ImGui::Text("Has Lua script table and callbacks.");
+        }
+      }
+      if (registry->HasComponent<CameraFollowComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("CameraFollow", ImGuiTreeNodeFlags_DefaultOpen)) {
+          ImGui::Text("Entity is being followed by the camera.");
+        }
+      }
+      if (registry->HasComponent<EntityMaskComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("EntityMask", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& em = registry->GetComponent<EntityMaskComponent>(selectedEntity);
+          ImGui::Text("Mask: %s", em.mask.to_string().c_str());
+        }
+      }
+      if (registry->HasComponent<KeyboardControlComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("KeyboardControl", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& kc = registry->GetComponent<KeyboardControlComponent>(selectedEntity);
+          auto vel = static_cast<float>(kc.velocity);
+          if (ImGui::DragFloat("Velocity", &vel)) {
+            kc.velocity = vel;
+          }
+        }
+      }
+      if (registry->HasComponent<ProjectileComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("Projectile", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& pc = registry->GetComponent<ProjectileComponent>(selectedEntity);
+          ImGui::DragInt("Damage", &pc.damage);
+          ImGui::Text("Timer: %.2f / %.2f", pc.timer, pc.duration);
+        }
+      }
+      if (registry->HasComponent<SquarePrimitiveComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("SquarePrimitive", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& sp = registry->GetComponent<SquarePrimitiveComponent>(selectedEntity);
+          ImGui::DragFloat2("Position", &sp.position.x);
+          ImGui::DragInt("Layer", &sp.layer);
+          ImGui::DragFloat("Width", &sp.width);
+          ImGui::DragFloat("Height", &sp.height);
+          float col[4] = {sp.color.r / 255.0f, sp.color.g / 255.0f, sp.color.b / 255.0f, sp.color.a / 255.0f};
+          if (ImGui::ColorEdit4("Color", col)) {
+            sp.color = {static_cast<Uint8>(col[0] * 255), static_cast<Uint8>(col[1] * 255),
+                        static_cast<Uint8>(col[2] * 255), static_cast<Uint8>(col[3] * 255)};
+          }
+          ImGui::Checkbox("Fixed", &sp.isFixed);
+        }
+      }
+      if (registry->HasComponent<UIButtonComponent>(selectedEntity)) {
+        if (ImGui::CollapsingHeader("UIButton", ImGuiTreeNodeFlags_DefaultOpen)) {
+          auto& ub = registry->GetComponent<UIButtonComponent>(selectedEntity);
+          ImGui::Checkbox("Active", &ub.isActive);
+        }
+      }
+
+      // --- Add Component dropdown ---
+      ImGui::Separator();
+      if (ImGui::BeginCombo("Add Component", "Select...")) {
+        if (!registry->HasComponent<TransformComponent>(selectedEntity) && ImGui::Selectable("Transform")) {
+          registry->AddComponent(selectedEntity, TransformComponent());
+        }
+        if (!registry->HasComponent<RigidBodyComponent>(selectedEntity) && ImGui::Selectable("RigidBody")) {
+          registry->AddComponent(selectedEntity, RigidBodyComponent());
+        }
+        if (!registry->HasComponent<SpriteComponent>(selectedEntity) && ImGui::Selectable("Sprite")) {
+          registry->AddComponent(selectedEntity, SpriteComponent());
+        }
+        if (!registry->HasComponent<BoxColliderComponent>(selectedEntity) && ImGui::Selectable("BoxCollider")) {
+          registry->AddComponent(selectedEntity, BoxColliderComponent());
+        }
+        if (!registry->HasComponent<AnimationComponent>(selectedEntity) && ImGui::Selectable("Animation")) {
+          registry->AddComponent(selectedEntity, AnimationComponent());
+        }
+        if (!registry->HasComponent<HealthComponent>(selectedEntity) && ImGui::Selectable("Health")) {
+          registry->AddComponent(selectedEntity, HealthComponent(100));
+        }
+        if (!registry->HasComponent<KeyboardControlComponent>(selectedEntity) && ImGui::Selectable("KeyboardControl")) {
+          registry->AddComponent(selectedEntity, KeyboardControlComponent());
+        }
+        if (!registry->HasComponent<CameraFollowComponent>(selectedEntity) && ImGui::Selectable("CameraFollow")) {
+          registry->AddComponent(selectedEntity, CameraFollowComponent());
+        }
+        ImGui::EndCombo();
       }
     } else {
       ImGui::Text("No entity selected or entity destroyed.");
@@ -190,6 +364,17 @@ class RenderDebugGUISystem {
     ImGui::EndChild();
 
     ImGui::End();
+  }
+
+  static void SceneWindow(SDL_Texture* gameTexture) {
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::Begin("Scene");
+    ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
+    if (gameTexture) {
+      ImGui::Image(reinterpret_cast<ImTextureID>(gameTexture), viewportPanelSize);
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
   }
 
   static void AssetBrowserWindow(Registry* registry) {
