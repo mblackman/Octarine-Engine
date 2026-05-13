@@ -105,7 +105,7 @@ install(TARGETS ${PROJECT_NAME}
 
 # Compiler-specific flags - Treat warnings as errors in prod builds
 if (MSVC)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_SIMD GLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_INTRINSICS)
     target_compile_options(${PROJECT_NAME} PRIVATE
             /W4
             /permissive-
@@ -125,7 +125,7 @@ if (MSVC)
             $<IF:$<CONFIG:Debug>,,-WX /arch:AVX2>
     )
 else ()
-    target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_SIMD GLM_FORCE_DEFAULT_ALIGNED_GENTYPES)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_INTRINSICS)
     target_compile_options(${PROJECT_NAME} PRIVATE
             -Wall
             -Wextra
