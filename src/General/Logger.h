@@ -4,9 +4,13 @@
 
 #include <memory>
 #include <string>
+#include <vector>
+#include <mutex>
 
 class Logger {
   static std::shared_ptr<spdlog::logger> lua_logger_;
+  static std::vector<std::string> history_;
+  static std::mutex history_mutex_;
 
  public:
   static void Init();
@@ -17,4 +21,7 @@ class Logger {
   static void ErrorLua(const std::string& message);
   static void WarnLua(const std::string& message);
   static void InfoLua(const std::string& message);
+
+  static std::vector<std::string> GetHistory();
+  static void ClearHistory();
 };

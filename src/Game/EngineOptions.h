@@ -9,6 +9,7 @@ struct EngineOptions {
   bool showProfiler = false;
   bool showHierarchy = false;
   bool showAssetBrowser = false;
+  bool showLuaConsole = false;
   bool audioEnabled = true;
   float masterVolume = 1.0F;
   bool isPaused = false;

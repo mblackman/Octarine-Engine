@@ -129,6 +129,7 @@ void GameConfig::SaveUserPreferences() {
   file << "showProfiler=" << (engine_options_.showProfiler ? "true" : "false") << "\n";
   file << "showHierarchy=" << (engine_options_.showHierarchy ? "true" : "false") << "\n";
   file << "showAssetBrowser=" << (engine_options_.showAssetBrowser ? "true" : "false") << "\n";
+  file << "showLuaConsole=" << (engine_options_.showLuaConsole ? "true" : "false") << "\n";
   file << "masterVolume=" << engine_options_.masterVolume << "\n";
   file << "editorFontSize=" << engine_options_.editorFontSize << "\n";
   file << "editorStyleIndex=" << engine_options_.editorStyleIndex << "\n";
@@ -164,6 +165,8 @@ void GameConfig::LoadUserPreferences() {
       engine_options_.showHierarchy = (value == "true");
     else if (key == "showAssetBrowser")
       engine_options_.showAssetBrowser = (value == "true");
+    else if (key == "showLuaConsole")
+      engine_options_.showLuaConsole = (value == "true");
     else if (key == "masterVolume")
       engine_options_.masterVolume = std::stof(value);
     else if (key == "editorFontSize")

@@ -408,7 +408,7 @@ void Game::Render(const float deltaTime) {
     if (!options.showDebugGUI) {
       SDL_RenderTexture(sdl_renderer_, game_render_texture_, nullptr, nullptr);
     }
-    RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, game_render_texture_, deltaTime);
+    RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, game_render_texture_, lua, deltaTime);
   }
 
 #ifdef OCTARINE_PROFILING
