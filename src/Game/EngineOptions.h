@@ -10,6 +10,8 @@ struct EngineOptions {
   bool showHierarchy = false;
   bool showAssetBrowser = false;
   bool showLuaConsole = false;
+  bool showSceneWindow = true;
+  bool showSceneManagement = false;
   bool audioEnabled = true;
   float masterVolume = 1.0F;
   bool isPaused = false;
@@ -20,4 +22,5 @@ struct EngineOptions {
   float editorFontSize = 0.0F;
   int editorStyleIndex = 0;
   std::string lastProjectPath;
+  std::string currentScenePath;
 };

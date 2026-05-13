@@ -48,6 +48,7 @@ set(SRC_FILES
         src/General/Logger.cpp
         src/Renderer/Renderer.cpp
         src/Systems/AudioSystem.cpp
+        src/Systems/RenderDebugGUISystem.cpp
 )
 
 if (UNIX AND NOT APPLE)

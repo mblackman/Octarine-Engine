@@ -156,6 +156,11 @@ class ScriptSystem {
     lua.set_function("load_entity", [this, &game](const sol::table &assetTable) {
       LuaEntityLoader::LoadEntityFromLua(game.GetRegistry(), assetTable);
     });
+    lua.set_function("clear_scene", [&game]() { const_cast<Game &>(game).StopScene(); });
+    lua.set_function("load_scene", [&game](const std::string &path) { const_cast<Game &>(game).LoadScene(path); });
+    lua.set_function("reload_scene", [&game]() { const_cast<Game &>(game).ReloadScene(); });
+    lua.set_function("stop_scene", [&game]() { const_cast<Game &>(game).StopScene(); });
+
     lua.set_function("get_asset_path", [this, &game](const std::string &relativePath) {
       return this->GetAssetPath(relativePath, game.GetRegistry()->Get<AssetManager>());
     });

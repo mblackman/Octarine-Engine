@@ -176,9 +176,12 @@ void GameConfig::SaveUserPreferences() {
   file << "showHierarchy=" << (engine_options_.showHierarchy ? "true" : "false") << "\n";
   file << "showAssetBrowser=" << (engine_options_.showAssetBrowser ? "true" : "false") << "\n";
   file << "showLuaConsole=" << (engine_options_.showLuaConsole ? "true" : "false") << "\n";
+  file << "showSceneWindow=" << (engine_options_.showSceneWindow ? "true" : "false") << "\n";
+  file << "showSceneManagement=" << (engine_options_.showSceneManagement ? "true" : "false") << "\n";
   file << "masterVolume=" << engine_options_.masterVolume << "\n";
   file << "editorFontSize=" << engine_options_.editorFontSize << "\n";
   file << "editorStyleIndex=" << engine_options_.editorStyleIndex << "\n";
+  file << "currentScenePath=" << engine_options_.currentScenePath << "\n";
 
   file.close();
 }
@@ -215,12 +218,18 @@ void GameConfig::LoadUserPreferences() {
       engine_options_.showAssetBrowser = (value == "true");
     else if (key == "showLuaConsole")
       engine_options_.showLuaConsole = (value == "true");
+    else if (key == "showSceneWindow")
+      engine_options_.showSceneWindow = (value == "true");
+    else if (key == "showSceneManagement")
+      engine_options_.showSceneManagement = (value == "true");
     else if (key == "masterVolume")
       engine_options_.masterVolume = std::stof(value);
     else if (key == "editorFontSize")
       engine_options_.editorFontSize = std::stof(value);
     else if (key == "editorStyleIndex")
       engine_options_.editorStyleIndex = std::stoi(value);
+    else if (key == "currentScenePath")
+      engine_options_.currentScenePath = value;
   }
 }
 

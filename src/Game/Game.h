@@ -43,6 +43,11 @@ class Game {
   [[nodiscard]] SDL_Renderer* GetRenderer() const { return sdl_renderer_; }
 
   [[nodiscard]] Registry* GetRegistry() const { return registry_.get(); }
+  [[nodiscard]] sol::state& GetLua() { return lua; }
+
+  void LoadScene(const std::string& scenePath);
+  void ReloadScene();
+  void StopScene();
 
  private:
   void ProcessInput() const;

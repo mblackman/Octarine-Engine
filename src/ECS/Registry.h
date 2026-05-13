@@ -151,6 +151,9 @@ class Registry {
     return entity_locations_[id].archetype != nullptr;
   }
 
+  // Blams all user-visible entities (those not marked as internal).
+  void ClearUserEntities();
+
   [[nodiscard]] std::uint64_t GetEntityCount() const { return entity_locations_.size(); }
 
   [[nodiscard]] std::vector<Entity> GetUserEntities() const;

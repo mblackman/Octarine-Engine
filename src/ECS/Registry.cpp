@@ -48,6 +48,13 @@ void Registry::Update(const float deltaTime) {
   }
 }
 
+void Registry::ClearUserEntities() {
+  const auto entities = GetUserEntities();
+  for (const auto& entity : entities) {
+    BlamEntity(entity);
+  }
+}
+
 Entity Registry::CreateEntity() {
   const Entity entity = entity_manager_->CreateEntity();
   const auto entityLocation = root_archetype_->AddEntity(entity);

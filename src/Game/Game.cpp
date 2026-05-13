@@ -287,6 +287,7 @@ void Game::Setup() {
     options.showProfiler = false;
     options.showHierarchy = false;
     options.showAssetBrowser = false;
+    options.showSceneWindow = false;
     options.showImGuiDemoWindow = false;
     options.drawColliders = false;
   }
@@ -445,11 +446,15 @@ void Game::Render(const float deltaTime) {
   SDL_RenderClear(sdl_renderer_);
 
   auto &options = gameConfig.GetEngineOptions();
+  const bool editorSession = gameConfig.IsEditorMode() || !gameConfig.HasLoadedConfig();
+
   if (!IsBenchMode()) {
-    if (!options.showDebugGUI) {
+    // Only draw the game texture to the full window if we are NOT in an editor session
+    // and NOT showing debug overlays. In editor mode, the Scene window handles drawing this texture.
+    if (!editorSession && !options.showDebugGUI) {
       SDL_RenderTexture(sdl_renderer_, game_render_texture_, nullptr, nullptr);
     }
-    RenderDebugGUISystem::Render(registry_.get(), sdl_renderer_, game_render_texture_, lua, deltaTime);
+    RenderDebugGUISystem::Render(this, sdl_renderer_, game_render_texture_, deltaTime);
   }
 
 #ifdef OCTARINE_PROFILING
@@ -500,6 +505,117 @@ void Game::OnKeyInputEvent(const KeyInputEvent &event) {
       break;
     default:
       break;
+  }
+}
+
+void Game::LoadScene(const std::string &scenePath) {
+  if (scenePath.empty()) {
+    Logger::Warn("LoadScene called with empty path.");
+    return;
+  }
+
+  auto &gameConfig = registry_->Get<GameConfig>();
+  auto &assetManager = registry_->Get<AssetManager>();
+
+  // Use the full path relative to the asset directory if it's a relative path.
+  std::string fullPath = assetManager.GetFullPath(scenePath);
+
+  Logger::Info("Loading scene: " + fullPath);
+
+  StopScene();
+
+  auto &options = gameConfig.GetEngineOptions();
+  options.currentScenePath = scenePath;
+  options.showSceneWindow = true;
+
+  sol::protected_function_result result = lua.safe_script_file(fullPath);
+  if (!result.valid()) {
+    const sol::error err = result;
+    Logger::Error("Failed to load scene '" + fullPath + "': " + std::string(err.what()));
+  } else if (result.return_count() > 0) {
+    if (result[0].is<sol::table>()) {
+      Logger::Info("Scene script returned a table. Attempting to load assets and entities...");
+      sol::table sceneTable = result[0];
+
+      // 1. Load Assets
+      sol::optional<sol::table> assets = sceneTable["assets"];
+      if (assets && assets->valid()) {
+        auto &am = registry_->Get<AssetManager>();
+        auto *mixer = registry_->TryGet<MIX_Mixer *>();
+        int assetCount = 0;
+        for (auto &[key, value] : *assets) {
+          if (value.is<sol::table>()) {
+            sol::table asset = value.as<sol::table>();
+            std::string type = asset["type"];
+            std::string id = asset["id"];
+            std::string file = asset["file"];
+            if (type == "texture") {
+              am.AddTexture(sdl_renderer_, id, file);
+            } else if (type == "font") {
+              float fontSize = asset["font_size"];
+              am.AddFont(id, file, fontSize);
+            } else if (type == "audio_clip") {
+              if (mixer) am.AddAudioClip(*mixer, id, file);
+            }
+            assetCount++;
+          }
+        }
+        Logger::Info("Loaded " + std::to_string(assetCount) + " assets from scene table.");
+      }
+
+      // 2. Load Entities
+      sol::optional<sol::table> entities = sceneTable["entities"];
+      if (entities && entities->valid()) {
+        int entityCount = 0;
+        for (auto &[key, value] : *entities) {
+          if (value.is<sol::table>()) {
+            LuaEntityLoader::LoadEntityFromLua(registry_.get(), value.as<sol::table>());
+            entityCount++;
+          }
+        }
+        Logger::Info("Loaded " + std::to_string(entityCount) + " entities from scene table.");
+      }
+
+      // 3. Try to call a 'run' or 'load' or 'setup' function if present
+      sol::optional<sol::function> runFunc = sceneTable["run"];
+      if (!runFunc) runFunc = sceneTable["load"];
+      if (!runFunc) runFunc = sceneTable["setup"];
+
+      if (runFunc && runFunc->valid()) {
+        Logger::Info("Found 'run/load/setup' function in scene table. Calling it...");
+        auto funcResult = (*runFunc)(sceneTable);
+        if (!funcResult.valid()) {
+          sol::error err = funcResult;
+          Logger::Error("Failed to run scene function: " + std::string(err.what()));
+        }
+      }
+    } else if (result[0].is<sol::function>()) {
+      Logger::Info("Scene script returned a function. Calling it...");
+      sol::function sceneFunc = result[0];
+      auto funcResult = sceneFunc();
+      if (!funcResult.valid()) {
+        sol::error err = funcResult;
+        Logger::Error("Failed to run scene function: " + std::string(err.what()));
+      }
+    }
+  }
+}
+
+void Game::ReloadScene() {
+  const auto &options = registry_->Get<GameConfig>().GetEngineOptions();
+  if (options.currentScenePath.empty()) {
+    Logger::Warn("ReloadScene called but no scene is currently loaded.");
+    return;
+  }
+  LoadScene(options.currentScenePath);
+}
+
+void Game::StopScene() {
+  Logger::Info("Stopping current scene (clearing entities).");
+  registry_->ClearUserEntities();
+  // We could also clear the script system's per-frame input, etc.
+  if (script_system_) {
+    script_system_->ClearPerFrameInput();
   }
 }
 
