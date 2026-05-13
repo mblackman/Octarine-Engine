@@ -39,6 +39,31 @@ class RenderDebugGUISystem {
     }
   }
 
+  /// Apply one of the three built-in ImGui styles.  0 = Dark, 1 = Light, 2 = Classic.
+  static void ApplyEditorStyle(const int styleIndex) {
+    switch (styleIndex) {
+      default:
+      case 0:
+        ImGui::StyleColorsDark();
+        break;
+      case 1:
+        ImGui::StyleColorsLight();
+        break;
+      case 2:
+        ImGui::StyleColorsClassic();
+        break;
+    }
+    // Slightly rounded corners and extra frame padding for readability at any scale.
+    ImGuiStyle& style = ImGui::GetStyle();
+    style.FrameRounding = 4.0F;
+    style.GrabRounding = 4.0F;
+    style.WindowRounding = 6.0F;
+    style.FramePadding = ImVec2(6, 4);
+    style.ItemSpacing = ImVec2(8, 6);
+    style.ScrollbarSize = 16.0F;
+    style.GrabMinSize = 14.0F;
+  }
+
   static void Render(Registry* registry, SDL_Renderer* renderer, SDL_Texture* gameTexture, const float deltaTime) {
     auto& engineOptions = registry->Get<GameConfig>().GetEngineOptions();
     if (!engineOptions.showDebugGUI && !engineOptions.showFpsCounter) {
@@ -74,6 +99,7 @@ class RenderDebugGUISystem {
     }
     if (engineOptions.showDebugGUI) {
       EngineOptionsWindow(engineOptions);
+      EditorSettingsWindow(engineOptions);
 
       if (engineOptions.showImGuiDemoWindow) {
         ImGui::ShowDemoWindow();
@@ -103,6 +129,49 @@ class RenderDebugGUISystem {
     ImGui::Separator();
     ImGui::Checkbox("Pause Execution", &options.isPaused);
     ImGui::SliderFloat("Time Scale", &options.timeScale, 0.0F, 5.0F);
+    ImGui::End();
+  }
+
+  static void EditorSettingsWindow(EngineOptions& options) {
+    ImGui::Begin("Editor Settings");
+
+    // --- Font Size ---
+    ImGui::SeparatorText("Appearance");
+    static float pendingFontSize = options.editorFontSize;
+    // Sync on first frame or if something else changed the value.
+    if (pendingFontSize <= 0.0F) pendingFontSize = options.editorFontSize;
+
+    ImGui::SliderFloat("Font Size", &pendingFontSize, 10.0F, 40.0F, "%.0f px");
+    ImGui::SameLine();
+    if (ImGui::Button("Reset")) {
+      pendingFontSize = 0.0F;  // signals auto-detect on next apply
+    }
+
+    if (ImGui::Button("Apply Font Size")) {
+      options.editorFontSize = pendingFontSize;
+      // Rebuild the font atlas at the new size.
+      ImGuiIO& io = ImGui::GetIO();
+      io.Fonts->Clear();
+      io.Fonts->AddFontDefault();
+      ImFontConfig fontConfig;
+      fontConfig.SizePixels = (pendingFontSize > 0.0F) ? pendingFontSize : 16.0F;
+      fontConfig.OversampleH = 2;
+      fontConfig.OversampleV = 2;
+      io.FontDefault = io.Fonts->AddFontDefault(&fontConfig);
+      io.Fonts->Build();
+      // Force the SDL renderer backend to re-upload the new font atlas texture.
+      ImGui_ImplSDLRenderer3_DestroyDeviceObjects();
+      ImGui_ImplSDLRenderer3_CreateDeviceObjects();
+    }
+    ImGui::SameLine();
+    ImGui::TextDisabled("(rebuilds font atlas)");
+
+    // --- Theme ---
+    const char* styles[] = {"Dark", "Light", "Classic"};
+    if (ImGui::Combo("Theme", &options.editorStyleIndex, styles, IM_ARRAYSIZE(styles))) {
+      ApplyEditorStyle(options.editorStyleIndex);
+    }
+
     ImGui::End();
   }
 

@@ -144,6 +144,33 @@ bool Game::Initialize(const std::string &assetPath) {
   ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
   ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
 
+  // --- Resolve editor font size (DPI-aware default) ---
+  auto &options = gameConfig.GetEngineOptions();
+  float fontSize = options.editorFontSize;
+  if (fontSize <= 0.0F) {
+    // Auto-detect: query the display DPI and scale from a 16px baseline.
+    const SDL_DisplayID displayId = SDL_GetPrimaryDisplay();
+    const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(displayId);
+    float dpiScale = 1.0F;
+    if (mode != nullptr && mode->pixel_density > 0.0F) {
+      dpiScale = mode->pixel_density;
+    }
+    fontSize = 16.0F * dpiScale;
+    options.editorFontSize = fontSize;
+  }
+  // Load the default font at the resolved size so all editor text is legible.
+  io.Fonts->Clear();
+  io.Fonts->AddFontDefault();
+  ImFontConfig fontConfig;
+  fontConfig.SizePixels = fontSize;
+  fontConfig.OversampleH = 2;
+  fontConfig.OversampleV = 2;
+  io.FontDefault = io.Fonts->AddFontDefault(&fontConfig);
+  io.Fonts->Build();
+
+  // Apply the saved editor style.
+  RenderDebugGUISystem::ApplyEditorStyle(options.editorStyleIndex);
+
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
 
   registry_->Set<SDL_Renderer *>(sdl_renderer_);
