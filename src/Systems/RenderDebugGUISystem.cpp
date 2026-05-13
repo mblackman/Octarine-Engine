@@ -160,7 +160,7 @@ void RenderDebugGUISystem::SceneManagementWindow(Game* game) {
   static char scenePath[256] = "";
   static std::string lastKnownScenePath;
   if (lastKnownScenePath != options.currentScenePath) {
-    strncpy(scenePath, options.currentScenePath.c_str(), sizeof(scenePath));
+    snprintf(scenePath, sizeof(scenePath), "%s", options.currentScenePath.c_str());
     lastKnownScenePath = options.currentScenePath;
   }
 
@@ -413,7 +413,7 @@ void RenderDebugGUISystem::HierarchyWindow(Registry* registry) {
       if (ImGui::CollapsingHeader("TextLabel", ImGuiTreeNodeFlags_DefaultOpen)) {
         auto& tl = registry->GetComponent<TextLabelComponent>(selectedEntity);
         char buf[256];
-        strncpy(buf, tl.text.c_str(), sizeof(buf));
+        snprintf(buf, sizeof(buf), "%s", tl.text.c_str());
         if (ImGui::InputText("Text", buf, sizeof(buf))) tl.text = buf;
         ImGui::Text("Font ID: %s", tl.fontId.c_str());
         float col[4] = {tl.color.r / 255.0f, tl.color.g / 255.0f, tl.color.b / 255.0f, tl.color.a / 255.0f};
@@ -524,7 +524,7 @@ void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open) {
   static char projectPath[256] = "";
   static std::string lastKnownProjectPath;
   if (lastKnownProjectPath != options.lastProjectPath) {
-    strncpy(projectPath, options.lastProjectPath.c_str(), sizeof(projectPath));
+    snprintf(projectPath, sizeof(projectPath), "%s", options.lastProjectPath.c_str());
     lastKnownProjectPath = options.lastProjectPath;
   }
 
@@ -550,7 +550,8 @@ void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open) {
   if (!options.lastProjectPath.empty()) {
     ImGui::Separator();
     ImGui::Text("Last Project: %s", options.lastProjectPath.c_str());
-    if (ImGui::Button("Load Last Project")) strncpy(projectPath, options.lastProjectPath.c_str(), sizeof(projectPath));
+    if (ImGui::Button("Load Last Project"))
+      snprintf(projectPath, sizeof(projectPath), "%s", options.lastProjectPath.c_str());
   }
   ImGui::End();
 }

@@ -578,8 +578,8 @@ void Game::LoadScene(const std::string &scenePath) {
 
       // 3. Try to call a 'run' or 'load' or 'setup' function if present
       sol::optional<sol::function> runFunc = sceneTable["run"];
-      if (!runFunc) runFunc = sceneTable["load"];
-      if (!runFunc) runFunc = sceneTable["setup"];
+      if (!runFunc) runFunc = sceneTable["load"].get<sol::optional<sol::function>>();
+      if (!runFunc) runFunc = sceneTable["setup"].get<sol::optional<sol::function>>();
 
       if (runFunc && runFunc->valid()) {
         Logger::Info("Found 'run/load/setup' function in scene table. Calling it...");
@@ -591,7 +591,7 @@ void Game::LoadScene(const std::string &scenePath) {
       }
     } else if (result[0].is<sol::function>()) {
       Logger::Info("Scene script returned a function. Calling it...");
-      sol::function sceneFunc = result[0];
+      sol::function sceneFunc = result[0].as<sol::function>();
       auto funcResult = sceneFunc();
       if (!funcResult.valid()) {
         sol::error err = funcResult;
