@@ -1,5 +1,7 @@
 #include "RenderDebugGUISystem.h"
 
+#include <filesystem>
+
 #include "../AssetManager/AssetManager.h"
 #include "../Components/AnimationComponent.h"
 #include "../Components/BoxColliderComponent.h"
@@ -20,6 +22,40 @@
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
+
+namespace {
+void SDLCALL OnProjectFolderSelected(void* userdata, const char* const* filelist, int /*filter*/) {
+  auto* game = static_cast<Game*>(userdata);
+  if (filelist && *filelist) {
+    auto& gameConfig = game->GetRegistry()->Get<GameConfig>();
+    gameConfig.GetEngineOptions().lastProjectPath = *filelist;
+    gameConfig.SaveGlobalPreferences();
+    Logger::Info("Project folder selected: " + std::string(*filelist));
+  }
+}
+
+void SDLCALL OnSceneFileSelected(void* userdata, const char* const* filelist, int /*filter*/) {
+  auto* game = static_cast<Game*>(userdata);
+  if (filelist && *filelist) {
+    auto& gameConfig = game->GetRegistry()->Get<GameConfig>();
+    auto& assetManager = game->GetRegistry()->Get<AssetManager>();
+    std::filesystem::path selectedPath(*filelist);
+    std::filesystem::path basePath(assetManager.GetBasePath());
+
+    // Try to make it relative to the project root
+    try {
+      if (selectedPath.string().find(basePath.string()) == 0) {
+        selectedPath = std::filesystem::relative(selectedPath, basePath);
+      }
+    } catch (const std::exception& e) {
+      Logger::Warn("Failed to make scene path relative: " + std::string(e.what()));
+    }
+
+    gameConfig.GetEngineOptions().currentScenePath = selectedPath.string();
+    Logger::Info("Scene file selected: " + selectedPath.string());
+  }
+}
+}  // namespace
 
 void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, SDL_Texture* gameTexture, const float deltaTime) {
   auto* registry = game->GetRegistry();
@@ -108,7 +144,7 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, SDL_Textur
   }
 
   if (!projectLoaded || showProjectSelector) {
-    ProjectSelectorWindow(registry, &showProjectSelector);
+    ProjectSelectorWindow(game, &showProjectSelector);
   }
 
   ImGui::Render();
@@ -122,12 +158,20 @@ void RenderDebugGUISystem::SceneManagementWindow(Game* game) {
   ImGui::Begin("Scene Management", &options.showSceneManagement);
 
   static char scenePath[256] = "";
-  if (scenePath[0] == '\0' && !options.currentScenePath.empty()) {
+  static std::string lastKnownScenePath;
+  if (lastKnownScenePath != options.currentScenePath) {
     strncpy(scenePath, options.currentScenePath.c_str(), sizeof(scenePath));
+    lastKnownScenePath = options.currentScenePath;
   }
 
   ImGui::Text("Scene Script Path:");
+  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 120);
   ImGui::InputText("##scenepath", scenePath, sizeof(scenePath));
+  ImGui::SameLine();
+  if (ImGui::Button("...")) {
+    const SDL_DialogFileFilter filters[] = {{"Lua Scripts", "lua"}, {"All Files", "*"}};
+    SDL_ShowOpenFileDialog(OnSceneFileSelected, game, game->GetWindow(), filters, 2, nullptr, false);
+  }
   ImGui::SameLine();
   if (ImGui::Button("Load")) {
     game->LoadScene(scenePath);
@@ -469,21 +513,30 @@ void RenderDebugGUISystem::HierarchyWindow(Registry* registry) {
   ImGui::End();
 }
 
-void RenderDebugGUISystem::ProjectSelectorWindow(Registry* registry, bool* p_open) {
-  ImGui::SetNextWindowSize(ImVec2(400, 200), ImGuiCond_FirstUseEver);
+void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open) {
+  ImGui::SetNextWindowSize(ImVec2(400, 240), ImGuiCond_FirstUseEver);
   if (!ImGui::Begin("Project Selector", p_open, ImGuiWindowFlags_NoDocking)) {
     ImGui::End();
     return;
   }
-  auto& gameConfig = registry->Get<GameConfig>();
+  auto& gameConfig = game->GetRegistry()->Get<GameConfig>();
   auto& options = gameConfig.GetEngineOptions();
   static char projectPath[256] = "";
-  if (projectPath[0] == '\0' && !options.lastProjectPath.empty())
+  static std::string lastKnownProjectPath;
+  if (lastKnownProjectPath != options.lastProjectPath) {
     strncpy(projectPath, options.lastProjectPath.c_str(), sizeof(projectPath));
+    lastKnownProjectPath = options.lastProjectPath;
+  }
 
   ImGui::Text("Enter Project Path:");
+  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 40);
   ImGui::InputText("##path", projectPath, sizeof(projectPath));
-  if (ImGui::Button("Open Project")) {
+  ImGui::SameLine();
+  if (ImGui::Button("...")) {
+    SDL_ShowOpenFolderDialog(OnProjectFolderSelected, game, game->GetWindow(), nullptr, false);
+  }
+
+  if (ImGui::Button("Open Project", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
     options.lastProjectPath = projectPath;
     gameConfig.SaveGlobalPreferences();
     *p_open = false;

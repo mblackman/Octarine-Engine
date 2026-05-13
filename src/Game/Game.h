@@ -41,6 +41,7 @@ class Game {
   [[nodiscard]] bool IsBenchMode() const { return !startup_mode_.empty() && startup_mode_ != "editor"; }
 
   [[nodiscard]] SDL_Renderer* GetRenderer() const { return sdl_renderer_; }
+  [[nodiscard]] SDL_Window* GetWindow() const { return window_; }
 
   [[nodiscard]] Registry* GetRegistry() const { return registry_.get(); }
   [[nodiscard]] sol::state& GetLua() { return lua; }

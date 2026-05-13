@@ -32,6 +32,7 @@ class AssetManager {
 
   ~AssetManager();
 
+  [[nodiscard]] std::string GetBasePath() const { return base_path_; }
   void LoadGameConfig(const GameConfig& config);
 
   void ClearAssets();
