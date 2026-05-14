@@ -2,8 +2,8 @@
 # Run OctarineEngine headlessly for a short period to capture TIMER: output.
 #
 # Usage: scripts/bench.sh [preset] [duration_seconds]
-#   preset:   debug-profile | release-profile  (default: release-profile)
-#   duration: integer seconds                  (default: 8)
+#   preset:   player-profile (default: player-profile)
+#   duration: integer seconds (default: 8)
 #
 # The stress scene reaches steady state in ~2s. The default 8s run combined
 # with the parser's --warmup 2 flag gives ~6s of pure plateau data.
@@ -21,14 +21,13 @@
 
 set -euo pipefail
 
-preset="${1:-release-profile}"
+preset="${1:-player-profile}"
 duration="${2:-8}"
 
 case "$preset" in
-  debug-profile)   config_dir=debug ;;
-  release-profile) config_dir=relwithdebinfo ;;
+  player-profile) config_dir=relwithdebinfo ;;
   *)
-    echo "error: preset must be debug-profile or release-profile (got '$preset')" >&2
+    echo "error: preset must be player-profile (got '$preset')" >&2
     echo "       other presets have OCTARINE_ENABLE_PROFILING=OFF, so no TIMER output." >&2
     exit 2
     ;;

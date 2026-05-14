@@ -161,8 +161,12 @@ class ComponentLuaFactory {
   static ScriptComponent CreateScriptComponent(const sol::table& data) {
     using namespace LuaComponentHelpers;
     const sol::protected_function updateFn = SafeGetProtectedFunction(data, "on_update");
+#ifdef OCTARINE_WITH_IMGUI
     const sol::protected_function onDebugGuiFn = SafeGetProtectedFunction(data, "on_debug_gui");
     return ScriptComponent(data, updateFn, onDebugGuiFn);
+#else
+    return ScriptComponent(data, updateFn);
+#endif
   }
 
   static UIButtonComponent CreateUIButtonComponent(const sol::table& data) {

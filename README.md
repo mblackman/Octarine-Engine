@@ -29,19 +29,26 @@ Octarine Engine is a lightweight, high-performance 2D game engine built with C++
 
 ## Building the Engine
 
+The engine uses **CMake Presets** for standardized build configurations.
+
 ```bash
 # Clone the repository
-git clone https://github.com/your-repo/Octarine-Engine.git
+git clone https://github.com/mblackman/Octarine-Engine.git
 cd Octarine-Engine
 
-# Configure with vcpkg (replace [vcpkg-path] with your actual vcpkg root)
-cmake -B build -DCMAKE_TOOLCHAIN_FILE=[vcpkg-path]/scripts/buildsystems/vcpkg.cmake
+# List available presets
+cmake --list-presets
 
-# Build the project
-cmake --build build
+# Configure and build the Editor (Standard development)
+cmake --preset editor-debug
+cmake --build --preset editor-debug
+
+# Configure and build the Player (Shipping build)
+cmake --preset player-release
+cmake --build --preset player-release
 ```
 
-The compiled binaries will be located in `build/bin/debug/` or `build/bin/release/`.
+The compiled binaries will be located in `cmake-build-[preset-name]/bin/`.
 
 ---
 
@@ -56,20 +63,20 @@ You can view the interactive historical performance dashboard here:
 
 ### Local Profiling
 
-The engine ships with two CMake presets that enable `OCTARINE_PROFILING` and emit `TIMER:` lines via `spdlog`:
+The engine ships with a dedicated CMake preset for performance analysis:
 
-- `debug-profile` — debug build with profiling
-- `release-profile` — optimized build with profiling (use this for perf numbers)
+- `player-profile` — optimized player with profiling enabled. No editor, no ImGui (for the most accurate core performance metrics).
 
 `scripts/bench.sh` runs the engine headlessly against a game directory for a fixed duration and streams the timer output:
 
 ```bash
-# By default, runs for 8s using release-profile preset.
+# By default, runs for 8s using player-profile preset.
 # Automatically clones Octarine-Engine-Example to .benchmark_game/ if no game is found!
 scripts/bench.sh
 
-# Override preset and duration
-scripts/bench.sh release-profile 15
+# Override duration (still uses player-profile by default)
+scripts/bench.sh player-profile 15
+```
 
 # Point at a different game
 OCT_BENCH_GAME=/path/to/game scripts/bench.sh

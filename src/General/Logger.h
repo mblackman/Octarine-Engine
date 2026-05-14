@@ -23,5 +23,6 @@ class Logger {
   static void InfoLua(const std::string& message);
 
   static std::vector<std::string> GetHistory();
+  static void ForEachHistory(const std::function<void(const std::string&)>& callback);
   static void ClearHistory();
 };

@@ -23,7 +23,10 @@
 #include "../General/Logger.h"
 #include "Game/GameConfig.h"
 #include "Lua/LuaEntityLoader.h"
+
+#ifdef OCTARINE_WITH_IMGUI
 #include "sol_ImGui.h"
+#endif
 
 inline glm::vec2 GetEntityPosition(Registry *registry, const Entity entity) {
   if (!registry->HasComponent<TransformComponent>(entity)) {
@@ -100,8 +103,10 @@ class ScriptSystem {
     // Set up logging
     SetupLuaLogging(lua);
 
+#ifdef OCTARINE_WITH_IMGUI
     // Init ImGui bindings
     sol_ImGui::Init(lua);
+#endif
   }
 
   void SubscribeToEvents(const std::unique_ptr<EventBus> &eventBus) {

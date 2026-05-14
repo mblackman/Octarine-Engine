@@ -3,7 +3,7 @@
 percentile-based JSON metrics suitable for github-action-benchmark.
 
 Usage:
-    scripts/bench.sh release-profile 8 | python3 scripts/parse_bench_output.py [--warmup SECONDS]
+    scripts/bench.sh player-profile 8 | python3 scripts/parse_bench_output.py [--warmup SECONDS]
 
 Options:
     --warmup SECONDS   Discard all TIMER/ACCUM lines from the first SECONDS of

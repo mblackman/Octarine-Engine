@@ -41,16 +41,19 @@
 #include "Systems/MovementSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
 #include "Systems/ProjectileLifecycleSystem.h"
-#include "Systems/RenderDebugGUISystem.h"
 #include "Systems/RenderPrimitiveSystem.h"
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/RenderTextSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "Systems/TransformSystem.h"
 #include "Systems/UIButtonSystem.h"
+
+#ifdef OCTARINE_WITH_IMGUI
+#include "Systems/RenderDebugGUISystem.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
+#endif
 
 constexpr Uint8 GREY_COLOR = 24;
 constexpr Uint8 BLACK_COLOR = 0;
@@ -121,8 +124,14 @@ bool Game::Initialize(const std::string &assetPath) {
     }
   }
 
-  if (!projectLoaded) {
-    Logger::Info("Starting in Editor Mode with no project loaded.");
+#ifdef OCTARINE_WITH_EDITOR
+  bool defaultToEditor = startup_mode_.empty() || startup_mode_ == "editor";
+#else
+  bool defaultToEditor = startup_mode_ == "editor";
+#endif
+
+  if (!projectLoaded || defaultToEditor) {
+    Logger::Info("Starting in Editor Mode.");
     gameConfig.SetIsEditorMode(true);
   }
 
@@ -151,6 +160,7 @@ bool Game::Initialize(const std::string &assetPath) {
     return false;
   }
 
+#ifdef OCTARINE_WITH_IMGUI
   IMGUI_CHECKVERSION();
   ImGui::CreateContext();
   ImGuiIO &io = ImGui::GetIO();
@@ -178,6 +188,11 @@ bool Game::Initialize(const std::string &assetPath) {
   ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
   ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
 
+  // Load the default font.
+  io.Fonts->Clear();
+  io.Fonts->AddFontDefault();
+
+#ifdef OCTARINE_WITH_EDITOR
   // --- Resolve editor font size (DPI-aware default) ---
   auto &options = gameConfig.GetEngineOptions();
   float fontSize = options.editorFontSize;
@@ -192,18 +207,17 @@ bool Game::Initialize(const std::string &assetPath) {
     fontSize = 16.0F * dpiScale;
     options.editorFontSize = fontSize;
   }
-  // Load the default font at the resolved size so all editor text is legible.
-  io.Fonts->Clear();
-  io.Fonts->AddFontDefault();
   ImFontConfig fontConfig;
   fontConfig.SizePixels = fontSize;
   fontConfig.OversampleH = 2;
   fontConfig.OversampleV = 2;
   io.FontDefault = io.Fonts->AddFontDefault(&fontConfig);
-  io.Fonts->Build();
-
   // Apply the saved editor style.
   RenderDebugGUISystem::ApplyEditorStyle(options.editorStyleIndex);
+#endif
+
+  io.Fonts->Build();
+#endif
 
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
 
@@ -229,9 +243,11 @@ void Game::Destroy() {
     if (game_render_texture_) {
       SDL_DestroyTexture(game_render_texture_);
     }
+#ifdef OCTARINE_WITH_IMGUI
     ImGui_ImplSDLRenderer3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
+#endif
     SDL_DestroyRenderer(sdl_renderer_);
   }
 
@@ -282,6 +298,7 @@ void Game::Setup() {
     // Bench runs shouldn't pay for debug overlays. Force-zero every toggle that would
     auto &options = gameConfig.GetEngineOptions();
     options.showDebugGUI = false;
+#ifdef OCTARINE_WITH_EDITOR
     options.showFpsCounter = false;
     options.showEntityInfo = false;
     options.showProfiler = false;
@@ -289,6 +306,7 @@ void Game::Setup() {
     options.showAssetBrowser = false;
     options.showSceneWindow = false;
     options.showImGuiDemoWindow = false;
+#endif
     options.drawColliders = false;
   }
 
@@ -355,6 +373,7 @@ void Game::ProcessInput() const {
   SDL_Event event;
 
   while (SDL_PollEvent(&event)) {
+#ifdef OCTARINE_WITH_IMGUI
     ImGui_ImplSDL3_ProcessEvent(&event);
     auto &io = ImGui::GetIO();
     float mouseX, mouseY;
@@ -362,6 +381,7 @@ void Game::ProcessInput() const {
     io.MousePos = ImVec2(mouseX, mouseY);
     io.MouseDown[0] = buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT);
     io.MouseDown[1] = buttons & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT);
+#endif
 
     switch (event.type) {
       case SDL_EVENT_QUIT:
@@ -409,7 +429,7 @@ void Game::Update(const float deltaTime) {
   }
 }
 
-void Game::Render(const float deltaTime) {
+void Game::Render([[maybe_unused]] const float deltaTime) {
   PROFILE_NAMED_SCOPE("Game::Render (total)");
   auto &renderQueue = registry_->Get<RenderQueue>();
   auto &gameConfig = registry_->Get<GameConfig>();
@@ -454,7 +474,9 @@ void Game::Render(const float deltaTime) {
     if (!editorSession && !options.showDebugGUI) {
       SDL_RenderTexture(sdl_renderer_, game_render_texture_, nullptr, nullptr);
     }
+#ifdef OCTARINE_WITH_IMGUI
     RenderDebugGUISystem::Render(this, sdl_renderer_, game_render_texture_, deltaTime);
+#endif
   }
 
 #ifdef OCTARINE_PROFILING
@@ -526,7 +548,9 @@ void Game::LoadScene(const std::string &scenePath) {
 
   auto &options = gameConfig.GetEngineOptions();
   options.currentScenePath = scenePath;
+#ifdef OCTARINE_WITH_EDITOR
   options.showSceneWindow = true;
+#endif
 
   sol::protected_function_result result = lua.safe_script_file(fullPath);
   if (!result.valid()) {

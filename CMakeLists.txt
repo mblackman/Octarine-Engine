@@ -20,6 +20,12 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 # Profiling option — when ON, enables TIMER/ACCUM logging in PerfUtils.h.
 # OFF by default so Debug and Release builds have zero profiling overhead.
 option(OCTARINE_ENABLE_PROFILING "Enable per-system performance instrumentation" OFF)
+option(OCTARINE_WITH_IMGUI "Build with ImGui debug tools" ON)
+option(OCTARINE_WITH_EDITOR "Build with the yellowish-purple editor environment" ON)
+
+if (OCTARINE_WITH_EDITOR)
+    set(OCTARINE_WITH_IMGUI ON CACHE BOOL "Forced ON by Editor" FORCE)
+endif ()
 
 # Set output directories for all build types
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY_DEBUG "${CMAKE_BINARY_DIR}/bin/debug")
@@ -35,7 +41,9 @@ find_package(SDL3_mixer CONFIG REQUIRED)
 find_package(Lua REQUIRED)
 find_package(sol2 CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
+if (OCTARINE_WITH_IMGUI)
+    find_package(imgui CONFIG REQUIRED)
+endif ()
 find_package(Threads REQUIRED)
 
 # Source files
@@ -48,15 +56,20 @@ set(SRC_FILES
         src/General/Logger.cpp
         src/Renderer/Renderer.cpp
         src/Systems/AudioSystem.cpp
-        src/Systems/RenderDebugGUISystem.cpp
 )
+
+if (OCTARINE_WITH_IMGUI)
+    list(APPEND SRC_FILES src/Systems/RenderDebugGUISystem.cpp)
+endif ()
 
 if (UNIX AND NOT APPLE)
     list(APPEND SRC_FILES src/General/SDL3_Linux_Stubs.cpp)
 endif ()
 
 # Add packaged libs
-add_subdirectory(libs/sol2_ImGui_Bindings)
+if (OCTARINE_WITH_IMGUI)
+    add_subdirectory(libs/sol2_ImGui_Bindings)
+endif ()
 
 # Create the executable target
 add_executable(${PROJECT_NAME} ${SRC_FILES})
@@ -71,6 +84,16 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
 if (OCTARINE_ENABLE_PROFILING)
     target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_PROFILING)
     message(STATUS "Octarine: Profiling ENABLED")
+endif ()
+
+if (OCTARINE_WITH_IMGUI)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_WITH_IMGUI)
+    message(STATUS "Octarine: ImGui Debug UI ENABLED")
+endif ()
+
+if (OCTARINE_WITH_EDITOR)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_WITH_EDITOR)
+    message(STATUS "Octarine: Editor ENABLED")
 endif ()
 
 # Include directories
@@ -90,12 +113,18 @@ target_link_libraries(${PROJECT_NAME}
         $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
         $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
         ${LUA_LIBRARIES}
-        imgui::imgui
         spdlog::spdlog
         sol2::sol2
-        sol2_ImGui_Bindings
         Threads::Threads
 )
+
+if (OCTARINE_WITH_IMGUI)
+    target_link_libraries(${PROJECT_NAME}
+            PRIVATE
+            imgui::imgui
+            sol2_ImGui_Bindings
+    )
+endif ()
 
 # Install rules (optional)
 install(TARGETS ${PROJECT_NAME}

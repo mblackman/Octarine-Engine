@@ -64,6 +64,13 @@ std::vector<std::string> Logger::GetHistory() {
   return history_;
 }
 
+void Logger::ForEachHistory(const std::function<void(const std::string&)>& callback) {
+  std::lock_guard<std::mutex> lock(history_mutex_);
+  for (const auto& line : history_) {
+    callback(line);
+  }
+}
+
 void Logger::ClearHistory() {
   std::lock_guard<std::mutex> lock(history_mutex_);
   history_.clear();

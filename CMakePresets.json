@@ -10,54 +10,71 @@
       "toolchainFile": "${sourceDir}/cmake/vcpkg-toolchain.cmake"
     },
     {
-      "name": "debug",
+      "name": "editor-debug",
       "inherits": "base",
-      "displayName": "Debug",
-      "description": "Debug build — no profiling, no optimizations",
+      "displayName": "Editor (Debug)",
+      "description": "Full development environment with yellowish-purple editor tools.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "OCTARINE_ENABLE_PROFILING": "OFF"
+        "OCTARINE_ENABLE_PROFILING": "OFF",
+        "OCTARINE_WITH_IMGUI": "ON",
+        "OCTARINE_WITH_EDITOR": "ON"
       }
     },
     {
-      "name": "debug-profile",
+      "name": "editor-release",
       "inherits": "base",
-      "displayName": "Debug + Profiling",
-      "description": "Debug build with per-system TIMER logging enabled",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "OCTARINE_ENABLE_PROFILING": "ON"
-      }
-    },
-    {
-      "name": "release",
-      "inherits": "base",
-      "displayName": "Release",
-      "description": "Optimized build — no profiling, full compiler optimizations",
+      "displayName": "Editor (Release)",
+      "description": "Optimized build with full editor tools.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "OCTARINE_ENABLE_PROFILING": "OFF"
+        "OCTARINE_ENABLE_PROFILING": "OFF",
+        "OCTARINE_WITH_IMGUI": "ON",
+        "OCTARINE_WITH_EDITOR": "ON"
       }
     },
     {
-      "name": "relwithdebinfo",
+      "name": "player-debug",
       "inherits": "base",
-      "displayName": "Release + Debug Info",
-      "description": "Optimized build with debug symbols for profiling/debugging",
+      "displayName": "Player (Debug with UI)",
+      "description": "Debug player with ImGui debug overlays enabled. Useful for testing.",
       "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "OCTARINE_ENABLE_PROFILING": "OFF"
+        "CMAKE_BUILD_TYPE": "Debug",
+        "OCTARINE_ENABLE_PROFILING": "OFF",
+        "OCTARINE_WITH_IMGUI": "ON",
+        "OCTARINE_WITH_EDITOR": "OFF"
       }
     },
     {
-      "name": "release-profile",
+      "name": "player-profile",
       "inherits": "base",
-      "displayName": "Release + Profiling",
-      "description": "Optimized build with per-system TIMER logging for performance analysis",
+      "displayName": "Player (Profile)",
+      "description": "Optimized build with profiling instrumentation enabled. No editor, no ImGui.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "OCTARINE_ENABLE_PROFILING": "ON"
+        "OCTARINE_ENABLE_PROFILING": "ON",
+        "OCTARINE_WITH_IMGUI": "OFF",
+        "OCTARINE_WITH_EDITOR": "OFF"
+      }
+    },
+    {
+      "name": "player-release",
+      "inherits": "base",
+      "displayName": "Player (Shipping)",
+      "description": "Minimal optimized build. No editor, no ImGui, no profiling. For end-users.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "OCTARINE_ENABLE_PROFILING": "OFF",
+        "OCTARINE_WITH_IMGUI": "OFF",
+        "OCTARINE_WITH_EDITOR": "OFF"
       }
     }
+  ],
+  "buildPresets": [
+    { "name": "editor-debug", "configurePreset": "editor-debug" },
+    { "name": "editor-release", "configurePreset": "editor-release" },
+    { "name": "player-debug", "configurePreset": "player-debug" },
+    { "name": "player-profile", "configurePreset": "player-profile" },
+    { "name": "player-release", "configurePreset": "player-release" }
   ]
 }

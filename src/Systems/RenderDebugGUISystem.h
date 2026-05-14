@@ -7,6 +7,8 @@
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"
+
+#ifdef OCTARINE_WITH_IMGUI
 #include "imgui.h"
 
 class Game;
@@ -14,6 +16,7 @@ class Game;
 class RenderDebugGUISystem {
  public:
   void operator()(const ContextFacade& context, ScriptComponent& script) const {
+#ifdef OCTARINE_WITH_IMGUI
     if (script.onDebugGUIFunction == sol::lua_nil) {
       return;
     }
@@ -21,10 +24,12 @@ class RenderDebugGUISystem {
       const sol::error err = result;
       Logger::ErrorLua(std::string(err.what()));
     }
+#endif
   }
 
   /// Apply one of the three built-in ImGui styles.  0 = Dark, 1 = Light, 2 = Classic.
-  static void ApplyEditorStyle(const int styleIndex) {
+  static void ApplyEditorStyle([[maybe_unused]] const int styleIndex) {
+#ifdef OCTARINE_WITH_EDITOR
     switch (styleIndex) {
       default:
       case 0:
@@ -46,20 +51,24 @@ class RenderDebugGUISystem {
     style.ItemSpacing = ImVec2(8, 6);
     style.ScrollbarSize = 16.0F;
     style.GrabMinSize = 14.0F;
+#endif
   }
 
   static void Render(Game* game, SDL_Renderer* renderer, SDL_Texture* gameTexture, const float deltaTime);
 
  private:
+#ifdef OCTARINE_WITH_EDITOR
   static void SceneManagementWindow(Game* game);
   static void EngineOptionsWindow(EngineOptions& options);
   static void EditorSettingsWindow(EngineOptions& options);
-  static void FPSWindow(float deltaTime);
-  static void EntityInfoWindow(const Registry* registry);
   static void PerformanceProfilerWindow();
   static void HierarchyWindow(Registry* registry);
   static void ProjectSelectorWindow(Game* game, bool* p_open);
   static void SceneWindow(SDL_Texture* gameTexture, bool* p_open);
   static void AssetBrowserWindow(Registry* registry);
   static void LuaConsoleWindow(sol::state& lua);
+#endif
+  static void FPSWindow(float deltaTime);
+  static void EntityInfoWindow(const Registry* registry);
 };
+#endif
