@@ -48,13 +48,6 @@ void Registry::Update(const float deltaTime) {
   }
 }
 
-void Registry::ClearUserEntities() {
-  const auto entities = GetUserEntities();
-  for (const auto& entity : entities) {
-    BlamEntity(entity);
-  }
-}
-
 Entity Registry::CreateEntity() {
   const Entity entity = entity_manager_->CreateEntity();
   const auto entityLocation = root_archetype_->AddEntity(entity);
@@ -127,22 +120,36 @@ void Registry::BlamEntity(const Entity entity) {
   }
 
   // Drop relationship entries authored by this entity, and any pair targeting it.
-  pairs_.erase(entity.id);
-  const auto targetId = entity.GetId();
-  for (auto pairIt = pairs_.begin(); pairIt != pairs_.end();) {
-    auto& pairSet = pairIt->second;
-    for (auto setIt = pairSet.begin(); setIt != pairSet.end();) {
-      if (Pair(*setIt).GetTarget() == targetId) {
-        setIt = pairSet.erase(setIt);
-      } else {
-        ++setIt;
+  if (const auto it = pairs_.find(entity.id); it != pairs_.end()) {
+    for (const EcsId pairId : it->second) {
+      const std::uint32_t tid = Pair(pairId).GetTarget();
+      if (const auto revIt = target_to_pair_authors_.find(tid); revIt != target_to_pair_authors_.end()) {
+        revIt->second.erase(entity.id);
+        if (revIt->second.empty()) target_to_pair_authors_.erase(revIt);
       }
     }
-    if (pairSet.empty()) {
-      pairIt = pairs_.erase(pairIt);
-    } else {
-      ++pairIt;
+    pairs_.erase(it);
+  }
+
+  const auto targetId = entity.GetId();
+  if (const auto revIt = target_to_pair_authors_.find(targetId); revIt != target_to_pair_authors_.end()) {
+    // Copy the authors set because we'll be removing entries from the pairs map, which
+    // would otherwise require complex iterator management if we stayed in-place.
+    const auto authors = revIt->second;
+    for (const EntityID authorId : authors) {
+      if (const auto pIt = pairs_.find(authorId); pIt != pairs_.end()) {
+        auto& pairSet = pIt->second;
+        for (auto setIt = pairSet.begin(); setIt != pairSet.end();) {
+          if (Pair(*setIt).GetTarget() == targetId) {
+            setIt = pairSet.erase(setIt);
+          } else {
+            ++setIt;
+          }
+        }
+        if (pairSet.empty()) pairs_.erase(pIt);
+      }
     }
+    target_to_pair_authors_.erase(revIt);
   }
 }
 
@@ -499,9 +506,12 @@ Archetype* Registry::GetOrCreateArchetypeFromSet(std::vector<ComponentID> compon
 }
 
 void Registry::AddPair(const Entity entity, const Entity relationship, const Entity target) {
+  const std::uint32_t targetId = target.GetId();
   const EcsId pairId =
-      (static_cast<EcsId>(relationship.GetId()) << kPairRelationshipOffset) | static_cast<EcsId>(target.GetId());
-  pairs_[entity.id].insert(pairId);
+      (static_cast<EcsId>(relationship.GetId()) << kPairRelationshipOffset) | static_cast<EcsId>(targetId);
+  if (pairs_[entity.id].insert(pairId).second) {
+    target_to_pair_authors_[targetId].insert(entity.id);
+  }
 }
 
 bool Registry::HasPair(const Entity entity, const Entity relationship, const Entity target) {

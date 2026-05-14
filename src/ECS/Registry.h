@@ -620,6 +620,8 @@ class Registry {
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
   std::unordered_map<ComponentID, ArchetypeList> component_index_;
   std::unordered_map<EntityID, std::unordered_set<EcsId>> pairs_;
+  // Reverse index for pairs: maps a target ID (32-bit) to all author EntityIDs (64-bit) pointing to it.
+  std::unordered_map<std::uint32_t, std::unordered_set<EntityID>> target_to_pair_authors_;
   // Hierarchy authoritative storage. Keys/values are full EntityIDs (generation in high 32),
   // so recycled ids cannot alias old children — the legacy `pairs_` map drops generation.
   std::unordered_map<EntityID, std::unordered_set<EntityID>> parent_to_children_;
