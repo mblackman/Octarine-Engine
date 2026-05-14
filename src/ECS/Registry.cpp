@@ -153,6 +153,13 @@ void Registry::BlamEntity(const Entity entity) {
   }
 }
 
+void Registry::ClearUserEntities() {
+  const auto entities = GetUserEntities();
+  for (const auto entity : entities) {
+    BlamEntity(entity);
+  }
+}
+
 std::vector<Entity> Registry::GetUserEntities() const {
   std::vector<Entity> entities;
   entities.reserve(user_entity_count_);
