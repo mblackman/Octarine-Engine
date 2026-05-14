@@ -203,14 +203,23 @@ if (OCTARINE_ENABLE_BENCHMARKS)
     target_link_libraries(OctarineBenchmarks PRIVATE
             benchmark::benchmark
             benchmark::benchmark_main
+            glm::glm
             spdlog::spdlog
             Threads::Threads
     )
 
     if (MSVC)
+        target_compile_definitions(OctarineBenchmarks PRIVATE GLM_FORCE_INTRINSICS)
         target_compile_options(OctarineBenchmarks PRIVATE /W4 /permissive- /MP /bigobj)
+        target_compile_options(OctarineBenchmarks PRIVATE
+                $<IF:$<CONFIG:Debug>,,-WX /arch:AVX2>
+        )
     else ()
+        target_compile_definitions(OctarineBenchmarks PRIVATE GLM_FORCE_INTRINSICS)
         target_compile_options(OctarineBenchmarks PRIVATE -Wall -Wextra -Wpedantic)
+        target_compile_options(OctarineBenchmarks PRIVATE
+                $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
+        )
     endif ()
 
     message(STATUS "Octarine: Benchmarks ENABLED")
