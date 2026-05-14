@@ -32,6 +32,33 @@ static void BM_EntityCreateAndBlam(benchmark::State& state) {
 }
 BENCHMARK(BM_EntityCreateAndBlam)->Range(8, 8192);
 
+// Benchmark Blam with many relationship pairs to verify reverse-index optimization
+static void BM_EntityCreateAndBlamWithPairs(benchmark::State& state) {
+  for (auto _ : state) {
+    state.PauseTiming();
+    Registry registry;
+    std::vector<Entity> targets;
+    targets.reserve(state.range(0));
+    for (int i = 0; i < state.range(0); ++i) {
+      targets.push_back(registry.CreateEntity());
+    }
+    // Create many pairs targeting these entities
+    Entity relationship = registry.TagId("test_rel");
+    for (int i = 0; i < state.range(0); ++i) {
+      Entity author = registry.CreateEntity();
+      registry.AddPair(author, relationship, targets[i]);
+    }
+    state.ResumeTiming();
+
+    for (Entity e : targets) {
+      registry.QueueBlamEntity(e);
+    }
+
+    registry.Update(1.0f / 60.0f);  // Process blams
+  }
+}
+BENCHMARK(BM_EntityCreateAndBlamWithPairs)->Range(8, 2048);
+
 // Benchmark pooling system
 static void BM_EntityPoolSpawnAndPark(benchmark::State& state) {
   for (auto _ : state) {
