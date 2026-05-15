@@ -19,6 +19,18 @@ public:
     ApplyTagField(currentData, "tags", registry, entity);
   }
 
+  // Reads top-level `name` string and attaches a NameComponent. Accepts plain strings only at
+  // the top level (`components.name = "foo"` also works via the factory map below).
+  static void ApplyName(const sol::table& currentData, Registry* registry, const Entity& entity)
+  {
+    const sol::object value = currentData.get<sol::object>("name");
+    if (value.is<std::string>())
+    {
+      const std::string n = value.as<std::string>();
+      if (!n.empty()) registry->AddComponent(entity, NameComponent(n));
+    }
+  }
+
   // Reads top-level `mask` int from the entity table and attaches an EntityMaskComponent.
   // Also attaches a default EntityMaskComponent when the entity declares a `box_collider`
   // (CollisionSystem queries this component, so collider entities must have one).
@@ -71,6 +83,13 @@ public:
       // entity_mask handled in ApplyEntityMask (also validates top-level vs component-level conflict).
       if (componentName == "entity_mask") continue;
 
+      // `name` can be a bare string (`components.name = "foo"`) — skip the table validation below.
+      if (componentName == "name")
+      {
+        registry->AddComponent(entity, ComponentLuaFactory::CreateNameComponent(data));
+        continue;
+      }
+
       auto componentDataTable = data.as<sol::table>();
 
       if (!componentDataTable.valid())
@@ -122,6 +141,7 @@ public:
         registry->SetParent(entity, *parentEntity);
       }
 
+      ApplyName(currentData, registry, entity);
       TagAndGroupEntity(currentData, registry, entity);
       ApplyEntityMask(currentData, registry, entity);
       LoadEntityComponents(currentData, registry, entity);

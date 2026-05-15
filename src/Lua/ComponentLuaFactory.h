@@ -10,6 +10,7 @@
 #include "Components/EntityMaskComponent.h"
 #include "Components/HealthComponent.h"
 #include "Components/KeyboardControlComponent.h"
+#include "Components/NameComponent.h"
 #include "Components/ProjectileEmitterComponent.h"
 #include "Components/RigidBodyComponent.h"
 #include "Components/ScriptComponent.h"
@@ -190,6 +191,20 @@ public:
     const bool isActive = SafeGetOptionalValue<bool>(data, "is_active", true);
     const sol::protected_function clickFn = SafeGetProtectedFunction(data, "on_click");
     return UIButtonComponent(isActive, data, clickFn);
+  }
+
+  static NameComponent CreateNameComponent(const sol::object& data)
+  {
+    if (data.is<std::string>()) return NameComponent(data.as<std::string>());
+    if (data.is<sol::table>())
+    {
+      const sol::table& tbl = data.as<sol::table>();
+      const auto value = tbl.get<sol::object>("value");
+      if (value.is<std::string>()) return NameComponent(value.as<std::string>());
+      const auto nameField = tbl.get<sol::object>("name");
+      if (nameField.is<std::string>()) return NameComponent(nameField.as<std::string>());
+    }
+    return {};
   }
 
   static TextLabelComponent CreateTextLabelComponent(const sol::table& data)
