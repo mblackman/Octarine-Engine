@@ -16,7 +16,6 @@
 
 inline constexpr auto kConfigFileName = "config.ini";
 inline constexpr auto kPreferencesFileName = "preferences.ini";
-inline constexpr auto kGlobalPreferencesFileName = "editor_settings.ini";
 inline constexpr auto kWhiteSpaceSymbols = " \t\n\r\f\v";
 
 std::string TrimRight(const std::string &s) {
@@ -64,48 +63,6 @@ inline auto ReadConfigFile(void *dst, const Uint64 dstLen) -> std::unordered_map
   }
 
   return config;
-}
-
-void GameConfig::SaveGlobalPreferences() {
-  char *prefPath = SDL_GetPrefPath("Octarine", "Engine");
-  if (!prefPath) {
-    Logger::Error("Failed to get global pref path: " + std::string(SDL_GetError()));
-    return;
-  }
-
-  std::ofstream file(std::string(prefPath) + kGlobalPreferencesFileName);
-  SDL_free(prefPath);
-
-  if (!file.is_open()) {
-    Logger::Error("Failed to open global preferences file for writing.");
-    return;
-  }
-
-  file << "lastProjectPath=" << engine_options_.lastProjectPath << "\n";
-  file.close();
-}
-
-void GameConfig::LoadGlobalPreferences() {
-  char *prefPath = SDL_GetPrefPath("Octarine", "Engine");
-  if (!prefPath) return;
-
-  std::ifstream file(std::string(prefPath) + kGlobalPreferencesFileName);
-  SDL_free(prefPath);
-
-  if (!file.is_open()) return;
-
-  std::string line;
-  while (std::getline(file, line)) {
-    const auto keyValue = line.find('=');
-    if (keyValue == std::string::npos) continue;
-
-    const auto key = line.substr(0, keyValue);
-    const auto value = line.substr(keyValue + 1);
-
-    if (key == "lastProjectPath") {
-      engine_options_.lastProjectPath = value;
-    }
-  }
 }
 
 bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
@@ -172,16 +129,7 @@ void GameConfig::SaveUserPreferences() {
   file << "drawColliders=" << (engine_options_.drawColliders ? "true" : "false") << "\n";
   file << "showFpsCounter=" << (engine_options_.showFpsCounter ? "true" : "false") << "\n";
   file << "showEntityInfo=" << (engine_options_.showEntityInfo ? "true" : "false") << "\n";
-  file << "showProfiler=" << (engine_options_.showProfiler ? "true" : "false") << "\n";
-  file << "showHierarchy=" << (engine_options_.showHierarchy ? "true" : "false") << "\n";
-  file << "showAssetBrowser=" << (engine_options_.showAssetBrowser ? "true" : "false") << "\n";
-  file << "showLuaConsole=" << (engine_options_.showLuaConsole ? "true" : "false") << "\n";
-  file << "showSceneWindow=" << (engine_options_.showSceneWindow ? "true" : "false") << "\n";
-  file << "showSceneManagement=" << (engine_options_.showSceneManagement ? "true" : "false") << "\n";
   file << "masterVolume=" << engine_options_.masterVolume << "\n";
-  file << "editorFontSize=" << engine_options_.editorFontSize << "\n";
-  file << "editorStyleIndex=" << engine_options_.editorStyleIndex << "\n";
-  file << "currentScenePath=" << engine_options_.currentScenePath << "\n";
 
   file.close();
 }
@@ -210,26 +158,8 @@ void GameConfig::LoadUserPreferences() {
       engine_options_.showFpsCounter = (value == "true");
     else if (key == "showEntityInfo")
       engine_options_.showEntityInfo = (value == "true");
-    else if (key == "showProfiler")
-      engine_options_.showProfiler = (value == "true");
-    else if (key == "showHierarchy")
-      engine_options_.showHierarchy = (value == "true");
-    else if (key == "showAssetBrowser")
-      engine_options_.showAssetBrowser = (value == "true");
-    else if (key == "showLuaConsole")
-      engine_options_.showLuaConsole = (value == "true");
-    else if (key == "showSceneWindow")
-      engine_options_.showSceneWindow = (value == "true");
-    else if (key == "showSceneManagement")
-      engine_options_.showSceneManagement = (value == "true");
     else if (key == "masterVolume")
       engine_options_.masterVolume = std::stof(value);
-    else if (key == "editorFontSize")
-      engine_options_.editorFontSize = std::stof(value);
-    else if (key == "editorStyleIndex")
-      engine_options_.editorStyleIndex = std::stoi(value);
-    else if (key == "currentScenePath")
-      engine_options_.currentScenePath = value;
   }
 }
 

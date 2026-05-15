@@ -25,13 +25,15 @@
 #include "imgui_impl_sdlrenderer3.h"
 
 #ifdef OCTARINE_WITH_EDITOR
+#include "../Editor/EditorPersistence.h"
+
 namespace {
 void SDLCALL OnProjectFolderSelected(void* userdata, const char* const* filelist, int /*filter*/) {
   auto* game = static_cast<Game*>(userdata);
   if (filelist && *filelist) {
-    auto& gameConfig = game->GetRegistry()->Get<GameConfig>();
-    gameConfig.GetEngineOptions().lastProjectPath = *filelist;
-    gameConfig.SaveGlobalPreferences();
+    auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
+    editorPersistence.lastProjectPath = *filelist;
+    editorPersistence.SaveGlobal();
     Logger::Info("Project folder selected: " + std::string(*filelist));
   }
 }
@@ -39,7 +41,7 @@ void SDLCALL OnProjectFolderSelected(void* userdata, const char* const* filelist
 void SDLCALL OnSceneFileSelected(void* userdata, const char* const* filelist, int /*filter*/) {
   auto* game = static_cast<Game*>(userdata);
   if (filelist && *filelist) {
-    auto& gameConfig = game->GetRegistry()->Get<GameConfig>();
+    auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
     auto& assetManager = game->GetRegistry()->Get<AssetManager>();
     std::filesystem::path selectedPath(*filelist);
     std::filesystem::path basePath(assetManager.GetBasePath());
@@ -52,7 +54,7 @@ void SDLCALL OnSceneFileSelected(void* userdata, const char* const* filelist, in
       Logger::Warn("Failed to make scene path relative: " + std::string(e.what()));
     }
 
-    gameConfig.GetEngineOptions().currentScenePath = selectedPath.string();
+    editorPersistence.currentScenePath = selectedPath.string();
     Logger::Info("Scene file selected: " + selectedPath.string());
   }
 }
@@ -71,6 +73,7 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
   auto& engineOptions = gameConfig.GetEngineOptions();
   const bool projectLoaded = gameConfig.HasLoadedConfig();
 #ifdef OCTARINE_WITH_EDITOR
+  auto& editorPersistence = registry->Get<EditorPersistence>();
   const bool editorSession = gameConfig.IsEditorMode() || !projectLoaded;
   const bool showEditorUI = editorSession;
 #endif
@@ -107,7 +110,8 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
         }
         if (ImGui::MenuItem("Save Preferences", "Ctrl+S")) {
           gameConfig.SaveUserPreferences();
-          gameConfig.SaveGlobalPreferences();
+          editorPersistence.SaveGlobal();
+          if (projectLoaded) editorPersistence.SaveProject(gameConfig.GetAssetPath());
         }
         ImGui::Separator();
         if (ImGui::MenuItem("Quit", "Alt+F4")) {
@@ -116,12 +120,12 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
         ImGui::EndMenu();
       }
       if (ImGui::BeginMenu("Windows")) {
-        ImGui::MenuItem("Scene View", nullptr, &engineOptions.showSceneWindow);
-        ImGui::MenuItem("Scene Management", nullptr, &engineOptions.showSceneManagement);
-        ImGui::MenuItem("Hierarchy", nullptr, &engineOptions.showHierarchy);
-        ImGui::MenuItem("Asset Browser", nullptr, &engineOptions.showAssetBrowser);
-        ImGui::MenuItem("Lua Console", nullptr, &engineOptions.showLuaConsole);
-        ImGui::MenuItem("Performance Profiler", nullptr, &engineOptions.showProfiler);
+        ImGui::MenuItem("Scene View", nullptr, &editorPersistence.showSceneWindow);
+        ImGui::MenuItem("Scene Management", nullptr, &editorPersistence.showSceneManagement);
+        ImGui::MenuItem("Hierarchy", nullptr, &editorPersistence.showHierarchy);
+        ImGui::MenuItem("Asset Browser", nullptr, &editorPersistence.showAssetBrowser);
+        ImGui::MenuItem("Lua Console", nullptr, &editorPersistence.showLuaConsole);
+        ImGui::MenuItem("Performance Profiler", nullptr, &editorPersistence.showProfiler);
         ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI);
         ImGui::Separator();
         ImGui::MenuItem("FPS Counter", nullptr, &engineOptions.showFpsCounter);
@@ -131,15 +135,15 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
       ImGui::EndMainMenuBar();
     }
 
-    if (engineOptions.showSceneWindow) SceneWindow(gameTexture, &engineOptions.showSceneWindow);
+    if (editorPersistence.showSceneWindow) SceneWindow(gameTexture, &editorPersistence.showSceneWindow);
 
-    if (engineOptions.showSceneManagement) SceneManagementWindow(game);
-    if (engineOptions.showHierarchy) HierarchyWindow(registry);
-    if (engineOptions.showAssetBrowser) AssetBrowserWindow(registry);
-    if (engineOptions.showLuaConsole) LuaConsoleWindow(game->GetLua());
-    if (engineOptions.showProfiler) PerformanceProfilerWindow();
-    EngineOptionsWindow(engineOptions);
-    EditorSettingsWindow(engineOptions);
+    if (editorPersistence.showSceneManagement) SceneManagementWindow(game);
+    if (editorPersistence.showHierarchy) HierarchyWindow(registry);
+    if (editorPersistence.showAssetBrowser) AssetBrowserWindow(registry);
+    if (editorPersistence.showLuaConsole) LuaConsoleWindow(game->GetLua());
+    if (editorPersistence.showProfiler) PerformanceProfilerWindow();
+    EngineOptionsWindow(engineOptions, editorPersistence);
+    EditorSettingsWindow(editorPersistence);
 
     if (engineOptions.showImGuiDemoWindow) {
       ImGui::ShowDemoWindow();
@@ -172,15 +176,15 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
 #ifdef OCTARINE_WITH_EDITOR
 void RenderDebugGUISystem::SceneManagementWindow(Game* game) {
   auto* registry = game->GetRegistry();
-  auto& options = registry->Get<GameConfig>().GetEngineOptions();
+  auto& editorPersistence = registry->Get<EditorPersistence>();
 
-  ImGui::Begin("Scene Management", &options.showSceneManagement);
+  ImGui::Begin("Scene Management", &editorPersistence.showSceneManagement);
 
   static char scenePath[256] = "";
   static std::string lastKnownScenePath;
-  if (lastKnownScenePath != options.currentScenePath) {
-    snprintf(scenePath, sizeof(scenePath), "%s", options.currentScenePath.c_str());
-    lastKnownScenePath = options.currentScenePath;
+  if (lastKnownScenePath != editorPersistence.currentScenePath) {
+    snprintf(scenePath, sizeof(scenePath), "%s", editorPersistence.currentScenePath.c_str());
+    lastKnownScenePath = editorPersistence.currentScenePath;
   }
 
   ImGui::Text("Scene Script Path:");
@@ -198,8 +202,8 @@ void RenderDebugGUISystem::SceneManagementWindow(Game* game) {
 
   ImGui::Separator();
 
-  if (!options.currentScenePath.empty()) {
-    ImGui::Text("Current Scene: %s", options.currentScenePath.c_str());
+  if (!editorPersistence.currentScenePath.empty()) {
+    ImGui::Text("Current Scene: %s", editorPersistence.currentScenePath.c_str());
     if (ImGui::Button("Reload")) {
       game->ReloadScene();
     }
@@ -217,15 +221,15 @@ void RenderDebugGUISystem::SceneManagementWindow(Game* game) {
   ImGui::End();
 }
 
-void RenderDebugGUISystem::EngineOptionsWindow(EngineOptions& options) {
+void RenderDebugGUISystem::EngineOptionsWindow(EngineOptions& options, EditorPersistence& editorPersistence) {
   ImGui::Begin("Engine Options");
   ImGui::Checkbox("Show ImGui Demo Window", &options.showImGuiDemoWindow);
   ImGui::Checkbox("Show FPS Counter", &options.showFpsCounter);
   ImGui::Checkbox("Show Entity Info", &options.showEntityInfo);
-  ImGui::Checkbox("Show Profiler", &options.showProfiler);
-  ImGui::Checkbox("Show Hierarchy", &options.showHierarchy);
-  ImGui::Checkbox("Show Asset Browser", &options.showAssetBrowser);
-  ImGui::Checkbox("Show Lua Console", &options.showLuaConsole);
+  ImGui::Checkbox("Show Profiler", &editorPersistence.showProfiler);
+  ImGui::Checkbox("Show Hierarchy", &editorPersistence.showHierarchy);
+  ImGui::Checkbox("Show Asset Browser", &editorPersistence.showAssetBrowser);
+  ImGui::Checkbox("Show Lua Console", &editorPersistence.showLuaConsole);
   ImGui::Checkbox("Draw Colliders", &options.drawColliders);
   ImGui::Checkbox("Audio Enabled", &options.audioEnabled);
   ImGui::SliderFloat("Master Volume", &options.masterVolume, 0.0F, 1.0F);
@@ -235,12 +239,12 @@ void RenderDebugGUISystem::EngineOptionsWindow(EngineOptions& options) {
   ImGui::End();
 }
 
-void RenderDebugGUISystem::EditorSettingsWindow(EngineOptions& options) {
+void RenderDebugGUISystem::EditorSettingsWindow(EditorPersistence& editorPersistence) {
   ImGui::Begin("Editor Settings");
 
   ImGui::SeparatorText("Appearance");
-  static float pendingFontSize = options.editorFontSize;
-  if (pendingFontSize <= 0.0F) pendingFontSize = options.editorFontSize;
+  static float pendingFontSize = editorPersistence.editorFontSize;
+  if (pendingFontSize <= 0.0F) pendingFontSize = editorPersistence.editorFontSize;
 
   ImGui::SliderFloat("Font Size", &pendingFontSize, 10.0F, 40.0F, "%.0f px");
   ImGui::SameLine();
@@ -249,7 +253,7 @@ void RenderDebugGUISystem::EditorSettingsWindow(EngineOptions& options) {
   }
 
   if (ImGui::Button("Apply Font Size")) {
-    options.editorFontSize = pendingFontSize;
+    editorPersistence.editorFontSize = pendingFontSize;
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear();
     ImFontConfig fontConfig;
@@ -265,8 +269,8 @@ void RenderDebugGUISystem::EditorSettingsWindow(EngineOptions& options) {
   ImGui::TextDisabled("(rebuilds font atlas)");
 
   const char* styles[] = {"Dark", "Light", "Classic"};
-  if (ImGui::Combo("Theme", &options.editorStyleIndex, styles, IM_ARRAYSIZE(styles))) {
-    ApplyEditorStyle(options.editorStyleIndex);
+  if (ImGui::Combo("Theme", &editorPersistence.editorStyleIndex, styles, IM_ARRAYSIZE(styles))) {
+    ApplyEditorStyle(editorPersistence.editorStyleIndex);
   }
 
   ImGui::End();
@@ -539,13 +543,12 @@ void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open) {
     ImGui::End();
     return;
   }
-  auto& gameConfig = game->GetRegistry()->Get<GameConfig>();
-  auto& options = gameConfig.GetEngineOptions();
+  auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
   static char projectPath[256] = "";
   static std::string lastKnownProjectPath;
-  if (lastKnownProjectPath != options.lastProjectPath) {
-    snprintf(projectPath, sizeof(projectPath), "%s", options.lastProjectPath.c_str());
-    lastKnownProjectPath = options.lastProjectPath;
+  if (lastKnownProjectPath != editorPersistence.lastProjectPath) {
+    snprintf(projectPath, sizeof(projectPath), "%s", editorPersistence.lastProjectPath.c_str());
+    lastKnownProjectPath = editorPersistence.lastProjectPath;
   }
 
   ImGui::Text("Enter Project Path:");
@@ -557,8 +560,8 @@ void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open) {
   }
 
   if (ImGui::Button("Open Project", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
-    options.lastProjectPath = projectPath;
-    gameConfig.SaveGlobalPreferences();
+    editorPersistence.lastProjectPath = projectPath;
+    editorPersistence.SaveGlobal();
     *p_open = false;
     ImGui::OpenPopup("Restart Required");
   }
@@ -567,11 +570,11 @@ void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open) {
     if (ImGui::Button("OK", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
   }
-  if (!options.lastProjectPath.empty()) {
+  if (!editorPersistence.lastProjectPath.empty()) {
     ImGui::Separator();
-    ImGui::Text("Last Project: %s", options.lastProjectPath.c_str());
+    ImGui::Text("Last Project: %s", editorPersistence.lastProjectPath.c_str());
     if (ImGui::Button("Load Last Project"))
-      snprintf(projectPath, sizeof(projectPath), "%s", options.lastProjectPath.c_str());
+      snprintf(projectPath, sizeof(projectPath), "%s", editorPersistence.lastProjectPath.c_str());
   }
   ImGui::End();
 }

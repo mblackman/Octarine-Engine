@@ -55,6 +55,10 @@
 #include "imgui_impl_sdlrenderer3.h"
 #endif
 
+#ifdef OCTARINE_WITH_EDITOR
+#include "../Editor/EditorPersistence.h"
+#endif
+
 constexpr Uint8 GREY_COLOR = 24;
 constexpr Uint8 BLACK_COLOR = 0;
 
@@ -103,21 +107,28 @@ bool Game::Initialize(const std::string &assetPath) {
   registry_->Set<GameConfig>(GameConfig());
   auto &gameConfig = registry_->Get<GameConfig>();
 
-  gameConfig.LoadGlobalPreferences();
   std::string effectivePath = assetPath;
+#ifdef OCTARINE_WITH_EDITOR
+  registry_->Set<EditorPersistence>(EditorPersistence());
+  auto &editorPersistence = registry_->Get<EditorPersistence>();
+  editorPersistence.LoadGlobal();
   if (effectivePath.empty()) {
-    effectivePath = gameConfig.GetEngineOptions().lastProjectPath;
+    effectivePath = editorPersistence.lastProjectPath;
     if (!effectivePath.empty()) {
       Logger::Info("No project path provided, attempting to load last project: " + effectivePath);
     }
   }
+#endif
 
   bool projectLoaded = false;
   if (!effectivePath.empty()) {
     if (gameConfig.LoadConfigFromFile(effectivePath)) {
       gameConfig.LoadUserPreferences();
-      gameConfig.GetEngineOptions().lastProjectPath = effectivePath;
-      gameConfig.SaveGlobalPreferences();
+#ifdef OCTARINE_WITH_EDITOR
+      editorPersistence.LoadProject(effectivePath);
+      editorPersistence.lastProjectPath = effectivePath;
+      editorPersistence.SaveGlobal();
+#endif
       projectLoaded = true;
     } else {
       Logger::Warn("Failed to load project from path: " + effectivePath);
@@ -195,8 +206,7 @@ bool Game::Initialize(const std::string &assetPath) {
   io.Fonts->Clear();
 #ifdef OCTARINE_WITH_EDITOR
   // --- Resolve editor font size (DPI-aware default) ---
-  auto &options = gameConfig.GetEngineOptions();
-  float fontSize = options.editorFontSize;
+  float fontSize = editorPersistence.editorFontSize;
   if (fontSize <= 0.0F) {
     const SDL_DisplayID displayId = SDL_GetPrimaryDisplay();
     const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(displayId);
@@ -205,14 +215,14 @@ bool Game::Initialize(const std::string &assetPath) {
       dpiScale = mode->pixel_density;
     }
     fontSize = 16.0F * dpiScale;
-    options.editorFontSize = fontSize;
+    editorPersistence.editorFontSize = fontSize;
   }
   ImFontConfig fontConfig;
   fontConfig.SizePixels = fontSize;
   fontConfig.OversampleH = 2;
   fontConfig.OversampleV = 2;
   io.FontDefault = io.Fonts->AddFontDefault(&fontConfig);
-  RenderDebugGUISystem::ApplyEditorStyle(options.editorStyleIndex);
+  RenderDebugGUISystem::ApplyEditorStyle(editorPersistence.editorStyleIndex);
 #else
   io.Fonts->AddFontDefault();
 #endif
@@ -230,8 +240,16 @@ bool Game::Initialize(const std::string &assetPath) {
 
 void Game::Destroy() {
   if (registry_) {
-    registry_->Get<GameConfig>().SaveUserPreferences();
-    registry_->Get<GameConfig>().SaveGlobalPreferences();
+    auto &gameConfig = registry_->Get<GameConfig>();
+    gameConfig.SaveUserPreferences();
+#ifdef OCTARINE_WITH_EDITOR
+    if (auto *editorPersistence = registry_->TryGet<EditorPersistence>()) {
+      editorPersistence->SaveGlobal();
+      if (gameConfig.HasLoadedConfig()) {
+        editorPersistence->SaveProject(gameConfig.GetAssetPath());
+      }
+    }
+#endif
   }
 
   // Tear registry/event bus down BEFORE SDL_Quit so owned systems (AudioSystem -> MIX_Quit,
@@ -301,12 +319,15 @@ void Game::Setup() {
 #ifdef OCTARINE_WITH_IMGUI
     options.showFpsCounter = false;
     options.showEntityInfo = false;
-    options.showProfiler = false;
 #endif
 #ifdef OCTARINE_WITH_EDITOR
-    options.showHierarchy = false;
-    options.showAssetBrowser = false;
-    options.showSceneWindow = false;
+    auto &bench_editor = registry_->Get<EditorPersistence>();
+    bench_editor.showProfiler = false;
+    bench_editor.showHierarchy = false;
+    bench_editor.showAssetBrowser = false;
+    bench_editor.showSceneWindow = false;
+    bench_editor.showLuaConsole = false;
+    bench_editor.showSceneManagement = false;
     options.showImGuiDemoWindow = false;
 #endif
     options.drawColliders = false;
@@ -538,7 +559,6 @@ void Game::LoadScene(const std::string &scenePath) {
     return;
   }
 
-  auto &gameConfig = registry_->Get<GameConfig>();
   auto &assetManager = registry_->Get<AssetManager>();
 
   // Use the full path relative to the asset directory if it's a relative path.
@@ -548,9 +568,12 @@ void Game::LoadScene(const std::string &scenePath) {
 
   StopScene();
 
-  auto &options = gameConfig.GetEngineOptions();
-  options.currentScenePath = scenePath;
-  options.showSceneWindow = true;
+#ifdef OCTARINE_WITH_EDITOR
+  if (auto *editorPersistence = registry_->TryGet<EditorPersistence>()) {
+    editorPersistence->currentScenePath = scenePath;
+    editorPersistence->showSceneWindow = true;
+  }
+#endif
 
   sol::protected_function_result result = lua.safe_script_file(fullPath);
   if (!result.valid()) {
@@ -626,12 +649,14 @@ void Game::LoadScene(const std::string &scenePath) {
 }
 
 void Game::ReloadScene() {
-  const auto &options = registry_->Get<GameConfig>().GetEngineOptions();
-  if (options.currentScenePath.empty()) {
-    Logger::Warn("ReloadScene called but no scene is currently loaded.");
+#ifdef OCTARINE_WITH_EDITOR
+  if (auto *editorPersistence = registry_->TryGet<EditorPersistence>(); editorPersistence != nullptr &&
+                                                                        !editorPersistence->currentScenePath.empty()) {
+    LoadScene(editorPersistence->currentScenePath);
     return;
   }
-  LoadScene(options.currentScenePath);
+#endif
+  Logger::Warn("ReloadScene called but no scene is currently loaded.");
 }
 
 void Game::StopScene() {

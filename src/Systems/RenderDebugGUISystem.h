@@ -11,6 +11,10 @@
 #ifdef OCTARINE_WITH_IMGUI
 #include "imgui.h"
 
+#ifdef OCTARINE_WITH_EDITOR
+#include "../Editor/EditorPersistence.h"
+#endif
+
 class Game;
 
 class RenderDebugGUISystem {
@@ -56,8 +60,8 @@ class RenderDebugGUISystem {
  private:
 #ifdef OCTARINE_WITH_EDITOR
   static void SceneManagementWindow(Game* game);
-  static void EngineOptionsWindow(EngineOptions& options);
-  static void EditorSettingsWindow(EngineOptions& options);
+  static void EngineOptionsWindow(EngineOptions& options, EditorPersistence& editorPersistence);
+  static void EditorSettingsWindow(EditorPersistence& editorPersistence);
   static void PerformanceProfilerWindow();
   static void HierarchyWindow(Registry* registry);
   static void ProjectSelectorWindow(Game* game, bool* p_open);

@@ -62,6 +62,10 @@ if (OCTARINE_WITH_IMGUI)
     list(APPEND SRC_FILES src/Systems/RenderDebugGUISystem.cpp)
 endif ()
 
+if (OCTARINE_WITH_EDITOR)
+    list(APPEND SRC_FILES src/Editor/EditorPersistence.cpp)
+endif ()
+
 if (UNIX AND NOT APPLE)
     list(APPEND SRC_FILES src/General/SDL3_Linux_Stubs.cpp)
 endif ()
