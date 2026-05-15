@@ -18,6 +18,10 @@ struct EditorPersistence {
   float editorFontSize = 0.0F;
   int editorStyleIndex = 0;
 
+  // Transient: set when the editor wants the font atlas rebuilt outside the
+  // active ImGui frame. Not serialized.
+  bool fontRebuildPending = false;
+
   // Per-project
   std::string currentScenePath;
   bool showProfiler = false;

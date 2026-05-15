@@ -171,6 +171,16 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
 
   ImGui::Render();
   ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
+
+#ifdef OCTARINE_WITH_EDITOR
+  // Honor any deferred font-rebuild requests now that the ImGui frame has ended.
+  // Atlas rebuilds inside an active frame would corrupt draw state.
+  if (editorPersistence.fontRebuildPending) {
+    RebuildEditorFont(editorPersistence.editorFontSize);
+    ApplyEditorStyle(editorPersistence.editorStyleIndex, editorPersistence.editorFontSize);
+    editorPersistence.fontRebuildPending = false;
+  }
+#endif
 }
 
 #ifdef OCTARINE_WITH_EDITOR
@@ -243,34 +253,26 @@ void RenderDebugGUISystem::EditorSettingsWindow(EditorPersistence& editorPersist
   ImGui::Begin("Editor Settings");
 
   ImGui::SeparatorText("Appearance");
-  static float pendingFontSize = editorPersistence.editorFontSize;
-  if (pendingFontSize <= 0.0F) pendingFontSize = editorPersistence.editorFontSize;
 
-  ImGui::SliderFloat("Font Size", &pendingFontSize, 10.0F, 40.0F, "%.0f px");
+  float fontSize =
+      (editorPersistence.editorFontSize > 0.0F) ? editorPersistence.editorFontSize : kBaselineFontSize;
+  if (ImGui::SliderFloat("Font Size", &fontSize, 10.0F, 40.0F, "%.0f px")) {
+    editorPersistence.editorFontSize = fontSize;
+  }
+  // Defer the actual atlas rebuild until the user releases the slider — rebuilding
+  // every frame while dragging is visibly laggy.
+  if (ImGui::IsItemDeactivatedAfterEdit()) {
+    editorPersistence.fontRebuildPending = true;
+  }
   ImGui::SameLine();
   if (ImGui::Button("Reset")) {
-    pendingFontSize = 0.0F;
+    editorPersistence.editorFontSize = kBaselineFontSize;
+    editorPersistence.fontRebuildPending = true;
   }
-
-  if (ImGui::Button("Apply Font Size")) {
-    editorPersistence.editorFontSize = pendingFontSize;
-    ImGuiIO& io = ImGui::GetIO();
-    io.Fonts->Clear();
-    ImFontConfig fontConfig;
-    fontConfig.SizePixels = (pendingFontSize > 0.0F) ? pendingFontSize : 16.0F;
-    fontConfig.OversampleH = 2;
-    fontConfig.OversampleV = 2;
-    io.FontDefault = io.Fonts->AddFontDefault(&fontConfig);
-    io.Fonts->Build();
-    ImGui_ImplSDLRenderer3_DestroyDeviceObjects();
-    ImGui_ImplSDLRenderer3_CreateDeviceObjects();
-  }
-  ImGui::SameLine();
-  ImGui::TextDisabled("(rebuilds font atlas)");
 
   const char* styles[] = {"Dark", "Light", "Classic"};
   if (ImGui::Combo("Theme", &editorPersistence.editorStyleIndex, styles, IM_ARRAYSIZE(styles))) {
-    ApplyEditorStyle(editorPersistence.editorStyleIndex);
+    ApplyEditorStyle(editorPersistence.editorStyleIndex, editorPersistence.editorFontSize);
   }
 
   ImGui::End();

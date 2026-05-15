@@ -203,9 +203,10 @@ bool Game::Initialize(const std::string &assetPath) {
   ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
   ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
 
-  io.Fonts->Clear();
 #ifdef OCTARINE_WITH_EDITOR
-  // --- Resolve editor font size (DPI-aware default) ---
+  // --- Resolve editor font size (DPI-aware default on first launch) ---
+  // Roboto renders a bit smaller than ProggyClean at the same px, so we use 17
+  // as the unscaled default rather than 16.
   float fontSize = editorPersistence.editorFontSize;
   if (fontSize <= 0.0F) {
     const SDL_DisplayID displayId = SDL_GetPrimaryDisplay();
@@ -214,19 +215,16 @@ bool Game::Initialize(const std::string &assetPath) {
     if (mode != nullptr && mode->pixel_density > 0.0F) {
       dpiScale = mode->pixel_density;
     }
-    fontSize = 16.0F * dpiScale;
+    fontSize = 17.0F * dpiScale;
     editorPersistence.editorFontSize = fontSize;
   }
-  ImFontConfig fontConfig;
-  fontConfig.SizePixels = fontSize;
-  fontConfig.OversampleH = 2;
-  fontConfig.OversampleV = 2;
-  io.FontDefault = io.Fonts->AddFontDefault(&fontConfig);
-  RenderDebugGUISystem::ApplyEditorStyle(editorPersistence.editorStyleIndex);
+  RenderDebugGUISystem::RebuildEditorFont(fontSize);
+  RenderDebugGUISystem::ApplyEditorStyle(editorPersistence.editorStyleIndex, fontSize);
 #else
+  io.Fonts->Clear();
   io.Fonts->AddFontDefault();
-#endif
   io.Fonts->Build();
+#endif
 #endif
 
   SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
