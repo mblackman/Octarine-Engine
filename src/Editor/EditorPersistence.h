@@ -22,6 +22,10 @@ struct EditorPersistence {
   // active ImGui frame. Not serialized.
   bool fontRebuildPending = false;
 
+  // Transient: set when a layout preset should be loaded at the start of the next frame.
+  // Contains the preset name to load.
+  std::string pendingLayoutLoad;
+
   // Per-project
   std::string currentScenePath;
   bool showProfiler = false;

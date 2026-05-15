@@ -25,6 +25,7 @@
 #include "imgui_impl_sdlrenderer3.h"
 
 #ifdef OCTARINE_WITH_EDITOR
+#include "../Editor/EditorLayoutPresets.h"
 #include "../Editor/EditorPersistence.h"
 
 namespace {
@@ -91,12 +92,24 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
 
   PROFILE_NAMED_SCOPE("RenderDebugGUISystem::Render");
 
+#ifdef OCTARINE_WITH_EDITOR
+  if (!editorPersistence.pendingLayoutLoad.empty()) {
+    if (editorPersistence.pendingLayoutLoad == "__default__") {
+      octarine::editor::layouts::ApplyDefaultPreset(editorPersistence);
+    } else {
+      octarine::editor::layouts::LoadPreset(editorPersistence.pendingLayoutLoad, editorPersistence);
+    }
+    editorPersistence.pendingLayoutLoad.clear();
+  }
+#endif
+
   ImGui_ImplSDLRenderer3_NewFrame();
   ImGui_ImplSDL3_NewFrame();
   ImGui::NewFrame();
 
 #ifdef OCTARINE_WITH_EDITOR
   static bool showProjectSelector = false;
+  static bool openSaveLayoutModal = false;
 
   if (showEditorUI) {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
@@ -119,6 +132,33 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
         }
         ImGui::EndMenu();
       }
+      if (ImGui::BeginMenu("Layout")) {
+        const auto presets = octarine::editor::layouts::ListPresets();
+        if (ImGui::BeginMenu("Apply", !presets.empty())) {
+          for (const auto& name : presets) {
+            if (ImGui::MenuItem(name.c_str())) {
+              editorPersistence.pendingLayoutLoad = name;
+            }
+          }
+          ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Delete", !presets.empty())) {
+          for (const auto& name : presets) {
+            if (ImGui::MenuItem(name.c_str())) {
+              octarine::editor::layouts::DeletePreset(name);
+            }
+          }
+          ImGui::EndMenu();
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Save Current As...")) {
+          openSaveLayoutModal = true;
+        }
+        if (ImGui::MenuItem("Reset to Default")) {
+          editorPersistence.pendingLayoutLoad = "__default__";
+        }
+        ImGui::EndMenu();
+      }
       if (ImGui::BeginMenu("Windows")) {
         ImGui::MenuItem("Scene View", nullptr, &editorPersistence.showSceneWindow);
         ImGui::MenuItem("Scene Management", nullptr, &editorPersistence.showSceneManagement);
@@ -133,6 +173,32 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
         ImGui::EndMenu();
       }
       ImGui::EndMainMenuBar();
+    }
+
+    if (openSaveLayoutModal) {
+      ImGui::OpenPopup("Save Layout Preset");
+      openSaveLayoutModal = false;
+    }
+    if (ImGui::BeginPopupModal("Save Layout Preset", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      static char nameBuf[64] = "";
+      ImGui::Text("Preset name:");
+      ImGui::SetNextItemWidth(260);
+      const bool enter = ImGui::InputText("##layoutname", nameBuf, sizeof(nameBuf),
+                                          ImGuiInputTextFlags_EnterReturnsTrue);
+      const bool hasName = nameBuf[0] != '\0';
+      ImGui::BeginDisabled(!hasName);
+      if (ImGui::Button("Save") || (enter && hasName)) {
+        octarine::editor::layouts::SavePreset(nameBuf, editorPersistence);
+        nameBuf[0] = '\0';
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      if (ImGui::Button("Cancel")) {
+        nameBuf[0] = '\0';
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndPopup();
     }
 
     if (editorPersistence.showSceneWindow) SceneWindow(gameTexture, &editorPersistence.showSceneWindow);

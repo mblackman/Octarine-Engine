@@ -56,6 +56,7 @@
 #endif
 
 #ifdef OCTARINE_WITH_EDITOR
+#include "../Editor/EditorLayoutPresets.h"
 #include "../Editor/EditorPersistence.h"
 #endif
 
@@ -220,6 +221,13 @@ bool Game::Initialize(const std::string &assetPath) {
   }
   RenderDebugGUISystem::RebuildEditorFont(fontSize);
   RenderDebugGUISystem::ApplyEditorStyle(editorPersistence.editorStyleIndex, fontSize);
+
+  // First-run: if ImGui has no saved layout for this project / pref dir, apply
+  // the bundled default so the user sees a curated workspace instead of a pile
+  // of floating windows.
+  if (!octarine::editor::layouts::HasImGuiIni()) {
+    octarine::editor::layouts::ApplyDefaultPreset(editorPersistence);
+  }
 #else
   io.Fonts->Clear();
   io.Fonts->AddFontDefault();
