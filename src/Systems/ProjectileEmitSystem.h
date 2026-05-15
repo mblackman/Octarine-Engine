@@ -6,6 +6,7 @@
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/EntityMaskComponent.h"
+#include "../Components/NameComponent.h"
 #include "../Components/ProjectileComponent.h"
 #include "../Components/ProjectileEmitterComponent.h"
 #include "../Components/RigidBodyComponent.h"
@@ -24,10 +25,13 @@ class ProjectileEmitSystem {
         registry.Get<EntityPoolManager>().RegisterPool<ProjectileComponent>(registry, [](Registry& reg) {
           reg.Tag<PoolableTag>();
           reg.Tag<ProjectileTag>();
+          // NameComponent baked into the archetype so emitter-assigned names take the cheap
+          // re-add path in Registry::AddComponent (assign-over) instead of an archetype transition,
+          // which would break pool reuse (pool routes by archetype id).
           return reg.CreateEntityWithBundle(EntityMaskComponent(), TransformComponent(), RigidBodyComponent(),
                                             BoxColliderComponent(4, 4, glm::vec2(0, 0), EntityMask{}),
                                             ProjectileComponent(), SpriteComponent("bullet-texture", 4.0f, 4.0f, 4),
-                                            PoolableTag{}, ProjectileTag{});
+                                            NameComponent(), PoolableTag{}, ProjectileTag{});
         });
     eventBus->SubscribeEvent<ProjectileEmitSystem, KeyInputEvent>(this, &ProjectileEmitSystem::OnKeyInput);
   }
@@ -97,5 +101,6 @@ class ProjectileEmitSystem {
     auto& projectileComponent = registry->GetComponent<ProjectileComponent>(projectile);
     projectileComponent.damage = emitter.damage;
     projectileComponent.duration = emitter.duration;
+    registry->GetComponent<NameComponent>(projectile).name = emitter.projectileName;
   }
 };

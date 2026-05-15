@@ -594,6 +594,12 @@ void RenderDebugGUISystem::HierarchyWindow(Registry* registry)
                 ImGui::DragFloat("Frequency (s)", &pe.frequency, 0.1f);
                 ImGui::DragFloat("Duration (s)", &pe.duration, 0.1f);
                 ImGui::DragInt("Damage", &pe.damage);
+                char projNameBuf[128] = {0};
+                snprintf(projNameBuf, sizeof(projNameBuf), "%s", pe.projectileName.c_str());
+                if (ImGui::InputText("Projectile Name", projNameBuf, sizeof(projNameBuf)))
+                {
+                    pe.projectileName = projNameBuf;
+                }
             }
         }
         if (registry->HasComponent<TextLabelComponent>(selectedEntity))

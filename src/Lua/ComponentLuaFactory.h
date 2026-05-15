@@ -156,9 +156,11 @@ public:
     const auto collisionMaskBits = EntityMask(static_cast<unsigned long long>(collisionMask));
     const auto projectileMask = SafeGetOptionalValue<int>(data, "projectile_mask", 0);
     const auto projectileMaskBits = EntityMask(static_cast<unsigned long long>(projectileMask));
+    const auto projectileName = SafeGetOptionalValue<std::string>(data, "projectile_name", std::string{});
 
     auto component = ProjectileEmitterComponent(projectileVelocity, projectileDuration, repeatFrequency,
-                                                projectileDamage, collisionMaskBits, projectileMaskBits);
+                                                projectileDamage, collisionMaskBits, projectileMaskBits,
+                                                projectileName);
 
     // Optional override for the initial countdown timer. Defaults to repeat_frequency
     // (the C++ constructor default). Stress tests use this to stagger emitter fire times
