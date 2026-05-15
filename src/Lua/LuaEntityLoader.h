@@ -42,7 +42,7 @@ public:
 
     if (hasTopLevelMask && hasComponentMask)
     {
-      Logger::Error("LoadEntityFromLua: entity_mask set at both top-level and components — pick one. Skipping mask.");
+      Logger::Error("LoadEntityFromLua: entity_mask set at both top-level and components - pick one. Skipping mask.");
       return;
     }
 
