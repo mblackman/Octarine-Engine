@@ -74,8 +74,8 @@ The engine ships with a dedicated CMake preset for performance analysis:
 # Automatically clones Octarine-Engine-Example to .benchmark_game/ if no game is found!
 scripts/bench.sh
 
-# Override duration (still uses player-profile by default)
-scripts/bench.sh player-profile 15
+# Override duration (always uses player-profile preset)
+scripts/bench.sh 15
 ```
 
 # Point at a different game

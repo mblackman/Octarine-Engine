@@ -21,11 +21,11 @@ jobs:
           - name: Linux x64
             os: ubuntu-latest
             artifact_name: OctarineEngine-linux-x64
-            artifact_path: cmake-build-release/bin/release
+            artifact_path: cmake-build-editor-release/bin/release
           - name: Windows x64
             os: windows-latest
             artifact_name: OctarineEngine-windows-x64
-            artifact_path: cmake-build-release/bin/release
+            artifact_path: cmake-build-editor-release/bin/release
 
     steps:
       - name: Checkout
@@ -90,22 +90,22 @@ jobs:
 
       - name: Configure CMake
         shell: bash
-        run: cmake --preset release
+        run: cmake --preset editor-release
 
       - name: Build
-        run: cmake --build cmake-build-release --config Release --parallel
+        run: cmake --build cmake-build-editor-release --config Release --parallel
 
       - name: Stage runtime DLLs (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $out = "cmake-build-release/bin/release"
+          $out = "cmake-build-editor-release/bin/release"
           # Ninja single-config writes directly to bin/release; vcpkg dlls already copied next to exe by CMake.
           Get-ChildItem $out
 
       - name: List artifact contents
         shell: bash
-        run: ls -la cmake-build-release/bin/release
+        run: ls -la cmake-build-editor-release/bin/release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
