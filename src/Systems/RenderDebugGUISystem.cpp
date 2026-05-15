@@ -24,8 +24,8 @@
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 
-namespace {
 #ifdef OCTARINE_WITH_EDITOR
+namespace {
 void SDLCALL OnProjectFolderSelected(void* userdata, const char* const* filelist, int /*filter*/) {
   auto* game = static_cast<Game*>(userdata);
   if (filelist && *filelist) {
@@ -44,7 +44,6 @@ void SDLCALL OnSceneFileSelected(void* userdata, const char* const* filelist, in
     std::filesystem::path selectedPath(*filelist);
     std::filesystem::path basePath(assetManager.GetBasePath());
 
-    // Try to make it relative to the project root
     try {
       if (selectedPath.string().find(basePath.string()) == 0) {
         selectedPath = std::filesystem::relative(selectedPath, basePath);
@@ -57,17 +56,24 @@ void SDLCALL OnSceneFileSelected(void* userdata, const char* const* filelist, in
     Logger::Info("Scene file selected: " + selectedPath.string());
   }
 }
-#endif
 }  // namespace
+#endif
 
-void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_unused]] SDL_Texture* gameTexture, const float deltaTime) {
+void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
+#ifdef OCTARINE_WITH_EDITOR
+                                  SDL_Texture* gameTexture,
+#else
+                                  SDL_Texture* /*gameTexture*/,
+#endif
+                                  const float deltaTime) {
   auto* registry = game->GetRegistry();
   auto& gameConfig = registry->Get<GameConfig>();
   auto& engineOptions = gameConfig.GetEngineOptions();
   const bool projectLoaded = gameConfig.HasLoadedConfig();
+#ifdef OCTARINE_WITH_EDITOR
   const bool editorSession = gameConfig.IsEditorMode() || !projectLoaded;
-
-  [[maybe_unused]] const bool showEditorUI = editorSession;
+  const bool showEditorUI = editorSession;
+#endif
   const bool showGameOverlays = engineOptions.showDebugGUI;
 
 #ifdef OCTARINE_WITH_EDITOR
@@ -127,7 +133,6 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_un
 
     if (engineOptions.showSceneWindow) SceneWindow(gameTexture, &engineOptions.showSceneWindow);
 
-    // --- Editor Mode Windows ---
     if (engineOptions.showSceneManagement) SceneManagementWindow(game);
     if (engineOptions.showHierarchy) HierarchyWindow(registry);
     if (engineOptions.showAssetBrowser) AssetBrowserWindow(registry);
@@ -171,62 +176,99 @@ void RenderDebugGUISystem::SceneManagementWindow(Game* game) {
 
   ImGui::Begin("Scene Management", &options.showSceneManagement);
 
-  if (ImGui::Button("Stop Scene")) {
-    game->StopScene();
-  }
-  ImGui::SameLine();
-  if (ImGui::Button("Reload Scene")) {
-    game->ReloadScene();
+  static char scenePath[256] = "";
+  static std::string lastKnownScenePath;
+  if (lastKnownScenePath != options.currentScenePath) {
+    snprintf(scenePath, sizeof(scenePath), "%s", options.currentScenePath.c_str());
+    lastKnownScenePath = options.currentScenePath;
   }
 
-  ImGui::Separator();
   ImGui::Text("Scene Script Path:");
-  static char scenePath[256] = "";
-  strncpy(scenePath, options.currentScenePath.c_str(), sizeof(scenePath));
   ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 120);
   ImGui::InputText("##scenepath", scenePath, sizeof(scenePath));
   ImGui::SameLine();
-  if (ImGui::Button("Browse...")) {
-    SDL_ShowOpenFileDialog(OnSceneFileSelected, game, game->GetWindow(), nullptr, 0, nullptr, false);
+  if (ImGui::Button("...")) {
+    const SDL_DialogFileFilter filters[] = {{"Lua Scripts", "lua"}, {"All Files", "*"}};
+    SDL_ShowOpenFileDialog(OnSceneFileSelected, game, game->GetWindow(), filters, 2, nullptr, false);
   }
-
-  if (ImGui::Button("Load Scene")) {
+  ImGui::SameLine();
+  if (ImGui::Button("Load")) {
     game->LoadScene(scenePath);
   }
+
+  ImGui::Separator();
+
+  if (!options.currentScenePath.empty()) {
+    ImGui::Text("Current Scene: %s", options.currentScenePath.c_str());
+    if (ImGui::Button("Reload")) {
+      game->ReloadScene();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Stop")) {
+      game->StopScene();
+    }
+  } else {
+    ImGui::Text("No scene currently loaded.");
+  }
+
+  ImGui::Separator();
+  ImGui::TextDisabled("Enter path relative to project root (e.g. scripts/level1.lua)");
 
   ImGui::End();
 }
 
 void RenderDebugGUISystem::EngineOptionsWindow(EngineOptions& options) {
-  // Always visible if editor is on
   ImGui::Begin("Engine Options");
-  ImGui::Checkbox("Pause Game", &options.isPaused);
-  if (options.isPaused) {
-    ImGui::SameLine();
-    if (ImGui::Button("Step Frame")) {
-      options.stepFrame = true;
-    }
-  }
-  ImGui::SliderFloat("Time Scale", &options.timeScale, 0.0f, 5.0f);
-  ImGui::Separator();
+  ImGui::Checkbox("Show ImGui Demo Window", &options.showImGuiDemoWindow);
+  ImGui::Checkbox("Show FPS Counter", &options.showFpsCounter);
+  ImGui::Checkbox("Show Entity Info", &options.showEntityInfo);
+  ImGui::Checkbox("Show Profiler", &options.showProfiler);
+  ImGui::Checkbox("Show Hierarchy", &options.showHierarchy);
+  ImGui::Checkbox("Show Asset Browser", &options.showAssetBrowser);
+  ImGui::Checkbox("Show Lua Console", &options.showLuaConsole);
   ImGui::Checkbox("Draw Colliders", &options.drawColliders);
   ImGui::Checkbox("Audio Enabled", &options.audioEnabled);
-  ImGui::SliderFloat("Master Volume", &options.masterVolume, 0.0f, 1.0f);
+  ImGui::SliderFloat("Master Volume", &options.masterVolume, 0.0F, 1.0F);
+  ImGui::Separator();
+  ImGui::Checkbox("Pause Execution", &options.isPaused);
+  ImGui::SliderFloat("Time Scale", &options.timeScale, 0.0F, 5.0F);
   ImGui::End();
 }
 
 void RenderDebugGUISystem::EditorSettingsWindow(EngineOptions& options) {
-  // Always visible if editor is on
   ImGui::Begin("Editor Settings");
-  ImGui::SliderFloat("Font Size", &options.editorFontSize, 8.0f, 48.0f);
-  if (ImGui::IsItemDeactivatedAfterEdit()) {
-    Logger::Info("Editor font size changed, restart required for full effect.");
+
+  ImGui::SeparatorText("Appearance");
+  static float pendingFontSize = options.editorFontSize;
+  if (pendingFontSize <= 0.0F) pendingFontSize = options.editorFontSize;
+
+  ImGui::SliderFloat("Font Size", &pendingFontSize, 10.0F, 40.0F, "%.0f px");
+  ImGui::SameLine();
+  if (ImGui::Button("Reset")) {
+    pendingFontSize = 0.0F;
   }
 
+  if (ImGui::Button("Apply Font Size")) {
+    options.editorFontSize = pendingFontSize;
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Clear();
+    ImFontConfig fontConfig;
+    fontConfig.SizePixels = (pendingFontSize > 0.0F) ? pendingFontSize : 16.0F;
+    fontConfig.OversampleH = 2;
+    fontConfig.OversampleV = 2;
+    io.FontDefault = io.Fonts->AddFontDefault(&fontConfig);
+    io.Fonts->Build();
+    ImGui_ImplSDLRenderer3_DestroyDeviceObjects();
+    ImGui_ImplSDLRenderer3_CreateDeviceObjects();
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("(rebuilds font atlas)");
+
   const char* styles[] = {"Dark", "Light", "Classic"};
-  if (ImGui::Combo("Editor Style", &options.editorStyleIndex, styles, IM_ARRAYSIZE(styles))) {
+  if (ImGui::Combo("Theme", &options.editorStyleIndex, styles, IM_ARRAYSIZE(styles))) {
     ApplyEditorStyle(options.editorStyleIndex);
   }
+
   ImGui::End();
 }
 #endif
@@ -238,184 +280,389 @@ void RenderDebugGUISystem::FPSWindow(const float deltaTime) {
   fpsHistory[fpsOffset] = fps;
   fpsOffset = (fpsOffset + 1) % 120;
 
-  float avgFps = 0;
-  for (float f : fpsHistory) avgFps += f;
-  avgFps /= 120.0f;
-
-  ImGui::SetNextWindowPos(ImVec2(10, 10), ImGuiCond_FirstUseEver);
-  ImGui::Begin("Performance", nullptr, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav);
-  ImGui::Text("FPS: %.1f (avg: %.1f)", static_cast<double>(fps), static_cast<double>(avgFps));
-  ImGui::PlotLines("##fps", fpsHistory, 120, fpsOffset, nullptr, 0.0f, 120.0f, ImVec2(150, 40));
+  ImGui::Begin("FPS");
+  char overlay[32];
+  snprintf(overlay, sizeof(overlay), "%.1f FPS", static_cast<double>(fps));
+  ImGui::PlotLines("##fps", fpsHistory, 120, fpsOffset, overlay, 0.0f, 120.0f, ImVec2(0, 50));
   ImGui::End();
 }
 
 void RenderDebugGUISystem::EntityInfoWindow(const Registry* registry) {
-  ImGui::SetNextWindowPos(ImVec2(10, 80), ImGuiCond_FirstUseEver);
-  ImGui::Begin("Entity Info", nullptr, ImGuiWindowFlags_AlwaysAutoResize);
-  ImGui::Text("User Entities: %zu", registry->GetUserEntityCount());
+  const auto count = registry->GetUserEntityCount();
+  ImGui::Begin("Entity Info");
+  ImGui::Text("Entity Count: %llu", static_cast<unsigned long long>(count));
   ImGui::End();
 }
 
 #ifdef OCTARINE_WITH_EDITOR
 void RenderDebugGUISystem::PerformanceProfilerWindow() {
-#ifdef OCTARINE_PROFILING
   ImGui::Begin("Performance Profiler");
-  if (ImGui::Button("Clear Max Values")) {
-    PerfUtils::ProfilingAccumulator::Clear();
-  }
-
-  if (ImGui::BeginTable("ProfilingTable", 3, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-    ImGui::TableSetupColumn("Metric");
-    ImGui::TableSetupColumn("Last (ms)");
-    ImGui::TableSetupColumn("Max (ms)");
+  const auto times = PerfUtils::ProfilingAccumulator::GetAccumulatedTimes();
+  if (ImGui::BeginTable("profiler_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+    ImGui::TableSetupColumn("System/Scope");
+    ImGui::TableSetupColumn("Time (ms)");
     ImGui::TableHeadersRow();
 
-    const auto& lastTimers = PerfUtils::ProfilingAccumulator::GetLastTimers();
-    const auto& maxTimers = PerfUtils::ProfilingAccumulator::GetMaxTimers();
-
-    for (const auto& [name, value] : lastTimers) {
+    for (const auto& [name, duration_us] : times) {
       ImGui::TableNextRow();
       ImGui::TableSetColumnIndex(0);
       ImGui::Text("%s", name.c_str());
       ImGui::TableSetColumnIndex(1);
-      ImGui::Text("%.3f", value);
-      ImGui::TableSetColumnIndex(2);
-      ImGui::Text("%.3f", maxTimers.at(name));
+      ImGui::Text("%.3f", static_cast<double>(duration_us) * 0.001);
     }
     ImGui::EndTable();
   }
 
   ImGui::Separator();
-  ImGui::Text("System Accumulators (Collision, etc):");
-  if (ImGui::BeginTable("AccumTable", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
-    ImGui::TableSetupColumn("Accumulator");
-    ImGui::TableSetupColumn("Total (ms)");
+  const auto counters = PerfUtils::PerfCounters::GetCounters();
+  if (!counters.empty() && ImGui::BeginTable("counters_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+    ImGui::TableSetupColumn("Counter");
+    ImGui::TableSetupColumn("Value");
     ImGui::TableHeadersRow();
 
-    const auto& accumulators = PerfUtils::ProfilingAccumulator::GetLastAccumulators();
-    for (const auto& [name, value] : accumulators) {
+    for (const auto& [name, value] : counters) {
       ImGui::TableNextRow();
       ImGui::TableSetColumnIndex(0);
       ImGui::Text("%s", name.c_str());
       ImGui::TableSetColumnIndex(1);
-      ImGui::Text("%.3f", value);
+      ImGui::Text("%lld", value);
     }
     ImGui::EndTable();
   }
   ImGui::End();
-#else
-  ImGui::Begin("Performance Profiler");
-  ImGui::Text("Profiling is disabled.");
-  ImGui::Text("Rebuild with OCTARINE_ENABLE_PROFILING=ON to see data.");
-  ImGui::End();
-#endif
 }
 
 void RenderDebugGUISystem::HierarchyWindow(Registry* registry) {
-  static auto selectedEntity = Entity();
+  ImGui::Begin("Hierarchy / Entity Inspector");
+  const auto entities = registry->GetUserEntities();
+  ImGui::Text("Total User Entities: %zu", entities.size());
+  if (ImGui::Button("Create Entity")) {
+    registry->CreateEntity();
+  }
 
-  ImGui::Begin("Hierarchy");
-  const auto& entities = registry->GetUserEntities();
+  static Entity selectedEntity{UINT64_MAX};
+  static ImGuiTextFilter entityFilter;
+  entityFilter.Draw("##filter", 140);
+
+  ImGui::BeginChild("EntityList", ImVec2(150, 0), true);
   for (const auto& entity : entities) {
-    std::string label = "Entity " + std::to_string(entity.GetId());
-    if (registry->HasComponent<TransformComponent>(entity)) {
-      label += " (Transform)";
-    }
-
+    std::string label = "Entity " + std::to_string(entity.id);
+    if (!entityFilter.PassFilter(label.c_str())) continue;
     if (ImGui::Selectable(label.c_str(), selectedEntity == entity)) {
       selectedEntity = entity;
     }
   }
-  ImGui::End();
+  ImGui::EndChild();
 
-  ImGui::Begin("Inspector");
+  ImGui::SameLine();
+
+  ImGui::BeginChild("EntityDetails", ImVec2(0, 0), true);
   if (registry->IsAlive(selectedEntity)) {
-    ImGui::Text("ID: %u", selectedEntity.GetId());
+    ImGui::Text("Selected Entity ID: %u", selectedEntity.GetId());
+    ImGui::SameLine();
+    if (ImGui::Button("Destroy Entity")) {
+      registry->BlamEntity(selectedEntity);
+      selectedEntity = Entity{UINT64_MAX};
+    }
     ImGui::Separator();
 
     if (registry->HasComponent<TransformComponent>(selectedEntity)) {
       if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
-        auto& t = registry->GetComponent<TransformComponent>(selectedEntity);
-        ImGui::DragFloat2("Position", &t.position.x, 1.0f);
-        ImGui::DragFloat2("Scale", &t.scale.x, 0.1f);
-        float rotation = static_cast<float>(t.rotation);
-        if (ImGui::DragFloat("Rotation", &rotation, 1.0f)) {
-          t.rotation = rotation;
+        auto& transform = registry->GetComponent<TransformComponent>(selectedEntity);
+        ImGui::DragFloat2("Position", &transform.position.x);
+        ImGui::DragFloat2("Scale", &transform.scale.x);
+        auto rotation = static_cast<float>(transform.rotation);
+        if (ImGui::DragFloat("Rotation", &rotation)) {
+          transform.rotation = rotation;
         }
       }
     }
-    // Add more component editors here...
+    if (registry->HasComponent<HealthComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("Health", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& health = registry->GetComponent<HealthComponent>(selectedEntity);
+        ImGui::SliderInt("HP", &health.currentHealth, 0, health.maxHealth);
+      }
+    }
+    if (registry->HasComponent<SpriteComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& sprite = registry->GetComponent<SpriteComponent>(selectedEntity);
+        ImGui::DragInt("Layer", &sprite.layer);
+        ImGui::Text("Asset ID: %s", sprite.assetId.c_str());
+        ImGui::DragFloat("Width", &sprite.width);
+        ImGui::DragFloat("Height", &sprite.height);
+        ImGui::Checkbox("Fixed", &sprite.isFixed);
+        auto& assetManager = registry->Get<AssetManager>();
+        if (auto* tex = assetManager.GetTexture(sprite.assetId); tex != nullptr) {
+          ImGui::Image(reinterpret_cast<ImTextureID>(tex), ImVec2(64, 64));
+        }
+      }
+    }
+    if (registry->HasComponent<RigidBodyComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("RigidBody", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& rb = registry->GetComponent<RigidBodyComponent>(selectedEntity);
+        ImGui::DragFloat2("Velocity", &rb.velocity.x, 1.0f);
+      }
+    }
+    if (registry->HasComponent<BoxColliderComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("BoxCollider", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& bc = registry->GetComponent<BoxColliderComponent>(selectedEntity);
+        ImGui::DragInt("Width", &bc.width);
+        ImGui::DragInt("Height", &bc.height);
+        ImGui::DragFloat2("Offset", &bc.offset.x, 1.0f);
+      }
+    }
+    if (registry->HasComponent<AnimationComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("Animation", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& anim = registry->GetComponent<AnimationComponent>(selectedEntity);
+        ImGui::Text("Num Frames: %d", anim.numFrames);
+        ImGui::SliderInt("Current Frame", &anim.currentFrame, 1, anim.numFrames);
+        ImGui::DragInt("Frame Speed (ms)", &anim.frameRateSpeed);
+        ImGui::Checkbox("Looping", &anim.shouldLoop);
+      }
+    }
+    if (registry->HasComponent<ProjectileEmitterComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("ProjectileEmitter", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& pe = registry->GetComponent<ProjectileEmitterComponent>(selectedEntity);
+        ImGui::DragFloat2("Velocity", &pe.velocity.x, 1.0f);
+        ImGui::DragFloat("Frequency (s)", &pe.frequency, 0.1f);
+        ImGui::DragFloat("Duration (s)", &pe.duration, 0.1f);
+        ImGui::DragInt("Damage", &pe.damage);
+      }
+    }
+    if (registry->HasComponent<TextLabelComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("TextLabel", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& tl = registry->GetComponent<TextLabelComponent>(selectedEntity);
+        char buf[256];
+        snprintf(buf, sizeof(buf), "%s", tl.text.c_str());
+        if (ImGui::InputText("Text", buf, sizeof(buf))) tl.text = buf;
+        ImGui::Text("Font ID: %s", tl.fontId.c_str());
+        float col[4] = {tl.color.r / 255.0f, tl.color.g / 255.0f, tl.color.b / 255.0f, tl.color.a / 255.0f};
+        if (ImGui::ColorEdit4("Color", col)) {
+          tl.color = {static_cast<Uint8>(col[0] * 255), static_cast<Uint8>(col[1] * 255),
+                      static_cast<Uint8>(col[2] * 255), static_cast<Uint8>(col[3] * 255)};
+        }
+        ImGui::Checkbox("Fixed", &tl.isFixed);
+      }
+    }
+    if (registry->HasComponent<ScriptComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("Script", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Text("Has Lua script table and callbacks.");
+      }
+    }
+    if (registry->HasComponent<CameraFollowComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("CameraFollow", ImGuiTreeNodeFlags_DefaultOpen)) {
+        ImGui::Text("Entity is being followed by the camera.");
+      }
+    }
+    if (registry->HasComponent<EntityMaskComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("EntityMask", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& em = registry->GetComponent<EntityMaskComponent>(selectedEntity);
+        ImGui::Text("Mask: %s", em.mask.to_string().c_str());
+      }
+    }
+    if (registry->HasComponent<KeyboardControlComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("KeyboardControl", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& kc = registry->GetComponent<KeyboardControlComponent>(selectedEntity);
+        auto vel = static_cast<float>(kc.velocity);
+        if (ImGui::DragFloat("Velocity", &vel)) {
+          kc.velocity = vel;
+        }
+      }
+    }
+    if (registry->HasComponent<ProjectileComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("Projectile", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& pc = registry->GetComponent<ProjectileComponent>(selectedEntity);
+        ImGui::DragInt("Damage", &pc.damage);
+        ImGui::Text("Timer: %.2f / %.2f", pc.timer, pc.duration);
+      }
+    }
+    if (registry->HasComponent<SquarePrimitiveComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("SquarePrimitive", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& sp = registry->GetComponent<SquarePrimitiveComponent>(selectedEntity);
+        ImGui::DragFloat2("Position", &sp.position.x);
+        ImGui::DragInt("Layer", &sp.layer);
+        ImGui::DragFloat("Width", &sp.width);
+        ImGui::DragFloat("Height", &sp.height);
+        float col[4] = {sp.color.r / 255.0f, sp.color.g / 255.0f, sp.color.b / 255.0f, sp.color.a / 255.0f};
+        if (ImGui::ColorEdit4("Color", col)) {
+          sp.color = {static_cast<Uint8>(col[0] * 255), static_cast<Uint8>(col[1] * 255),
+                      static_cast<Uint8>(col[2] * 255), static_cast<Uint8>(col[3] * 255)};
+        }
+        ImGui::Checkbox("Fixed", &sp.isFixed);
+      }
+    }
+    if (registry->HasComponent<UIButtonComponent>(selectedEntity)) {
+      if (ImGui::CollapsingHeader("UIButton", ImGuiTreeNodeFlags_DefaultOpen)) {
+        auto& ub = registry->GetComponent<UIButtonComponent>(selectedEntity);
+        ImGui::Checkbox("Active", &ub.isActive);
+      }
+    }
+
+    ImGui::Separator();
+    if (ImGui::BeginCombo("Add Component", "Select...")) {
+      if (!registry->HasComponent<TransformComponent>(selectedEntity) && ImGui::Selectable("Transform"))
+        registry->AddComponent(selectedEntity, TransformComponent());
+      if (!registry->HasComponent<RigidBodyComponent>(selectedEntity) && ImGui::Selectable("RigidBody"))
+        registry->AddComponent(selectedEntity, RigidBodyComponent());
+      if (!registry->HasComponent<SpriteComponent>(selectedEntity) && ImGui::Selectable("Sprite"))
+        registry->AddComponent(selectedEntity, SpriteComponent());
+      if (!registry->HasComponent<BoxColliderComponent>(selectedEntity) && ImGui::Selectable("BoxCollider"))
+        registry->AddComponent(selectedEntity, BoxColliderComponent());
+      if (!registry->HasComponent<AnimationComponent>(selectedEntity) && ImGui::Selectable("Animation"))
+        registry->AddComponent(selectedEntity, AnimationComponent());
+      if (!registry->HasComponent<HealthComponent>(selectedEntity) && ImGui::Selectable("Health"))
+        registry->AddComponent(selectedEntity, HealthComponent(100));
+      if (!registry->HasComponent<KeyboardControlComponent>(selectedEntity) && ImGui::Selectable("KeyboardControl"))
+        registry->AddComponent(selectedEntity, KeyboardControlComponent());
+      if (!registry->HasComponent<CameraFollowComponent>(selectedEntity) && ImGui::Selectable("CameraFollow"))
+        registry->AddComponent(selectedEntity, CameraFollowComponent());
+      if (!registry->HasComponent<ProjectileEmitterComponent>(selectedEntity) && ImGui::Selectable("ProjectileEmitter"))
+        registry->AddComponent(selectedEntity, ProjectileEmitterComponent());
+      if (!registry->HasComponent<TextLabelComponent>(selectedEntity) && ImGui::Selectable("TextLabel"))
+        registry->AddComponent(selectedEntity, TextLabelComponent());
+      if (!registry->HasComponent<UIButtonComponent>(selectedEntity) && ImGui::Selectable("UIButton"))
+        registry->AddComponent(selectedEntity, UIButtonComponent());
+      if (!registry->HasComponent<SquarePrimitiveComponent>(selectedEntity) && ImGui::Selectable("SquarePrimitive"))
+        registry->AddComponent(selectedEntity, SquarePrimitiveComponent());
+      ImGui::EndCombo();
+    }
   } else {
-    ImGui::Text("Select an entity in the Hierarchy.");
+    ImGui::Text("No entity selected or entity destroyed.");
   }
+  ImGui::EndChild();
   ImGui::End();
 }
 
 void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open) {
-  ImGui::OpenPopup("Project Selector");
-  if (ImGui::BeginPopupModal("Project Selector", p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
-    auto& gameConfig = game->GetRegistry()->Get<GameConfig>();
-    static char projectPath[256] = "";
-    strncpy(projectPath, gameConfig.GetEngineOptions().lastProjectPath.c_str(), sizeof(projectPath));
+  ImGui::SetNextWindowSize(ImVec2(400, 240), ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Project Selector", p_open, ImGuiWindowFlags_NoDocking)) {
+    ImGui::End();
+    return;
+  }
+  auto& gameConfig = game->GetRegistry()->Get<GameConfig>();
+  auto& options = gameConfig.GetEngineOptions();
+  static char projectPath[256] = "";
+  static std::string lastKnownProjectPath;
+  if (lastKnownProjectPath != options.lastProjectPath) {
+    snprintf(projectPath, sizeof(projectPath), "%s", options.lastProjectPath.c_str());
+    lastKnownProjectPath = options.lastProjectPath;
+  }
 
-    ImGui::Text("Select a project folder to load:");
-    ImGui::SetNextItemWidth(300);
-    ImGui::InputText("##path", projectPath, sizeof(projectPath));
-    ImGui::SameLine();
-    if (ImGui::Button("Browse...")) {
-      SDL_ShowOpenFileDialog(OnProjectFolderSelected, game, game->GetWindow(), nullptr, 0, nullptr, false);
-    }
+  ImGui::Text("Enter Project Path:");
+  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 40);
+  ImGui::InputText("##path", projectPath, sizeof(projectPath));
+  ImGui::SameLine();
+  if (ImGui::Button("...")) {
+    SDL_ShowOpenFolderDialog(OnProjectFolderSelected, game, game->GetWindow(), nullptr, false);
+  }
 
-    ImGui::Separator();
-    if (ImGui::Button("Load Project", ImVec2(120, 0))) {
-      gameConfig.LoadConfigFromFile(projectPath);
-      ImGui::CloseCurrentPopup();
-      *p_open = false;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Cancel", ImVec2(120, 0))) {
-      ImGui::CloseCurrentPopup();
-      *p_open = false;
-    }
+  if (ImGui::Button("Open Project", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+    options.lastProjectPath = projectPath;
+    gameConfig.SaveGlobalPreferences();
+    *p_open = false;
+    ImGui::OpenPopup("Restart Required");
+  }
+  if (ImGui::BeginPopupModal("Restart Required", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::Text("Project path saved. Please restart the engine to load the new project.");
+    if (ImGui::Button("OK", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
     ImGui::EndPopup();
   }
-}
-
-void RenderDebugGUISystem::SceneWindow(SDL_Texture* gameTexture, bool* p_open) {
-  ImGui::Begin("Scene", p_open);
-  const ImVec2 viewportSize = ImGui::GetContentRegionAvail();
-  if (gameTexture) {
-    ImGui::Image(reinterpret_cast<void*>(gameTexture), viewportSize);
+  if (!options.lastProjectPath.empty()) {
+    ImGui::Separator();
+    ImGui::Text("Last Project: %s", options.lastProjectPath.c_str());
+    if (ImGui::Button("Load Last Project"))
+      snprintf(projectPath, sizeof(projectPath), "%s", options.lastProjectPath.c_str());
   }
   ImGui::End();
 }
 
+void RenderDebugGUISystem::SceneWindow(SDL_Texture* gameTexture, bool* p_open) {
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+  if (ImGui::Begin("Scene View", p_open)) {
+    ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
+    if (gameTexture) {
+      float texW = 0, texH = 0;
+      SDL_GetTextureSize(gameTexture, &texW, &texH);
+      if (texW > 0 && texH > 0) {
+        float aspectRatio = texW / texH;
+        float targetW = viewportPanelSize.x;
+        float targetH = targetW / aspectRatio;
+        if (targetH > viewportPanelSize.y) {
+          targetH = viewportPanelSize.y;
+          targetW = targetH * aspectRatio;
+        }
+        ImVec2 imageSize(targetW, targetH);
+        ImVec2 imagePos =
+            ImVec2((viewportPanelSize.x - imageSize.x) * 0.5f, (viewportPanelSize.y - imageSize.y) * 0.5f);
+        ImGui::SetCursorPos(imagePos);
+        ImGui::Image(reinterpret_cast<ImTextureID>(gameTexture), imageSize);
+      }
+    }
+  }
+  ImGui::End();
+  ImGui::PopStyleVar();
+}
+
 void RenderDebugGUISystem::AssetBrowserWindow(Registry* registry) {
   ImGui::Begin("Asset Browser");
-  auto& am = registry->Get<AssetManager>();
+  auto& assetManager = registry->Get<AssetManager>();
   if (ImGui::CollapsingHeader("Textures", ImGuiTreeNodeFlags_DefaultOpen)) {
-    for (const auto& [id, texture] : am.GetTextures()) {
-      ImGui::Text("%s", id.c_str());
-    }
+    const auto& textures = assetManager.GetTextures();
+    ImGui::Text("Loaded: %zu", textures.size());
+    for (const auto& [id, texture] : textures) ImGui::BulletText("%s", id.c_str());
+  }
+  if (ImGui::CollapsingHeader("Fonts", ImGuiTreeNodeFlags_DefaultOpen)) {
+    const auto& fonts = assetManager.GetFonts();
+    ImGui::Text("Loaded: %zu", fonts.size());
+    for (const auto& [id, font] : fonts) ImGui::BulletText("%s", id.c_str());
+  }
+  if (ImGui::CollapsingHeader("Audio Clips", ImGuiTreeNodeFlags_DefaultOpen)) {
+    const auto& audioClips = assetManager.GetAudioClips();
+    ImGui::Text("Loaded: %zu", audioClips.size());
+    for (const auto& [id, clip] : audioClips) ImGui::BulletText("%s", id.c_str());
   }
   ImGui::End();
 }
 
 void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua) {
   static char inputBuffer[256] = "";
+  static std::vector<std::string> commandHistory;
+  static int commandHistoryIndex = -1;
   static bool scrollToBottom = false;
   static bool reclaimFocus = false;
 
-  ImGui::Begin("Lua Console");
+  ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Lua Console")) {
+    ImGui::End();
+    return;
+  }
+
+  if (ImGui::Button("Clear")) {
+    Logger::ClearHistory();
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("Type Lua commands below. Use Up/Down for history.");
 
   const float footerHeightToReserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
   ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footerHeightToReserve), false, ImGuiWindowFlags_HorizontalScrollbar);
 
   Logger::ForEachHistory([](const std::string& line) {
+    ImVec4 color = ImVec4(1.0F, 1.0F, 1.0F, 1.0F);
+    if (line.find("[Error]") != std::string::npos) {
+      color = ImVec4(1.0F, 0.4F, 0.4F, 1.0F);
+    } else if (line.find("[Warn]") != std::string::npos) {
+      color = ImVec4(1.0F, 1.0F, 0.4F, 1.0F);
+    } else if (line.find("[Info]") != std::string::npos) {
+      color = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
+    } else if (line.find("> ") == 0) {
+      color = ImVec4(0.4F, 0.8F, 1.0F, 1.0F);
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, color);
     ImGui::TextUnformatted(line.c_str());
+    ImGui::PopStyleColor();
   });
 
-  if (scrollToBottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+  if (scrollToBottom) {
     ImGui::SetScrollHereY(1.0f);
   }
   scrollToBottom = false;
@@ -423,13 +670,50 @@ void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua) {
 
   ImGui::Separator();
 
-  if (ImGui::InputText("Input", inputBuffer, sizeof(inputBuffer), ImGuiInputTextFlags_EnterReturnsTrue)) {
-    std::string input(inputBuffer);
-    if (!input.empty()) {
-      Logger::LogLua("> " + input);
-      auto result = lua.safe_script(input, sol::script_pass_on_error);
+  struct CallbackData {
+    std::vector<std::string>* history;
+    int* index;
+  } cbData{&commandHistory, &commandHistoryIndex};
+
+  auto wrappedCallback = [](ImGuiInputTextCallbackData* data) -> int {
+    auto* cb = static_cast<CallbackData*>(data->UserData);
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
+      if (data->EventKey == ImGuiKey_UpArrow) {
+        if (*cb->index == -1) {
+          *cb->index = static_cast<int>(cb->history->size()) - 1;
+        } else if (*cb->index > 0) {
+          (*cb->index)--;
+        }
+      } else if (data->EventKey == ImGuiKey_DownArrow) {
+        if (*cb->index != -1) {
+          if (*cb->index < static_cast<int>(cb->history->size()) - 1) {
+            (*cb->index)++;
+          } else {
+            *cb->index = -1;
+          }
+        }
+      }
+      if (*cb->index != -1) {
+        data->DeleteChars(0, data->BufTextLen);
+        data->InsertChars(0, (*cb->history)[*cb->index].c_str());
+      } else {
+        data->DeleteChars(0, data->BufTextLen);
+      }
+    }
+    return 0;
+  };
+
+  ImGuiInputTextFlags inputTextFlags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory;
+  if (ImGui::InputText("##Input", inputBuffer, IM_ARRAYSIZE(inputBuffer), inputTextFlags, wrappedCallback, &cbData)) {
+    std::string command(inputBuffer);
+    if (!command.empty()) {
+      Logger::LogLua("> " + command);
+      commandHistory.push_back(command);
+      commandHistoryIndex = -1;
+
+      auto result = lua.safe_script(command, sol::script_pass_on_error);
       if (!result.valid()) {
-        sol::error err = result;
+        const sol::error err = result;
         Logger::ErrorLua(std::string(err.what()));
       }
 
@@ -439,7 +723,6 @@ void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua) {
     }
   }
 
-  // Auto-focus
   if (reclaimFocus) {
     ImGui::SetKeyboardFocusHere(-1);
     reclaimFocus = false;

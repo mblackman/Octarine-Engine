@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # Run OctarineEngine headlessly for a short period to capture TIMER: output.
 #
-# Usage: scripts/bench.sh [preset] [duration_seconds]
-#   preset:   player-profile (default: player-profile)
+# Usage: scripts/bench.sh [duration_seconds]
 #   duration: integer seconds (default: 8)
 #
-# The stress scene reaches steady state in ~2s. The default 8s run combined
-# with the parser's --warmup 2 flag gives ~6s of pure plateau data.
-# Bump the duration if you want more signal.
+# Always uses the player-profile preset — that's the only build that emits
+# TIMER lines. The stress scene reaches steady state in ~2s. The default 8s run
+# combined with the parser's --warmup 2 flag gives ~6s of pure plateau data.
 #
 # Env:
 #   OCT_BENCH_GAME   Path to a game dir containing config.ini.
@@ -21,17 +20,10 @@
 
 set -euo pipefail
 
-preset="${1:-player-profile}"
-duration="${2:-8}"
+duration="${1:-8}"
 
-case "$preset" in
-  player-profile) config_dir=relwithdebinfo ;;
-  *)
-    echo "error: preset must be player-profile (got '$preset')" >&2
-    echo "       other presets have OCTARINE_ENABLE_PROFILING=OFF, so no TIMER output." >&2
-    exit 2
-    ;;
-esac
+preset=player-profile
+config_dir=relwithdebinfo
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd "$script_dir/.." && pwd)"

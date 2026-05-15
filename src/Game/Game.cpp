@@ -125,9 +125,13 @@ bool Game::Initialize(const std::string &assetPath) {
   }
 
 #ifdef OCTARINE_WITH_EDITOR
-  bool defaultToEditor = startup_mode_.empty() || startup_mode_ == "editor";
+  const bool defaultToEditor = startup_mode_.empty() || startup_mode_ == "editor";
 #else
-  bool defaultToEditor = startup_mode_ == "editor";
+  if (startup_mode_ == "editor") {
+    Logger::Error("--startup-mode editor was requested but this is a player build (built without OCTARINE_WITH_EDITOR).");
+    return false;
+  }
+  const bool defaultToEditor = false;
 #endif
 
   if (!projectLoaded || defaultToEditor) {
@@ -188,16 +192,12 @@ bool Game::Initialize(const std::string &assetPath) {
   ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
   ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
 
-  // Load the default font.
   io.Fonts->Clear();
-  io.Fonts->AddFontDefault();
-
 #ifdef OCTARINE_WITH_EDITOR
   // --- Resolve editor font size (DPI-aware default) ---
   auto &options = gameConfig.GetEngineOptions();
   float fontSize = options.editorFontSize;
   if (fontSize <= 0.0F) {
-    // Auto-detect: query the display DPI and scale from a 16px baseline.
     const SDL_DisplayID displayId = SDL_GetPrimaryDisplay();
     const SDL_DisplayMode *mode = SDL_GetCurrentDisplayMode(displayId);
     float dpiScale = 1.0F;
@@ -212,10 +212,10 @@ bool Game::Initialize(const std::string &assetPath) {
   fontConfig.OversampleH = 2;
   fontConfig.OversampleV = 2;
   io.FontDefault = io.Fonts->AddFontDefault(&fontConfig);
-  // Apply the saved editor style.
   RenderDebugGUISystem::ApplyEditorStyle(options.editorStyleIndex);
+#else
+  io.Fonts->AddFontDefault();
 #endif
-
   io.Fonts->Build();
 #endif
 
@@ -298,10 +298,12 @@ void Game::Setup() {
     // Bench runs shouldn't pay for debug overlays. Force-zero every toggle that would
     auto &options = gameConfig.GetEngineOptions();
     options.showDebugGUI = false;
-#ifdef OCTARINE_WITH_EDITOR
+#ifdef OCTARINE_WITH_IMGUI
     options.showFpsCounter = false;
     options.showEntityInfo = false;
     options.showProfiler = false;
+#endif
+#ifdef OCTARINE_WITH_EDITOR
     options.showHierarchy = false;
     options.showAssetBrowser = false;
     options.showSceneWindow = false;
@@ -548,9 +550,7 @@ void Game::LoadScene(const std::string &scenePath) {
 
   auto &options = gameConfig.GetEngineOptions();
   options.currentScenePath = scenePath;
-#ifdef OCTARINE_WITH_EDITOR
   options.showSceneWindow = true;
-#endif
 
   sol::protected_function_result result = lua.safe_script_file(fullPath);
   if (!result.valid()) {

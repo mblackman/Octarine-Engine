@@ -170,7 +170,6 @@ void GameConfig::SaveUserPreferences() {
 
   file << "showDebugGUI=" << (engine_options_.showDebugGUI ? "true" : "false") << "\n";
   file << "drawColliders=" << (engine_options_.drawColliders ? "true" : "false") << "\n";
-#ifdef OCTARINE_WITH_EDITOR
   file << "showFpsCounter=" << (engine_options_.showFpsCounter ? "true" : "false") << "\n";
   file << "showEntityInfo=" << (engine_options_.showEntityInfo ? "true" : "false") << "\n";
   file << "showProfiler=" << (engine_options_.showProfiler ? "true" : "false") << "\n";
@@ -179,12 +178,9 @@ void GameConfig::SaveUserPreferences() {
   file << "showLuaConsole=" << (engine_options_.showLuaConsole ? "true" : "false") << "\n";
   file << "showSceneWindow=" << (engine_options_.showSceneWindow ? "true" : "false") << "\n";
   file << "showSceneManagement=" << (engine_options_.showSceneManagement ? "true" : "false") << "\n";
-#endif
   file << "masterVolume=" << engine_options_.masterVolume << "\n";
-#ifdef OCTARINE_WITH_EDITOR
   file << "editorFontSize=" << engine_options_.editorFontSize << "\n";
   file << "editorStyleIndex=" << engine_options_.editorStyleIndex << "\n";
-#endif
   file << "currentScenePath=" << engine_options_.currentScenePath << "\n";
 
   file.close();
@@ -210,7 +206,6 @@ void GameConfig::LoadUserPreferences() {
       engine_options_.showDebugGUI = (value == "true");
     else if (key == "drawColliders")
       engine_options_.drawColliders = (value == "true");
-#ifdef OCTARINE_WITH_EDITOR
     else if (key == "showFpsCounter")
       engine_options_.showFpsCounter = (value == "true");
     else if (key == "showEntityInfo")
@@ -227,15 +222,12 @@ void GameConfig::LoadUserPreferences() {
       engine_options_.showSceneWindow = (value == "true");
     else if (key == "showSceneManagement")
       engine_options_.showSceneManagement = (value == "true");
-#endif
     else if (key == "masterVolume")
       engine_options_.masterVolume = std::stof(value);
-#ifdef OCTARINE_WITH_EDITOR
     else if (key == "editorFontSize")
       engine_options_.editorFontSize = std::stof(value);
     else if (key == "editorStyleIndex")
       engine_options_.editorStyleIndex = std::stoi(value);
-#endif
     else if (key == "currentScenePath")
       engine_options_.currentScenePath = value;
   }

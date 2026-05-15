@@ -16,7 +16,6 @@ class Game;
 class RenderDebugGUISystem {
  public:
   void operator()(const ContextFacade& context, ScriptComponent& script) const {
-#ifdef OCTARINE_WITH_IMGUI
     if (script.onDebugGUIFunction == sol::lua_nil) {
       return;
     }
@@ -24,12 +23,11 @@ class RenderDebugGUISystem {
       const sol::error err = result;
       Logger::ErrorLua(std::string(err.what()));
     }
-#endif
   }
 
-  /// Apply one of the three built-in ImGui styles.  0 = Dark, 1 = Light, 2 = Classic.
-  static void ApplyEditorStyle([[maybe_unused]] const int styleIndex) {
 #ifdef OCTARINE_WITH_EDITOR
+  /// Apply one of the three built-in ImGui styles.  0 = Dark, 1 = Light, 2 = Classic.
+  static void ApplyEditorStyle(const int styleIndex) {
     switch (styleIndex) {
       default:
       case 0:
@@ -42,7 +40,6 @@ class RenderDebugGUISystem {
         ImGui::StyleColorsClassic();
         break;
     }
-    // Slightly rounded corners and extra frame padding for readability at any scale.
     ImGuiStyle& style = ImGui::GetStyle();
     style.FrameRounding = 4.0F;
     style.GrabRounding = 4.0F;
@@ -51,8 +48,8 @@ class RenderDebugGUISystem {
     style.ItemSpacing = ImVec2(8, 6);
     style.ScrollbarSize = 16.0F;
     style.GrabMinSize = 14.0F;
-#endif
   }
+#endif
 
   static void Render(Game* game, SDL_Renderer* renderer, SDL_Texture* gameTexture, const float deltaTime);
 

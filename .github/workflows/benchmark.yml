@@ -115,7 +115,7 @@ jobs:
         run: |
           chmod +x scripts/bench.sh
           chmod +x scripts/parse_bench_output.py
-          OCT_BENCH_GAME=example_repo scripts/bench.sh player-profile 8 | python3 scripts/parse_bench_output.py --warmup 2 > macro_bench.json
+          OCT_BENCH_GAME=example_repo scripts/bench.sh 8 | python3 scripts/parse_bench_output.py --warmup 2 > macro_bench.json
 
       - name: Store macro-benchmark result
         uses: benchmark-action/github-action-benchmark@v1
