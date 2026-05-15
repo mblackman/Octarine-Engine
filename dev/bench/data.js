@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778859373182,
+  "lastUpdate": 1778860426824,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -2304,6 +2304,114 @@ window.BENCHMARK_DATA = {
             "value": 646011.0091071986,
             "unit": "ns/iter",
             "extra": "iterations: 1083\ncpu: 645928.5364727438 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "a9b5acbfb22c72cfdb7872c2a12d52641fbd466b",
+          "message": "Add audio source/sink, pool & deferred commands\n\nIntroduce AudioSourceComponent and AudioSinkComponent and wire audio into the ECS/Lua stack. Revamp AudioSystem to use a managed track pool with generation-tagged slots, dynamic initial/max sizing from EngineOptions, safer acquisition/ownership checks, proper mixer lifecycle, and per-entity sink management (playOnSpawn, loop, despawnOnFinish). Add deferred function channel and templated AddComponent to CommandBuffer, and ensure system wrappers playback command buffers after system execution. Update Registry playback to handle deferred component adds. Expose audio_source creation in the Lua component factory and register the AudioSystem via the Registry in Game::Setup; Init now reports failure instead of assuming success. These changes enable safe, deferred component mutations from systems, reduce per-frame audio retries, and prevent pool reuse races.",
+          "timestamp": "2026-05-15T09:46:43-06:00",
+          "tree_id": "7dd89baef189dfdd9ad8f46d953957278095d914",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/a9b5acbfb22c72cfdb7872c2a12d52641fbd466b"
+        },
+        "date": 1778860418039,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4017.5618949863356,
+            "unit": "ns/iter",
+            "extra": "iterations: 172545\ncpu: 4055.5292996030234 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 15957.821179474817,
+            "unit": "ns/iter",
+            "extra": "iterations: 42333\ncpu: 16005.538657784908 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 107681.3338582936,
+            "unit": "ns/iter",
+            "extra": "iterations: 6456\ncpu: 107729.4165117745 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 898036.2216998202,
+            "unit": "ns/iter",
+            "extra": "iterations: 779\ncpu: 898038.2618741974 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1798555.263402787,
+            "unit": "ns/iter",
+            "extra": "iterations: 385\ncpu: 1798686.8181818423 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2380.569882056039,
+            "unit": "ns/iter",
+            "extra": "iterations: 294647\ncpu: 2377.293038789467 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10001.530814089707,
+            "unit": "ns/iter",
+            "extra": "iterations: 69867\ncpu: 9997.390069701956 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 100526.91556135728,
+            "unit": "ns/iter",
+            "extra": "iterations: 7005\ncpu: 100526.40599571675 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 396569.6579607998,
+            "unit": "ns/iter",
+            "extra": "iterations: 1761\ncpu: 396565.3617262832 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2359.660219884403,
+            "unit": "ns/iter",
+            "extra": "iterations: 290673\ncpu: 2329.9965459472005 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 7008.873303334912,
+            "unit": "ns/iter",
+            "extra": "iterations: 101554\ncpu: 6974.111526874914 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41926.76553153663,
+            "unit": "ns/iter",
+            "extra": "iterations: 16731\ncpu: 41891.50337697924 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 323175.4917410852,
+            "unit": "ns/iter",
+            "extra": "iterations: 2168\ncpu: 323062.54935427697 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 651707.7435649211,
+            "unit": "ns/iter",
+            "extra": "iterations: 1085\ncpu: 651550.2617511956 ns\nthreads: 1"
           }
         ]
       }
