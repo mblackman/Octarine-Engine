@@ -285,6 +285,7 @@ class Registry {
      public:
       SystemWrapper(Registry* registry, Func&& f)
           : ISystem(PrettifyTypeName(typeid(StoredFunc).name())),
+            registry_(registry),
             func_(std::forward<Func>(f)),
             query_(registry->CreateQuery<TArgs...>()) {}
 
@@ -292,11 +293,16 @@ class Registry {
         query_->Update();
         // Pass by reference so captured state in the system lambda persists across invocations.
         query_->ForEach(func_);
+
+        if constexpr (requires { func_.GetCommandBuffer(); }) {
+          func_.GetCommandBuffer().Playback(registry_);
+        }
       }
 
       StoredFunc& GetFunc() { return func_; }
 
      private:
+      Registry* registry_;
       StoredFunc func_;
       std::unique_ptr<ComponentQuery<TArgs...>> query_;
     };

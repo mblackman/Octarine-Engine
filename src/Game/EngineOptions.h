@@ -8,6 +8,8 @@ struct EngineOptions {
   bool showImGuiDemoWindow = false;
   bool audioEnabled = true;
   float masterVolume = 1.0F;
+  int audioTrackPoolInitial = 32;
+  int audioTrackPoolMax = 128;
   bool isPaused = false;
   float timeScale = 1.0F;
   bool stepFrame = false;

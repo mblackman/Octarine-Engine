@@ -345,9 +345,13 @@ void Game::Setup() {
   }
 
   // Audio must be live before LoadGame: the startup script may call load_asset for audio_clip
-  // entries, which need the mixer.
-  auto &audioSystem = registry_->Set<AudioSystem>(AudioSystem());
-  audioSystem.Init(registry_.get(), event_bus_);
+  // entries, which need the mixer. RegisterSystem owns the single AudioSystem instance — Init
+  // runs against that instance so the EventBus subscription, cmd buffer, and per-frame Update
+  // all share state.
+  auto &audioSystem = registry_->RegisterSystem<AudioSourceComponent>(AudioSystem());
+  if (!audioSystem.Init(registry_.get(), event_bus_)) {
+    Logger::Error("AudioSystem failed to initialize; audio disabled this session.");
+  }
 
   registry_->Set<EntityPoolManager>(EntityPoolManager());
 

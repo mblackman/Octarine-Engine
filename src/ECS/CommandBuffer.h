@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -38,16 +39,15 @@ struct Channel {
 };
 
 // Per-system, thread-safe deferred command buffer for state changes that must resolve
-// on the main thread (e.g. entity destruction). Render keys do NOT go through here —
-// parallel render systems write straight into the lock-free RenderQueue. Keeping this
-// buffer narrow avoids the channel + playback copy that dominated render perf.
+// on the main thread (e.g. entity destruction).
 class CommandBuffer {
  public:
   enum class CommandType { Blam, Despawn };
-  struct Command {
+  struct EntityCommand {
     CommandType type;
     Entity entity;
   };
+  using DeferredFn = std::function<void(Registry*)>;
 
   explicit CommandBuffer(size_t capacity = Constants::kSystemCommandBufferSize)
       : state_(std::make_unique<State>(capacity)) {}
@@ -57,16 +57,23 @@ class CommandBuffer {
   CommandBuffer(const CommandBuffer&) = delete;
   CommandBuffer& operator=(const CommandBuffer&) = delete;
 
-  void EmplaceBlam(Entity entity) const { state_->commands.Emplace(Command{CommandType::Blam, entity}); }
+  void EmplaceBlam(Entity entity) const { state_->commands.Emplace(EntityCommand{CommandType::Blam, entity}); }
 
-  void EmplaceDespawn(Entity entity) const { state_->commands.Emplace(Command{CommandType::Despawn, entity}); }
+  void EmplaceDespawn(Entity entity) const { state_->commands.Emplace(EntityCommand{CommandType::Despawn, entity}); }
+
+  template <typename T>
+  void AddComponent(Entity entity, T component) const {
+    state_->deferred.Emplace(
+        [entity, c = std::move(component)](Registry* r) mutable { r->AddComponent(entity, std::move(c)); });
+  }
 
   void Playback(Registry* registry) const;
 
  private:
   struct State {
-    Channel<Command> commands;
-    explicit State(const size_t capacity) : commands(capacity) {}
+    Channel<EntityCommand> commands;
+    Channel<DeferredFn> deferred;
+    explicit State(const size_t capacity) : commands(capacity), deferred(capacity) {}
   };
 
   std::unique_ptr<State> state_;

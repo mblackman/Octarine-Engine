@@ -5,6 +5,7 @@
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
 #include "Components/AnimationComponent.h"
+#include "Components/AudioSourceComponent.h"
 #include "Components/BoxColliderComponent.h"
 #include "Components/CameraFollowComponent.h"
 #include "Components/EntityMaskComponent.h"
@@ -219,5 +220,16 @@ public:
     const SDL_Color color = SafeGetColor(data, "color");
     const bool isFixed = SafeGetOptionalValue<bool>(data, "is_fixed", true);
     return TextLabelComponent(offsetPosition, layer, text, fontId, color, isFixed);
+  }
+
+  static AudioSourceComponent CreateAudioSourceComponent(const sol::table& data) {
+    using namespace LuaComponentHelpers;
+    const std::string clipId = data["clip_id"].get<std::string>();
+    const float volume = SafeGetOptionalValue<float>(data, "volume", 1.0f);
+    const float pitch = SafeGetOptionalValue<float>(data, "pitch", 1.0f);
+    const bool loop = SafeGetOptionalValue<bool>(data, "loop", false);
+    const bool playOnSpawn = SafeGetOptionalValue<bool>(data, "play_on_spawn", true);
+    const bool despawnOnFinish = SafeGetOptionalValue<bool>(data, "despawn_on_finish", false);
+    return AudioSourceComponent(clipId, volume, pitch, loop, playOnSpawn, despawnOnFinish);
   }
 };

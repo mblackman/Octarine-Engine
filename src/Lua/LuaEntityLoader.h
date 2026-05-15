@@ -258,6 +258,9 @@ private:
     {
       registry->AddComponent(ent, ComponentLuaFactory::CreateTextLabelComponent(data));
     };
+    factories["audio_source"] = [](Registry* registry, const Entity ent, const sol::table& data) {
+      registry->AddComponent(ent, ComponentLuaFactory::CreateAudioSourceComponent(data));
+    };
 
     return factories;
   }

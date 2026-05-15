@@ -574,7 +574,7 @@ void CommandBuffer::Playback(Registry* registry) const {
       registry->QueueDespawnEntity(chan.buffer[i].entity);
     }
   }
-  for (const Command& cmd : chan.overflow_buffer) {
+  for (const EntityCommand& cmd : chan.overflow_buffer) {
     if (cmd.type == CommandType::Blam) {
       registry->QueueBlamEntity(cmd.entity);
     } else {
@@ -582,4 +582,13 @@ void CommandBuffer::Playback(Registry* registry) const {
     }
   }
   chan.Clear();
+
+  auto& deferred = state_->deferred;
+  const size_t deferredTotal = std::min(deferred.count.load(std::memory_order_relaxed), deferred.buffer.size());
+  for (size_t i = 0; i < deferredTotal; ++i) {
+    deferred.buffer[i](registry);
+    deferred.buffer[i] = nullptr;
+  }
+  for (const auto& fn : deferred.overflow_buffer) fn(registry);
+  deferred.Clear();
 }
