@@ -158,7 +158,7 @@ class ScriptSystem {
       this->LoadAsset(std::move(assetTable), registry->Get<AssetManager>(), game.GetRenderer(),
                       registry->Get<MIX_Mixer *>());
     });
-    lua.set_function("load_entity", [this, &game](const sol::table &assetTable) {
+    lua.set_function("load_entity", [&game](const sol::table &assetTable) {
       LuaEntityLoader::LoadEntityFromLua(game.GetRegistry(), assetTable);
     });
     lua.set_function("clear_scene", [&game]() { const_cast<Game &>(game).StopScene(); });

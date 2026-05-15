@@ -158,7 +158,7 @@ class RenderQueue {
     // --- Phase 2: determine which passes are needed ---
     // A pass is skippable when exactly one bucket holds all n entries (all bytes identical).
     std::array<bool, 8> skip{};
-    for (int pass = 0; pass < 8; ++pass) {
+    for (size_t pass = 0; pass < 8; ++pass) {
       for (size_t bucket = 0; bucket < 256; ++bucket) {
         if (histograms[pass][bucket] == n) {
           skip[pass] = true;
@@ -171,10 +171,10 @@ class RenderQueue {
     std::vector<SortEntry>* in = &sort_entries_;
     std::vector<SortEntry>* out = &radix_scratch_;
 
-    for (int pass = 0; pass < 8; ++pass) {
+    for (size_t pass = 0; pass < 8; ++pass) {
       if (skip[pass]) continue;
 
-      const int shift = pass * 8;
+      const size_t shift = pass * 8;
 
       // Convert the histogram to exclusive prefix sums (offsets) for scatter.
       auto& counts = histograms[pass];

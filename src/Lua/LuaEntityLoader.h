@@ -34,7 +34,8 @@ class LuaEntityLoader {
 
     if (!hasMask && !hasCollider) return;
 
-    const EntityMask mask = hasMask ? EntityMask(maskValue.as<int>()) : EntityMask(Constants::kDefaultEntityMask);
+    const EntityMask mask = hasMask ? EntityMask(static_cast<unsigned long long>(maskValue.as<int>()))
+                                    : EntityMask(static_cast<unsigned long long>(Constants::kDefaultEntityMask));
     registry->AddComponent(entity, EntityMaskComponent(mask));
   }
 

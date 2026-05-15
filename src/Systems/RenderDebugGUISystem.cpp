@@ -766,7 +766,7 @@ void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua) {
       }
       if (*cb->index != -1) {
         data->DeleteChars(0, data->BufTextLen);
-        data->InsertChars(0, (*cb->history)[*cb->index].c_str());
+        data->InsertChars(0, (*cb->history)[static_cast<size_t>(*cb->index)].c_str());
       } else {
         data->DeleteChars(0, data->BufTextLen);
       }

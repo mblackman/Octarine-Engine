@@ -17,6 +17,7 @@
 #include <vector>
 
 #include "Component.h"
+#include "Context.h"
 #include "Entity.h"
 #include "General/Logger.h"
 #include "System.h"
@@ -27,10 +28,6 @@ template <typename... TComponents>
 class ComponentQuery;
 
 class Iterable;
-class ContextFacade;
-namespace Internal {
-class BulkContextImpl;
-}
 
 class ComponentRegistry {
  public:
@@ -344,6 +341,7 @@ class Registry {
         if constexpr (std::is_invocable_v<StoredFunc, Entity, float, TArgs&...> ||
                       std::is_invocable_v<StoredFunc, Entity, TArgs&...>) {
           query_->ParallelForEach([this, dt](Entity entity, TArgs&... args) {
+            (void)dt;
             if constexpr (std::is_invocable_v<StoredFunc, Entity, float, TArgs&...>) {
               func_(entity, dt, args...);
             } else if constexpr (std::is_invocable_v<StoredFunc, Entity, TArgs&...>) {
@@ -357,6 +355,7 @@ class Registry {
         } else if constexpr (std::is_invocable_v<StoredFunc, float, TArgs&...> ||
                              std::is_invocable_v<StoredFunc, TArgs&...>) {
           query_->ParallelForEach([this, dt](TArgs&... args) {
+            (void)dt;
             if constexpr (std::is_invocable_v<StoredFunc, float, TArgs&...>) {
               func_(dt, args...);
             } else if constexpr (std::is_invocable_v<StoredFunc, TArgs&...>) {
@@ -636,3 +635,10 @@ class Registry {
   std::uint64_t user_entity_count_{0};
   std::unordered_set<EcsId> internal_entity_ids_;
 };
+
+template <typename T>
+inline T& ContextFacade::Component() const {
+  const auto componentEntity = impl_->GetRegistry()->Component<T>();
+  void* ptr = impl_->GetComponentPtr(componentEntity.GetId());
+  return *static_cast<T*>(ptr);
+}

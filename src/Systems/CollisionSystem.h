@@ -135,8 +135,10 @@ class CollisionSystem {
 
     for (int i = begin; i < end; ++i) {
       for (int j = i + 1; j < end; ++j) {
-        if (boxes[i].intersects(boxes[j])) {
-          intersectingPairs.emplace_back(boxes[i].entity, boxes[j].entity);
+        const auto& bi = boxes[static_cast<size_t>(i)];
+        const auto& bj = boxes[static_cast<size_t>(j)];
+        if (bi.intersects(bj)) {
+          intersectingPairs.emplace_back(bi.entity, bj.entity);
         }
       }
     }
@@ -179,8 +181,10 @@ class CollisionSystem {
     ACCUMULATE_PROFILE_SCOPE("Brute Force Bipartite");
     for (int i = begin1; i < end1; ++i) {
       for (int j = begin2; j < end2; ++j) {
-        if (boxes[i].intersects(boxes[j])) {
-          pairs.emplace_back(boxes[i].entity, boxes[j].entity);
+        const auto& bi = boxes[static_cast<size_t>(i)];
+        const auto& bj = boxes[static_cast<size_t>(j)];
+        if (bi.intersects(bj)) {
+          pairs.emplace_back(bi.entity, bj.entity);
         }
       }
     }
@@ -206,10 +210,10 @@ class CollisionSystem {
                 [](const Box& a, const Box& b) { return a.minX < b.minX; });
       int start_j = begin2;
       for (int i = begin1; i < end1; ++i) {
-        const Box& a = boxes[i];
-        while (start_j < end2 && boxes[start_j].maxX < a.minX) ++start_j;
+        const Box& a = boxes[static_cast<size_t>(i)];
+        while (start_j < end2 && boxes[static_cast<size_t>(start_j)].maxX < a.minX) ++start_j;
         for (int j = start_j; j < end2; ++j) {
-          const Box& b = boxes[j];
+          const Box& b = boxes[static_cast<size_t>(j)];
           if (b.minX > a.maxX) break;
           if (a.intersects(b)) pairs.emplace_back(a.entity, b.entity);
         }
@@ -221,10 +225,10 @@ class CollisionSystem {
                 [](const Box& a, const Box& b) { return a.minY < b.minY; });
       int start_j = begin2;
       for (int i = begin1; i < end1; ++i) {
-        const Box& a = boxes[i];
-        while (start_j < end2 && boxes[start_j].maxY < a.minY) ++start_j;
+        const Box& a = boxes[static_cast<size_t>(i)];
+        while (start_j < end2 && boxes[static_cast<size_t>(start_j)].maxY < a.minY) ++start_j;
         for (int j = start_j; j < end2; ++j) {
-          const Box& b = boxes[j];
+          const Box& b = boxes[static_cast<size_t>(j)];
           if (b.minY > a.maxY) break;
           if (a.intersects(b)) pairs.emplace_back(a.entity, b.entity);
         }
@@ -254,7 +258,8 @@ class CollisionSystem {
                        return a.maxY + a.minY < b.maxY + b.minY;
                      });
     const float medianValue =
-        (dimension == 0) ? (boxes[mid].minX + boxes[mid].maxX) / 2.0f : (boxes[mid].minY + boxes[mid].maxY) / 2.0f;
+        (dimension == 0) ? (boxes[static_cast<size_t>(mid)].minX + boxes[static_cast<size_t>(mid)].maxX) / 2.0f
+                         : (boxes[static_cast<size_t>(mid)].minY + boxes[static_cast<size_t>(mid)].maxY) / 2.0f;
 
     // Divide boxes into sub-partitions: left, right, and spanning the median.
     const auto [leftEnd, rightStart] = partition_boxes(boxes, begin, end, dimension, medianValue);
