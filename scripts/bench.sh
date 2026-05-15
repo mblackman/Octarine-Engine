@@ -61,7 +61,7 @@ mode="${OCT_BENCH_MODE:-stress}"
 
 set +e
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
-  timeout "$duration" "$binary" --path "$game_path" --startup-mode "$mode"
+  timeout "$duration" "$binary" "$game_path" --startup-mode "$mode"
 status=$?
 set -e
 

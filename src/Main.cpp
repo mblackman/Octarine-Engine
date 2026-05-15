@@ -11,15 +11,7 @@ int main(const int argc, char *argv[]) {
   for (int i = 1; i < argc; ++i) {
     std::string currentArg = argv[i];
 
-    if (currentArg == "-p" || currentArg == "--path") {
-      if (i + 1 < argc) {
-        gamePath = argv[++i];
-        Logger::Info("Game path set to: " + gamePath);
-      } else {
-        Logger::Error("Error: " + currentArg + " flag requires a path argument.");
-        return 1;
-      }
-    } else if (currentArg == "-m" || currentArg == "--startup-mode") {
+    if (currentArg == "-m" || currentArg == "--startup-mode") {
       if (i + 1 < argc) {
         startupMode = argv[++i];
         Logger::Info("Startup mode set to: " + startupMode);
@@ -27,11 +19,11 @@ int main(const int argc, char *argv[]) {
         Logger::Error("Error: " + currentArg + " flag requires a mode argument.");
         return 1;
       }
-    } else if (currentArg == "--editor") {
-      startupMode = "editor";
-      Logger::Info("Editor mode enabled.");
-    } else {
+    } else if (currentArg.starts_with("-")) {
       Logger::Warn("Unknown command-line argument: " + currentArg);
+    } else {
+      gamePath = currentArg;
+      Logger::Info("Game path set to: " + gamePath);
     }
   }
 
