@@ -7,15 +7,20 @@
 #include <string>
 #include <unordered_map>
 
+#include <atomic>
+
 #include "../AssetManager/AssetManager.h"
 #include "../Components/TextLabelComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../General/Logger.h"
+#include "../General/PerfUtils.h"
 #include "../Renderer/RenderCommands.h"
+#include "../Renderer/RenderCulling.h"
 #include "../Renderer/RenderQueue.h"
 #include "Components/CameraComponents.h"
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
+#include "Game/GameConfig.h"
 
 class RenderTextSystem {
  public:
@@ -75,6 +80,22 @@ class RenderTextSystem {
       const auto& transform = registry->GetComponent<TransformComponent>(entity);
       origin += transform.globalPosition;
     }
+
+    const auto& gameConfig = registry->Get<GameConfig>();
+    const bool isOutsideCamera = IsRenderableOutsideViewport(
+        origin.x, origin.y, it->second.width, it->second.height, text.isFixed, camera,
+        static_cast<float>(gameConfig.windowWidth), static_cast<float>(gameConfig.windowHeight));
+
+#ifdef OCTARINE_PROFILING
+    static auto* culledCounter = PROFILE_COUNTER_HANDLE("RenderText: Culled");
+    static auto* emplacedCounter = PROFILE_COUNTER_HANDLE("RenderText: Emplaced");
+#endif
+
+    if (isOutsideCamera) {
+      PROFILE_COUNTER_INC(culledCounter);
+      return;
+    }
+    PROFILE_COUNTER_INC(emplacedCounter);
 
     const float x = text.isFixed ? origin.x : origin.x - camera.x;
     const float y = text.isFixed ? origin.y : origin.y - camera.y;

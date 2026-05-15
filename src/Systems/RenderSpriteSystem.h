@@ -8,6 +8,7 @@
 #include "../Components/SpriteComponent.h"
 #include "../Components/TransformComponent.h"
 #include "../General/PerfUtils.h"
+#include "../Renderer/RenderCulling.h"
 #include "../Renderer/RenderQueue.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"
@@ -28,19 +29,9 @@ class RenderSpriteSystem {
   }
 
   void operator()(const TransformComponent& transform, const SpriteComponent& sprite) const {
-    bool isOutsideCamera = false;
-
-    if (sprite.isFixed) {
-      isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < 0 ||
-                        transform.globalPosition.x > windowWidth_ ||
-                        transform.globalPosition.y + sprite.height * transform.globalScale.y < 0 ||
-                        transform.globalPosition.y > windowHeight_;
-    } else {
-      isOutsideCamera = transform.globalPosition.x + sprite.width * transform.globalScale.x < camera_.x ||
-                        transform.globalPosition.x > camera_.x + camera_.w ||
-                        transform.globalPosition.y + sprite.height * transform.globalScale.y < camera_.y ||
-                        transform.globalPosition.y > camera_.y + camera_.h;
-    }
+    const bool isOutsideCamera = IsRenderableOutsideViewport(
+        transform.globalPosition.x, transform.globalPosition.y, sprite.width * transform.globalScale.x,
+        sprite.height * transform.globalScale.y, sprite.isFixed, camera_, windowWidth_, windowHeight_);
 
     if (isOutsideCamera) {
       PROFILE_COUNTER_INC(culledCounter_);
