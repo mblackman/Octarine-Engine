@@ -8,7 +8,7 @@
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/EntityMaskComponent.h"
-#include "../Components/TransformComponent.h"
+#include "../Components/GlobalTransformComponent.h"
 #include "../ECS/Entity.h"
 #include "../ECS/Iterable.h"
 #include "../ECS/Registry.h"
@@ -82,7 +82,7 @@ class CollisionSystem {
       PROFILE_NAMED_SCOPE("Gather Boxes");
 
       if (!query_) {
-        query_ = ctx.GetRegistry()->CreateQuery<TransformComponent, BoxColliderComponent, EntityMaskComponent>();
+        query_ = ctx.GetRegistry()->CreateQuery<GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent>();
       }
       query_->Update();
 
@@ -90,16 +90,16 @@ class CollisionSystem {
       boxes.resize(count);
       std::atomic<size_t> nextIndex{0};
 
-      query_->ParallelForEach([&](Entity entity, const TransformComponent& transform,
+      query_->ParallelForEach([&](Entity entity, const GlobalTransformComponent& transform,
                                   const BoxColliderComponent& collider, const EntityMaskComponent& entityMask) {
         const size_t idx = nextIndex.fetch_add(1, std::memory_order_relaxed);
         boxes[idx] = {entity,
                       entityMask.mask,
                       collider.collisionMask,
-                      transform.globalPosition.x,
-                      transform.globalPosition.y,
-                      transform.globalPosition.x + static_cast<float>(collider.width) * transform.globalScale.x,
-                      transform.globalPosition.y + static_cast<float>(collider.height) * transform.globalScale.y};
+                      transform.position.x,
+                      transform.position.y,
+                      transform.position.x + static_cast<float>(collider.width) * transform.scale.x,
+                      transform.position.y + static_cast<float>(collider.height) * transform.scale.y};
       });
     }
 
@@ -115,7 +115,7 @@ class CollisionSystem {
  private:
   std::vector<Box> cachedBoxes_;
   std::future<CollisionResult> collisionResult_;
-  std::unique_ptr<ComponentQuery<TransformComponent, BoxColliderComponent, EntityMaskComponent>> query_;
+  std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent>> query_;
 
   std::future<CollisionResult> start_async_collision_detection(std::vector<Box> boxes) {
     return std::async(std::launch::async, [boxes = std::move(boxes), this]() mutable -> CollisionResult {

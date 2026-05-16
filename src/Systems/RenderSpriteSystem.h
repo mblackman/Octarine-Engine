@@ -5,8 +5,8 @@
 #include <atomic>
 
 #include "../AssetManager/AssetManager.h"
+#include "../Components/GlobalTransformComponent.h"
 #include "../Components/SpriteComponent.h"
-#include "../Components/TransformComponent.h"
 #include "../General/PerfUtils.h"
 #include "../Renderer/RenderCulling.h"
 #include "../Renderer/RenderQueue.h"
@@ -28,10 +28,10 @@ class RenderSpriteSystem {
 #endif
   }
 
-  void operator()(const TransformComponent& transform, const SpriteComponent& sprite) const {
+  void operator()(const GlobalTransformComponent& transform, const SpriteComponent& sprite) const {
     const bool isOutsideCamera = IsRenderableOutsideViewport(
-        transform.globalPosition.x, transform.globalPosition.y, sprite.width * transform.globalScale.x,
-        sprite.height * transform.globalScale.y, sprite.isFixed, camera_, windowWidth_, windowHeight_);
+        transform.position.x, transform.position.y, sprite.width * transform.scale.x,
+        sprite.height * transform.scale.y, sprite.isFixed, camera_, windowWidth_, windowHeight_);
 
     if (isOutsideCamera) {
       PROFILE_COUNTER_INC(culledCounter_);
@@ -48,17 +48,17 @@ class RenderSpriteSystem {
       sprite.cachedTextureGeneration = assetGen;
     }
 
-    const float x = sprite.isFixed ? transform.globalPosition.x : transform.globalPosition.x - camera_.x;
-    const float y = sprite.isFixed ? transform.globalPosition.y : transform.globalPosition.y - camera_.y;
+    const float x = sprite.isFixed ? transform.position.x : transform.position.x - camera_.x;
+    const float y = sprite.isFixed ? transform.position.y : transform.position.y - camera_.y;
 
-    auto& cmd = renderQueue_->EmplaceSprite(static_cast<unsigned int>(sprite.layer), transform.globalPosition.y,
+    auto& cmd = renderQueue_->EmplaceSprite(static_cast<unsigned int>(sprite.layer), transform.position.y,
                                             sprite.cachedTexture);
     cmd.destX = x;
     cmd.destY = y;
-    cmd.destW = sprite.width * transform.globalScale.x;
-    cmd.destH = sprite.height * transform.globalScale.y;
+    cmd.destW = sprite.width * transform.scale.x;
+    cmd.destH = sprite.height * transform.scale.y;
     cmd.srcRect = sprite.srcRect;
-    cmd.rotation = transform.globalRotation;
+    cmd.rotation = transform.rotation;
     cmd.pivot = {cmd.destW * 0.5f, cmd.destH * 0.5f};
     cmd.flip = sprite.flip;
     cmd.texture = sprite.cachedTexture;

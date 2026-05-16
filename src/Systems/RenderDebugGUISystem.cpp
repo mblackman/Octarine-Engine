@@ -8,16 +8,19 @@
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/CameraFollowComponent.h"
 #include "../Components/EntityMaskComponent.h"
+#include "../Components/GlobalTransformComponent.h"
 #include "../Components/HealthComponent.h"
 #include "../Components/KeyboardControlComponent.h"
 #include "../Components/NameComponent.h"
+#include "../Components/PositionComponent.h"
 #include "../Components/ProjectileComponent.h"
 #include "../Components/ProjectileEmitterComponent.h"
 #include "../Components/RigidBodyComponent.h"
+#include "../Components/RotationComponent.h"
+#include "../Components/ScaleComponent.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/SquarePrimitiveComponent.h"
 #include "../Components/TextLabelComponent.h"
-#include "../Components/TransformComponent.h"
 #include "../Components/UIButtonComponent.h"
 #include "../Game/Game.h"
 #include "../Game/GameConfig.h"
@@ -517,17 +520,39 @@ void RenderDebugGUISystem::HierarchyWindow(Registry* registry)
         }
         ImGui::Separator();
 
-        if (registry->HasComponent<TransformComponent>(selectedEntity))
+        const bool hasAnyTransform = registry->HasComponent<PositionComponent>(selectedEntity) ||
+            registry->HasComponent<ScaleComponent>(selectedEntity) ||
+            registry->HasComponent<RotationComponent>(selectedEntity) ||
+            registry->HasComponent<GlobalTransformComponent>(selectedEntity);
+        if (hasAnyTransform)
         {
             if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
             {
-                auto& transform = registry->GetComponent<TransformComponent>(selectedEntity);
-                ImGui::DragFloat2("Position", &transform.position.x);
-                ImGui::DragFloat2("Scale", &transform.scale.x);
-                auto rotation = static_cast<float>(transform.rotation);
-                if (ImGui::DragFloat("Rotation", &rotation))
+                if (registry->HasComponent<PositionComponent>(selectedEntity))
                 {
-                    transform.rotation = rotation;
+                    auto& position = registry->GetComponent<PositionComponent>(selectedEntity);
+                    ImGui::DragFloat2("Position", &position.value.x);
+                }
+                if (registry->HasComponent<ScaleComponent>(selectedEntity))
+                {
+                    auto& scale = registry->GetComponent<ScaleComponent>(selectedEntity);
+                    ImGui::DragFloat2("Scale", &scale.value.x);
+                }
+                if (registry->HasComponent<RotationComponent>(selectedEntity))
+                {
+                    auto& rotationComp = registry->GetComponent<RotationComponent>(selectedEntity);
+                    auto rotation = static_cast<float>(rotationComp.value);
+                    if (ImGui::DragFloat("Rotation", &rotation))
+                    {
+                        rotationComp.value = rotation;
+                    }
+                }
+                if (registry->HasComponent<GlobalTransformComponent>(selectedEntity))
+                {
+                    const auto& global = registry->GetComponent<GlobalTransformComponent>(selectedEntity);
+                    ImGui::Text("Global Pos: %.2f, %.2f", global.position.x, global.position.y);
+                    ImGui::Text("Global Scale: %.2f, %.2f", global.scale.x, global.scale.y);
+                    ImGui::Text("Global Rot: %.2f", global.rotation);
                 }
             }
         }
@@ -697,8 +722,14 @@ void RenderDebugGUISystem::HierarchyWindow(Registry* registry)
         ImGui::Separator();
         if (ImGui::BeginCombo("Add Component", "Select..."))
         {
-            if (!registry->HasComponent<TransformComponent>(selectedEntity) && ImGui::Selectable("Transform"))
-                registry->AddComponent(selectedEntity, TransformComponent());
+            if (!registry->HasComponent<PositionComponent>(selectedEntity) && ImGui::Selectable("Position"))
+                registry->AddComponent(selectedEntity, PositionComponent());
+            if (!registry->HasComponent<ScaleComponent>(selectedEntity) && ImGui::Selectable("Scale"))
+                registry->AddComponent(selectedEntity, ScaleComponent());
+            if (!registry->HasComponent<RotationComponent>(selectedEntity) && ImGui::Selectable("Rotation"))
+                registry->AddComponent(selectedEntity, RotationComponent());
+            if (!registry->HasComponent<GlobalTransformComponent>(selectedEntity) && ImGui::Selectable("Global Transform"))
+                registry->AddComponent(selectedEntity, GlobalTransformComponent{});
             if (!registry->HasComponent<RigidBodyComponent>(selectedEntity) && ImGui::Selectable("RigidBody"))
                 registry->AddComponent(selectedEntity, RigidBodyComponent());
             if (!registry->HasComponent<SpriteComponent>(selectedEntity) && ImGui::Selectable("Sprite"))

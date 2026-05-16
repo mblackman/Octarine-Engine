@@ -2,6 +2,15 @@
 #include <functional>
 #include <stack>
 
+#include "../Components/BoxColliderComponent.h"
+#include "../Components/GlobalTransformComponent.h"
+#include "../Components/PositionComponent.h"
+#include "../Components/RotationComponent.h"
+#include "../Components/ScaleComponent.h"
+#include "../Components/SpriteComponent.h"
+#include "../Components/SquarePrimitiveComponent.h"
+#include "../Components/TextLabelComponent.h"
+#include "../Components/UIButtonComponent.h"
 #include "../ECS/Registry.h"
 #include "../General/Logger.h"
 #include "ComponentLuaFactory.h"
@@ -107,6 +116,8 @@ public:
         Logger::Error("LoadEntityFromLua: Unknown component type '" + componentName + "' in Lua table.");
       }
     }
+
+    MaybeAttachGlobalTransform(registry, entity);
   }
 
   /**
@@ -169,6 +180,27 @@ public:
   }
 
 private:
+  // Add a GlobalTransformComponent iff (a) any local transform component is present and
+  // (b) at least one world-space consumer system (sprite/primitive/collider/UI button/text label)
+  // is attached. Keeps script-only or camera-anchor entities lean.
+  static void MaybeAttachGlobalTransform(Registry* registry, const Entity& entity)
+  {
+    const bool hasAnyLocal = registry->HasComponent<PositionComponent>(entity) ||
+        registry->HasComponent<ScaleComponent>(entity) ||
+        registry->HasComponent<RotationComponent>(entity);
+    if (!hasAnyLocal) return;
+
+    const bool needsGlobal = registry->HasComponent<SpriteComponent>(entity) ||
+        registry->HasComponent<SquarePrimitiveComponent>(entity) ||
+        registry->HasComponent<BoxColliderComponent>(entity) ||
+        registry->HasComponent<UIButtonComponent>(entity) ||
+        registry->HasComponent<TextLabelComponent>(entity);
+    if (!needsGlobal) return;
+
+    if (registry->HasComponent<GlobalTransformComponent>(entity)) return;
+    registry->AddComponent(entity, GlobalTransformComponent{});
+  }
+
   static void ApplyTagField(const sol::table& currentData, const char* key, Registry* registry, const Entity& entity)
   {
     const sol::object value = currentData.get<sol::object>(key);
@@ -208,7 +240,22 @@ private:
 
     factories["transform"] = [](Registry* registry, const Entity ent, const sol::table& data)
     {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateTransformComponent(data));
+      using namespace LuaComponentHelpers;
+      // Each transform field maps to its own component, but only when explicitly present in the
+      // Lua table. Omitting a field means the entity skips that slot and the system defaults
+      // (identity) apply.
+      if (data["position"].valid())
+      {
+        registry->AddComponent(ent, PositionComponent(SafeGetVec2(data, "position")));
+      }
+      if (data["scale"].valid())
+      {
+        registry->AddComponent(ent, ScaleComponent(SafeGetVec2(data, "scale", 1.0f, 1.0f)));
+      }
+      if (data["rotation"].valid())
+      {
+        registry->AddComponent(ent, RotationComponent(SafeGetOptionalValue<double>(data, "rotation", 0.0)));
+      }
     };
     factories["rigidbody"] = [](Registry* registry, const Entity ent, const sol::table& data)
     {

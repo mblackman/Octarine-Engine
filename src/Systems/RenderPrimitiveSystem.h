@@ -4,8 +4,8 @@
 
 #include <atomic>
 
+#include "../Components/GlobalTransformComponent.h"
 #include "../Components/SquarePrimitiveComponent.h"
-#include "../Components/TransformComponent.h"
 #include "../General/PerfUtils.h"
 #include "../Renderer/RenderCulling.h"
 #include "../Renderer/RenderQueue.h"
@@ -27,8 +27,8 @@ class RenderPrimitiveSystem {
 #endif
   }
 
-  void operator()(const SquarePrimitiveComponent& square, const TransformComponent& transform) const {
-    const glm::vec2 origin = square.position + transform.globalPosition;
+  void operator()(const SquarePrimitiveComponent& square, const GlobalTransformComponent& transform) const {
+    const glm::vec2 origin = square.position + transform.position;
 
     const bool isOutsideCamera = IsRenderableOutsideViewport(origin.x, origin.y, square.width, square.height,
                                                              square.isFixed, camera_, windowWidth_, windowHeight_);

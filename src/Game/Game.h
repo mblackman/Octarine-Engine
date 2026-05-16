@@ -6,7 +6,7 @@
 #include <sol/sol.hpp>
 
 #include "../Components/BoxColliderComponent.h"
-#include "../Components/TransformComponent.h"
+#include "../Components/GlobalTransformComponent.h"
 #include "../ECS/Query.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
@@ -71,5 +71,5 @@ class Game {
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
   ScriptSystem* script_system_{nullptr};
-  std::unique_ptr<ComponentQuery<TransformComponent, BoxColliderComponent>> collider_query_;
+  std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent>> collider_query_;
 };

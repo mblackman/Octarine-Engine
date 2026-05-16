@@ -1,8 +1,10 @@
 #pragma once
 
+#include "../Components/GlobalTransformComponent.h"
+#include "../Components/PositionComponent.h"
 #include "../Components/RigidBodyComponent.h"
+#include "../Components/ScaleComponent.h"
 #include "../Components/SpriteComponent.h"
-#include "../Components/TransformComponent.h"
 #include "../ECS/Entity.h"
 #include "../ECS/Registry.h"
 #include "../EventBus/EventBus.h"
@@ -42,32 +44,41 @@ class MovementSystem {
     }
   }
 
-  void operator()(const Entity entity, const float deltaTime, TransformComponent& transform,
+  void operator()(const Entity entity, const float deltaTime, PositionComponent& position,
                   const RigidBodyComponent& rigidBody, const SpriteComponent& spriteComponent) const {
     const bool isPlayer = registry_->HasTag(entity, player_);
 
+    const glm::vec2 localScale = registry_->HasComponent<ScaleComponent>(entity)
+                                     ? registry_->GetComponent<ScaleComponent>(entity).value
+                                     : glm::vec2(1.0f, 1.0f);
+
     if (!isPlayer) {
       // Use global position so children of moving parents respect off-screen bounds.
-      const float right = transform.globalPosition.x + spriteComponent.width * transform.globalScale.x;
-      const float bottom = transform.globalPosition.y + spriteComponent.height * transform.globalScale.y;
-      if (transform.globalPosition.x > playableAreaWidth_ || transform.globalPosition.y > playableAreaHeight_ ||
-          right < 0 || bottom < 0) {
+      const glm::vec2 globalPos = registry_->HasComponent<GlobalTransformComponent>(entity)
+                                      ? registry_->GetComponent<GlobalTransformComponent>(entity).position
+                                      : position.value;
+      const glm::vec2 globalScale = registry_->HasComponent<GlobalTransformComponent>(entity)
+                                        ? registry_->GetComponent<GlobalTransformComponent>(entity).scale
+                                        : localScale;
+      const float right = globalPos.x + spriteComponent.width * globalScale.x;
+      const float bottom = globalPos.y + spriteComponent.height * globalScale.y;
+      if (globalPos.x > playableAreaWidth_ || globalPos.y > playableAreaHeight_ || right < 0 || bottom < 0) {
         cmd_buffer_.EmplaceDespawn(entity);
         return;
       }
     }
 
-    transform.position.x += rigidBody.velocity.x * deltaTime;
-    transform.position.y += rigidBody.velocity.y * deltaTime;
+    position.value.x += rigidBody.velocity.x * deltaTime;
+    position.value.y += rigidBody.velocity.y * deltaTime;
 
     if (isPlayer) {
-      if (transform.position.x < 0) transform.position.x = 0;
-      if (transform.position.y < 0) transform.position.y = 0;
-      if (transform.position.x + spriteComponent.width * transform.scale.x > playableAreaWidth_) {
-        transform.position.x = playableAreaWidth_ - spriteComponent.width * transform.scale.x;
+      if (position.value.x < 0) position.value.x = 0;
+      if (position.value.y < 0) position.value.y = 0;
+      if (position.value.x + spriteComponent.width * localScale.x > playableAreaWidth_) {
+        position.value.x = playableAreaWidth_ - spriteComponent.width * localScale.x;
       }
-      if (transform.position.y + spriteComponent.height * transform.scale.y > playableAreaHeight_) {
-        transform.position.y = playableAreaHeight_ - spriteComponent.height * transform.scale.y;
+      if (position.value.y + spriteComponent.height * localScale.y > playableAreaHeight_) {
+        position.value.y = playableAreaHeight_ - spriteComponent.height * localScale.y;
       }
     }
   }

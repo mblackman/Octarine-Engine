@@ -6,7 +6,7 @@
 #include <sol/sol.hpp>
 
 #include "../Components/BoxColliderComponent.h"
-#include "../Components/TransformComponent.h"
+#include "../Components/GlobalTransformComponent.h"
 #include "../Components/UIButtonComponent.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/MouseInputEvent.h"
@@ -29,17 +29,17 @@ class UIButtonSystem {
     const float mouseX = event.event.x;
     const float mouseY = event.event.y;
 
-    auto query = registry_->CreateQuery<UIButtonComponent, TransformComponent, BoxColliderComponent>();
-    auto handler = [&](Entity entity, UIButtonComponent& button, const TransformComponent& transform,
+    auto query = registry_->CreateQuery<UIButtonComponent, GlobalTransformComponent, BoxColliderComponent>();
+    auto handler = [&](Entity entity, UIButtonComponent& button, const GlobalTransformComponent& transform,
                        const BoxColliderComponent& collider) {
       if (!button.isActive || button.clickFunction == sol::lua_nil) {
         return;
       }
 
-      const float w = static_cast<float>(collider.width) * transform.globalScale.x;
-      const float h = static_cast<float>(collider.height) * transform.globalScale.y;
-      const bool isClick = transform.globalPosition.x <= mouseX && transform.globalPosition.x + w >= mouseX &&
-                           transform.globalPosition.y <= mouseY && transform.globalPosition.y + h >= mouseY;
+      const float w = static_cast<float>(collider.width) * transform.scale.x;
+      const float h = static_cast<float>(collider.height) * transform.scale.y;
+      const bool isClick = transform.position.x <= mouseX && transform.position.x + w >= mouseX &&
+                           transform.position.y <= mouseY && transform.position.y + h >= mouseY;
 
       if (!isClick) return;
 

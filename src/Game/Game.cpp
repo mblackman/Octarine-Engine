@@ -21,8 +21,11 @@
 #include "Components/ScriptComponent.h"
 #include "Components/SpriteComponent.h"
 #include "Components/SquarePrimitiveComponent.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/PositionComponent.h"
+#include "Components/RotationComponent.h"
+#include "Components/ScaleComponent.h"
 #include "Components/TextLabelComponent.h"
-#include "Components/TransformComponent.h"
 #include "ECS/Iterable.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
@@ -361,29 +364,29 @@ void Game::Setup() {
 
   registry_->RegisterParallelSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
   auto &projectileEmitSystem =
-      registry_->RegisterSystem<TransformComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
+      registry_->RegisterSystem<PositionComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
   registry_->RegisterParallelSystem<ProjectileComponent>(ProjectileLifecycleSystem());
   auto &keyboardControlSystem =
       registry_->RegisterSystem<KeyboardControlComponent, RigidBodyComponent, SpriteComponent>(KeyboardControlSystem());
 
-  registry_->RegisterParallelSystem<TransformComponent, RigidBodyComponent, SpriteComponent>(MovementSystem());
+  registry_->RegisterParallelSystem<PositionComponent, RigidBodyComponent, SpriteComponent>(MovementSystem());
 
   // Resolve hierarchy after Movement mutates local positions, before Collision reads globals.
-  registry_->RegisterBulkSystem<TransformComponent>(TransformSystem());
+  registry_->RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
 
   // Collision reads transform.globalPosition / globalScale — must run after TransformSystem.
   registry_->RegisterBulkSystem(CollisionSystem());
 
   // Camera follows after gameplay-driven transform updates
-  registry_->RegisterSystem<TransformComponent, CameraFollowComponent>(CameraFollowSystem());
+  registry_->RegisterSystem<PositionComponent, CameraFollowComponent>(CameraFollowSystem());
 
   // Health UI updates before render so values reflect current frame
   registry_->RegisterSystem<HealthComponent, TextLabelComponent, SquarePrimitiveComponent>(DisplayHealthSystem());
 
   // Render queue producers
-  registry_->RegisterParallelSystem<TransformComponent, SpriteComponent>(RenderSpriteSystem());
+  registry_->RegisterParallelSystem<GlobalTransformComponent, SpriteComponent>(RenderSpriteSystem());
   registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
-  registry_->RegisterParallelSystem<SquarePrimitiveComponent, TransformComponent>(RenderPrimitiveSystem());
+  registry_->RegisterParallelSystem<SquarePrimitiveComponent, GlobalTransformComponent>(RenderPrimitiveSystem());
 
   // Event subscriptions (one-time)
   event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
@@ -398,7 +401,7 @@ void Game::Setup() {
   damageSystem.Init(registry_.get(), event_bus_);
 
   // Pre-build the debug-collider query once so we don't allocate per render frame.
-  collider_query_ = registry_->CreateQuery<TransformComponent, BoxColliderComponent>();
+  collider_query_ = registry_->CreateQuery<GlobalTransformComponent, BoxColliderComponent>();
 }
 
 void Game::ProcessInput() const {

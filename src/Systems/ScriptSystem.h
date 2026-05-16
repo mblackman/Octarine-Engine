@@ -14,9 +14,9 @@
 
 #include "../AssetManager/AssetManager.h"
 #include "../Components/NameComponent.h"
+#include "../Components/PositionComponent.h"
 #include "../Components/ScriptComponent.h"
 #include "../Components/SpriteComponent.h"
-#include "../Components/TransformComponent.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/AudioPlayEvent.h"
 #include "../Events/KeyInputEvent.h"
@@ -31,14 +31,13 @@
 
 inline glm::vec2 GetEntityPosition(Registry* registry, const Entity entity)
 {
-    if (!registry->HasComponent<TransformComponent>(entity))
+    if (!registry->HasComponent<PositionComponent>(entity))
     {
-        Logger::Error("Entity does not have TransformComponent.");
+        Logger::Error("Entity does not have PositionComponent.");
         return {0, 0};
     }
 
-    const auto& transform = registry->GetComponent<TransformComponent>(entity);
-    return transform.position;
+    return registry->GetComponent<PositionComponent>(entity).value;
 }
 
 inline std::string GetEntityName(Registry* registry, const Entity entity)
@@ -67,14 +66,14 @@ inline sol::object FindEntityByName(sol::this_state state, Registry* registry, c
 
 inline void SetEntityPosition(Registry* registry, const Entity entity, const double x, const double y)
 {
-    if (!registry->HasComponent<TransformComponent>(entity))
+    if (!registry->HasComponent<PositionComponent>(entity))
     {
-        Logger::Error("Entity does not have TransformComponent.");
+        Logger::Error("Entity does not have PositionComponent.");
         return;
     }
 
-    auto& transform = registry->GetComponent<TransformComponent>(entity);
-    transform.position = glm::vec2(static_cast<float>(x), static_cast<float>(y));
+    registry->GetComponent<PositionComponent>(entity).value =
+        glm::vec2(static_cast<float>(x), static_cast<float>(y));
 }
 
 inline void SetEntitySpriteSrcRect(Registry* registry, const Entity entity, const float srcRectX,

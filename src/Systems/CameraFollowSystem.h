@@ -5,7 +5,7 @@
 #include <algorithm>
 
 #include "../Components/CameraFollowComponent.h"
-#include "../Components/TransformComponent.h"
+#include "../Components/PositionComponent.h"
 #include "Components/CameraComponents.h"
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
@@ -14,17 +14,17 @@
 
 class CameraFollowSystem {
  public:
-  void operator()(const ContextFacade& context, const TransformComponent& transform,
+  void operator()(const ContextFacade& context, const PositionComponent& position,
                   const CameraFollowComponent& /*follow*/) const {
     auto& [viewport] = context.GetRegistry()->Get<CameraComponent>();
     const auto& gameConfig = context.GetRegistry()->Get<GameConfig>();
 
-    if (transform.position.x + viewport.w / Constants::kTwo < gameConfig.playableAreaWidth) {
-      viewport.x = transform.position.x - static_cast<float>(gameConfig.windowWidth) / Constants::kTwo;
+    if (position.value.x + viewport.w / Constants::kTwo < gameConfig.playableAreaWidth) {
+      viewport.x = position.value.x - static_cast<float>(gameConfig.windowWidth) / Constants::kTwo;
     }
 
-    if (transform.position.y + viewport.h / Constants::kTwo < gameConfig.playableAreaHeight) {
-      viewport.y = transform.position.y - static_cast<float>(gameConfig.windowHeight) / Constants::kTwo;
+    if (position.value.y + viewport.h / Constants::kTwo < gameConfig.playableAreaHeight) {
+      viewport.y = position.value.y - static_cast<float>(gameConfig.windowHeight) / Constants::kTwo;
     }
 
     const float maxX = std::max(0.0f, gameConfig.playableAreaWidth - viewport.w);

@@ -10,8 +10,8 @@
 #include <atomic>
 
 #include "../AssetManager/AssetManager.h"
+#include "../Components/GlobalTransformComponent.h"
 #include "../Components/TextLabelComponent.h"
-#include "../Components/TransformComponent.h"
 #include "../General/Logger.h"
 #include "../General/PerfUtils.h"
 #include "../Renderer/RenderCommands.h"
@@ -76,9 +76,9 @@ class RenderTextSystem {
 
     const Entity entity = ctx.GetEntity();
     glm::vec2 origin = text.position;
-    if (registry->HasComponent<TransformComponent>(entity)) {
-      const auto& transform = registry->GetComponent<TransformComponent>(entity);
-      origin += transform.globalPosition;
+    if (registry->HasComponent<GlobalTransformComponent>(entity)) {
+      const auto& transform = registry->GetComponent<GlobalTransformComponent>(entity);
+      origin += transform.position;
     }
 
     const auto& gameConfig = registry->Get<GameConfig>();

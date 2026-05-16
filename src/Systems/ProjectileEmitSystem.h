@@ -6,12 +6,15 @@
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/EntityMaskComponent.h"
+#include "../Components/GlobalTransformComponent.h"
 #include "../Components/NameComponent.h"
+#include "../Components/PositionComponent.h"
 #include "../Components/ProjectileComponent.h"
 #include "../Components/ProjectileEmitterComponent.h"
 #include "../Components/RigidBodyComponent.h"
+#include "../Components/RotationComponent.h"
+#include "../Components/ScaleComponent.h"
 #include "../Components/SpriteComponent.h"
-#include "../Components/TransformComponent.h"
 #include "../ECS/ECS.h"
 #include "../ECS/Registry.h"
 #include "../EventBus/EventBus.h"
@@ -28,7 +31,8 @@ class ProjectileEmitSystem {
           // NameComponent baked into the archetype so emitter-assigned names take the cheap
           // re-add path in Registry::AddComponent (assign-over) instead of an archetype transition,
           // which would break pool reuse (pool routes by archetype id).
-          return reg.CreateEntityWithBundle(EntityMaskComponent(), TransformComponent(), RigidBodyComponent(),
+          return reg.CreateEntityWithBundle(EntityMaskComponent(), PositionComponent(), ScaleComponent(),
+                                            RotationComponent(), GlobalTransformComponent{}, RigidBodyComponent(),
                                             BoxColliderComponent(4, 4, glm::vec2(0, 0), EntityMask{}),
                                             ProjectileComponent(), SpriteComponent("bullet-texture", 4.0f, 4.0f, 4),
                                             NameComponent(), PoolableTag{}, ProjectileTag{});
@@ -36,7 +40,7 @@ class ProjectileEmitSystem {
     eventBus->SubscribeEvent<ProjectileEmitSystem, KeyInputEvent>(this, &ProjectileEmitSystem::OnKeyInput);
   }
 
-  void operator()(const ContextFacade& context, const TransformComponent& transform,
+  void operator()(const ContextFacade& context, const PositionComponent& position,
                   ProjectileEmitterComponent& emitter) {
     const auto registry = context.GetRegistry();
     const bool isPlayer = registry->HasTag(context.GetEntity(), "player");
@@ -45,11 +49,11 @@ class ProjectileEmitSystem {
       emitter.countDownTimer -= context.GetDeltaTime();
 
       if (emitter.countDownTimer <= 0.0f) {
-        SpawnProjectile(transform, context.GetEntity(), registry, emitter);
+        SpawnProjectile(position, context.GetEntity(), registry, emitter);
         emitter.countDownTimer = emitter.frequency;
       }
     } else if (spawnFriendlyProjectiles_) {
-      SpawnProjectile(transform, context.GetEntity(), registry, emitter, true);
+      SpawnProjectile(position, context.GetEntity(), registry, emitter, true);
       spawnFriendlyProjectiles_ = false;
     }
   }
@@ -68,15 +72,18 @@ class ProjectileEmitSystem {
   ArchetypeID projectile_pool_id_{};
   bool spawnFriendlyProjectiles_ = false;
 
-  void SpawnProjectile(const TransformComponent& transform, const Entity& entity, Registry* registry,
+  void SpawnProjectile(const PositionComponent& position, const Entity& entity, Registry* registry,
                        ProjectileEmitterComponent& emitter, bool isPlayer = false) const {
-    auto projectilePosition = transform.position;
+    auto projectilePosition = position.value;
     auto velocity = emitter.velocity;
 
     if (registry->HasComponent<SpriteComponent>(entity)) {
       const auto& sprite = registry->GetComponent<SpriteComponent>(entity);
-      projectilePosition.x += transform.scale.x * static_cast<float>(sprite.width) / 2;
-      projectilePosition.y += transform.scale.y * static_cast<float>(sprite.height) / 2;
+      const glm::vec2 emitterScale = registry->HasComponent<ScaleComponent>(entity)
+                                         ? registry->GetComponent<ScaleComponent>(entity).value
+                                         : glm::vec2(1.0f, 1.0f);
+      projectilePosition.x += emitterScale.x * static_cast<float>(sprite.width) / 2;
+      projectilePosition.y += emitterScale.y * static_cast<float>(sprite.height) / 2;
     }
 
     if (isPlayer && registry->HasComponent<RigidBodyComponent>(entity)) {
@@ -94,8 +101,9 @@ class ProjectileEmitSystem {
     // to be "seen" by the emitter's own collision mask, destroying themselves.
     const Entity projectile = registry->Get<EntityPoolManager>().Spawn(*registry, projectile_pool_id_);
     registry->GetComponent<EntityMaskComponent>(projectile).mask = emitter.projectileMask;
-    registry->GetComponent<TransformComponent>(projectile) =
-        TransformComponent(projectilePosition, glm::vec2(1.0f, 1.0f), 0.0);
+    registry->GetComponent<PositionComponent>(projectile).value = projectilePosition;
+    registry->GetComponent<ScaleComponent>(projectile).value = glm::vec2(1.0f, 1.0f);
+    registry->GetComponent<RotationComponent>(projectile).value = 0.0;
     registry->GetComponent<RigidBodyComponent>(projectile).velocity = velocity;
     registry->GetComponent<BoxColliderComponent>(projectile).collisionMask = emitter.collisionMask;
     auto& projectileComponent = registry->GetComponent<ProjectileComponent>(projectile);

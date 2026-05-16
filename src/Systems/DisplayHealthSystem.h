@@ -5,10 +5,10 @@
 #include <string>
 
 #include "../Components/HealthComponent.h"
+#include "../Components/ScaleComponent.h"
 #include "../Components/SpriteComponent.h"
 #include "../Components/SquarePrimitiveComponent.h"
 #include "../Components/TextLabelComponent.h"
-#include "../Components/TransformComponent.h"
 #include "../ECS/Iterable.h"
 #include "../ECS/Registry.h"
 
@@ -32,8 +32,10 @@ class DisplayHealthSystem {
     if (const auto parent = registry->GetParent(ctx.GetEntity());
         parent.has_value() && registry->HasComponent<SpriteComponent>(parent.value())) {
       const auto& sprite = registry->GetComponent<SpriteComponent>(parent.value());
-      const auto& transform = registry->GetComponent<TransformComponent>(parent.value());
-      healthWidth = static_cast<int>(sprite.width * healthPercentage * transform.scale.x);
+      const float parentScaleX = registry->HasComponent<ScaleComponent>(parent.value())
+                                     ? registry->GetComponent<ScaleComponent>(parent.value()).value.x
+                                     : 1.0f;
+      healthWidth = static_cast<int>(sprite.width * healthPercentage * parentScaleX);
     }
 
     square.width = static_cast<float>(healthWidth);

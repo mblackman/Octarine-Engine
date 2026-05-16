@@ -3,7 +3,6 @@
 #include <sol/sol.hpp>
 
 #include "../Components/SpriteComponent.h"
-#include "../Components/TransformComponent.h"
 #include "Components/AnimationComponent.h"
 #include "Components/AudioSourceComponent.h"
 #include "Components/BoxColliderComponent.h"
@@ -73,15 +72,6 @@ namespace LuaComponentHelpers
 class ComponentLuaFactory
 {
 public:
-  static TransformComponent CreateTransformComponent(const sol::table& data)
-  {
-    using namespace LuaComponentHelpers;
-    const glm::vec2 position = SafeGetVec2(data, "position");
-    const glm::vec2 scale = SafeGetVec2(data, "scale", 1.0f, 1.0f);
-    const auto rotation = SafeGetOptionalValue<double>(data, "rotation", 0.0);
-    return TransformComponent(position, scale, rotation);
-  }
-
   static RigidBodyComponent CreateRigidBodyComponent(const sol::table& data)
   {
     using namespace LuaComponentHelpers;
