@@ -93,23 +93,23 @@ jobs:
         run: cmake --preset ${{ matrix.preset }}
 
       - name: Build
-        run: cmake --build cmake-build-${{ matrix.preset }} --config Release --parallel
+        run: cmake --build build/${{ matrix.preset }} --config Release --parallel
 
       - name: Stage runtime DLLs (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
         run: |
-          $out = "cmake-build-${{ matrix.preset }}/bin/release"
+          $out = "build/${{ matrix.preset }}/bin/release"
           # Ninja single-config writes directly to bin/release; vcpkg dlls already copied next to exe by CMake.
           Get-ChildItem $out
 
       - name: List artifact contents
         shell: bash
-        run: ls -la cmake-build-${{ matrix.preset }}/bin/release
+        run: ls -la build/${{ matrix.preset }}/bin/release
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: OctarineEngine-${{ matrix.platform }}-${{ matrix.preset }}
-          path: cmake-build-${{ matrix.preset }}/bin/release
+          path: build/${{ matrix.preset }}/bin/release
           if-no-files-found: error

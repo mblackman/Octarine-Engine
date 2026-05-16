@@ -58,7 +58,7 @@ cmake --preset player-profile
 cmake --build --preset player-profile
 ```
 
-The compiled binaries will be located in `cmake-build-[preset-name]/bin/`.
+The compiled binaries will be located in `build/[preset-name]/bin/`.
 
 ### Running the Engine
 
@@ -99,5 +99,5 @@ For ad-hoc profiling runs:
 
 ```bash
 SDL_VIDEODRIVER=dummy SDL_AUDIODRIVER=dummy \
-  ./cmake-build-player-profile/bin/relwithdebinfo/OctarineEngine /path/to/game --startup-mode bench
+  ./build/player-profile/bin/relwithdebinfo/OctarineEngine /path/to/game --startup-mode bench
 ```

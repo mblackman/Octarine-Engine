@@ -87,10 +87,10 @@ jobs:
         run: cmake --preset player-profile -DOCTARINE_ENABLE_BENCHMARKS=ON
 
       - name: Build Benchmarks
-        run: cmake --build cmake-build-player-profile --target OctarineBenchmarks --parallel
+        run: cmake --build build/player-profile --target OctarineBenchmarks --parallel
 
       - name: Run Micro-Benchmarks
-        run: ./cmake-build-player-profile/bin/relwithdebinfo/OctarineBenchmarks --benchmark_format=json | tee benchmark_result.json
+        run: ./build/player-profile/bin/relwithdebinfo/OctarineBenchmarks --benchmark_format=json | tee benchmark_result.json
 
       - name: Store micro-benchmark result
         uses: benchmark-action/github-action-benchmark@v1
