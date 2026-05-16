@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778952629200,
+  "lastUpdate": 1778954039730,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -2736,6 +2736,114 @@ window.BENCHMARK_DATA = {
             "value": 634951.2167624303,
             "unit": "ns/iter",
             "extra": "iterations: 1109\ncpu: 634847.0063120372 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "1c189fe8b8fba5764ce7641a56eff89925e5a9e9",
+          "message": "Move all build artifacts to build/ directory",
+          "timestamp": "2026-05-16T11:47:23-06:00",
+          "tree_id": "99acc612eafe6d5e790615e0e47ae9b28d002706",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/1c189fe8b8fba5764ce7641a56eff89925e5a9e9"
+        },
+        "date": 1778954031014,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 3977.483265846236,
+            "unit": "ns/iter",
+            "extra": "iterations: 177194\ncpu: 4006.3881169794518 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 15689.219031792029,
+            "unit": "ns/iter",
+            "extra": "iterations: 43569\ncpu: 15726.225986366715 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 107939.5621469278,
+            "unit": "ns/iter",
+            "extra": "iterations: 6526\ncpu: 107978.4567882335 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 901571.5985487287,
+            "unit": "ns/iter",
+            "extra": "iterations: 780\ncpu: 901646.4948717912 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1851925.5483805821,
+            "unit": "ns/iter",
+            "extra": "iterations: 382\ncpu: 1851586.816753925 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2292.457912821884,
+            "unit": "ns/iter",
+            "extra": "iterations: 308220\ncpu: 2284.555788073283 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10040.493362469007,
+            "unit": "ns/iter",
+            "extra": "iterations: 69736\ncpu: 10033.344269819574 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 101136.82585125184,
+            "unit": "ns/iter",
+            "extra": "iterations: 6866\ncpu: 101144.75138362696 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 396404.13168430794,
+            "unit": "ns/iter",
+            "extra": "iterations: 1781\ncpu: 396380.2156092035 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2162.8933691475336,
+            "unit": "ns/iter",
+            "extra": "iterations: 328612\ncpu: 2131.2164771780685 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6694.564118393214,
+            "unit": "ns/iter",
+            "extra": "iterations: 104738\ncpu: 6657.196585769913 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 43085.33420652376,
+            "unit": "ns/iter",
+            "extra": "iterations: 16319\ncpu: 43049.72908878798 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 318990.10065139644,
+            "unit": "ns/iter",
+            "extra": "iterations: 2198\ncpu: 318808.04822562577 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 640267.2667469502,
+            "unit": "ns/iter",
+            "extra": "iterations: 1118\ncpu: 640172.9588551361 ns\nthreads: 1"
           }
         ]
       }
