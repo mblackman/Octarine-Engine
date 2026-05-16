@@ -44,7 +44,7 @@ bool AudioSystem::Init(Registry* registry, const std::unique_ptr<EventBus>& even
   state_->mixer = mixer;
   state_->track_pool_max = trackPoolMax;
 
-  state_->track_pool.reserve(trackPoolInitial);
+  state_->track_pool.reserve(static_cast<std::size_t>(trackPoolInitial));
   for (int i = 0; i < trackPoolInitial; ++i) {
     if (MIX_Track* track = MIX_CreateTrack(mixer)) {
       state_->track_pool.push_back({track, 0});
