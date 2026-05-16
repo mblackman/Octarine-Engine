@@ -189,10 +189,17 @@ else ()
             $<$<NOT:$<CONFIG:Debug>>:-ffunction-sections>
             $<$<NOT:$<CONFIG:Debug>>:-fdata-sections>
     )
-    target_link_options(${PROJECT_NAME} PRIVATE
-            $<$<NOT:$<CONFIG:Debug>>:-Wl,--gc-sections>
-            $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-s>
-    )
+    if (APPLE)
+        target_link_options(${PROJECT_NAME} PRIVATE
+                $<$<NOT:$<CONFIG:Debug>>:-Wl,-dead_strip>
+                $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-Wl,-x>
+        )
+    else ()
+        target_link_options(${PROJECT_NAME} PRIVATE
+                $<$<NOT:$<CONFIG:Debug>>:-Wl,--gc-sections>
+                $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-s>
+        )
+    endif ()
 endif ()
 
 # -----------------------------------------------------------------------------
