@@ -17,6 +17,16 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# LTO for non-Debug builds. Combines with --gc-sections to drop unreferenced
+# code/data from statically linked third-party libs (SDL3, Lua, etc).
+include(CheckIPOSupported)
+check_ipo_supported(RESULT OCTARINE_IPO_SUPPORTED OUTPUT OCTARINE_IPO_ERROR)
+if (OCTARINE_IPO_SUPPORTED)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
+endif ()
+
 # Profiling option — when ON, enables TIMER/ACCUM logging in PerfUtils.h.
 # OFF by default so Debug and Release builds have zero profiling overhead.
 option(OCTARINE_ENABLE_PROFILING "Enable per-system performance instrumentation" OFF)
@@ -171,6 +181,17 @@ else ()
     )
     target_compile_options(${PROJECT_NAME} PRIVATE
             $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
+    )
+    # Size reduction for non-Debug builds:
+    # - function/data sections + --gc-sections drops unreferenced symbols from static libs
+    # - -s strips the linked binary
+    target_compile_options(${PROJECT_NAME} PRIVATE
+            $<$<NOT:$<CONFIG:Debug>>:-ffunction-sections>
+            $<$<NOT:$<CONFIG:Debug>>:-fdata-sections>
+    )
+    target_link_options(${PROJECT_NAME} PRIVATE
+            $<$<NOT:$<CONFIG:Debug>>:-Wl,--gc-sections>
+            $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-s>
     )
 endif ()
 
