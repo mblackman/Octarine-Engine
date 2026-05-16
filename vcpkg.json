@@ -52,6 +52,14 @@
       "version>=": "3.2.2"
     },
     {
+      "name": "freetype",
+      "default-features": false,
+      "features": [
+        "png",
+        "zlib"
+      ]
+    },
+    {
       "name": "sol2",
       "version>=": "3.5.0"
     },
