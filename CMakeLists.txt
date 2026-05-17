@@ -64,6 +64,7 @@ set(SRC_FILES
         src/Game/Game.cpp
         src/Game/GameConfig.cpp
         src/General/Logger.cpp
+        src/Lua/Bindings/RegisterAllBindings.cpp
         src/Renderer/Renderer.cpp
         src/Systems/AudioSystem.cpp
 )

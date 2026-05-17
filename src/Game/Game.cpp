@@ -32,6 +32,9 @@
 #include "Events/MouseWheelEvent.h"
 #include "GameConfig.h"
 #include "General/PerfUtils.h"
+#include "Lua/Bindings/InputSystemLuaBinding.h"
+#include "Lua/Bindings/LuaSystemRegistry.h"
+#include "Lua/Bindings/RegisterAllBindings.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/AudioSystem.h"
 #include "Systems/CameraFollowSystem.h"
@@ -316,9 +319,19 @@ void Game::Setup() {
   auto &inputSystem = registry_->Set<InputSystem>(InputSystem());
   inputSystem.SubscribeToEvents(event_bus_);
 
+  // Component bindings (LuaBinding<T> specializations) must be registered BEFORE
+  // ScriptSystem's CreateLuaBindings runs — usertypes + registry.has_/get_ are
+  // populated from LuaComponentRegistry at that point.
+  RegisterAllLuaBindings();
+
+  // Systems that expose a Lua surface register here; bindAll installs them all once
+  // the sol::state has its libraries open.
+  LuaSystemRegistry::clear();
+  LuaSystemRegistry::registerSystem(inputSystem);
+
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
   scriptSystem.CreateLuaBindings(lua, *this);
-  inputSystem.CreateLuaBindings(lua);
+  LuaSystemRegistry::bindAll(lua);
   lua["game_window_width"] = gameConfig.windowWidth;
   lua["game_window_height"] = gameConfig.windowHeight;
   lua["oct_startup_mode"] = startup_mode_;

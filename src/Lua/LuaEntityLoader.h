@@ -1,9 +1,10 @@
 #pragma once
-#include <functional>
 #include <stack>
 
 #include "../Components/BoxColliderComponent.h"
+#include "../Components/EntityMaskComponent.h"
 #include "../Components/GlobalTransformComponent.h"
+#include "../Components/NameComponent.h"
 #include "../Components/PositionComponent.h"
 #include "../Components/RotationComponent.h"
 #include "../Components/ScaleComponent.h"
@@ -13,13 +14,12 @@
 #include "../Components/UIButtonComponent.h"
 #include "../ECS/Registry.h"
 #include "../General/Logger.h"
-#include "ComponentLuaFactory.h"
+#include "Lua/Bindings/LuaBinding.h"
+#include "Lua/Bindings/LuaComponentRegistry.h"
 
 class LuaEntityLoader
 {
 public:
-  using ComponentCreationFunction = std::function<void(Registry*, Entity, const sol::table&)>;
-
   // Reads `tag`/`tags`/`group`/`groups` (string or list of strings) and applies each as a label
   // tag on the entity. `group(s)` is a back-compat alias for `tag(s)`.
   static void TagAndGroupEntity(const sol::table& currentData, Registry* registry, const Entity& entity)
@@ -29,7 +29,7 @@ public:
   }
 
   // Reads top-level `name` string and attaches a NameComponent. Accepts plain strings only at
-  // the top level (`components.name = "foo"` also works via the factory map below).
+  // the top level (`components.name = "foo"` also works via the registry lookup below).
   static void ApplyName(const sol::table& currentData, Registry* registry, const Entity& entity)
   {
     const sol::object value = currentData.get<sol::object>("name");
@@ -70,7 +70,8 @@ public:
     if (!hasTopLevelMask && !hasComponentMask && !hasCollider) return;
 
     const sol::object& maskValue = hasTopLevelMask ? topLevelMask : componentMask;
-    registry->AddComponent(entity, ComponentLuaFactory::CreateEntityMaskComponent(maskValue));
+    const int raw = maskValue.is<int>() ? maskValue.as<int>() : Constants::kDefaultEntityMask;
+    registry->AddComponent(entity, EntityMaskComponent(EntityMask(static_cast<unsigned long long>(raw))));
   }
 
   static void LoadEntityComponents(const sol::table& currentData, Registry* registry, const Entity& entity)
@@ -83,7 +84,6 @@ public:
       return;
     }
 
-    // Add all defined components to the entity
     const sol::table& componentsTable = componentsTableOpt.value();
     for (const auto& [name, data] : componentsTable)
     {
@@ -92,24 +92,36 @@ public:
       // entity_mask handled in ApplyEntityMask (also validates top-level vs component-level conflict).
       if (componentName == "entity_mask") continue;
 
-      // `name` can be a bare string (`components.name = "foo"`) — skip the table validation below.
-      if (componentName == "name")
+      // `transform` explodes into up-to-three real components. Per-field tables are optional;
+      // omitted fields fall back to system defaults (identity).
+      if (componentName == "transform")
       {
-        registry->AddComponent(entity, ComponentLuaFactory::CreateNameComponent(data));
+        if (!data.is<sol::table>())
+        {
+          Logger::Error("LoadEntityFromLua: 'transform' must be a table.");
+          continue;
+        }
+        const sol::table t = data.as<sol::table>();
+        using namespace LuaComponentHelpers;
+        if (t["position"].valid())
+        {
+          registry->AddComponent(entity, PositionComponent(SafeGetVec2(t, "position")));
+        }
+        if (t["scale"].valid())
+        {
+          registry->AddComponent(entity, ScaleComponent(SafeGetVec2(t, "scale", 1.0f, 1.0f)));
+        }
+        if (t["rotation"].valid())
+        {
+          registry->AddComponent(entity, RotationComponent(SafeGetOptionalValue<double>(t, "rotation", 0.0)));
+        }
         continue;
       }
 
-      auto componentDataTable = data.as<sol::table>();
-
-      if (!componentDataTable.valid())
+      const sol::object dataObj = data;
+      if (const auto* entry = LuaComponentRegistry::find(componentName))
       {
-        Logger::Error("LoadEntityFromLua: Invalid data table for component: " + componentName);
-        continue;
-      }
-
-      if (auto it = GetComponentFactoryMap().find(componentName); it != GetComponentFactoryMap().end())
-      {
-        it->second(registry, entity, componentDataTable);
+        entry->attach(registry, entity, dataObj);
       }
       else
       {
@@ -186,15 +198,15 @@ private:
   static void MaybeAttachGlobalTransform(Registry* registry, const Entity& entity)
   {
     const bool hasAnyLocal = registry->HasComponent<PositionComponent>(entity) ||
-        registry->HasComponent<ScaleComponent>(entity) ||
-        registry->HasComponent<RotationComponent>(entity);
+      registry->HasComponent<ScaleComponent>(entity) ||
+      registry->HasComponent<RotationComponent>(entity);
     if (!hasAnyLocal) return;
 
     const bool needsGlobal = registry->HasComponent<SpriteComponent>(entity) ||
-        registry->HasComponent<SquarePrimitiveComponent>(entity) ||
-        registry->HasComponent<BoxColliderComponent>(entity) ||
-        registry->HasComponent<UIButtonComponent>(entity) ||
-        registry->HasComponent<TextLabelComponent>(entity);
+      registry->HasComponent<SquarePrimitiveComponent>(entity) ||
+      registry->HasComponent<BoxColliderComponent>(entity) ||
+      registry->HasComponent<UIButtonComponent>(entity) ||
+      registry->HasComponent<TextLabelComponent>(entity);
     if (!needsGlobal) return;
 
     if (registry->HasComponent<GlobalTransformComponent>(entity)) return;
@@ -222,89 +234,5 @@ private:
         if (!name.empty()) registry->AddTag(entity, name);
       }
     }
-  }
-
-  static const std::unordered_map<std::string, ComponentCreationFunction>& GetComponentFactoryMap()
-  {
-    static std::unordered_map<std::string, ComponentCreationFunction> componentFactories;
-    if (componentFactories.empty())
-    {
-      componentFactories = InitializeFactories();
-    }
-    return componentFactories;
-  }
-
-  static std::unordered_map<std::string, ComponentCreationFunction> InitializeFactories()
-  {
-    std::unordered_map<std::string, ComponentCreationFunction> factories;
-
-    factories["transform"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      using namespace LuaComponentHelpers;
-      // Each transform field maps to its own component, but only when explicitly present in the
-      // Lua table. Omitting a field means the entity skips that slot and the system defaults
-      // (identity) apply.
-      if (data["position"].valid())
-      {
-        registry->AddComponent(ent, PositionComponent(SafeGetVec2(data, "position")));
-      }
-      if (data["scale"].valid())
-      {
-        registry->AddComponent(ent, ScaleComponent(SafeGetVec2(data, "scale", 1.0f, 1.0f)));
-      }
-      if (data["rotation"].valid())
-      {
-        registry->AddComponent(ent, RotationComponent(SafeGetOptionalValue<double>(data, "rotation", 0.0)));
-      }
-    };
-    factories["rigidbody"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateRigidBodyComponent(data));
-    };
-    factories["sprite"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateSpriteComponent(data));
-    };
-    factories["square"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateSquarePrimitiveComponent(data));
-    };
-    factories["animation"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateAnimationComponent(data));
-    };
-    factories["box_collider"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateBoxColliderComponent(data));
-    };
-    factories["health"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateHealthComponent(data));
-    };
-    factories["projectile_emitter"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateProjectileEmitterComponent(data));
-    };
-    factories["camera_follow"] = [](Registry* registry, Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateCameraFollowComponent(data));
-    };
-    factories["script"] =[](Registry* registry, Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateScriptComponent(data));
-    };
-    factories["ui_button"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateUIButtonComponent(data));
-    };
-    factories["text_label"] = [](Registry* registry, const Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateTextLabelComponent(data));
-    };
-    factories["audio_source"] = [](Registry* registry, const Entity ent, const sol::table& data) {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateAudioSourceComponent(data));
-    };
-
-    return factories;
   }
 };
