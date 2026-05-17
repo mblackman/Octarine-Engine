@@ -10,10 +10,14 @@
 #include <utility>
 
 #include "../AssetManager/AssetManager.h"
+#include "../Components/HealthComponent.h"
 #include "../Components/NameComponent.h"
 #include "../Components/PositionComponent.h"
+#include "../Components/ScaleComponent.h"
 #include "../Components/ScriptComponent.h"
 #include "../Components/SpriteComponent.h"
+#include "../Components/SquarePrimitiveComponent.h"
+#include "../Components/TextLabelComponent.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/AudioPlayEvent.h"
 #include "../Game/Game.h"
@@ -166,6 +170,38 @@ private:
         lua.new_usertype<glm::vec2>("vec2", sol::constructors<glm::vec2(float, float), glm::vec2()>(), "x",
                                     &glm::vec2::x,
                                     "y", &glm::vec2::y);
+
+        lua.new_usertype<SDL_Color>("color",
+                                    sol::constructors<SDL_Color(), SDL_Color(Uint8, Uint8, Uint8, Uint8)>(),
+                                    "r", &SDL_Color::r, "g", &SDL_Color::g, "b", &SDL_Color::b, "a", &SDL_Color::a);
+
+        lua.new_usertype<HealthComponent>("health_component",
+                                          "current_health", &HealthComponent::currentHealth,
+                                          "max_health", &HealthComponent::maxHealth);
+
+        lua.new_usertype<TextLabelComponent>("text_label_component",
+                                             "text", &TextLabelComponent::text,
+                                             "color", &TextLabelComponent::color,
+                                             "layer", &TextLabelComponent::layer,
+                                             "position", &TextLabelComponent::position,
+                                             "is_fixed", &TextLabelComponent::isFixed);
+
+        lua.new_usertype<SquarePrimitiveComponent>("square_primitive_component",
+                                                   "width", &SquarePrimitiveComponent::width,
+                                                   "height", &SquarePrimitiveComponent::height,
+                                                   "color", &SquarePrimitiveComponent::color,
+                                                   "position", &SquarePrimitiveComponent::position,
+                                                   "layer", &SquarePrimitiveComponent::layer,
+                                                   "is_fixed", &SquarePrimitiveComponent::isFixed);
+
+        lua.new_usertype<SpriteComponent>("sprite_component",
+                                          "width", sol::readonly(&SpriteComponent::width),
+                                          "height", sol::readonly(&SpriteComponent::height),
+                                          "layer", &SpriteComponent::layer,
+                                          "asset_id", sol::readonly(&SpriteComponent::assetId));
+
+        lua.new_usertype<ScaleComponent>("scale_component",
+                                         "value", &ScaleComponent::value);
     }
 
     void CreateLuaGameBindings(sol::state& lua, const Game& game)
@@ -232,6 +268,57 @@ private:
                 return;
             }
             eventBus->EmitEvent<AudioPlayEvent>(clipId, volume.value_or(1.0F));
+        });
+
+        lua["registry"] = lua.create_table();
+        sol::table reg = lua["registry"];
+
+        reg.set_function("get_parent", [&game](sol::this_state state, const Entity entity) -> sol::object
+        {
+            const auto parent = game.GetRegistry()->GetParent(entity);
+            if (!parent.has_value()) return sol::lua_nil;
+            return sol::make_object(state, parent.value());
+        });
+
+        reg.set_function("has_health", [&game](const Entity e)
+        {
+            return game.GetRegistry()->HasComponent<HealthComponent>(e);
+        });
+        reg.set_function("get_health", [&game](const Entity e) -> HealthComponent&
+        {
+            return game.GetRegistry()->GetComponent<HealthComponent>(e);
+        });
+        reg.set_function("has_text_label", [&game](const Entity e)
+        {
+            return game.GetRegistry()->HasComponent<TextLabelComponent>(e);
+        });
+        reg.set_function("get_text_label", [&game](const Entity e) -> TextLabelComponent&
+        {
+            return game.GetRegistry()->GetComponent<TextLabelComponent>(e);
+        });
+        reg.set_function("has_square", [&game](const Entity e)
+        {
+            return game.GetRegistry()->HasComponent<SquarePrimitiveComponent>(e);
+        });
+        reg.set_function("get_square", [&game](const Entity e) -> SquarePrimitiveComponent&
+        {
+            return game.GetRegistry()->GetComponent<SquarePrimitiveComponent>(e);
+        });
+        reg.set_function("has_sprite", [&game](const Entity e)
+        {
+            return game.GetRegistry()->HasComponent<SpriteComponent>(e);
+        });
+        reg.set_function("get_sprite", [&game](const Entity e) -> SpriteComponent&
+        {
+            return game.GetRegistry()->GetComponent<SpriteComponent>(e);
+        });
+        reg.set_function("has_scale", [&game](const Entity e)
+        {
+            return game.GetRegistry()->HasComponent<ScaleComponent>(e);
+        });
+        reg.set_function("get_scale", [&game](const Entity e) -> ScaleComponent&
+        {
+            return game.GetRegistry()->GetComponent<ScaleComponent>(e);
         });
     }
 

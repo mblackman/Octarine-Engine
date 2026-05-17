@@ -37,7 +37,6 @@
 #include "Systems/CameraFollowSystem.h"
 #include "Systems/CollisionSystem.h"
 #include "Systems/DamageSystem.h"
-#include "Systems/DisplayHealthSystem.h"
 #include "Systems/DrawColliderSystem.h"
 #include "Systems/EntityPoolSystem.h"
 #include "Systems/InputSystem.h"
@@ -390,9 +389,6 @@ void Game::Setup() {
 
   // Camera follows after gameplay-driven transform updates
   registry_->RegisterSystem<PositionComponent, CameraFollowComponent>(CameraFollowSystem());
-
-  // Health UI updates before render so values reflect current frame
-  registry_->RegisterSystem<HealthComponent, TextLabelComponent, SquarePrimitiveComponent>(DisplayHealthSystem());
 
   // Render queue producers
   registry_->RegisterParallelSystem<GlobalTransformComponent, SpriteComponent>(RenderSpriteSystem());
