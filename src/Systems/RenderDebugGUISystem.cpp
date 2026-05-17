@@ -10,7 +10,6 @@
 #include "../Components/EntityMaskComponent.h"
 #include "../Components/GlobalTransformComponent.h"
 #include "../Components/HealthComponent.h"
-#include "../Components/KeyboardControlComponent.h"
 #include "../Components/NameComponent.h"
 #include "../Components/PositionComponent.h"
 #include "../Components/ProjectileComponent.h"
@@ -669,18 +668,6 @@ void RenderDebugGUISystem::HierarchyWindow(Registry* registry)
                 ImGui::Text("Mask: %s", em.mask.to_string().c_str());
             }
         }
-        if (registry->HasComponent<KeyboardControlComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("KeyboardControl", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& kc = registry->GetComponent<KeyboardControlComponent>(selectedEntity);
-                auto vel = static_cast<float>(kc.velocity);
-                if (ImGui::DragFloat("Velocity", &vel))
-                {
-                    kc.velocity = vel;
-                }
-            }
-        }
         if (registry->HasComponent<ProjectileComponent>(selectedEntity))
         {
             if (ImGui::CollapsingHeader("Projectile", ImGuiTreeNodeFlags_DefaultOpen))
@@ -740,9 +727,6 @@ void RenderDebugGUISystem::HierarchyWindow(Registry* registry)
                 registry->AddComponent(selectedEntity, AnimationComponent());
             if (!registry->HasComponent<HealthComponent>(selectedEntity) && ImGui::Selectable("Health"))
                 registry->AddComponent(selectedEntity, HealthComponent(100));
-            if (!registry->HasComponent<KeyboardControlComponent>(selectedEntity) && ImGui::Selectable(
-                "KeyboardControl"))
-                registry->AddComponent(selectedEntity, KeyboardControlComponent());
             if (!registry->HasComponent<CameraFollowComponent>(selectedEntity) && ImGui::Selectable("CameraFollow"))
                 registry->AddComponent(selectedEntity, CameraFollowComponent());
             if (!registry->HasComponent<ProjectileEmitterComponent>(selectedEntity) && ImGui::Selectable(

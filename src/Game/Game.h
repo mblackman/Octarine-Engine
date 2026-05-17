@@ -12,8 +12,6 @@
 #include "../Events/KeyInputEvent.h"
 #include "../Renderer/Renderer.h"
 
-class ScriptSystem;
-
 class Registry;
 
 class Game {
@@ -70,6 +68,5 @@ class Game {
   std::unique_ptr<Registry> registry_;
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
-  ScriptSystem* script_system_{nullptr};
   std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent>> collider_query_;
 };

@@ -14,7 +14,6 @@
 #include "Components/CameraComponents.h"
 #include "Components/EntityMaskComponent.h"
 #include "Components/HealthComponent.h"
-#include "Components/KeyboardControlComponent.h"
 #include "Components/ProjectileComponent.h"
 #include "Components/ProjectileEmitterComponent.h"
 #include "Components/RigidBodyComponent.h"
@@ -30,6 +29,7 @@
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
 #include "Events/MouseInputEvent.h"
+#include "Events/MouseWheelEvent.h"
 #include "GameConfig.h"
 #include "General/PerfUtils.h"
 #include "Systems/AnimationSystem.h"
@@ -40,8 +40,9 @@
 #include "Systems/DisplayHealthSystem.h"
 #include "Systems/DrawColliderSystem.h"
 #include "Systems/EntityPoolSystem.h"
-#include "Systems/KeyboardControlSystem.h"
-#include "Systems/MovementSystem.h"
+#include "Systems/InputSystem.h"
+#include "Systems/ObstacleBounceSystem.h"
+#include "Systems/OffScreenDespawnSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
 #include "Systems/ProjectileLifecycleSystem.h"
 #include "Systems/RenderPrimitiveSystem.h"
@@ -50,6 +51,7 @@
 #include "Systems/ScriptSystem.h"
 #include "Systems/TransformSystem.h"
 #include "Systems/UIButtonSystem.h"
+#include "Systems/VelocityIntegrationSystem.h"
 
 #ifdef OCTARINE_WITH_IMGUI
 #include "Systems/RenderDebugGUISystem.h"
@@ -309,10 +311,15 @@ void Game::Setup() {
 
   // Gameplay
   auto &scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
-  script_system_ = &scriptSystem;
+  // InputSystem owned by the Registry so Lua bindings + event subscriptions outlive any single
+  // scene script reload. Must be Set before CreateLuaBindings so the `input` table is installed
+  // alongside ScriptSystem's globals.
+  auto &inputSystem = registry_->Set<InputSystem>(InputSystem());
+  inputSystem.SubscribeToEvents(event_bus_);
 
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
   scriptSystem.CreateLuaBindings(lua, *this);
+  inputSystem.CreateLuaBindings(lua);
   lua["game_window_width"] = gameConfig.windowWidth;
   lua["game_window_height"] = gameConfig.windowHeight;
   lua["oct_startup_mode"] = startup_mode_;
@@ -363,13 +370,17 @@ void Game::Setup() {
   }
 
   registry_->RegisterParallelSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
-  auto &projectileEmitSystem =
-      registry_->RegisterSystem<PositionComponent, ProjectileEmitterComponent>(ProjectileEmitSystem());
+  // ProjectileEmitSystem has no per-frame system pass anymore — gameplay drives shots via
+  // fire_projectile(...) in Lua. The instance owns the projectile pool registration + Fire().
+  auto &projectileEmitSystem = registry_->Set<ProjectileEmitSystem>(ProjectileEmitSystem());
   registry_->RegisterParallelSystem<ProjectileComponent>(ProjectileLifecycleSystem());
-  auto &keyboardControlSystem =
-      registry_->RegisterSystem<KeyboardControlComponent, RigidBodyComponent, SpriteComponent>(KeyboardControlSystem());
 
-  registry_->RegisterParallelSystem<PositionComponent, RigidBodyComponent, SpriteComponent>(MovementSystem());
+  // Integrate velocity into local position. Must run before TransformSystem so the hierarchy
+  // resolves with the latest positions, and before CollisionSystem reads the global transforms.
+  registry_->RegisterParallelSystem<PositionComponent, RigidBodyComponent>(VelocityIntegrationSystem());
+
+  // Despawn entities (except the player) once they leave the playable area.
+  registry_->RegisterParallelSystem<PositionComponent, SpriteComponent>(OffScreenDespawnSystem());
 
   // Resolve hierarchy after Movement mutates local positions, before Collision reads globals.
   registry_->RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
@@ -390,15 +401,25 @@ void Game::Setup() {
 
   // Event subscriptions (one-time)
   event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
-  scriptSystem.SubscribeToEvents(event_bus_);
-  keyboardControlSystem.SubscribeToEvents(event_bus_);
-  projectileEmitSystem.Init(event_bus_, *registry_);
+  projectileEmitSystem.Init(*registry_);
+  // Expose manual fire to Lua. Player-tagged emitters now skip auto-fire — gameplay code drives
+  // shots via input callbacks. dx/dy is a non-normalized aim vector; 0,0 falls back to the
+  // emitter's configured velocity.
+  lua.set_function("fire_projectile",
+                   [&projectileEmitSystem, this](const Entity emitter, const sol::optional<double> dx,
+                                                 const sol::optional<double> dy) {
+                     projectileEmitSystem.Fire(*registry_, emitter,
+                                               glm::vec2(static_cast<float>(dx.value_or(0.0)),
+                                                         static_cast<float>(dy.value_or(0.0))));
+                   });
   // Event-driven systems with no per-frame Update — owned by the Registry instead of
   // living as parallel members on Game. Keeps the registry as the single source of truth.
   auto &uiButtonSystem = registry_->Set<UIButtonSystem>(UIButtonSystem());
   auto &damageSystem = registry_->Set<DamageSystem>(DamageSystem());
+  auto &obstacleBounceSystem = registry_->Set<ObstacleBounceSystem>(ObstacleBounceSystem());
   uiButtonSystem.Init(registry_.get(), event_bus_);
   damageSystem.Init(registry_.get(), event_bus_);
+  obstacleBounceSystem.Init(registry_.get(), event_bus_);
 
   // Pre-build the debug-collider query once so we don't allocate per render frame.
   collider_query_ = registry_->CreateQuery<GlobalTransformComponent, BoxColliderComponent>();
@@ -436,6 +457,10 @@ void Game::ProcessInput() const {
         event_bus_->EmitEvent<MouseInputEvent>(mouseButtonEvent);
         break;
       }
+      case SDL_EVENT_MOUSE_WHEEL: {
+        event_bus_->EmitEvent<MouseWheelEvent>(event.wheel.x, event.wheel.y);
+        break;
+      }
       default:
         break;
     }
@@ -451,6 +476,11 @@ void Game::Update(const float deltaTime) {
 
   auto &options = registry_->Get<GameConfig>().GetEngineOptions();
 
+  auto *inputSystem = registry_->TryGet<InputSystem>();
+  if (inputSystem) {
+    inputSystem->BeginFrame();
+  }
+
   if (!options.isPaused || options.stepFrame) {
     registry_->Update(deltaTime * options.timeScale);
     options.stepFrame = false;
@@ -458,10 +488,10 @@ void Game::Update(const float deltaTime) {
     // If paused, we might still want to clear some per-frame signals so they don't get stuck.
   }
 
-  // Pressed-keys are a per-frame edge signal — clear after every script entity in this frame
-  // has had a chance to observe them.
-  if (script_system_) {
-    script_system_->ClearPerFrameInput();
+  // Pressed/released keys and wheel deltas are per-frame edge signals — clear after every
+  // system in this frame has observed them.
+  if (inputSystem) {
+    inputSystem->ClearPerFrameInput();
   }
 }
 
@@ -675,9 +705,8 @@ void Game::ReloadScene() {
 void Game::StopScene() {
   Logger::Info("Stopping current scene (clearing entities).");
   registry_->ClearUserEntities();
-  // We could also clear the script system's per-frame input, etc.
-  if (script_system_) {
-    script_system_->ClearPerFrameInput();
+  if (auto *inputSystem = registry_->TryGet<InputSystem>()) {
+    inputSystem->ResetLuaState();
   }
 }
 

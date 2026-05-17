@@ -9,7 +9,6 @@
 #include "Components/CameraFollowComponent.h"
 #include "Components/EntityMaskComponent.h"
 #include "Components/HealthComponent.h"
-#include "Components/KeyboardControlComponent.h"
 #include "Components/NameComponent.h"
 #include "Components/ProjectileEmitterComponent.h"
 #include "Components/RigidBodyComponent.h"
@@ -162,13 +161,6 @@ public:
   }
 
   static CameraFollowComponent CreateCameraFollowComponent(const sol::table& /*data*/) { return {}; }
-
-  static KeyboardControlComponent CreateKeyboardControlledComponent(const sol::table& data)
-  {
-    using namespace LuaComponentHelpers;
-    const double velocity = data.get<double>("velocity");
-    return KeyboardControlComponent(velocity);
-  }
 
   static ScriptComponent CreateScriptComponent(const sol::table& data)
   {

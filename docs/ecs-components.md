@@ -116,14 +116,6 @@ Automatically spawns projectile entities at a set interval.
 | `hit_damage`          | `number`       | `10`         | Damage value assigned to projectiles.   |
 | `collision_mask`      | `number`       | `1`          | Collision mask for spawned projectiles. |
 
-### `keyboard_controller`
-
-Maps arrow keys or WASD to entity movement.
-
-| Field      | Type     | Default      | Description        |
-|------------|----------|--------------|--------------------|
-| `velocity` | `number` | **Required** | Speed of movement. |
-
 ### `health`
 
 Tracks an entity's health.

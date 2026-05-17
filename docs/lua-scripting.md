@@ -88,15 +88,20 @@ local player = {
         rigidbody = {
             velocity = { x = 0, y = 0 }
         },
-        keyboard_controller = {
-            velocity = 100
-        },
         script = {
+            speed = 100,
             on_update = function(self, entity, delta_time)
-                -- Custom logic here
-                if is_key_pressed("space") then
-                    log("Jump!")
-                end
+                -- Movement via the global `input` table. See lib/player_controller.lua
+                -- in the example project for a clamped + normalized version.
+                local pos = get_position(entity)
+                local dx, dy = 0, 0
+                if input.is_key_down("left")  then dx = dx - 1 end
+                if input.is_key_down("right") then dx = dx + 1 end
+                if input.is_key_down("up")    then dy = dy - 1 end
+                if input.is_key_down("down")  then dy = dy + 1 end
+                set_position(entity, pos.x + dx * self.speed * delta_time,
+                                     pos.y + dy * self.speed * delta_time)
+                if input.is_key_pressed("space") then log("Jump!") end
             end
         }
     }
@@ -116,11 +121,30 @@ load_entity(player)
 | `load_entity(table)` | Spawns a new entity with components. |
 | `blam(entity)` | Destroys the specified entity. |
 | `get_asset_path(path)` | Returns the absolute path for a relative asset path. |
-| `is_key_pressed(key)` | Returns true if a key was just pressed (e.g., "space"). |
-| `is_key_held(key)` | Returns true if a key is currently being held. |
 | `set_position(entity, x, y)` | Manually updates an entity's position. |
+| `get_position(entity)` | Returns the entity's position as a `vec2`. |
+| `get_game_map_dimensions()` | Returns playable area as `vec2(width, height)`. |
+| `set_game_map_dimensions(w, h)` | Sets the playable area used by off-screen despawn. |
+| `set_sprite_src_rect(entity, x, y)` | Sets the sprite's source-rect origin (animation row/col). |
+| `fire_projectile(entity, dx, dy)` | Spawns a projectile from `entity`'s `projectile_emitter`, aimed at `(dx, dy)` (zero = emitter default). |
 | `read_file_lines(path)` | Reads a file and returns its lines as a table. |
 | `quit_game()` | Gracefully exits the engine. |
+
+### `input` table
+
+Polling, action map, and callbacks. Action bindings + callbacks are cleared on `load_scene`/`reload_scene` — re-install in the new scene's `setup` (use a guard for idempotency).
+
+| Function | Description |
+| --- | --- |
+| `input.is_key_down(name)` / `is_key_pressed(name)` / `is_key_released(name)` | Held / went-down-this-frame / went-up-this-frame. |
+| `input.is_mouse_down(btn)` / `is_mouse_pressed(btn)` / `is_mouse_released(btn)` | `btn` is `"left"`, `"middle"`, `"right"`, `"x1"`, `"x2"`, or an SDL button id. |
+| `input.mouse_position()` | Screen-space cursor as `vec2`. |
+| `input.mouse_wheel()` | Per-frame wheel delta as `vec2`. |
+| `input.bind(action, key)` / `unbind(action, key?)` | Register / remove key for action; nil key removes all. |
+| `input.is_action_down(name)` / `is_action_pressed(name)` / `is_action_released(name)` | As above, OR over all keys bound to the action. |
+| `input.on_key_down(fn)` / `on_key_up(fn)` | `fn(key_name)`. |
+| `input.on_mouse_down(fn)` / `on_mouse_up(fn)` | `fn(btn, x, y)`. |
+| `input.on_mouse_wheel(fn)` | `fn(dx, dy)`. |
 
 ---
 

@@ -3,13 +3,10 @@
 #include <SDL3/SDL.h>
 #include <SDL3_mixer/SDL_mixer.h>
 
-#include <cctype>
 #include <filesystem>
 #include <fstream>
 #include <sol/sol.hpp>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 
 #include "../AssetManager/AssetManager.h"
@@ -19,7 +16,6 @@
 #include "../Components/SpriteComponent.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/AudioPlayEvent.h"
-#include "../Events/KeyInputEvent.h"
 #include "../Game/Game.h"
 #include "../General/Logger.h"
 #include "Game/GameConfig.h"
@@ -131,12 +127,7 @@ inline int LuaHandler(lua_State* /*lua_state*/, sol::optional<const std::excepti
 class ScriptSystem
 {
 public:
-    ScriptSystem()
-    {
-        keyMap_["ctrl"] = {"left ctrl", "right ctrl"};
-        keyMap_["shift"] = {"left shift", "right shift"};
-        keyMap_["alt"] = {"left alt", "right alt"};
-    }
+    ScriptSystem() = default;
 
     void CreateLuaBindings(sol::state& lua, const Game& game)
     {
@@ -151,11 +142,6 @@ public:
         // Init ImGui bindings
         sol_ImGui::Init(lua);
 #endif
-    }
-
-    void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus)
-    {
-        eventBus->SubscribeEvent<ScriptSystem, KeyInputEvent>(this, &ScriptSystem::OnKeyInput);
     }
 
     void operator()(const ContextFacade& context, ScriptComponent& script) const
@@ -173,10 +159,6 @@ public:
         }
     }
 
-    // Caller (Game) invokes this once after all systems have run so every script entity in
-    // the frame observes the same pressed-keys snapshot.
-    void ClearPerFrameInput() { pressedKeys_.clear(); }
-
 private:
     void CreateLuaTypes(sol::state& lua)
     {
@@ -189,8 +171,6 @@ private:
     void CreateLuaGameBindings(sol::state& lua, const Game& game)
     {
         lua.set_function("read_file_lines", &ReadFileLines);
-        lua.set_function("is_key_pressed", &ScriptSystem::IsKeyPressed, this);
-        lua.set_function("is_key_held", &ScriptSystem::IsKeyHeld, this);
         lua.set_function("quit_game", &Game::Quit);
         lua.set_function("blam", [&game](const Entity entity) { game.GetRegistry()->BlamEntity(entity); });
         lua.set_function("get_name", [&game](const Entity entity)
@@ -218,6 +198,11 @@ private:
         lua.set_function("set_game_map_dimensions", [this, &game](const double width, const double height)
         {
             SetGameMapDimensions(width, height, game);
+        });
+        lua.set_function("get_game_map_dimensions", [&game]()
+        {
+            const auto& gameConfig = game.GetRegistry()->Get<GameConfig>();
+            return glm::vec2(gameConfig.playableAreaWidth, gameConfig.playableAreaHeight);
         });
         lua.set_function("load_asset", [this, &game](sol::table assetTable)
         {
@@ -262,74 +247,6 @@ private:
         lua.set_function("print", [](const std::string& message) { Logger::LogLua(message); });
     }
 
-    bool IsKeyPressed(const std::string& key)
-    {
-        if (key.empty())
-        {
-            return false;
-        }
-        const std::string lowerKey = makeKey(key);
-
-        if (const auto it = keyMap_.find(lowerKey); it != keyMap_.end())
-        {
-            for (const auto& pressedKey : pressedKeys_)
-            {
-                if (it->second.find(pressedKey) != it->second.end())
-                {
-                    return true;
-                }
-            }
-        }
-        return pressedKeys_.find(lowerKey) != pressedKeys_.end();
-    }
-
-    bool IsKeyHeld(const std::string& key)
-    {
-        if (key.empty())
-        {
-            return false;
-        }
-        const std::string lowerKey = makeKey(key);
-
-        if (const auto it = keyMap_.find(lowerKey); it != keyMap_.end())
-        {
-            for (const auto& heldKey : heldKeys_)
-            {
-                if (it->second.find(heldKey) != it->second.end())
-                {
-                    return true;
-                }
-            }
-        }
-        return heldKeys_.find(lowerKey) != heldKeys_.end();
-    }
-
-    void OnKeyInput(const KeyInputEvent& event)
-    {
-        const std::string key = makeKey(SDL_GetKeyName(event.inputKey));
-        if (event.isPressed)
-        {
-            if (heldKeys_.find(key) == heldKeys_.end())
-            {
-                pressedKeys_.insert(key);
-            }
-            heldKeys_.insert(key);
-        }
-        else
-        {
-            heldKeys_.erase(key);
-            pressedKeys_.erase(key);
-        }
-    }
-
-    static std::string makeKey(const std::string& key)
-    {
-        std::string lowerKey = key;
-        std::transform(lowerKey.begin(), lowerKey.end(), lowerKey.begin(),
-                       [](const unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        return lowerKey;
-    }
-
     void LoadAsset(sol::table assetTable, AssetManager& assetManager, SDL_Renderer* renderer, MIX_Mixer* mixer) const
     {
         if (const std::string assetType = assetTable["type"]; assetType == "texture")
@@ -362,8 +279,4 @@ private:
         gameConfig.playableAreaHeight = static_cast<float>(height);
         gameConfig.playableAreaWidth = static_cast<float>(width);
     }
-
-    std::unordered_set<std::string> pressedKeys_;
-    std::unordered_set<std::string> heldKeys_;
-    std::unordered_map<std::string, std::unordered_set<std::string>> keyMap_;
 };

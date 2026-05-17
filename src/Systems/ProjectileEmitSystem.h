@@ -1,7 +1,5 @@
 #pragma once
 
-#include <SDL3/SDL_keycode.h>
-
 #include <glm/glm.hpp>
 
 #include "../Components/BoxColliderComponent.h"
@@ -17,13 +15,11 @@
 #include "../Components/SpriteComponent.h"
 #include "../ECS/ECS.h"
 #include "../ECS/Registry.h"
-#include "../EventBus/EventBus.h"
-#include "../Events/KeyInputEvent.h"
 #include "EntityPoolSystem.h"
 
 class ProjectileEmitSystem {
  public:
-  void Init(const std::unique_ptr<EventBus>& eventBus, Registry& registry) {
+  void Init(Registry& registry) {
     projectile_pool_id_ =
         registry.Get<EntityPoolManager>().RegisterPool<ProjectileComponent>(registry, [](Registry& reg) {
           reg.Tag<PoolableTag>();
@@ -37,78 +33,52 @@ class ProjectileEmitSystem {
                                             ProjectileComponent(), SpriteComponent("bullet-texture", 4.0f, 4.0f, 4),
                                             NameComponent(), PoolableTag{}, ProjectileTag{});
         });
-    eventBus->SubscribeEvent<ProjectileEmitSystem, KeyInputEvent>(this, &ProjectileEmitSystem::OnKeyInput);
   }
 
-  void operator()(const ContextFacade& context, const PositionComponent& position,
-                  ProjectileEmitterComponent& emitter) {
-    const auto registry = context.GetRegistry();
-    const bool isPlayer = registry->HasTag(context.GetEntity(), "player");
-
-    if (!isPlayer) {
-      emitter.countDownTimer -= context.GetDeltaTime();
-
-      if (emitter.countDownTimer <= 0.0f) {
-        SpawnProjectile(position, context.GetEntity(), registry, emitter);
-        emitter.countDownTimer = emitter.frequency;
-      }
-    } else if (spawnFriendlyProjectiles_) {
-      SpawnProjectile(position, context.GetEntity(), registry, emitter, true);
-      spawnFriendlyProjectiles_ = false;
-    }
-  }
-
-  void OnKeyInput(const KeyInputEvent& event) {
-    if (!event.isPressed) {
+  // Lua entry point. `direction` is a non-normalized aim vector; zero falls back to the emitter's
+  // configured velocity vector. Component-wise multiply matches the legacy player-fire semantics.
+  void Fire(Registry& registry, Entity emitter, glm::vec2 direction) const {
+    if (!registry.HasComponent<PositionComponent>(emitter) ||
+        !registry.HasComponent<ProjectileEmitterComponent>(emitter)) {
       return;
     }
+    const auto& position = registry.GetComponent<PositionComponent>(emitter);
+    auto& emitterComp = registry.GetComponent<ProjectileEmitterComponent>(emitter);
 
-    if (event.inputKey == SDLK_SPACE) {
-      spawnFriendlyProjectiles_ = true;
+    glm::vec2 velocity = emitterComp.velocity;
+    if (glm::length(direction) > 1e-4f) {
+      velocity = glm::normalize(direction) * emitterComp.velocity;
     }
+    SpawnProjectile(registry, emitter, position.value, emitterComp, velocity);
   }
 
  private:
   ArchetypeID projectile_pool_id_{};
-  bool spawnFriendlyProjectiles_ = false;
 
-  void SpawnProjectile(const PositionComponent& position, const Entity& entity, Registry* registry,
-                       ProjectileEmitterComponent& emitter, bool isPlayer = false) const {
-    auto projectilePosition = position.value;
-    auto velocity = emitter.velocity;
-
-    if (registry->HasComponent<SpriteComponent>(entity)) {
-      const auto& sprite = registry->GetComponent<SpriteComponent>(entity);
-      const glm::vec2 emitterScale = registry->HasComponent<ScaleComponent>(entity)
-                                         ? registry->GetComponent<ScaleComponent>(entity).value
+  void SpawnProjectile(Registry& registry, const Entity& entity, glm::vec2 spawnPosition,
+                       const ProjectileEmitterComponent& emitter, glm::vec2 velocity) const {
+    if (registry.HasComponent<SpriteComponent>(entity)) {
+      const auto& sprite = registry.GetComponent<SpriteComponent>(entity);
+      const glm::vec2 emitterScale = registry.HasComponent<ScaleComponent>(entity)
+                                         ? registry.GetComponent<ScaleComponent>(entity).value
                                          : glm::vec2(1.0f, 1.0f);
-      projectilePosition.x += emitterScale.x * static_cast<float>(sprite.width) / 2;
-      projectilePosition.y += emitterScale.y * static_cast<float>(sprite.height) / 2;
-    }
-
-    if (isPlayer && registry->HasComponent<RigidBodyComponent>(entity)) {
-      const auto& rigidBody = registry->GetComponent<RigidBodyComponent>(entity);
-      // Skip normalize when the player is idle — glm::normalize((0,0)) returns NaN.
-      // Fall through with the emitter's default velocity vector.
-      if (glm::length(rigidBody.velocity) > 1e-4f) {
-        const auto direction = glm::normalize(rigidBody.velocity);
-        velocity = direction * emitter.velocity;
-      }
+      spawnPosition.x += emitterScale.x * static_cast<float>(sprite.width) / 2;
+      spawnPosition.y += emitterScale.y * static_cast<float>(sprite.height) / 2;
     }
 
     // Use the emitter's dedicated projectile mask — NOT the emitter entity's own
     // EntityMaskComponent.  Inheriting the emitter's identity caused projectiles
     // to be "seen" by the emitter's own collision mask, destroying themselves.
-    const Entity projectile = registry->Get<EntityPoolManager>().Spawn(*registry, projectile_pool_id_);
-    registry->GetComponent<EntityMaskComponent>(projectile).mask = emitter.projectileMask;
-    registry->GetComponent<PositionComponent>(projectile).value = projectilePosition;
-    registry->GetComponent<ScaleComponent>(projectile).value = glm::vec2(1.0f, 1.0f);
-    registry->GetComponent<RotationComponent>(projectile).value = 0.0;
-    registry->GetComponent<RigidBodyComponent>(projectile).velocity = velocity;
-    registry->GetComponent<BoxColliderComponent>(projectile).collisionMask = emitter.collisionMask;
-    auto& projectileComponent = registry->GetComponent<ProjectileComponent>(projectile);
+    const Entity projectile = registry.Get<EntityPoolManager>().Spawn(registry, projectile_pool_id_);
+    registry.GetComponent<EntityMaskComponent>(projectile).mask = emitter.projectileMask;
+    registry.GetComponent<PositionComponent>(projectile).value = spawnPosition;
+    registry.GetComponent<ScaleComponent>(projectile).value = glm::vec2(1.0f, 1.0f);
+    registry.GetComponent<RotationComponent>(projectile).value = 0.0;
+    registry.GetComponent<RigidBodyComponent>(projectile).velocity = velocity;
+    registry.GetComponent<BoxColliderComponent>(projectile).collisionMask = emitter.collisionMask;
+    auto& projectileComponent = registry.GetComponent<ProjectileComponent>(projectile);
     projectileComponent.damage = emitter.damage;
     projectileComponent.duration = emitter.duration;
-    registry->GetComponent<NameComponent>(projectile).name = emitter.projectileName;
+    registry.GetComponent<NameComponent>(projectile).name = emitter.projectileName;
   }
 };

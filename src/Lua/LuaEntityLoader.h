@@ -289,11 +289,7 @@ private:
     {
       registry->AddComponent(ent, ComponentLuaFactory::CreateCameraFollowComponent(data));
     };
-    factories["keyboard_controller"] = [](Registry* registry, Entity ent, const sol::table& data)
-    {
-      registry->AddComponent(ent, ComponentLuaFactory::CreateKeyboardControlledComponent(data));
-    };
-    factories["script"] = [](Registry* registry, Entity ent, const sol::table& data)
+    factories["script"] =[](Registry* registry, Entity ent, const sol::table& data)
     {
       registry->AddComponent(ent, ComponentLuaFactory::CreateScriptComponent(data));
     };
