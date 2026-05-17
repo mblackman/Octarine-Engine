@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1778980326900,
+  "lastUpdate": 1778990191637,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -3060,6 +3060,114 @@ window.BENCHMARK_DATA = {
             "value": 631516.6220951765,
             "unit": "ns/iter",
             "extra": "iterations: 1114\ncpu: 631458.9362656852 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "2be94b328fc19520a5e7560703c88ddd4a9aebdc",
+          "message": "Lua-driven InputSystem; split MovementSystem into focused systems; drop KeyboardControlSystem\n\nAdds InputSystem (header-only, owned by Registry) that exposes a global `input` table\nto Lua: polling (is_key_down/pressed/released, is_mouse_*, mouse_position, mouse_wheel),\naction bindings (bind/unbind, is_action_down/pressed/released), and callbacks\n(on_key_down/up, on_mouse_down/up, on_mouse_wheel). Subscribes to KeyInputEvent,\nMouseInputEvent, and a new MouseWheelEvent emitted from Game::ProcessInput.\n\nMovementSystem is split by responsibility: VelocityIntegrationSystem (position += velocity*dt),\nOffScreenDespawnSystem (despawns non-player entities outside the playable area), and\nObstacleBounceSystem (event-driven enemy<->obstacle reflect). KeyboardControlSystem,\nMovementSystem, and KeyboardControlComponent are removed; player movement and clamping\nmove to Lua via input.is_action_* + get/set_position + get_game_map_dimensions.\n\nProjectileEmitSystem loses its per-frame system pass and the SPACE auto-fire hook; it\nnow owns only the projectile pool and a public Fire(registry, entity, direction).\nGameplay drives shots via a new fire_projectile(entity, dx, dy) Lua binding. Auto-fire\nfor enemies moves to Lua scripts (see example project's lib/auto_fire.lua).\n\nScriptSystem is trimmed to ScriptComponent dispatch; key polling state and bindings\nmove to InputSystem. Adds get_game_map_dimensions() getter. InputSystem.ResetLuaState\nruns on StopScene/LoadScene to drop stale callbacks/actions.\n\nDocs: removes keyboard_controller component reference; rewrites the player example to\nuse the input table; adds a full input-table API reference.",
+          "timestamp": "2026-05-16T21:47:48-06:00",
+          "tree_id": "f95786a0bcb065467239575b4859f512622e4672",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/2be94b328fc19520a5e7560703c88ddd4a9aebdc"
+        },
+        "date": 1778990182894,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4234.045494338838,
+            "unit": "ns/iter",
+            "extra": "iterations: 164412\ncpu: 4263.736035082363 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16543.69456547889,
+            "unit": "ns/iter",
+            "extra": "iterations: 41514\ncpu: 16584.660885484307 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 111983.46033739441,
+            "unit": "ns/iter",
+            "extra": "iterations: 6330\ncpu: 112030.03380726877 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 971582.6706898293,
+            "unit": "ns/iter",
+            "extra": "iterations: 745\ncpu: 971352.6040268439 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1936393.2370544302,
+            "unit": "ns/iter",
+            "extra": "iterations: 363\ncpu: 1935838.685950403 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2920.4227184116917,
+            "unit": "ns/iter",
+            "extra": "iterations: 237311\ncpu: 2915.4395287205202 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 14783.305756958169,
+            "unit": "ns/iter",
+            "extra": "iterations: 46662\ncpu: 14765.987077281652 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 108862.33623277996,
+            "unit": "ns/iter",
+            "extra": "iterations: 6418\ncpu: 108838.24898721483 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 541200.9016705039,
+            "unit": "ns/iter",
+            "extra": "iterations: 1293\ncpu: 541137.6697602984 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2384.054992469499,
+            "unit": "ns/iter",
+            "extra": "iterations: 297610\ncpu: 2354.1154463877756 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6733.772142927282,
+            "unit": "ns/iter",
+            "extra": "iterations: 104813\ncpu: 6700.0402526360285 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41223.70026791738,
+            "unit": "ns/iter",
+            "extra": "iterations: 16856\ncpu: 41183.11681298483 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 317328.3774333202,
+            "unit": "ns/iter",
+            "extra": "iterations: 2209\ncpu: 317232.6758714339 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 630790.4534142204,
+            "unit": "ns/iter",
+            "extra": "iterations: 1114\ncpu: 630714.6418312716 ns\nthreads: 1"
           }
         ]
       }
