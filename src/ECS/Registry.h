@@ -148,6 +148,15 @@ class Registry {
     return entity_locations_[id].archetype != nullptr;
   }
 
+  // Resolve an entity to its (archetype, chunk, index) slot. Returns a null-archetype location
+  // when the entity is out of range or has no archetype assigned. Used by systems that need
+  // direct chunk access (e.g. tree walks that can't piggyback on a query's per-chunk caching).
+  [[nodiscard]] EntityLocation GetEntityLocation(const Entity entity) const {
+    const std::uint32_t id = entity.GetId();
+    if (id >= entity_locations_.size()) return EntityLocation{nullptr, 0, 0};
+    return entity_locations_[id];
+  }
+
   // Blams all user-visible entities (those not marked as internal).
   void ClearUserEntities();
 

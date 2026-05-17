@@ -12,13 +12,58 @@
 #include "Component.h"
 #include "Entity.h"
 
+template <typename T>
+struct Opt;  // forward decl
+
+namespace Internal {
+template <typename T>
+struct is_optional : std::false_type {};
+template <typename T>
+struct is_optional<Opt<T>> : std::true_type {};
+template <typename T>
+inline constexpr bool is_optional_v = is_optional<T>::value;
+
+template <typename T>
+struct unwrap_opt {
+  using type = T;
+};
+template <typename T>
+struct unwrap_opt<Opt<T>> {
+  using type = T;
+};
+template <typename T>
+using unwrap_opt_t = typename unwrap_opt<T>::type;
+
+template <typename T>
+struct resolve_yield {
+  using type = T&;
+};
+template <typename T>
+struct resolve_yield<Opt<T>> {
+  using type = T*;
+};
+template <typename T>
+using resolve_yield_t = typename resolve_yield<T>::type;
+
+template <typename T>
+struct resolve_pointer {
+  using type = T*;
+};
+template <typename T>
+struct resolve_pointer<Opt<T>> {
+  using type = T*;
+};
+template <typename T>
+using resolve_pointer_t = typename resolve_pointer<T>::type;
+}  // namespace Internal
+
 template <typename... TComponents>
 class ArchetypeQuery {
  public:
   class Iterator {
    public:
     using IteratorCategory = std::input_iterator_tag;
-    using ValueType = std::tuple<Entity, TComponents&...>;
+    using ValueType = std::tuple<Entity, Internal::resolve_yield_t<TComponents>...>;
     using Reference = ValueType;
     using Pointer = void;
     using DifferenceType = std::ptrdiff_t;
@@ -38,9 +83,16 @@ class ArchetypeQuery {
 
     Reference operator*() const {
       assert(sizeof...(TComponents) == type_.size());
-      return std::apply(
-          [&](auto*... arrays) { return std::tie(current_entities_[entity_idx_], arrays[entity_idx_]...); },
-          current_arrays_);
+      return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+        return Reference(current_entities_[entity_idx_], [&]() -> Internal::resolve_yield_t<TComponents> {
+          auto* array = std::get<Is>(current_arrays_);
+          if constexpr (Internal::is_optional_v<std::tuple_element_t<Is, std::tuple<TComponents...>>>) {
+            return array ? &array[entity_idx_] : nullptr;
+          } else {
+            return array[entity_idx_];
+          }
+        }()...);
+      }(std::index_sequence_for<TComponents...>{});
     }
 
     Iterator& operator++() {
@@ -59,7 +111,13 @@ class ArchetypeQuery {
     void UpdateChunkPointers() {
       Archetype* current_archetype = *archetype_it_;
       current_arrays_ = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return std::make_tuple(current_archetype->GetComponentArray<TComponents>(chunk_idx_, type_[Is])...);
+        return std::make_tuple([&]() -> Internal::resolve_pointer_t<TComponents> {
+          using RawT = Internal::unwrap_opt_t<std::tuple_element_t<Is, std::tuple<TComponents...>>>;
+          if constexpr (Internal::is_optional_v<std::tuple_element_t<Is, std::tuple<TComponents...>>>) {
+            if (!current_archetype->HasComponent(type_[Is])) return nullptr;
+          }
+          return current_archetype->template GetComponentArray<RawT>(chunk_idx_, type_[Is]);
+        }()...);
       }(std::index_sequence_for<TComponents...>{});
       current_entities_ = current_archetype->chunks_[chunk_idx_].GetEntityArray();
     }
@@ -93,7 +151,7 @@ class ArchetypeQuery {
     std::vector<Archetype*>::iterator archetype_end_it_;
     size_t chunk_idx_;
     size_t entity_idx_;
-    std::tuple<TComponents*...> current_arrays_;
+    std::tuple<Internal::resolve_pointer_t<TComponents>...> current_arrays_;
     const Entity* current_entities_;
     bool include_inactive_ = false;
   };
@@ -221,21 +279,39 @@ class ArchetypeQuery {
 
       // Get typed component arrays directly from the chunk — same as Iterator::UpdateChunkPointers.
       auto arrays = [&]<std::size_t... Is>(std::index_sequence<Is...>) {
-        return std::make_tuple(w.archetype->template GetComponentArray<TComponents>(w.chunkIdx, type_[Is])...);
+        return std::make_tuple([&]() -> Internal::resolve_pointer_t<TComponents> {
+          using RawT = Internal::unwrap_opt_t<std::tuple_element_t<Is, std::tuple<TComponents...>>>;
+          if constexpr (Internal::is_optional_v<std::tuple_element_t<Is, std::tuple<TComponents...>>>) {
+            if (!w.archetype->HasComponent(type_[Is])) return nullptr;
+          }
+          return w.archetype->template GetComponentArray<RawT>(w.chunkIdx, type_[Is]);
+        }()...);
       }(std::index_sequence_for<TComponents...>{});
 
       const Entity* entities = w.archetype->chunks_[w.chunkIdx].GetEntityArray();
 
       for (size_t e = 0; e < w.entityCount; ++e) {
-        std::apply(
-            [&](auto*... compArrays) {
-              if constexpr (std::is_invocable_v<Func, Entity, TComponents&...>) {
-                func(entities[e], compArrays[e]...);
+        [&]<std::size_t... Is>(std::index_sequence<Is...>) {
+          if constexpr (std::is_invocable_v<Func, Entity, Internal::resolve_yield_t<TComponents>...>) {
+            func(entities[e], [&]() -> Internal::resolve_yield_t<TComponents> {
+              auto* array = std::get<Is>(arrays);
+              if constexpr (Internal::is_optional_v<std::tuple_element_t<Is, std::tuple<TComponents...>>>) {
+                return array ? &array[e] : nullptr;
               } else {
-                func(compArrays[e]...);
+                return array[e];
               }
-            },
-            arrays);
+            }()...);
+          } else {
+            func([&]() -> Internal::resolve_yield_t<TComponents> {
+              auto* array = std::get<Is>(arrays);
+              if constexpr (Internal::is_optional_v<std::tuple_element_t<Is, std::tuple<TComponents...>>>) {
+                return array ? &array[e] : nullptr;
+              } else {
+                return array[e];
+              }
+            }()...);
+          }
+        }(std::index_sequence_for<TComponents...>{});
       }
     }
   }

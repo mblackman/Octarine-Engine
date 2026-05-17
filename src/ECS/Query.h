@@ -19,11 +19,14 @@ class Query {
   virtual void Update() = 0;
 };
 
+template <typename T>
+struct Opt {};  // marker only — never instantiated
+
 template <typename... TComponents>
 class ComponentQuery final : public Query {
  public:
   explicit ComponentQuery(Registry* registry)
-      : registry_(registry), type_({(registry->Component<TComponents>().GetId())...}) {
+      : registry_(registry), type_({(registry->Component<Internal::unwrap_opt_t<TComponents>>().GetId())...}) {
     // type_ stays in user-pack order so Iterator can map TComponents...[Is] to type_[Is].
     // sorted_type_ is the canonical form used for archetype matching (two-pointer superset check).
     RebuildSorted();
@@ -96,6 +99,11 @@ class ComponentQuery final : public Query {
   void ForEach(Func&& func) {
     if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...> ||
                   std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
+      // ContextFacade-based iteration doesn't easily support optional components yet (requires
+      // updating ContextFacade and IteratorImpl). For now, systems using Opt<T> must use the
+      // simpler void(Entity, T&, U*...) or void(T&, U*...) signatures.
+      static_assert(!(... || Internal::is_optional_v<TComponents>),
+                    "Optional components are not yet supported in ContextFacade-based ForEach.");
       for (const auto iterable = CreateIterable(); auto&& context : iterable) {
         if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...>) {
           func(context, context.GetEntity(), context.template Component<TComponents>()...);
@@ -106,16 +114,16 @@ class ComponentQuery final : public Query {
     } else {
       for (auto it = archetype_query_.begin(); it != archetype_query_.end(); ++it) {
         std::apply(
-            [&](Entity e, TComponents&... comps) {
-              if constexpr (std::is_invocable_v<Func, Entity, TComponents&...>) {
-                func(e, comps...);
-              } else if constexpr (std::is_invocable_v<Func, TComponents&...>) {
-                func(comps...);
+            [&](Entity e, auto&&... comps) {
+              if constexpr (std::is_invocable_v<Func, Entity, decltype(comps)...>) {
+                func(e, std::forward<decltype(comps)>(comps)...);
+              } else if constexpr (std::is_invocable_v<Func, decltype(comps)...>) {
+                func(std::forward<decltype(comps)>(comps)...);
               } else {
                 static_assert(!std::is_same_v<Func, Func>,
                               "The function passed to ForEach does not match the required signatures. "
                               "Expected one of: void(ContextFacade&, Entity, T&...), void(ContextFacade&, T&...), "
-                              "void(Entity, T&...), or void(T&...).");
+                              "void(Entity, T&..., U*...), or void(T&..., U*...).");
               }
             },
             *it);
@@ -140,7 +148,15 @@ class ComponentQuery final : public Query {
 
  private:
   void RebuildSorted() {
-    sorted_type_ = type_;
+    sorted_type_.clear();
+    // Only components NOT wrapped in Opt<T> drive matching.
+    ([&] {
+      if constexpr (!Internal::is_optional_v<TComponents>) {
+        sorted_type_.push_back(registry_->Component<Internal::unwrap_opt_t<TComponents>>().GetId());
+      }
+    }(),
+     ...);
+
     for (const ComponentID id : extra_required_) {
       if (std::ranges::find(sorted_type_, id) == sorted_type_.end()) {
         sorted_type_.push_back(id);
@@ -150,16 +166,17 @@ class ComponentQuery final : public Query {
   }
 
   Iterable CreateIterable() {
-    auto beginFunc = [&] {
-      return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.begin(), registry_,
-                                                                                  registry_->delta_time_));
-    };
-    auto endFunc = [&] {
-      return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.end(), registry_,
-                                                                                  registry_->delta_time_));
-    };
-
-    return Iterable(beginFunc, endFunc);
+    // CreateIterable currently only works for required components because IteratorImpl is not
+    // yet optional-aware.
+    return Iterable(
+        [&] {
+          return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.begin(),
+                                                                                      registry_, registry_->DeltaTime()));
+        },
+        [&] {
+          return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.end(), registry_,
+                                                                                      registry_->DeltaTime()));
+        });
   }
 
   Registry* registry_;

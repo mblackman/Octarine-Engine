@@ -26,113 +26,166 @@ class TransformSystem {
  public:
   void operator()(const ContextFacade& ctx, const Iterable& /*iter*/) {
     auto* registry = ctx.GetRegistry();
+    EnsureInitialized(registry);
+    optionalQuery_->Update();
 
-    if (!globalQuery_) {
-      globalQuery_ = registry->CreateQuery<GlobalTransformComponent>();
-      positionQuery_ = registry->CreateQuery<PositionComponent, GlobalTransformComponent>();
-      scaleQuery_ = registry->CreateQuery<ScaleComponent, GlobalTransformComponent>();
-      rotationQuery_ = registry->CreateQuery<RotationComponent, GlobalTransformComponent>();
-    }
-    globalQuery_->Update();
-    positionQuery_->Update();
-    scaleQuery_->Update();
-    rotationQuery_->Update();
-
-    // Fast path: no ChildOf hierarchy live. Unrelated relationship pairs do not disable it.
     if (!registry->HasAnyChildPairs()) {
-      PROFILE_NAMED_SCOPE("TransformSystem: Fast");
-      if (!loggedPath_) {
-        Logger::Info("TransformSystem: FAST path (no hierarchy)");
-        loggedPath_ = true;
-      }
-      // Reset all globals to identity, then overlay any locals that are present. Entities missing
-      // a local component default to identity for that field.
-      globalQuery_->ParallelForEach([](GlobalTransformComponent& global) {
-        global.position = glm::vec2(0.0f, 0.0f);
-        global.scale = glm::vec2(1.0f, 1.0f);
-        global.rotation = 0.0;
-      });
-      positionQuery_->ParallelForEach([](const PositionComponent& position, GlobalTransformComponent& global) {
-        global.position = position.value;
-      });
-      scaleQuery_->ParallelForEach([](const ScaleComponent& scale, GlobalTransformComponent& global) {
-        global.scale = scale.value;
-      });
-      rotationQuery_->ParallelForEach([](const RotationComponent& rotation, GlobalTransformComponent& global) {
-        global.rotation = rotation.value;
-      });
-      return;
-    }
-    PROFILE_NAMED_SCOPE("TransformSystem: Slow");
-    if (!loggedPath_) {
-      Logger::Info("TransformSystem: SLOW path (hierarchy detected)");
-      loggedPath_ = true;
-    }
-
-    // Slow path: walk top-down from roots. Rebuild the roots list every frame — caching
-    // by ArchetypeGeneration misses entities created in an existing archetype (e.g. pool
-    // factory growth that reuses a registered projectile archetype), leaving their globals
-    // stuck at the default (0,0). The roots scan is a single O(N) pass over entities with
-    // GlobalTransformComponent and is cheap relative to the actual walk below.
-    {
-      PROFILE_NAMED_SCOPE("TransformSystem: Slow (roots rebuild)");
-      roots_.clear();
-      globalQuery_->ForEach([&](const Entity entity, GlobalTransformComponent& /*global*/) {
-        if (!registry->GetParent(entity).has_value()) {
-          roots_.push_back(entity);
-        }
-      });
-    }
-
-    PROFILE_NAMED_SCOPE("TransformSystem: Slow (walk)");
-    std::stack<TransformUpdateJob> jobs;
-    for (const Entity root : roots_) {
-      jobs.push({root, glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 1.0f), 0.0});
-    }
-
-    while (!jobs.empty()) {
-      const auto [entity, parentPos, parentScale, parentRot] = jobs.top();
-      jobs.pop();
-
-      if (!registry->HasComponent<GlobalTransformComponent>(entity)) {
-        continue;
-      }
-
-      const glm::vec2 localPos = registry->HasComponent<PositionComponent>(entity)
-                                     ? registry->GetComponent<PositionComponent>(entity).value
-                                     : glm::vec2(0.0f, 0.0f);
-      const glm::vec2 localScale = registry->HasComponent<ScaleComponent>(entity)
-                                       ? registry->GetComponent<ScaleComponent>(entity).value
-                                       : glm::vec2(1.0f, 1.0f);
-      const double localRot = registry->HasComponent<RotationComponent>(entity)
-                                  ? registry->GetComponent<RotationComponent>(entity).value
-                                  : 0.0;
-
-      const float c = std::cos(static_cast<float>(parentRot));
-      const float s = std::sin(static_cast<float>(parentRot));
-      const glm::vec2 scaled = localPos * parentScale;
-      const glm::vec2 rotated = {scaled.x * c - scaled.y * s, scaled.x * s + scaled.y * c};
-      const glm::vec2 globalPosition = parentPos + rotated;
-
-      const glm::vec2 globalScale = parentScale * localScale;
-      const double globalRotation = parentRot + localRot;
-
-      auto& global = registry->GetComponent<GlobalTransformComponent>(entity);
-      global.position = globalPosition;
-      global.scale = globalScale;
-      global.rotation = globalRotation;
-
-      for (const auto& child : registry->GetChildren(entity)) {
-        jobs.push({child, globalPosition, globalScale, globalRotation});
-      }
+      UpdateFlat();
+    } else {
+      UpdateHierarchical(registry);
     }
   }
 
  private:
-  std::unique_ptr<ComponentQuery<GlobalTransformComponent>> globalQuery_;
-  std::unique_ptr<ComponentQuery<PositionComponent, GlobalTransformComponent>> positionQuery_;
-  std::unique_ptr<ComponentQuery<ScaleComponent, GlobalTransformComponent>> scaleQuery_;
-  std::unique_ptr<ComponentQuery<RotationComponent, GlobalTransformComponent>> rotationQuery_;
-  std::vector<Entity> roots_;
+  using TransformQuery = ComponentQuery<GlobalTransformComponent, Opt<PositionComponent>, Opt<ScaleComponent>,
+                                        Opt<RotationComponent>>;
+
+  void EnsureInitialized(Registry* registry) {
+    if (optionalQuery_) return;
+    optionalQuery_ = registry->CreateQuery<GlobalTransformComponent, Opt<PositionComponent>, Opt<ScaleComponent>,
+                                           Opt<RotationComponent>>();
+    posEntity_ = registry->Component<PositionComponent>();
+    scaleEntity_ = registry->Component<ScaleComponent>();
+    rotEntity_ = registry->Component<RotationComponent>();
+    globalEntity_ = registry->Component<GlobalTransformComponent>();
+  }
+
+  // Fast path: no ChildOf hierarchy live. Unrelated relationship pairs do not disable it.
+  // Each entity's global is its local (identity for missing slots), in a single parallel pass.
+  void UpdateFlat() {
+    PROFILE_NAMED_SCOPE("TransformSystem: Fast");
+    LogPathOnce("TransformSystem: FAST path (no hierarchy)");
+    optionalQuery_->ParallelForEach([](GlobalTransformComponent& global, const PositionComponent* p,
+                                       const ScaleComponent* s, const RotationComponent* r) {
+      global.position = p ? p->value : glm::vec2(0.0f, 0.0f);
+      global.scale = s ? s->value : glm::vec2(1.0f, 1.0f);
+      global.rotation = r ? r->value : 0.0;
+    });
+  }
+
+  // Slow path: walk top-down from roots. Rebuild the roots list every frame — caching by
+  // ArchetypeGeneration misses entities created in an existing archetype (e.g. pool factory
+  // growth that reuses a registered projectile archetype), leaving their globals stuck at (0,0).
+  void UpdateHierarchical(Registry* registry) {
+    PROFILE_NAMED_SCOPE("TransformSystem: Slow");
+    LogPathOnce("TransformSystem: SLOW path (hierarchy detected)");
+
+    std::stack<TransformUpdateJob> jobs;
+    SeedRoots(registry, jobs);
+    WalkDescendants(registry, jobs);
+  }
+
+  // Iterate every entity; write each root's global directly from its local and queue its
+  // children for the descendants walk. Optional pointers come from the query's per-chunk
+  // cache so no per-entity HasComponent/GetComponent lookups happen here.
+  void SeedRoots(Registry* registry, std::stack<TransformUpdateJob>& jobs) const
+  {
+    PROFILE_NAMED_SCOPE("TransformSystem: Slow (roots rebuild + walk start)");
+    optionalQuery_->ForEach([&](const Entity entity, GlobalTransformComponent& global, const PositionComponent* p,
+                                const ScaleComponent* s, const RotationComponent* r) {
+      if (registry->GetParent(entity).has_value()) return;
+
+      const glm::vec2 localPos = p ? p->value : glm::vec2(0.0f, 0.0f);
+      const glm::vec2 localScale = s ? s->value : glm::vec2(1.0f, 1.0f);
+      const double localRot = r ? r->value : 0.0;
+
+      global.position = localPos;
+      global.scale = localScale;
+      global.rotation = localRot;
+
+      for (const auto& child : registry->GetChildren(entity)) {
+        jobs.push({child, localPos, localScale, localRot});
+      }
+    });
+  }
+
+  // Drain the job stack: compose each entity's global from its parent's global and its own
+  // local, then enqueue its children with the freshly-computed values as their parent state.
+  void WalkDescendants(const Registry* registry, std::stack<TransformUpdateJob>& jobs) const
+  {
+    PROFILE_NAMED_SCOPE("TransformSystem: Slow (descendants walk)");
+    while (!jobs.empty()) {
+      const auto job = jobs.top();
+      jobs.pop();
+
+      const auto [archetype, chunkIdx, indexInChunk] = registry->GetEntityLocation(job.entity);
+      if (!archetype) continue;
+
+      const auto local = LoadLocal(archetype, chunkIdx, indexInChunk);
+      const auto global = Compose(job, local);
+
+      WriteGlobal(archetype, chunkIdx, indexInChunk, global);
+
+      for (const auto& child : registry->GetChildren(job.entity)) {
+        jobs.push({child, global.position, global.scale, global.rotation});
+      }
+    }
+  }
+
+  struct LocalTransform {
+    glm::vec2 position;
+    glm::vec2 scale;
+    double rotation;
+  };
+
+  struct GlobalTransform {
+    glm::vec2 position;
+    glm::vec2 scale;
+    double rotation;
+  };
+
+  // Per-entity chunk fetch: each component is independently optional, so we look up the
+  // archetype's array per id and default missing slots to identity.
+  LocalTransform LoadLocal(Archetype* archetype, size_t chunkIdx, size_t indexInChunk) const {
+    const auto* pArr = archetype->HasComponent(posEntity_.GetId())
+                           ? archetype->GetComponentArray<PositionComponent>(chunkIdx, posEntity_.GetId())
+                           : nullptr;
+    const auto* sArr = archetype->HasComponent(scaleEntity_.GetId())
+                           ? archetype->GetComponentArray<ScaleComponent>(chunkIdx, scaleEntity_.GetId())
+                           : nullptr;
+    const auto* rArr = archetype->HasComponent(rotEntity_.GetId())
+                           ? archetype->GetComponentArray<RotationComponent>(chunkIdx, rotEntity_.GetId())
+                           : nullptr;
+    return {
+        pArr ? pArr[indexInChunk].value : glm::vec2(0.0f, 0.0f),
+        sArr ? sArr[indexInChunk].value : glm::vec2(1.0f, 1.0f),
+        rArr ? rArr[indexInChunk].value : 0.0,
+    };
+  }
+
+  // Compose parent×local into a world-space transform. Rotation is applied to the
+  // already-scaled local position so children orbit their parent in parent space.
+  static GlobalTransform Compose(const TransformUpdateJob& parent, const LocalTransform& local) {
+    const float c = std::cos(static_cast<float>(parent.parentGlobalRotation));
+    const float s_val = std::sin(static_cast<float>(parent.parentGlobalRotation));
+    const glm::vec2 scaled = local.position * parent.parentGlobalScale;
+    const glm::vec2 rotated = {scaled.x * c - scaled.y * s_val, scaled.x * s_val + scaled.y * c};
+    return {
+        parent.parentGlobalPosition + rotated,
+        parent.parentGlobalScale * local.scale,
+        parent.parentGlobalRotation + local.rotation,
+    };
+  }
+
+  void WriteGlobal(Archetype* archetype, size_t chunkIdx, size_t indexInChunk, const GlobalTransform& g) const {
+    auto* gArray = archetype->GetComponentArray<GlobalTransformComponent>(chunkIdx, globalEntity_.GetId());
+    if (!gArray) return;
+    auto& global = gArray[indexInChunk];
+    global.position = g.position;
+    global.scale = g.scale;
+    global.rotation = g.rotation;
+  }
+
+  void LogPathOnce(const char* message) {
+    if (loggedPath_) return;
+    Logger::Info(message);
+    loggedPath_ = true;
+  }
+
+  std::unique_ptr<TransformQuery> optionalQuery_;
+  Entity posEntity_ = {};
+  Entity scaleEntity_ = {};
+  Entity rotEntity_ = {};
+  Entity globalEntity_ = {};
   bool loggedPath_ = false;
 };

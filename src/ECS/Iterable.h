@@ -76,11 +76,23 @@ template <typename... TComponents>
 class ContextImpl final : public AnyContext {
  public:
   ContextImpl(Registry* registry, const float dt)
-      : registry_(registry), dt_(dt), ids_{registry->Component<std::remove_reference_t<TComponents>>().GetId()...} {}
+      : registry_(registry),
+        dt_(dt),
+        ids_{registry->Component<Internal::unwrap_opt_t<TComponents>>().GetId()...} {}
 
-  void Update(const Entity entity, std::tuple<TComponents&...> components) {
+  void Update(const Entity entity, std::tuple<Internal::resolve_yield_t<TComponents>...> components) {
     entity_ = entity;
-    components_ = std::apply([](auto&... comps) { return std::make_tuple(&comps...); }, components);
+    components_ = std::apply(
+        [](auto&&... comps) {
+          return std::make_tuple([&]() {
+            if constexpr (std::is_pointer_v<std::remove_reference_t<decltype(comps)>>) {
+              return comps;
+            } else {
+              return &comps;
+            }
+          }()...);
+        },
+        components);
   }
 
   [[nodiscard]] Entity GetEntity() const override { return entity_; }
@@ -92,7 +104,6 @@ class ContextImpl final : public AnyContext {
     size_t i = 0;
     auto check = [&]<typename T0>(T0* component) {
       if (ptr) {
-        ++i;
         return;
       }
       if (ids_[i] == id) {
@@ -108,13 +119,13 @@ class ContextImpl final : public AnyContext {
   Registry* registry_;
   float dt_;
   Entity entity_{};
-  std::tuple<std::remove_reference_t<TComponents>*...> components_;
+  std::tuple<Internal::unwrap_opt_t<TComponents>*...> components_;
   std::array<ComponentID, sizeof...(TComponents)> ids_;
 };
 
 template <typename... TComponents>
 class IteratorImpl final : public AnyIteratorImpl {
-  using UnderlyingIterator = ArchetypeQuery<TComponents...>::Iterator;
+  using UnderlyingIterator = typename ArchetypeQuery<TComponents...>::Iterator;
 
  public:
   IteratorImpl(UnderlyingIterator it, Registry* registry, const float dt)
@@ -135,7 +146,7 @@ class IteratorImpl final : public AnyIteratorImpl {
   }
 
   [[nodiscard]] AnyContext* Dereference() const override {
-    std::apply([&](Entity e, TComponents&... comps) { context_.Update(e, std::tie(comps...)); }, *it_);
+    std::apply([&](Entity e, auto&&... comps) { context_.Update(e, std::forward_as_tuple(comps...)); }, *it_);
     return &context_;
   }
 
