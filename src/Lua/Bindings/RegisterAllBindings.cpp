@@ -7,8 +7,10 @@
 #include "Lua/Bindings/HealthComponentLuaBinding.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
 #include "Lua/Bindings/NameComponentLuaBinding.h"
+#include "Lua/Bindings/PositionComponentLuaBinding.h"
 #include "Lua/Bindings/ProjectileEmitterComponentLuaBinding.h"
 #include "Lua/Bindings/RigidBodyComponentLuaBinding.h"
+#include "Lua/Bindings/RotationComponentLuaBinding.h"
 #include "Lua/Bindings/ScaleComponentLuaBinding.h"
 #include "Lua/Bindings/ScriptComponentLuaBinding.h"
 #include "Lua/Bindings/SpriteComponentLuaBinding.h"
@@ -33,4 +35,6 @@ void RegisterAllLuaBindings()
     LuaComponentRegistry::registerComponent<AudioSourceComponent>();
     LuaComponentRegistry::registerComponent<NameComponent>();
     LuaComponentRegistry::registerComponent<ScaleComponent>();
+    LuaComponentRegistry::registerComponent<PositionComponent>();
+    LuaComponentRegistry::registerComponent<RotationComponent>();
 }

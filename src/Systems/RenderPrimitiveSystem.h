@@ -46,6 +46,7 @@ class RenderPrimitiveSystem {
     auto& cmd = renderQueue_->EmplaceSquare(static_cast<unsigned int>(square.layer), square.position.y);
     cmd.destRect = {x, y, square.width, square.height};
     cmd.color = square.color;
+    cmd.rotation = transform.rotation;
   }
 
  private:

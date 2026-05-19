@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <future>
 #include <utility>
 #include <vector>
@@ -25,8 +26,14 @@ struct Box {
   Entity entity;
   EntityMask entityMask;
   EntityMask collisionMask;
+  // AABB enclosing the (possibly rotated) OBB — used by the median-cut broadphase.
   float minX, minY;
   float maxX, maxY;
+  // OBB narrowphase state.
+  float cx, cy;
+  float hx, hy;
+  float rotCos, rotSin;
+  bool rotated;
 
   [[nodiscard]] bool intersectsInDimension(const Box& other, const int dim) const {
     if (dim == 0) return !(maxX < other.minX || minX > other.maxX);
@@ -34,12 +41,37 @@ struct Box {
     return false;  // Invalid dimension
   }
 
+  // SAT on the 4 face normals of two OBBs. Only invoked when at least one box is rotated;
+  // axis-aligned pairs short-circuit on the AABB check above.
+  [[nodiscard]] bool obbIntersects(const Box& other) const {
+    const float ax0 = rotCos, ay0 = rotSin;
+    const float ax1 = -rotSin, ay1 = rotCos;
+    const float bx0 = other.rotCos, by0 = other.rotSin;
+    const float bx1 = -other.rotSin, by1 = other.rotCos;
+    const float dx = other.cx - cx;
+    const float dy = other.cy - cy;
+
+    const float axes[4][2] = {{ax0, ay0}, {ax1, ay1}, {bx0, by0}, {bx1, by1}};
+    for (const auto& axis : axes) {
+      const float ux = axis[0];
+      const float uy = axis[1];
+      const float aProj = hx * std::abs(ax0 * ux + ay0 * uy) + hy * std::abs(ax1 * ux + ay1 * uy);
+      const float bProj =
+          other.hx * std::abs(bx0 * ux + by0 * uy) + other.hy * std::abs(bx1 * ux + by1 * uy);
+      const float distProj = std::abs(dx * ux + dy * uy);
+      if (distProj > aProj + bProj) return false;
+    }
+    return true;
+  }
+
   [[nodiscard]] bool intersects(const Box& other) const {
     const bool canInteract = !(collisionMask & other.entityMask).none() || !(other.collisionMask & entityMask).none();
     if (!canInteract) {
       return false;
     }
-    return intersectsInDimension(other, 0) && intersectsInDimension(other, 1);
+    if (!intersectsInDimension(other, 0) || !intersectsInDimension(other, 1)) return false;
+    if (!rotated && !other.rotated) return true;
+    return obbIntersects(other);
   }
 };
 
@@ -93,13 +125,21 @@ class CollisionSystem {
       query_->ParallelForEach([&](Entity entity, const GlobalTransformComponent& transform,
                                   const BoxColliderComponent& collider, const EntityMaskComponent& entityMask) {
         const size_t idx = nextIndex.fetch_add(1, std::memory_order_relaxed);
-        boxes[idx] = {entity,
-                      entityMask.mask,
-                      collider.collisionMask,
-                      transform.position.x,
-                      transform.position.y,
-                      transform.position.x + static_cast<float>(collider.width) * transform.scale.x,
-                      transform.position.y + static_cast<float>(collider.height) * transform.scale.y};
+        const float w = static_cast<float>(collider.width) * transform.scale.x;
+        const float h = static_cast<float>(collider.height) * transform.scale.y;
+        const float hx = w * 0.5f;
+        const float hy = h * 0.5f;
+        const float cx = transform.position.x + hx;
+        const float cy = transform.position.y + hy;
+        const float rot = static_cast<float>(transform.rotation);
+        const float rc = std::cos(rot);
+        const float rs = std::sin(rot);
+        const bool rotated = transform.rotation != 0.0;
+        const float aabbHx = hx * std::abs(rc) + hy * std::abs(rs);
+        const float aabbHy = hx * std::abs(rs) + hy * std::abs(rc);
+        boxes[idx] = {entity, entityMask.mask, collider.collisionMask,
+                      cx - aabbHx, cy - aabbHy, cx + aabbHx, cy + aabbHy,
+                      cx, cy, hx, hy, rc, rs, rotated};
       });
     }
 

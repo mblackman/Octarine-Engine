@@ -14,6 +14,7 @@ struct SpriteCommand {
 struct SquareCommand {
   SDL_FRect destRect{};
   SDL_Color color{};
+  double rotation{};
 };
 
 struct TextCommand {
