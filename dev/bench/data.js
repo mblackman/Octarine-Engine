@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779039821789,
+  "lastUpdate": 1779164234979,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -3384,6 +3384,114 @@ window.BENCHMARK_DATA = {
             "value": 634617.5699954119,
             "unit": "ns/iter",
             "extra": "iterations: 1105\ncpu: 634522.8606334598 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "6f35a51f22747490b8f62972aad577297a289de4",
+          "message": "Add rotation/scale Lua bindings and wire rotation through rendering and collision\n\nExpose PositionComponent and RotationComponent via LuaComponentRegistry\nso registry.has_*/get_* and the entity-table component keys work for the\nfull local transform triplet.\n\nPipe GlobalTransformComponent.rotation through SquareCommand and render\nrotated quads via SDL_RenderGeometry. Draw rotated box colliders as a\nwireframe OBB. Promote CollisionSystem boxes to oriented bounding boxes:\nbroadphase still uses an AABB enclosing the OBB so the median-cut sweep\nis unchanged; narrowphase adds SAT over the four face normals when at\nleast one box is rotated.",
+          "timestamp": "2026-05-18T22:08:38-06:00",
+          "tree_id": "f8e7d49ddd9a31fc1af58cb7eb79eb9602b79c4e",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/6f35a51f22747490b8f62972aad577297a289de4"
+        },
+        "date": 1779164223941,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 3901.9913082003686,
+            "unit": "ns/iter",
+            "extra": "iterations: 178458\ncpu: 3933.3765143615765 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 15928.168682734817,
+            "unit": "ns/iter",
+            "extra": "iterations: 43874\ncpu: 15970.099329899718 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 108717.07926722962,
+            "unit": "ns/iter",
+            "extra": "iterations: 6534\ncpu: 108768.41322313757 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 901824.448479658,
+            "unit": "ns/iter",
+            "extra": "iterations: 772\ncpu: 901876.7499999907 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1839532.4937960343,
+            "unit": "ns/iter",
+            "extra": "iterations: 383\ncpu: 1839190.9556135882 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2314.3771259390996,
+            "unit": "ns/iter",
+            "extra": "iterations: 294623\ncpu: 2307.2132759488136 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 9909.904071434965,
+            "unit": "ns/iter",
+            "extra": "iterations: 70991\ncpu: 9901.998506855047 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 69345.39533292151,
+            "unit": "ns/iter",
+            "extra": "iterations: 10230\ncpu: 69314.67956988975 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 392584.06498581,
+            "unit": "ns/iter",
+            "extra": "iterations: 1786\ncpu: 392546.264837612 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2304.039708926783,
+            "unit": "ns/iter",
+            "extra": "iterations: 304998\ncpu: 2274.985291709063 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6656.306126061573,
+            "unit": "ns/iter",
+            "extra": "iterations: 105632\ncpu: 6623.044872775737 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 40854.836722431086,
+            "unit": "ns/iter",
+            "extra": "iterations: 17057\ncpu: 40810.61528989688 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 315833.02729884494,
+            "unit": "ns/iter",
+            "extra": "iterations: 2194\ncpu: 315695.8103919574 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 653030.7226415685,
+            "unit": "ns/iter",
+            "extra": "iterations: 1077\ncpu: 652885.7465180971 ns\nthreads: 1"
           }
         ]
       }
