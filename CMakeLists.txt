@@ -65,6 +65,14 @@ set(SRC_FILES
         src/Game/GameConfig.cpp
         src/General/Logger.cpp
         src/Lua/Bindings/RegisterAllBindings.cpp
+        src/Lua/Modules/RegisterAllModules.cpp
+        src/Lua/Modules/AssetsModuleLuaBinding.cpp
+        src/Lua/Modules/AudioModuleLuaBinding.cpp
+        src/Lua/Modules/EntityModuleLuaBinding.cpp
+        src/Lua/Modules/GameModuleLuaBinding.cpp
+        src/Lua/Modules/IoModuleLuaBinding.cpp
+        src/Lua/Modules/LogModuleLuaBinding.cpp
+        src/Lua/Modules/SceneModuleLuaBinding.cpp
         src/Renderer/Renderer.cpp
         src/Systems/AudioSystem.cpp
 )

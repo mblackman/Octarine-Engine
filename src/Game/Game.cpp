@@ -35,6 +35,8 @@
 #include "Lua/Bindings/InputSystemLuaBinding.h"
 #include "Lua/Bindings/LuaSystemRegistry.h"
 #include "Lua/Bindings/RegisterAllBindings.h"
+#include "Lua/LuaEntityLoader.h"
+#include "Lua/Modules/RegisterAllModules.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/AudioSystem.h"
 #include "Systems/CameraFollowSystem.h"
@@ -330,7 +332,20 @@ void Game::Setup() {
   LuaSystemRegistry::registerSystem(inputSystem);
 
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
-  scriptSystem.CreateLuaBindings(lua, *this);
+
+  // EntityPoolManager Set before ProjectileEmitSystem::Init — Init calls
+  // Get<EntityPoolManager>().RegisterPool<...>. Was Set later (after audio); moved up to
+  // satisfy the new init order.
+  registry_->Set<EntityPoolManager>(EntityPoolManager());
+
+  // ProjectileEmitSystem set + Init early so GameModule's fire_projectile can capture it from
+  // the Registry during RegisterAllLuaModules. Init only does RegisterPool<...> calls — safe
+  // to run before scene/system registration.
+  auto &projectileEmitSystem = registry_->Set<ProjectileEmitSystem>(ProjectileEmitSystem());
+  projectileEmitSystem.Init(*registry_);
+
+  scriptSystem.CreateLuaBindings(lua);
+  RegisterAllLuaModules(lua, *this);
   LuaSystemRegistry::bindAll(lua);
   lua["game_window_width"] = gameConfig.windowWidth;
   lua["game_window_height"] = gameConfig.windowHeight;
@@ -375,16 +390,14 @@ void Game::Setup() {
     Logger::Error("AudioSystem failed to initialize; audio disabled this session.");
   }
 
-  registry_->Set<EntityPoolManager>(EntityPoolManager());
-
   if (gameConfig.HasLoadedConfig()) {
     LoadGame(lua, assetManager, gameConfig);
   }
 
   registry_->RegisterParallelSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
   // ProjectileEmitSystem has no per-frame system pass anymore — gameplay drives shots via
-  // fire_projectile(...) in Lua. The instance owns the projectile pool registration + Fire().
-  auto &projectileEmitSystem = registry_->Set<ProjectileEmitSystem>(ProjectileEmitSystem());
+  // fire_projectile(...) in Lua. The instance is Set + Init'd earlier in Setup so GameModule
+  // can bind fire_projectile against it during module install.
   registry_->RegisterParallelSystem<ProjectileComponent>(ProjectileLifecycleSystem());
 
   // Integrate velocity into local position. Must run before TransformSystem so the hierarchy
@@ -410,17 +423,6 @@ void Game::Setup() {
 
   // Event subscriptions (one-time)
   event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
-  projectileEmitSystem.Init(*registry_);
-  // Expose manual fire to Lua. Player-tagged emitters now skip auto-fire — gameplay code drives
-  // shots via input callbacks. dx/dy is a non-normalized aim vector; 0,0 falls back to the
-  // emitter's configured velocity.
-  lua.set_function("fire_projectile",
-                   [&projectileEmitSystem, this](const Entity emitter, const sol::optional<double> dx,
-                                                 const sol::optional<double> dy) {
-                     projectileEmitSystem.Fire(*registry_, emitter,
-                                               glm::vec2(static_cast<float>(dx.value_or(0.0)),
-                                                         static_cast<float>(dy.value_or(0.0))));
-                   });
   // Event-driven systems with no per-frame Update — owned by the Registry instead of
   // living as parallel members on Game. Keeps the registry as the single source of truth.
   auto &uiButtonSystem = registry_->Set<UIButtonSystem>(UIButtonSystem());

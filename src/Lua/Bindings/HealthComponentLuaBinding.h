@@ -2,6 +2,8 @@
 
 #include <sol/sol.hpp>
 
+#include <algorithm>
+
 #include "Components/HealthComponent.h"
 #include "Lua/Bindings/LuaBinding.h"
 
@@ -21,8 +23,20 @@ struct LuaBinding<HealthComponent>
 
     static void bindUsertype(sol::state& lua)
     {
+        // current_health is a clamping property — direct writes from Lua are clamped to
+        // [0, maxHealth] so scripts can't bypass damage()/heal() invariants by assigning the
+        // field. Reads stay zero-overhead.
         lua.new_usertype<HealthComponent>(kUsertypeName,
-                                          "current_health", &HealthComponent::currentHealth,
-                                          "max_health", &HealthComponent::maxHealth);
+                                          "current_health", sol::property(
+                                              [](const HealthComponent& h) { return h.currentHealth; },
+                                              [](HealthComponent& h, const int v)
+                                              {
+                                                  h.currentHealth = std::clamp(v, 0, h.maxHealth);
+                                              }),
+                                          "max_health", &HealthComponent::maxHealth,
+                                          "damage", &HealthComponent::damage,
+                                          "heal", &HealthComponent::heal,
+                                          "is_dead", sol::property(&HealthComponent::isDead),
+                                          "fraction", sol::property(&HealthComponent::fraction));
     }
 };
