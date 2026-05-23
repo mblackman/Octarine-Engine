@@ -4,6 +4,7 @@
 
 #include <SDL3/SDL_filesystem.h>
 
+#include <cctype>
 #include <fstream>
 #include <sstream>
 
@@ -26,6 +27,18 @@ std::string ProjectPath(const std::string& projectAssetPath) {
   return projectAssetPath + "/" + kProjectFileName;
 }
 }  // namespace
+
+bool ParseIniLine(const std::string& line, std::string& key, std::string& value) {
+  const auto eq = line.find('=');
+  if (eq == std::string::npos) return false;
+  key = line.substr(0, eq);
+  value = line.substr(eq + 1);
+  // Trim trailing whitespace / CR so CRLF files and hand edits round-trip cleanly.
+  while (!value.empty() && std::isspace(static_cast<unsigned char>(value.back()))) {
+    value.pop_back();
+  }
+  return true;
+}
 
 void EditorPersistence::SaveGlobal() const {
   const auto path = GlobalPath();
@@ -53,11 +66,10 @@ void EditorPersistence::LoadGlobal() {
   if (!file.is_open()) return;
 
   std::string line;
+  std::string key;
+  std::string value;
   while (std::getline(file, line)) {
-    const auto eq = line.find('=');
-    if (eq == std::string::npos) continue;
-    const auto key = line.substr(0, eq);
-    const auto value = line.substr(eq + 1);
+    if (!ParseIniLine(line, key, value)) continue;
 
     if (key == "lastProjectPath") {
       lastProjectPath = value;
@@ -80,12 +92,9 @@ void EditorPersistence::SaveProject(const std::string& projectAssetPath) const {
   }
 
   file << "currentScenePath=" << currentScenePath << "\n";
-  file << "showProfiler=" << (showProfiler ? "true" : "false") << "\n";
-  file << "showHierarchy=" << (showHierarchy ? "true" : "false") << "\n";
-  file << "showAssetBrowser=" << (showAssetBrowser ? "true" : "false") << "\n";
-  file << "showLuaConsole=" << (showLuaConsole ? "true" : "false") << "\n";
-  file << "showSceneWindow=" << (showSceneWindow ? "true" : "false") << "\n";
-  file << "showSceneManagement=" << (showSceneManagement ? "true" : "false") << "\n";
+  for (const auto& [key, member] : kWindowFlags) {
+    file << key << "=" << (this->*member ? "true" : "false") << "\n";
+  }
 }
 
 void EditorPersistence::LoadProject(const std::string& projectAssetPath) {
@@ -96,19 +105,21 @@ void EditorPersistence::LoadProject(const std::string& projectAssetPath) {
   if (!file.is_open()) return;  // Silent — fine if it doesn't exist yet.
 
   std::string line;
+  std::string key;
+  std::string value;
   while (std::getline(file, line)) {
-    const auto eq = line.find('=');
-    if (eq == std::string::npos) continue;
-    const auto key = line.substr(0, eq);
-    const auto value = line.substr(eq + 1);
+    if (!ParseIniLine(line, key, value)) continue;
 
-    if (key == "currentScenePath") currentScenePath = value;
-    else if (key == "showProfiler") showProfiler = (value == "true");
-    else if (key == "showHierarchy") showHierarchy = (value == "true");
-    else if (key == "showAssetBrowser") showAssetBrowser = (value == "true");
-    else if (key == "showLuaConsole") showLuaConsole = (value == "true");
-    else if (key == "showSceneWindow") showSceneWindow = (value == "true");
-    else if (key == "showSceneManagement") showSceneManagement = (value == "true");
+    if (key == "currentScenePath") {
+      currentScenePath = value;
+      continue;
+    }
+    for (const auto& [flagKey, member] : kWindowFlags) {
+      if (key == flagKey) {
+        this->*member = (value == "true");
+        break;
+      }
+    }
   }
 }
 

@@ -2,7 +2,9 @@
 
 #ifdef OCTARINE_WITH_EDITOR
 
+#include <array>
 #include <string>
+#include <utility>
 
 // Editor-only persistent state. Lives outside GameConfig so the player build
 // neither carries these fields nor reads/writes their files.
@@ -34,6 +36,23 @@ struct EditorPersistence {
   bool showLuaConsole = false;
   bool showSceneWindow = true;
   bool showSceneManagement = false;
+  bool showEngineOptions = true;
+  bool showEditorSettings = true;
+
+  // Single source of truth for persisted window-visibility flags. Both the project-prefs
+  // serializer (EditorPersistence.cpp) and the layout-preset serializer (EditorLayoutPresets.cpp)
+  // iterate this table, so a new window = one entry here.
+  using FlagRef = std::pair<const char*, bool EditorPersistence::*>;
+  static constexpr std::array<FlagRef, 8> kWindowFlags = {{
+      {"showProfiler", &EditorPersistence::showProfiler},
+      {"showHierarchy", &EditorPersistence::showHierarchy},
+      {"showAssetBrowser", &EditorPersistence::showAssetBrowser},
+      {"showLuaConsole", &EditorPersistence::showLuaConsole},
+      {"showSceneWindow", &EditorPersistence::showSceneWindow},
+      {"showSceneManagement", &EditorPersistence::showSceneManagement},
+      {"showEngineOptions", &EditorPersistence::showEngineOptions},
+      {"showEditorSettings", &EditorPersistence::showEditorSettings},
+  }};
 
   void LoadGlobal();
   void SaveGlobal() const;
@@ -41,5 +60,9 @@ struct EditorPersistence {
   void LoadProject(const std::string& projectAssetPath);
   void SaveProject(const std::string& projectAssetPath) const;
 };
+
+// Splits "key=value" into key/value, trimming trailing whitespace and CR (handles CRLF files /
+// hand edits). Returns false when the line has no '='.
+bool ParseIniLine(const std::string& line, std::string& key, std::string& value);
 
 #endif  // OCTARINE_WITH_EDITOR

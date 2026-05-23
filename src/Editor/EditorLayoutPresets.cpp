@@ -38,12 +38,9 @@ std::filesystem::path PresetPath(const std::string& name) {
 
 std::string SerializeFlags(const EditorPersistence& p) {
   std::ostringstream out;
-  out << "showSceneWindow=" << (p.showSceneWindow ? "true" : "false") << "\n";
-  out << "showSceneManagement=" << (p.showSceneManagement ? "true" : "false") << "\n";
-  out << "showHierarchy=" << (p.showHierarchy ? "true" : "false") << "\n";
-  out << "showAssetBrowser=" << (p.showAssetBrowser ? "true" : "false") << "\n";
-  out << "showLuaConsole=" << (p.showLuaConsole ? "true" : "false") << "\n";
-  out << "showProfiler=" << (p.showProfiler ? "true" : "false") << "\n";
+  for (const auto& [key, member] : EditorPersistence::kWindowFlags) {
+    out << key << "=" << (p.*member ? "true" : "false") << "\n";
+  }
   return out.str();
 }
 
@@ -71,18 +68,16 @@ void ApplyParsedContent(const std::string& content, EditorPersistence& p) {
       continue;
     }
 
-    const auto eq = line.find('=');
-    if (eq == std::string::npos) continue;
-    const auto key = line.substr(0, eq);
-    const auto value = line.substr(eq + 1);
+    std::string key;
+    std::string value;
+    if (!ParseIniLine(line, key, value)) continue;
     const bool truthy = (value == "true");
-
-    if (key == "showSceneWindow") p.showSceneWindow = truthy;
-    else if (key == "showSceneManagement") p.showSceneManagement = truthy;
-    else if (key == "showHierarchy") p.showHierarchy = truthy;
-    else if (key == "showAssetBrowser") p.showAssetBrowser = truthy;
-    else if (key == "showLuaConsole") p.showLuaConsole = truthy;
-    else if (key == "showProfiler") p.showProfiler = truthy;
+    for (const auto& [flagKey, member] : EditorPersistence::kWindowFlags) {
+      if (key == flagKey) {
+        p.*member = truthy;
+        break;
+      }
+    }
   }
 
   if (!imguiBlob.empty()) {
