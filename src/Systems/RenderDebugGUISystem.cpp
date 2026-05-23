@@ -30,6 +30,8 @@
 #ifdef OCTARINE_WITH_EDITOR
 #include "../Editor/EditorLayoutPresets.h"
 #include "../Editor/EditorPersistence.h"
+#include "../Editor/Inspectors/ComponentInspectorRegistry.h"
+#include "../Editor/Inspectors/InspectorWidgets.h"
 
 namespace
 {
@@ -52,23 +54,19 @@ namespace
         {
             auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
             auto& assetManager = game->GetRegistry()->Get<AssetManager>();
-            std::filesystem::path selectedPath(*filelist);
-            std::filesystem::path basePath(assetManager.GetBasePath());
+            const std::filesystem::path selectedPath(*filelist);
+            const std::filesystem::path basePath(assetManager.GetBasePath());
 
-            try
-            {
-                if (selectedPath.string().find(basePath.string()) == 0)
-                {
-                    selectedPath = std::filesystem::relative(selectedPath, basePath);
-                }
-            }
-            catch (const std::exception& e)
-            {
-                Logger::Warn("Failed to make scene path relative: " + std::string(e.what()));
-            }
+            // Prefer a project-relative path (e.g. "scripts/level1.lua"), but only when the file
+            // actually lives inside the project — a relative result starting with ".." escapes it,
+            // so keep the absolute path in that case.
+            std::error_code ec;
+            const std::filesystem::path relativePath = std::filesystem::relative(selectedPath, basePath, ec);
+            const bool insideProject = !ec && !relativePath.empty() && relativePath.begin()->string() != "..";
+            const std::string scenePath = insideProject ? relativePath.generic_string() : selectedPath.string();
 
-            editorPersistence.currentScenePath = selectedPath.string();
-            Logger::Info("Scene file selected: " + selectedPath.string());
+            editorPersistence.currentScenePath = scenePath;
+            Logger::Info("Scene file selected: " + scenePath);
         }
     }
 } // namespace
@@ -194,6 +192,8 @@ static bool openSaveLayoutModal = false;
             ImGui::MenuItem("Asset Browser", nullptr, &editorPersistence.showAssetBrowser);
             ImGui::MenuItem("Lua Console", nullptr, &editorPersistence.showLuaConsole);
             ImGui::MenuItem("Performance Profiler", nullptr, &editorPersistence.showProfiler);
+            ImGui::MenuItem("Engine Options", nullptr, &editorPersistence.showEngineOptions);
+            ImGui::MenuItem("Editor Settings", nullptr, &editorPersistence.showEditorSettings);
             ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI);
             ImGui::Separator();
             ImGui::MenuItem("FPS Counter", nullptr, &engineOptions.showFpsCounter);
@@ -240,8 +240,10 @@ static bool openSaveLayoutModal = false;
     if (editorPersistence.showAssetBrowser) AssetBrowserWindow(registry);
     if (editorPersistence.showLuaConsole) LuaConsoleWindow(game->GetLua());
     if (editorPersistence.showProfiler) PerformanceProfilerWindow();
-    EngineOptionsWindow(engineOptions, editorPersistence);
-    EditorSettingsWindow(editorPersistence);
+    if (editorPersistence.showEngineOptions)
+        EngineOptionsWindow(engineOptions, &editorPersistence.showEngineOptions);
+    if (editorPersistence.showEditorSettings)
+        EditorSettingsWindow(editorPersistence, &editorPersistence.showEditorSettings);
 
     if (engineOptions.showImGuiDemoWindow)
     {
@@ -292,17 +294,22 @@ void RenderDebugGUISystem::SceneManagementWindow(Game* game)
 
     ImGui::Begin("Scene Management", &editorPersistence.showSceneManagement);
 
-    static char scenePath[256] = "";
+    static std::string scenePath;
     static std::string lastKnownScenePath;
     if (lastKnownScenePath != editorPersistence.currentScenePath)
     {
-        snprintf(scenePath, sizeof(scenePath), "%s", editorPersistence.currentScenePath.c_str());
+        scenePath = editorPersistence.currentScenePath;
         lastKnownScenePath = editorPersistence.currentScenePath;
     }
 
     ImGui::Text("Scene Script Path:");
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 120);
-    ImGui::InputText("##scenepath", scenePath, sizeof(scenePath));
+    // Reserve exactly the width of the trailing "..." + "Load" buttons so the input field doesn't
+    // push them off-screen at large editor font sizes.
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float sceneButtonsWidth = ImGui::CalcTextSize("...").x + ImGui::CalcTextSize("Load").x +
+                                    style.FramePadding.x * 4.0F + style.ItemSpacing.x * 2.0F;
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - sceneButtonsWidth);
+    octarine::editor::inspectors::InputTextString("##scenepath", scenePath);
     ImGui::SameLine();
     if (ImGui::Button("..."))
     {
@@ -341,28 +348,30 @@ void RenderDebugGUISystem::SceneManagementWindow(Game* game)
     ImGui::End();
 }
 
-void RenderDebugGUISystem::EngineOptionsWindow(EngineOptions& options, EditorPersistence& editorPersistence)
+void RenderDebugGUISystem::EngineOptionsWindow(EngineOptions& options, bool* p_open)
 {
-    ImGui::Begin("Engine Options");
+    // Runtime engine options only. Window show/hide lives in the Windows menu (single source of truth).
+    ImGui::Begin("Engine Options", p_open);
     ImGui::Checkbox("Show ImGui Demo Window", &options.showImGuiDemoWindow);
     ImGui::Checkbox("Show FPS Counter", &options.showFpsCounter);
     ImGui::Checkbox("Show Entity Info", &options.showEntityInfo);
-    ImGui::Checkbox("Show Profiler", &editorPersistence.showProfiler);
-    ImGui::Checkbox("Show Hierarchy", &editorPersistence.showHierarchy);
-    ImGui::Checkbox("Show Asset Browser", &editorPersistence.showAssetBrowser);
-    ImGui::Checkbox("Show Lua Console", &editorPersistence.showLuaConsole);
     ImGui::Checkbox("Draw Colliders", &options.drawColliders);
     ImGui::Checkbox("Audio Enabled", &options.audioEnabled);
     ImGui::SliderFloat("Master Volume", &options.masterVolume, 0.0F, 1.0F);
     ImGui::Separator();
     ImGui::Checkbox("Pause Execution", &options.isPaused);
+    ImGui::SameLine();
+    if (ImGui::Button("Step Frame"))
+    {
+        options.stepFrame = true;
+    }
     ImGui::SliderFloat("Time Scale", &options.timeScale, 0.0F, 5.0F);
     ImGui::End();
 }
 
-void RenderDebugGUISystem::EditorSettingsWindow(EditorPersistence& editorPersistence)
+void RenderDebugGUISystem::EditorSettingsWindow(EditorPersistence& editorPersistence, bool* p_open)
 {
-    ImGui::Begin("Editor Settings");
+    ImGui::Begin("Editor Settings", p_open);
 
     ImGui::SeparatorText("Appearance");
 
@@ -506,239 +515,36 @@ void RenderDebugGUISystem::HierarchyWindow(Registry* registry)
         }
         if (registry->IsAlive(selectedEntity))
         {
-            char nameBuf[128] = {0};
+            std::string name;
             if (registry->HasComponent<NameComponent>(selectedEntity))
             {
-                const auto& nameComp = registry->GetComponent<NameComponent>(selectedEntity);
-                snprintf(nameBuf, sizeof(nameBuf), "%s", nameComp.name.c_str());
+                name = registry->GetComponent<NameComponent>(selectedEntity).name;
             }
-            if (ImGui::InputText("Name", nameBuf, sizeof(nameBuf)))
+            if (octarine::editor::inspectors::InputTextString("Name", name))
             {
-                registry->AddComponent(selectedEntity, NameComponent(std::string(nameBuf)));
+                registry->AddComponent(selectedEntity, NameComponent(name));
             }
         }
         ImGui::Separator();
 
-        const bool hasAnyTransform = registry->HasComponent<PositionComponent>(selectedEntity) ||
-            registry->HasComponent<ScaleComponent>(selectedEntity) ||
-            registry->HasComponent<RotationComponent>(selectedEntity) ||
-            registry->HasComponent<GlobalTransformComponent>(selectedEntity);
-        if (hasAnyTransform)
+        // Per-component inspector blocks are driven by ComponentInspectorRegistry — each entry
+        // renders its own collapsing header when the entity has that component.
+        for (const auto& inspector : ComponentInspectorRegistry::all())
         {
-            if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                if (registry->HasComponent<PositionComponent>(selectedEntity))
-                {
-                    auto& position = registry->GetComponent<PositionComponent>(selectedEntity);
-                    ImGui::DragFloat2("Position", &position.value.x);
-                }
-                if (registry->HasComponent<ScaleComponent>(selectedEntity))
-                {
-                    auto& scale = registry->GetComponent<ScaleComponent>(selectedEntity);
-                    ImGui::DragFloat2("Scale", &scale.value.x);
-                }
-                if (registry->HasComponent<RotationComponent>(selectedEntity))
-                {
-                    auto& rotationComp = registry->GetComponent<RotationComponent>(selectedEntity);
-                    auto rotation = static_cast<float>(rotationComp.value);
-                    if (ImGui::DragFloat("Rotation", &rotation))
-                    {
-                        rotationComp.value = rotation;
-                    }
-                }
-                if (registry->HasComponent<GlobalTransformComponent>(selectedEntity))
-                {
-                    const auto& global = registry->GetComponent<GlobalTransformComponent>(selectedEntity);
-                    ImGui::Text("Global Pos: %.2f, %.2f", global.position.x, global.position.y);
-                    ImGui::Text("Global Scale: %.2f, %.2f", global.scale.x, global.scale.y);
-                    ImGui::Text("Global Rot: %.2f", global.rotation);
-                }
-            }
-        }
-        if (registry->HasComponent<HealthComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("Health", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& health = registry->GetComponent<HealthComponent>(selectedEntity);
-                ImGui::SliderInt("HP", &health.currentHealth, 0, health.maxHealth);
-            }
-        }
-        if (registry->HasComponent<SpriteComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("Sprite", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& sprite = registry->GetComponent<SpriteComponent>(selectedEntity);
-                ImGui::DragInt("Layer", &sprite.layer);
-                ImGui::Text("Asset ID: %s", sprite.assetId.c_str());
-                ImGui::DragFloat("Width", &sprite.width);
-                ImGui::DragFloat("Height", &sprite.height);
-                ImGui::Checkbox("Fixed", &sprite.isFixed);
-                auto& assetManager = registry->Get<AssetManager>();
-                if (auto* tex = assetManager.GetTexture(sprite.assetId); tex != nullptr)
-                {
-                    ImGui::Image(reinterpret_cast<ImTextureID>(tex), ImVec2(64, 64));
-                }
-            }
-        }
-        if (registry->HasComponent<RigidBodyComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("RigidBody", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& rb = registry->GetComponent<RigidBodyComponent>(selectedEntity);
-                ImGui::DragFloat2("Velocity", &rb.velocity.x, 1.0f);
-            }
-        }
-        if (registry->HasComponent<BoxColliderComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("BoxCollider", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& bc = registry->GetComponent<BoxColliderComponent>(selectedEntity);
-                ImGui::DragInt("Width", &bc.width);
-                ImGui::DragInt("Height", &bc.height);
-                ImGui::DragFloat2("Offset", &bc.offset.x, 1.0f);
-            }
-        }
-        if (registry->HasComponent<AnimationComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("Animation", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& anim = registry->GetComponent<AnimationComponent>(selectedEntity);
-                ImGui::Text("Num Frames: %d", anim.numFrames);
-                ImGui::SliderInt("Current Frame", &anim.currentFrame, 1, anim.numFrames);
-                ImGui::DragInt("Frame Speed (ms)", &anim.frameRateSpeed);
-                ImGui::Checkbox("Looping", &anim.shouldLoop);
-            }
-        }
-        if (registry->HasComponent<ProjectileEmitterComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("ProjectileEmitter", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& pe = registry->GetComponent<ProjectileEmitterComponent>(selectedEntity);
-                ImGui::DragFloat2("Velocity", &pe.velocity.x, 1.0f);
-                ImGui::DragFloat("Frequency (s)", &pe.frequency, 0.1f);
-                ImGui::DragFloat("Duration (s)", &pe.duration, 0.1f);
-                ImGui::DragInt("Damage", &pe.damage);
-                char projNameBuf[128] = {0};
-                snprintf(projNameBuf, sizeof(projNameBuf), "%s", pe.projectileName.c_str());
-                if (ImGui::InputText("Projectile Name", projNameBuf, sizeof(projNameBuf)))
-                {
-                    pe.projectileName = projNameBuf;
-                }
-            }
-        }
-        if (registry->HasComponent<TextLabelComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("TextLabel", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& tl = registry->GetComponent<TextLabelComponent>(selectedEntity);
-                char buf[256];
-                snprintf(buf, sizeof(buf), "%s", tl.text.c_str());
-                if (ImGui::InputText("Text", buf, sizeof(buf))) tl.text = buf;
-                ImGui::Text("Font ID: %s", tl.fontId.c_str());
-                float col[4] = {tl.color.r / 255.0f, tl.color.g / 255.0f, tl.color.b / 255.0f, tl.color.a / 255.0f};
-                if (ImGui::ColorEdit4("Color", col))
-                {
-                    tl.color = {
-                        static_cast<Uint8>(col[0] * 255), static_cast<Uint8>(col[1] * 255),
-                        static_cast<Uint8>(col[2] * 255), static_cast<Uint8>(col[3] * 255)
-                    };
-                }
-                ImGui::Checkbox("Fixed", &tl.isFixed);
-            }
-        }
-        if (registry->HasComponent<ScriptComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("Script", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                ImGui::Text("Has Lua script table and callbacks.");
-            }
-        }
-        if (registry->HasComponent<CameraFollowComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("CameraFollow", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                ImGui::Text("Entity is being followed by the camera.");
-            }
-        }
-        if (registry->HasComponent<EntityMaskComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("EntityMask", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& em = registry->GetComponent<EntityMaskComponent>(selectedEntity);
-                ImGui::Text("Mask: %s", em.mask.to_string().c_str());
-            }
-        }
-        if (registry->HasComponent<ProjectileComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("Projectile", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& pc = registry->GetComponent<ProjectileComponent>(selectedEntity);
-                ImGui::DragInt("Damage", &pc.damage);
-                ImGui::Text("Timer: %.2f / %.2f", pc.timer, pc.duration);
-            }
-        }
-        if (registry->HasComponent<SquarePrimitiveComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("SquarePrimitive", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& sp = registry->GetComponent<SquarePrimitiveComponent>(selectedEntity);
-                ImGui::DragFloat2("Position", &sp.position.x);
-                ImGui::DragInt("Layer", &sp.layer);
-                ImGui::DragFloat("Width", &sp.width);
-                ImGui::DragFloat("Height", &sp.height);
-                float col[4] = {sp.color.r / 255.0f, sp.color.g / 255.0f, sp.color.b / 255.0f, sp.color.a / 255.0f};
-                if (ImGui::ColorEdit4("Color", col))
-                {
-                    sp.color = {
-                        static_cast<Uint8>(col[0] * 255), static_cast<Uint8>(col[1] * 255),
-                        static_cast<Uint8>(col[2] * 255), static_cast<Uint8>(col[3] * 255)
-                    };
-                }
-                ImGui::Checkbox("Fixed", &sp.isFixed);
-            }
-        }
-        if (registry->HasComponent<UIButtonComponent>(selectedEntity))
-        {
-            if (ImGui::CollapsingHeader("UIButton", ImGuiTreeNodeFlags_DefaultOpen))
-            {
-                auto& ub = registry->GetComponent<UIButtonComponent>(selectedEntity);
-                ImGui::Checkbox("Active", &ub.isActive);
-            }
+            inspector.draw(registry, selectedEntity);
         }
 
         ImGui::Separator();
         if (ImGui::BeginCombo("Add Component", "Select..."))
         {
-            if (!registry->HasComponent<PositionComponent>(selectedEntity) && ImGui::Selectable("Position"))
-                registry->AddComponent(selectedEntity, PositionComponent());
-            if (!registry->HasComponent<ScaleComponent>(selectedEntity) && ImGui::Selectable("Scale"))
-                registry->AddComponent(selectedEntity, ScaleComponent());
-            if (!registry->HasComponent<RotationComponent>(selectedEntity) && ImGui::Selectable("Rotation"))
-                registry->AddComponent(selectedEntity, RotationComponent());
-            if (!registry->HasComponent<GlobalTransformComponent>(selectedEntity) && ImGui::Selectable("Global Transform"))
-                registry->AddComponent(selectedEntity, GlobalTransformComponent{});
-            if (!registry->HasComponent<RigidBodyComponent>(selectedEntity) && ImGui::Selectable("RigidBody"))
-                registry->AddComponent(selectedEntity, RigidBodyComponent());
-            if (!registry->HasComponent<SpriteComponent>(selectedEntity) && ImGui::Selectable("Sprite"))
-                registry->AddComponent(selectedEntity, SpriteComponent());
-            if (!registry->HasComponent<BoxColliderComponent>(selectedEntity) && ImGui::Selectable("BoxCollider"))
-                registry->AddComponent(selectedEntity, BoxColliderComponent());
-            if (!registry->HasComponent<AnimationComponent>(selectedEntity) && ImGui::Selectable("Animation"))
-                registry->AddComponent(selectedEntity, AnimationComponent());
-            if (!registry->HasComponent<HealthComponent>(selectedEntity) && ImGui::Selectable("Health"))
-                registry->AddComponent(selectedEntity, HealthComponent(100));
-            if (!registry->HasComponent<CameraFollowComponent>(selectedEntity) && ImGui::Selectable("CameraFollow"))
-                registry->AddComponent(selectedEntity, CameraFollowComponent());
-            if (!registry->HasComponent<ProjectileEmitterComponent>(selectedEntity) && ImGui::Selectable(
-                "ProjectileEmitter"))
-                registry->AddComponent(selectedEntity, ProjectileEmitterComponent());
-            if (!registry->HasComponent<TextLabelComponent>(selectedEntity) && ImGui::Selectable("TextLabel"))
-                registry->AddComponent(selectedEntity, TextLabelComponent());
-            if (!registry->HasComponent<UIButtonComponent>(selectedEntity) && ImGui::Selectable("UIButton"))
-                registry->AddComponent(selectedEntity, UIButtonComponent());
-            if (!registry->HasComponent<SquarePrimitiveComponent>(selectedEntity) && ImGui::Selectable(
-                "SquarePrimitive"))
-                registry->AddComponent(selectedEntity, SquarePrimitiveComponent());
+            for (const auto& inspector : ComponentInspectorRegistry::all())
+            {
+                if (inspector.addDefault && !inspector.has(registry, selectedEntity) &&
+                    ImGui::Selectable(inspector.displayName.c_str()))
+                {
+                    inspector.addDefault(registry, selectedEntity);
+                }
+            }
             ImGui::EndCombo();
         }
     }
@@ -759,17 +565,20 @@ void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open)
         return;
     }
     auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
-    static char projectPath[256] = "";
+    static std::string projectPath;
     static std::string lastKnownProjectPath;
     if (lastKnownProjectPath != editorPersistence.lastProjectPath)
     {
-        snprintf(projectPath, sizeof(projectPath), "%s", editorPersistence.lastProjectPath.c_str());
+        projectPath = editorPersistence.lastProjectPath;
         lastKnownProjectPath = editorPersistence.lastProjectPath;
     }
 
     ImGui::Text("Enter Project Path:");
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - 40);
-    ImGui::InputText("##path", projectPath, sizeof(projectPath));
+    // Reserve the trailing "..." button width so the input scales with the editor font size.
+    const ImGuiStyle& style = ImGui::GetStyle();
+    const float browseButtonWidth = ImGui::CalcTextSize("...").x + style.FramePadding.x * 2.0F + style.ItemSpacing.x;
+    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - browseButtonWidth);
+    octarine::editor::inspectors::InputTextString("##path", projectPath);
     ImGui::SameLine();
     if (ImGui::Button("..."))
     {
@@ -794,7 +603,7 @@ void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open)
         ImGui::Separator();
         ImGui::Text("Last Project: %s", editorPersistence.lastProjectPath.c_str());
         if (ImGui::Button("Load Last Project"))
-            snprintf(projectPath, sizeof(projectPath), "%s", editorPersistence.lastProjectPath.c_str());
+            projectPath = editorPersistence.lastProjectPath;
     }
     ImGui::End();
 }
@@ -987,15 +796,12 @@ void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua)
         }
     }
 
+    // Only refocus the input right after submitting a command. Don't steal focus whenever the
+    // window is focused — that prevented scrolling the log with the keyboard.
     if (reclaimFocus)
     {
         ImGui::SetKeyboardFocusHere(-1);
         reclaimFocus = false;
-    }
-    else if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::IsAnyItemActive() &&
-        !ImGui::IsMouseClicked(0))
-    {
-        ImGui::SetKeyboardFocusHere(-1);
     }
 
     ImGui::End();
