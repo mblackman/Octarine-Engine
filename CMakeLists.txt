@@ -85,6 +85,7 @@ endif ()
 if (OCTARINE_WITH_EDITOR)
     list(APPEND SRC_FILES src/Editor/EditorPersistence.cpp)
     list(APPEND SRC_FILES src/Editor/EditorLayoutPresets.cpp)
+    list(APPEND SRC_FILES src/Editor/Inspectors/RegisterAllInspectors.cpp)
 endif ()
 
 if (UNIX AND NOT APPLE)

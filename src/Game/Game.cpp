@@ -68,6 +68,7 @@
 #ifdef OCTARINE_WITH_EDITOR
 #include "../Editor/EditorLayoutPresets.h"
 #include "../Editor/EditorPersistence.h"
+#include "../Editor/Inspectors/RegisterAllInspectors.h"
 #endif
 
 constexpr Uint8 GREY_COLOR = 24;
@@ -326,6 +327,11 @@ void Game::Setup() {
   // ScriptSystem's CreateLuaBindings runs — usertypes + registry.has_/get_ are
   // populated from LuaComponentRegistry at that point.
   RegisterAllLuaBindings();
+
+#ifdef OCTARINE_WITH_EDITOR
+  // Editor inspector surface — declarative parallel to the Lua bindings.
+  RegisterAllComponentInspectors();
+#endif
 
   // Systems that expose a Lua surface register here; bindAll installs them all once
   // the sol::state has its libraries open.

@@ -11,11 +11,16 @@
 #include <sol/sol.hpp>
 
 #include <iostream>
+#include <set>
 #include <string>
 #include <vector>
 
 #include "ECS/Registry.h"
 #include "Game/Game.h"
+#ifdef OCTARINE_WITH_EDITOR
+#include "Editor/Inspectors/ComponentInspectorRegistry.h"
+#include "Editor/Inspectors/RegisterAllInspectors.h"
+#endif
 #include "Lua/Bindings/InputSystemLuaBinding.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
 #include "Lua/Bindings/LuaSystemRegistry.h"
@@ -67,6 +72,9 @@ int main()
     // Mirror Game::Setup's binding order: component types, then free-function modules, then
     // system surfaces.
     RegisterAllLuaBindings();
+#ifdef OCTARINE_WITH_EDITOR
+    RegisterAllComponentInspectors();
+#endif
 
     ScriptSystem scriptSystem;
     scriptSystem.CreateLuaBindings(lua); // primitives + component usertypes
@@ -88,6 +96,31 @@ int main()
         Check(TableHasFunction(lua, "registry", "has_" + entry.luaKey), "registry.has_" + entry.luaKey);
         Check(TableHasFunction(lua, "registry", "get_" + entry.luaKey), "registry.get_" + entry.luaKey);
     }
+
+#ifdef OCTARINE_WITH_EDITOR
+    std::cout << "[inspectors] component inspector registry\n";
+    {
+        const auto& inspectors = ComponentInspectorRegistry::all();
+        Check(!inspectors.empty(), "inspector registry is non-empty");
+
+        std::set<std::string> names;
+        for (const auto& entry : inspectors)
+        {
+            Check(names.insert(entry.displayName).second, "inspector display name unique: " + entry.displayName);
+        }
+
+        // Every addable inspector's makeDefault() must yield a component that has() can find —
+        // catches a broken default ctor or a mis-wired registerComponent<T>().
+        auto* reg = game.GetRegistry();
+        for (const auto& entry : inspectors)
+        {
+            if (!entry.addDefault) continue;
+            const Entity ent = reg->CreateEntity();
+            entry.addDefault(reg, ent);
+            Check(entry.has(reg, ent), "addDefault produces has(): " + entry.displayName);
+        }
+    }
+#endif
 
     std::cout << "[modules] one sentinel global per module\n";
     // If a module is dropped from RegisterAllModules.cpp, its sentinel disappears and this fails.
