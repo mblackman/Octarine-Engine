@@ -26,6 +26,7 @@
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
+#include "imgui_internal.h"  // BeginViewportSideBar (playback toolbar pinned under the menu bar)
 
 #ifdef OCTARINE_WITH_EDITOR
 #include "../Editor/EditorLayoutPresets.h"
@@ -138,6 +139,8 @@ static bool openSaveLayoutModal = false;
             if (ImGui::MenuItem("Save Preferences", "Ctrl+S"))
             {
                 gameConfig.SaveUserPreferences();
+                editorPersistence.audioMuted = !engineOptions.audioEnabled;
+                editorPersistence.masterVolume = engineOptions.masterVolume;
                 editorPersistence.SaveGlobal();
                 if (projectLoaded) editorPersistence.SaveProject(gameConfig.GetAssetPath());
             }
@@ -201,6 +204,63 @@ static bool openSaveLayoutModal = false;
             ImGui::EndMenu();
         }
         ImGui::EndMainMenuBar();
+    }
+
+    // Playback toolbar: a fixed full-width bar pinned directly under the main menu bar.
+    // Submitting it as an Up side-bar after the menu bar stacks it beneath the menu.
+    {
+        ImGuiViewport* vp = ImGui::GetMainViewport();
+        if (ImGui::BeginViewportSideBar("##PlaybackToolbar", vp, ImGuiDir_Up, ImGui::GetFrameHeight(),
+                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar))
+        {
+            if (ImGui::BeginMenuBar())
+            {
+                const bool hasScene = !editorPersistence.currentScenePath.empty();
+
+                // Play — resume execution. If a configured scene was stopped, (re)start it first.
+                // Disabled while already running so the button reads as the current state.
+                ImGui::BeginDisabled(!engineOptions.isPaused);
+                if (ImGui::Button("Play"))
+                {
+                    if (!game->IsSceneRunning() && hasScene)
+                    {
+                        game->ReloadScene();
+                    }
+                    engineOptions.isPaused = false;
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                ImGui::BeginDisabled(engineOptions.isPaused);
+                if (ImGui::Button("Pause"))
+                {
+                    engineOptions.isPaused = true;
+                }
+                ImGui::EndDisabled();
+                ImGui::SameLine();
+                if (ImGui::Button("Step")) // freeze, then advance exactly one frame
+                {
+                    engineOptions.isPaused = true;
+                    engineOptions.stepFrame = true;
+                }
+                ImGui::SameLine();
+                if (ImGui::Button("Stop"))
+                {
+                    game->StopScene();
+                    engineOptions.isPaused = true; // back to the default ready-but-paused state
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button(engineOptions.audioEnabled ? "Mute" : "Unmute"))
+                {
+                    engineOptions.audioEnabled = !engineOptions.audioEnabled;
+                    editorPersistence.audioMuted = !engineOptions.audioEnabled;
+                    editorPersistence.masterVolume = engineOptions.masterVolume;
+                    editorPersistence.SaveGlobal(); // persist immediately
+                }
+                ImGui::EndMenuBar();
+            }
+        }
+        ImGui::End();
     }
 
     if (openSaveLayoutModal)
@@ -307,7 +367,7 @@ void RenderDebugGUISystem::SceneManagementWindow(Game* game)
     // push them off-screen at large editor font sizes.
     const ImGuiStyle& style = ImGui::GetStyle();
     const float sceneButtonsWidth = ImGui::CalcTextSize("...").x + ImGui::CalcTextSize("Load").x +
-                                    style.FramePadding.x * 4.0F + style.ItemSpacing.x * 2.0F;
+        style.FramePadding.x * 4.0F + style.ItemSpacing.x * 2.0F;
     ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - sceneButtonsWidth);
     octarine::editor::inspectors::InputTextString("##scenepath", scenePath);
     ImGui::SameLine();

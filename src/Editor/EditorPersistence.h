@@ -19,6 +19,11 @@ struct EditorPersistence {
   std::string lastProjectPath;
   float editorFontSize = 0.0F;
   int editorStyleIndex = 0;
+  // Audio mute + master volume. Persisted globally so they survive across projects (and with no
+  // project loaded). Applied to the live EngineOptions at startup; EngineOptions stays the source
+  // AudioSystem reads, these are its persisted shadow.
+  bool audioMuted = false;
+  float masterVolume = 1.0F;
 
   // Transient: set when the editor wants the font atlas rebuilt outside the
   // active ImGui frame. Not serialized.

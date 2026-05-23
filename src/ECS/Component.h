@@ -323,8 +323,9 @@ class Archetype {
   template <typename T>
   void AddComponent(const EntityLocation& location, const Entity& componentEntity, const T& component) {
     AssertLocation(location);
-    assert(HasComponent(componentEntity.id));
-    const auto index = component_type_to_index_[componentEntity.id];
+    const auto id = componentEntity.GetId();
+    assert(HasComponent(id));
+    const auto index = component_type_to_index_[id];
     chunks_[location.chunkIndex].AddComponent(component, component_offsets_[index], location.indexInChunk);
   }
 
