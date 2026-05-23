@@ -296,3 +296,69 @@ if (OCTARINE_ENABLE_BENCHMARKS)
 
     message(STATUS "Octarine: Benchmarks ENABLED")
 endif ()
+
+# -----------------------------------------------------------------------------
+# Tests
+# -----------------------------------------------------------------------------
+
+option(OCTARINE_ENABLE_TESTS "Build engine tests" OFF)
+
+if (OCTARINE_ENABLE_TESTS)
+    enable_testing()
+
+    # The Lua API smoke test links the whole engine (it constructs a Game) minus the real
+    # entry point, then replays Game::Setup's binding sequence headless.
+    set(TEST_SRC_FILES ${SRC_FILES})
+    list(REMOVE_ITEM TEST_SRC_FILES src/Main.cpp)
+    list(APPEND TEST_SRC_FILES tests/LuaApiSmokeTest.cpp)
+
+    add_executable(OctarineLuaApiTest ${TEST_SRC_FILES})
+
+    set_target_properties(OctarineLuaApiTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+    )
+
+    # Mirror the main target's feature defines so the shared sources compile identically.
+    target_compile_definitions(OctarineLuaApiTest PRIVATE GLM_FORCE_INTRINSICS)
+    if (OCTARINE_WITH_IMGUI)
+        target_compile_definitions(OctarineLuaApiTest PRIVATE OCTARINE_WITH_IMGUI)
+    endif ()
+    if (OCTARINE_WITH_EDITOR)
+        target_compile_definitions(OctarineLuaApiTest PRIVATE OCTARINE_WITH_EDITOR)
+    endif ()
+    if (OCTARINE_ENABLE_PROFILING)
+        target_compile_definitions(OctarineLuaApiTest PRIVATE OCTARINE_PROFILING)
+    endif ()
+
+    target_include_directories(OctarineLuaApiTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs
+            ${LUA_INCLUDE_DIR}
+    )
+
+    target_link_libraries(OctarineLuaApiTest PRIVATE
+            glm::glm
+            SDL3::SDL3
+            SDL3_ttf::SDL3_ttf
+            $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
+            $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
+            ${LUA_LIBRARIES}
+            spdlog::spdlog
+            sol2::sol2
+            Threads::Threads
+    )
+    if (OCTARINE_WITH_IMGUI)
+        target_link_libraries(OctarineLuaApiTest PRIVATE imgui::imgui sol2_ImGui_Bindings)
+    endif ()
+
+    # /bigobj: sol2 + the aggregated engine TU exceed MSVC's default section limit.
+    if (MSVC)
+        target_compile_options(OctarineLuaApiTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
+    endif ()
+
+    add_test(NAME LuaApiSmokeTest COMMAND OctarineLuaApiTest)
+
+    message(STATUS "Octarine: Tests ENABLED")
+endif ()

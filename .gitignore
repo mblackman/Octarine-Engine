@@ -1011,3 +1011,5 @@ imgui.ini
 
 # Ignore auto-cloned game repo for benchmarking
 .benchmark_game/
+# Lua API smoke-test artifact (written to cwd by OctarineLuaApiTest)
+lua_api.smoke.lua
