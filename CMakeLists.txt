@@ -65,6 +65,7 @@ set(SRC_FILES
         src/Game/GameConfig.cpp
         src/General/Logger.cpp
         src/Lua/Bindings/RegisterAllBindings.cpp
+        src/Lua/LuaApiManifest.cpp
         src/Lua/Modules/RegisterAllModules.cpp
         src/Lua/Modules/AssetsModuleLuaBinding.cpp
         src/Lua/Modules/AudioModuleLuaBinding.cpp

@@ -16,6 +16,7 @@ public:
     struct Entry
     {
         std::string luaKey;
+        std::string usertypeName;
         std::function<void(Registry *, Entity, const sol::object &)> attach;
         std::function<void(sol::state &)> bindUsertype;
         std::function<void(sol::table &, Registry *)> bindRegistryAccessors;
@@ -27,6 +28,7 @@ public:
         using B = LuaBinding<T>;
         Entry entry;
         entry.luaKey = B::kLuaKey;
+        entry.usertypeName = B::kUsertypeName;
         entry.attach = [](Registry* r, Entity e, const sol::object& d) { r->AddComponent(e, B::fromLua(d)); };
         entry.bindUsertype = [](sol::state& lua) { B::bindUsertype(lua); };
         entry.bindRegistryAccessors = [key = std::string(B::kLuaKey)](sol::table& reg, Registry* r)

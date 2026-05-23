@@ -35,6 +35,7 @@
 #include "Lua/Bindings/InputSystemLuaBinding.h"
 #include "Lua/Bindings/LuaSystemRegistry.h"
 #include "Lua/Bindings/RegisterAllBindings.h"
+#include "Lua/LuaApiManifest.h"
 #include "Lua/LuaEntityLoader.h"
 #include "Lua/Modules/RegisterAllModules.h"
 #include "Systems/AnimationSystem.h"
@@ -332,6 +333,9 @@ void Game::Setup() {
   LuaSystemRegistry::registerSystem(inputSystem);
 
   lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
+  // Snapshot stdlib globals before binding so the API manifest can diff out everything the
+  // engine adds. Cheap; the actual dump only fires when OCTARINE_DUMP_LUA_API is set.
+  const auto preBindingGlobals = LuaApiManifest::SnapshotGlobals(lua);
 
   // EntityPoolManager Set before ProjectileEmitSystem::Init — Init calls
   // Get<EntityPoolManager>().RegisterPool<...>. Was Set later (after audio); moved up to
@@ -350,6 +354,10 @@ void Game::Setup() {
   lua["game_window_width"] = gameConfig.windowWidth;
   lua["game_window_height"] = gameConfig.windowHeight;
   lua["oct_startup_mode"] = startup_mode_;
+
+  // Emit the EmmyLua API stub when requested (no-op otherwise). Runs once per Setup, after the
+  // full surface — globals, modules, system tables — is installed.
+  LuaApiManifest::MaybeDumpFromEnv(lua, preBindingGlobals);
 
   if (startup_mode_ == "editor") {
     gameConfig.SetIsEditorMode(true);
