@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779164278897,
+  "lastUpdate": 1779558110420,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -3492,6 +3492,114 @@ window.BENCHMARK_DATA = {
             "value": 653030.7226415685,
             "unit": "ns/iter",
             "extra": "iterations: 1077\ncpu: 652885.7465180971 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "2c630ba63d71586571fed8b4900ab392558241bc",
+          "message": "Add declarative Lua free-function modules; add HealthComponent methods\n\nMirror the LuaBinding<T> component pattern for global free functions.\nEach domain gets a LuaModuleBinding<M> specialization owning its\ninstall(sol::state&, Game&); RegisterAllModules.cpp drives them in one\nlist. Migrates the hand-wired blocks out of ScriptSystem: globals split\ninto Log/Io/Assets/Audio/Entity/Scene/Game modules, EntityModule owns\nthe registry table + per-component accessor loop. Global names unchanged\nso existing scripts keep working.\n\nScriptSystem::CreateLuaBindings now only binds primitive + component\nusertypes and drops its Game param. Game::Setup calls CreateLuaBindings\n-> RegisterAllLuaModules -> bindAll. ProjectileEmitSystem (and\nEntityPoolManager) Set+Init early so GameModule binds fire_projectile\nagainst the live instance during module install.\n\nHealthComponent gains damage/heal/isDead/fraction. current_health binds\nas a clamping sol::property so Lua field writes cannot bypass invariants;\nis_dead/fraction expose as read-only properties. LuaBinding.h documents\nthe methods-in-bindUsertype pattern and the own-fields-only rule.",
+          "timestamp": "2026-05-23T11:31:11-06:00",
+          "tree_id": "b12caa008feedef3e0c242dbee12e3b125ffadd2",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/2c630ba63d71586571fed8b4900ab392558241bc"
+        },
+        "date": 1779558099715,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 3917.3490051105896,
+            "unit": "ns/iter",
+            "extra": "iterations: 178664\ncpu: 3958.2840863298584 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 15778.889177150457,
+            "unit": "ns/iter",
+            "extra": "iterations: 43472\ncpu: 15824.512973867906 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 107784.58586454813,
+            "unit": "ns/iter",
+            "extra": "iterations: 6502\ncpu: 107829.35450631237 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 912750.5654760171,
+            "unit": "ns/iter",
+            "extra": "iterations: 768\ncpu: 912841.1953125022 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1844921.2657287717,
+            "unit": "ns/iter",
+            "extra": "iterations: 380\ncpu: 1844959.8131578658 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2320.9929953096516,
+            "unit": "ns/iter",
+            "extra": "iterations: 304834\ncpu: 2315.0888319551646 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10159.026605733668,
+            "unit": "ns/iter",
+            "extra": "iterations: 69403\ncpu: 10150.088108582338 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 71146.50646537163,
+            "unit": "ns/iter",
+            "extra": "iterations: 10036\ncpu: 71109.66311279732 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 398468.7991729309,
+            "unit": "ns/iter",
+            "extra": "iterations: 1753\ncpu: 398411.1534512222 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2167.4397725989497,
+            "unit": "ns/iter",
+            "extra": "iterations: 326166\ncpu: 2129.8047313313336 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6545.953206522763,
+            "unit": "ns/iter",
+            "extra": "iterations: 106794\ncpu: 6502.877792763082 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 40704.90146375884,
+            "unit": "ns/iter",
+            "extra": "iterations: 17255\ncpu: 40656.33474355349 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 317431.0135751855,
+            "unit": "ns/iter",
+            "extra": "iterations: 2214\ncpu: 317337.6553749224 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 630897.1951331173,
+            "unit": "ns/iter",
+            "extra": "iterations: 1107\ncpu: 630816.1743450814 ns\nthreads: 1"
           }
         ]
       }
