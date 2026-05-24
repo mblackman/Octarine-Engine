@@ -6,6 +6,7 @@ struct EngineOptions {
   bool showFpsCounter = true;
   bool showEntityInfo = true;
   bool showImGuiDemoWindow = false;
+  bool logInputEvents = false;
   bool audioEnabled = true;
   float masterVolume = 1.0F;
   int audioTrackPoolInitial = 32;
