@@ -748,11 +748,11 @@ void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua)
     static char inputBuffer[256] = "";
     static std::vector<std::string> commandHistory;
     static int commandHistoryIndex = -1;
-    static bool scrollToBottom = false;
+    static bool scrollToBottom = true;
     static bool reclaimFocus = false;
 
     ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Lua Console"))
+    if (!ImGui::Begin("Lua Console", nullptr, ImGuiWindowFlags_NoScrollbar))
     {
         ImGui::End();
         return;
@@ -793,7 +793,9 @@ void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua)
         ImGui::PopStyleColor();
     });
 
-    if (scrollToBottom)
+    // Snap to bottom on an explicit request (open / new command) or when already pinned to the
+    // bottom so fresh logs keep scrolling in. Scrolling up disengages the auto-follow.
+    if (scrollToBottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
     {
         ImGui::SetScrollHereY(1.0f);
     }
@@ -852,6 +854,7 @@ void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua)
     };
 
     ImGuiInputTextFlags inputTextFlags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory;
+    ImGui::SetNextItemWidth(-FLT_MIN);
     if (ImGui::InputText("##Input", inputBuffer, IM_ARRAYSIZE(inputBuffer), inputTextFlags, wrappedCallback, &cbData))
     {
         std::string command(inputBuffer);
