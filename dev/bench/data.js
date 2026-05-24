@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1779562734568,
+  "lastUpdate": 1779591295293,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -3816,6 +3816,114 @@ window.BENCHMARK_DATA = {
             "value": 631737.2651719445,
             "unit": "ns/iter",
             "extra": "iterations: 1090\ncpu: 631640.1449541847 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "distinct": true,
+          "id": "e8d4bfc456fe819e3f1cf58c52dfcbe42efba585",
+          "message": "Add isFixed flag for screen-fixed colliders and UI buttons\n\nAdds a bool isFixed to BoxColliderComponent and UIButtonComponent\n(exposed to Lua as is_fixed, editable in the inspectors). When set, the\ncollider/button is treated as screen-space: DrawColliderSystem and the\nUIButtonSystem click test skip the camera offset so fixed HUD elements\nstay put regardless of camera scroll. Also exposes get_camera_position()\nto Lua for scripts that need the camera origin.",
+          "timestamp": "2026-05-23T20:37:55-06:00",
+          "tree_id": "e1a8b93476cfb5037a36886006d9c91bf083b8bc",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/e8d4bfc456fe819e3f1cf58c52dfcbe42efba585"
+        },
+        "date": 1779591286537,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 3879.565168222605,
+            "unit": "ns/iter",
+            "extra": "iterations: 180790\ncpu: 3905.493871342322 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16039.90931443984,
+            "unit": "ns/iter",
+            "extra": "iterations: 43879\ncpu: 16072.704847422046 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 106509.37874234011,
+            "unit": "ns/iter",
+            "extra": "iterations: 6501\ncpu: 106555.13505614351 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 906443.6908280525,
+            "unit": "ns/iter",
+            "extra": "iterations: 772\ncpu: 904976.358808299 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1823493.6212519964,
+            "unit": "ns/iter",
+            "extra": "iterations: 372\ncpu: 1823612.2983871025 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2189.151543019361,
+            "unit": "ns/iter",
+            "extra": "iterations: 312657\ncpu: 2174.4092280051204 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 9747.447707055067,
+            "unit": "ns/iter",
+            "extra": "iterations: 72218\ncpu: 9732.847267994553 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 76051.66704321565,
+            "unit": "ns/iter",
+            "extra": "iterations: 9975\ncpu: 76029.01654135589 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 390899.46756571834,
+            "unit": "ns/iter",
+            "extra": "iterations: 1766\ncpu: 390882.3805209507 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2316.6543040276256,
+            "unit": "ns/iter",
+            "extra": "iterations: 307283\ncpu: 2280.2427664404877 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6627.981960464705,
+            "unit": "ns/iter",
+            "extra": "iterations: 105691\ncpu: 6589.1251856930685 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41045.50274007068,
+            "unit": "ns/iter",
+            "extra": "iterations: 17146\ncpu: 41001.721742693 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 316898.4440437901,
+            "unit": "ns/iter",
+            "extra": "iterations: 2228\ncpu: 316723.67684021493 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 652800.9808607406,
+            "unit": "ns/iter",
+            "extra": "iterations: 1063\ncpu: 652642.7911571583 ns\nthreads: 1"
           }
         ]
       }
