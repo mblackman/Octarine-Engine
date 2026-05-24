@@ -16,6 +16,7 @@ struct EditorInspector<BoxColliderComponent> {
     ImGui::DragInt("Width", &bc.width);
     ImGui::DragInt("Height", &bc.height);
     ImGui::DragFloat2("Offset", &bc.offset.x, 1.0F);
+    ImGui::Checkbox("Fixed", &bc.isFixed);
   }
   static std::optional<BoxColliderComponent> makeDefault() { return BoxColliderComponent{}; }
 };

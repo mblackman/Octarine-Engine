@@ -6,6 +6,7 @@
 #include <sol/sol.hpp>
 
 #include "../Components/BoxColliderComponent.h"
+#include "../Components/CameraComponents.h"
 #include "../Components/GlobalTransformComponent.h"
 #include "../Components/UIButtonComponent.h"
 #include "../EventBus/EventBus.h"
@@ -47,6 +48,7 @@ class UIButtonSystem {
     }
 
     auto query = registry_->CreateQuery<UIButtonComponent, GlobalTransformComponent, BoxColliderComponent>();
+    const auto& camera = registry_->Get<CameraComponent>().viewport;
     auto handler = [&](Entity entity, UIButtonComponent& button, const GlobalTransformComponent& transform,
                        const BoxColliderComponent& collider) {
       if (!button.isActive || button.clickFunction == sol::lua_nil) {
@@ -54,8 +56,13 @@ class UIButtonSystem {
       }
 
       // transform.position is top-left. apply collider offset (scaled).
-      const float x = transform.position.x + collider.offset.x * transform.scale.x;
-      const float y = transform.position.y + collider.offset.y * transform.scale.y;
+      float x = transform.position.x + collider.offset.x * transform.scale.x;
+      float y = transform.position.y + collider.offset.y * transform.scale.y;
+
+      if (!button.isFixed) {
+        x -= camera.x;
+        y -= camera.y;
+      }
 
       const float w = static_cast<float>(collider.width) * transform.scale.x;
       const float h = static_cast<float>(collider.height) * transform.scale.y;

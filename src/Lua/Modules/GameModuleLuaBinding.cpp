@@ -2,6 +2,7 @@
 
 #include <glm/glm.hpp>
 
+#include "Components/CameraComponents.h"
 #include "ECS/Registry.h"
 #include "Game/Game.h"
 #include "Game/GameConfig.h"
@@ -22,6 +23,12 @@ void LuaModuleBinding<GameModule>::install(sol::state& lua, Game& game)
     {
         const auto& gameConfig = game.GetRegistry()->Get<GameConfig>();
         return glm::vec2(gameConfig.playableAreaWidth, gameConfig.playableAreaHeight);
+    });
+
+    lua.set_function("get_camera_position", [&game]()
+    {
+        const auto& camera = game.GetRegistry()->Get<CameraComponent>();
+        return glm::vec2(camera.viewport.x, camera.viewport.y);
     });
 
     // Manual fire from Lua. Player-tagged emitters skip auto-fire — gameplay code drives shots

@@ -16,12 +16,14 @@ struct LuaBinding<UIButtonComponent>
         const auto t = data.as<sol::table>();
         using namespace LuaComponentHelpers;
         const bool isActive = SafeGetOptionalValue<bool>(t, "is_active", true);
+        const bool isFixed = SafeGetOptionalValue<bool>(t, "is_fixed", true);
         const sol::protected_function clickFn = SafeGetProtectedFunction(t, "on_click");
-        return UIButtonComponent(isActive, t, clickFn);
+        return UIButtonComponent(isActive, isFixed, t, clickFn);
     }
 
     static void bindUsertype(sol::state& lua)
     {
-        lua.new_usertype<UIButtonComponent>(kUsertypeName, "is_active", &UIButtonComponent::isActive);
+        lua.new_usertype<UIButtonComponent>(kUsertypeName, "is_active", &UIButtonComponent::isActive, "is_fixed",
+                                            &UIButtonComponent::isFixed);
     }
 };

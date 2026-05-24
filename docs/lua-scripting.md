@@ -123,6 +123,7 @@ load_entity(player)
 | `get_asset_path(path)` | Returns the absolute path for a relative asset path. |
 | `set_position(entity, x, y)` | Manually updates an entity's position. |
 | `get_position(entity)` | Returns the entity's position as a `vec2`. |
+| `get_camera_position()` | Returns the current camera viewport origin as `vec2`. |
 | `get_game_map_dimensions()` | Returns playable area as `vec2(width, height)`. |
 | `set_game_map_dimensions(w, h)` | Sets the playable area used by off-screen despawn. |
 | `set_sprite_src_rect(entity, x, y)` | Sets the sprite's source-rect origin (animation row/col). |

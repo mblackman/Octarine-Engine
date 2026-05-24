@@ -14,6 +14,7 @@ struct EditorInspector<UIButtonComponent> {
   static constexpr const char* kDisplayName = "UIButton";
   static void draw(Registry* /*registry*/, Entity /*entity*/, UIButtonComponent& ub) {
     ImGui::Checkbox("Active", &ub.isActive);
+    ImGui::Checkbox("Fixed", &ub.isFixed);
   }
   static std::optional<UIButtonComponent> makeDefault() { return UIButtonComponent{}; }
 };

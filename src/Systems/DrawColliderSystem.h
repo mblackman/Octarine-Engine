@@ -24,8 +24,13 @@ class DrawColliderSystem {
     const float hy = h * 0.5f;
 
     // transform.position is top-left. apply collider offset (scaled).
-    const float cx = transform.position.x + collider.offset.x * transform.scale.x + hx - camera.x;
-    const float cy = transform.position.y + collider.offset.y * transform.scale.y + hy - camera.y;
+    float cx = transform.position.x + collider.offset.x * transform.scale.x + hx;
+    float cy = transform.position.y + collider.offset.y * transform.scale.y + hy;
+
+    if (!collider.isFixed) {
+      cx -= camera.x;
+      cy -= camera.y;
+    }
 
     SDL_SetRenderDrawColor(renderer, Constants::kUint8Max, 0, 0, Constants::kUint8Max);
 

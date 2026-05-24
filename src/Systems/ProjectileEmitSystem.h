@@ -29,7 +29,7 @@ class ProjectileEmitSystem {
           // which would break pool reuse (pool routes by archetype id).
           return reg.CreateEntityWithBundle(EntityMaskComponent(), PositionComponent(), ScaleComponent(),
                                             RotationComponent(), GlobalTransformComponent{}, RigidBodyComponent(),
-                                            BoxColliderComponent(4, 4, glm::vec2(0, 0), EntityMask{}),
+                                            BoxColliderComponent(4, 4, glm::vec2(0, 0), false, EntityMask{}),
                                             ProjectileComponent(), SpriteComponent("bullet-texture", 4.0f, 4.0f, 4),
                                             NameComponent(), PoolableTag{}, ProjectileTag{});
         });
