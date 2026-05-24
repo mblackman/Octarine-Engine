@@ -144,9 +144,18 @@ namespace LuaApiManifest
 
     bool MaybeDumpFromEnv(sol::state& lua, const std::unordered_set<std::string>& before)
     {
+#ifdef _MSC_VER
+        char* env = nullptr;
+        size_t len = 0;
+        const bool hasEnv = _dupenv_s(&env, &len, "OCTARINE_DUMP_LUA_API") == 0 && env != nullptr;
+        const std::string value = hasEnv ? std::string(env) : std::string();
+        free(env);
+        if (value.empty()) return false;
+#else
         const char* env = std::getenv("OCTARINE_DUMP_LUA_API");
         if (env == nullptr || env[0] == '\0') return false;
         const std::string value(env);
+#endif
         const std::string outPath = (value == "1") ? "lua_api.lua" : value;
         return Write(lua, before, outPath);
     }
