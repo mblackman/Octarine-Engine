@@ -129,8 +129,11 @@ class CollisionSystem {
         const float h = static_cast<float>(collider.height) * transform.scale.y;
         const float hx = w * 0.5f;
         const float hy = h * 0.5f;
-        const float cx = transform.position.x + hx;
-        const float cy = transform.position.y + hy;
+
+        // transform.position is top-left. apply collider offset (scaled).
+        const float cx = transform.position.x + collider.offset.x * transform.scale.x + hx;
+        const float cy = transform.position.y + collider.offset.y * transform.scale.y + hy;
+
         const float rot = static_cast<float>(transform.rotation);
         const float rc = std::cos(rot);
         const float rs = std::sin(rot);

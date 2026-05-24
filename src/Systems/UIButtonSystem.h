@@ -53,10 +53,14 @@ class UIButtonSystem {
         return;
       }
 
+      // transform.position is top-left. apply collider offset (scaled).
+      const float x = transform.position.x + collider.offset.x * transform.scale.x;
+      const float y = transform.position.y + collider.offset.y * transform.scale.y;
+
       const float w = static_cast<float>(collider.width) * transform.scale.x;
       const float h = static_cast<float>(collider.height) * transform.scale.y;
-      const bool isClick = transform.position.x <= mouseX && transform.position.x + w >= mouseX &&
-                           transform.position.y <= mouseY && transform.position.y + h >= mouseY;
+
+      const bool isClick = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
 
       if (!isClick) return;
 
