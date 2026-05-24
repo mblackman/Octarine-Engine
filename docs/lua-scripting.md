@@ -138,7 +138,7 @@ Polling, action map, and callbacks. Action bindings + callbacks are cleared on `
 | --- | --- |
 | `input.is_key_down(name)` / `is_key_pressed(name)` / `is_key_released(name)` | Held / went-down-this-frame / went-up-this-frame. |
 | `input.is_mouse_down(btn)` / `is_mouse_pressed(btn)` / `is_mouse_released(btn)` | `btn` is `"left"`, `"middle"`, `"right"`, `"x1"`, `"x2"`, or an SDL button id. |
-| `input.mouse_position()` | Screen-space cursor as `vec2`. |
+| `input.mouse_position()` | Cursor position as `vec2`. Mapped to game resolution, viewport-aware (works in Editor). |
 | `input.mouse_wheel()` | Per-frame wheel delta as `vec2`. |
 | `input.bind(action, key)` / `unbind(action, key?)` | Register / remove key for action; nil key removes all. |
 | `input.is_action_down(name)` / `is_action_pressed(name)` / `is_action_released(name)` | As above, OR over all keys bound to the action. |

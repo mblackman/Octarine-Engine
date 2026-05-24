@@ -12,15 +12,18 @@
 #include <unordered_set>
 #include <vector>
 
+#include "../Components/ViewportInfo.h"
+#include "../ECS/Registry.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
 #include "../Events/MouseInputEvent.h"
 #include "../Events/MouseWheelEvent.h"
+#include "../Game/GameConfig.h"
 #include "../General/Logger.h"
 
 class InputSystem {
  public:
-  InputSystem() {
+  InputSystem() : registry_(nullptr) {
     keyAliases_["ctrl"] = {"left ctrl", "right ctrl"};
     keyAliases_["shift"] = {"left shift", "right shift"};
     keyAliases_["alt"] = {"left alt", "right alt"};
@@ -33,7 +36,8 @@ class InputSystem {
     return lower;
   }
 
-  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus) {
+  void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus, Registry* registry) {
+    registry_ = registry;
     eventBus->SubscribeEvent<InputSystem, KeyInputEvent>(this, &InputSystem::OnKeyInput);
     eventBus->SubscribeEvent<InputSystem, MouseInputEvent>(this, &InputSystem::OnMouseInput);
     eventBus->SubscribeEvent<InputSystem, MouseWheelEvent>(this, &InputSystem::OnMouseWheel);
@@ -45,8 +49,17 @@ class InputSystem {
     float mx = 0.0f;
     float my = 0.0f;
     SDL_GetMouseState(&mx, &my);
-    mouseX_ = mx;
-    mouseY_ = my;
+
+    if (registry_) {
+      const auto& viewport = registry_->Get<ViewportInfo>();
+      const auto& config = registry_->Get<GameConfig>();
+      const glm::vec2 transformed = viewport.TransformCoordinates(mx, my, config.windowWidth, config.windowHeight);
+      mouseX_ = transformed.x;
+      mouseY_ = transformed.y;
+    } else {
+      mouseX_ = mx;
+      mouseY_ = my;
+    }
   }
 
   // Called at the end of Game::Update — pressed/released are per-frame edges, wheel
@@ -90,6 +103,8 @@ class InputSystem {
     input.set_function("is_mouse_down", [this](sol::object btn) { return IsMouseDown(ToMouseButton(btn)); });
     input.set_function("is_mouse_pressed", [this](sol::object btn) { return IsMousePressed(ToMouseButton(btn)); });
     input.set_function("is_mouse_released", [this](sol::object btn) { return IsMouseReleased(ToMouseButton(btn)); });
+    input.set_function("is_hovered", [this]() { return registry_ ? registry_->Get<ViewportInfo>().isHovered : true; });
+    input.set_function("is_focused", [this]() { return registry_ ? registry_->Get<ViewportInfo>().isFocused : true; });
     input.set_function("mouse_position", [this]() { return glm::vec2(mouseX_, mouseY_); });
     input.set_function("mouse_wheel", [this]() { return glm::vec2(wheelDx_, wheelDy_); });
 
@@ -115,6 +130,13 @@ class InputSystem {
 
  private:
   void OnKeyInput(const KeyInputEvent& event) {
+    if (registry_ && event.isPressed) {
+      const auto& viewport = registry_->Get<ViewportInfo>();
+      if (!viewport.isFocused) {
+        return;
+      }
+    }
+
     const std::string key = MakeKey(SDL_GetKeyName(event.inputKey));
     if (event.isPressed) {
       if (heldKeys_.find(key) == heldKeys_.end()) {
@@ -131,9 +153,25 @@ class InputSystem {
   }
 
   void OnMouseInput(const MouseInputEvent& event) {
+    if (registry_ && (event.event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)) {
+      const auto& viewport = registry_->Get<ViewportInfo>();
+      if (!viewport.isHovered) {
+        return;
+      }
+    }
+
     const int btn = static_cast<int>(event.event.button);
-    const float x = event.event.x;
-    const float y = event.event.y;
+    float x = event.event.x;
+    float y = event.event.y;
+
+    if (registry_) {
+      const auto& viewport = registry_->Get<ViewportInfo>();
+      const auto& config = registry_->Get<GameConfig>();
+      const glm::vec2 transformed = viewport.TransformCoordinates(x, y, config.windowWidth, config.windowHeight);
+      x = transformed.x;
+      y = transformed.y;
+    }
+
     if (event.event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
       if (heldMouseButtons_.find(btn) == heldMouseButtons_.end()) {
         pressedMouseButtons_.insert(btn);
@@ -149,6 +187,13 @@ class InputSystem {
   }
 
   void OnMouseWheel(const MouseWheelEvent& event) {
+    if (registry_) {
+      const auto& viewport = registry_->Get<ViewportInfo>();
+      if (!viewport.isHovered) {
+        return;
+      }
+    }
+
     wheelDx_ += event.dx;
     wheelDy_ += event.dy;
     Dispatch(onMouseWheel_, event.dx, event.dy);
@@ -166,9 +211,18 @@ class InputSystem {
     }
   }
 
-  [[nodiscard]] bool IsKeyDown(const std::string& key) const { return MatchesSet(key, heldKeys_); }
-  [[nodiscard]] bool IsKeyPressed(const std::string& key) const { return MatchesSet(key, pressedKeys_); }
-  [[nodiscard]] bool IsKeyReleased(const std::string& key) const { return MatchesSet(key, releasedKeys_); }
+  [[nodiscard]] bool IsKeyDown(const std::string& key) const {
+    if (registry_ && !registry_->Get<ViewportInfo>().isFocused) return false;
+    return MatchesSet(key, heldKeys_);
+  }
+  [[nodiscard]] bool IsKeyPressed(const std::string& key) const {
+    if (registry_ && !registry_->Get<ViewportInfo>().isFocused) return false;
+    return MatchesSet(key, pressedKeys_);
+  }
+  [[nodiscard]] bool IsKeyReleased(const std::string& key) const {
+    if (registry_ && !registry_->Get<ViewportInfo>().isFocused) return false;
+    return MatchesSet(key, releasedKeys_);
+  }
 
   [[nodiscard]] bool MatchesSet(const std::string& key, const std::unordered_set<std::string>& set) const {
     if (key.empty()) return false;
@@ -182,12 +236,15 @@ class InputSystem {
   }
 
   [[nodiscard]] bool IsMouseDown(const int btn) const {
+    if (registry_ && !registry_->Get<ViewportInfo>().isHovered) return false;
     return btn > 0 && heldMouseButtons_.find(btn) != heldMouseButtons_.end();
   }
   [[nodiscard]] bool IsMousePressed(const int btn) const {
+    if (registry_ && !registry_->Get<ViewportInfo>().isHovered) return false;
     return btn > 0 && pressedMouseButtons_.find(btn) != pressedMouseButtons_.end();
   }
   [[nodiscard]] bool IsMouseReleased(const int btn) const {
+    if (registry_ && !registry_->Get<ViewportInfo>().isHovered) return false;
     return btn > 0 && releasedMouseButtons_.find(btn) != releasedMouseButtons_.end();
   }
 
@@ -241,6 +298,7 @@ class InputSystem {
     return false;
   }
 
+  Registry* registry_;
   std::unordered_set<std::string> pressedKeys_;
   std::unordered_set<std::string> releasedKeys_;
   std::unordered_set<std::string> heldKeys_;

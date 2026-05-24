@@ -11,6 +11,7 @@
 #include "../Components/GlobalTransformComponent.h"
 #include "../Components/HealthComponent.h"
 #include "../Components/NameComponent.h"
+#include "../Components/ViewportInfo.h"
 #include "../Components/PositionComponent.h"
 #include "../Components/ProjectileComponent.h"
 #include "../Components/ProjectileEmitterComponent.h"
@@ -293,7 +294,7 @@ static bool openSaveLayoutModal = false;
         ImGui::EndPopup();
     }
 
-    if (editorPersistence.showSceneWindow) SceneWindow(gameTexture, &editorPersistence.showSceneWindow);
+    if (editorPersistence.showSceneWindow) SceneWindow(game, gameTexture, &editorPersistence.showSceneWindow);
 
     if (editorPersistence.showSceneManagement) SceneManagementWindow(game);
     if (editorPersistence.showHierarchy) HierarchyWindow(registry);
@@ -668,7 +669,7 @@ void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open)
     ImGui::End();
 }
 
-void RenderDebugGUISystem::SceneWindow(SDL_Texture* gameTexture, bool* p_open)
+void RenderDebugGUISystem::SceneWindow(Game* game, SDL_Texture* gameTexture, bool* p_open)
 {
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     if (ImGui::Begin("Scene View", p_open))
@@ -689,10 +690,26 @@ void RenderDebugGUISystem::SceneWindow(SDL_Texture* gameTexture, bool* p_open)
                     targetW = targetH * aspectRatio;
                 }
                 ImVec2 imageSize(targetW, targetH);
-                ImVec2 imagePos =
-                    ImVec2((viewportPanelSize.x - imageSize.x) * 0.5f, (viewportPanelSize.y - imageSize.y) * 0.5f);
-                ImGui::SetCursorPos(imagePos);
+
+                // Center the image within the available content area.
+                float offsetX = (viewportPanelSize.x - imageSize.x) * 0.5f;
+                float offsetY = (viewportPanelSize.y - imageSize.y) * 0.5f;
+                ImVec2 contentStartPos = ImGui::GetCursorPos();
+                ImGui::SetCursorPos(ImVec2(contentStartPos.x + offsetX, contentStartPos.y + offsetY));
+
+                // Record the image's screen rect (relative to the main viewport origin) so input
+                // systems can map window-space cursor coordinates into the shrunken game viewport.
+                ImVec2 imageScreenPos = ImGui::GetCursorScreenPos();
+                ImVec2 windowPos = ImGui::GetMainViewport()->Pos;
+                auto& viewportInfo = game->GetRegistry()->Get<ViewportInfo>();
+                viewportInfo.x = imageScreenPos.x - windowPos.x;
+                viewportInfo.y = imageScreenPos.y - windowPos.y;
+                viewportInfo.width = imageSize.x;
+                viewportInfo.height = imageSize.y;
+
                 ImGui::Image(reinterpret_cast<ImTextureID>(gameTexture), imageSize);
+                viewportInfo.isHovered = ImGui::IsItemHovered();
+                viewportInfo.isFocused = ImGui::IsWindowFocused();
             }
         }
     }

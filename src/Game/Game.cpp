@@ -26,6 +26,7 @@
 #include "Components/RotationComponent.h"
 #include "Components/ScaleComponent.h"
 #include "Components/TextLabelComponent.h"
+#include "Components/ViewportInfo.h"
 #include "ECS/Iterable.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
@@ -372,6 +373,8 @@ void Game::Setup()
     registry_->Set<RenderQueue>(RenderQueue());
     registry_->Set<CameraComponent>(CameraComponent{camera});
     registry_->Set<AssetManager>(AssetManager());
+    registry_->Set<ViewportInfo>(ViewportInfo{0, 0, static_cast<float>(gameConfig.windowWidth),
+                                              static_cast<float>(gameConfig.windowHeight)});
 
     // Gameplay
     auto& scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
@@ -379,7 +382,7 @@ void Game::Setup()
     // scene script reload. Must be Set before CreateLuaBindings so the `input` table is installed
     // alongside ScriptSystem's globals.
     auto& inputSystem = registry_->Set<InputSystem>(InputSystem());
-    inputSystem.SubscribeToEvents(event_bus_);
+    inputSystem.SubscribeToEvents(event_bus_, registry_.get());
 
     // Component bindings (LuaBinding<T> specializations) must be registered BEFORE
     // ScriptSystem's CreateLuaBindings runs — usertypes + registry.has_/get_ are
@@ -555,6 +558,16 @@ void Game::ProcessInput() const
                 event_bus_->EmitEvent<MouseWheelEvent>(event.wheel.x, event.wheel.y);
                 break;
             }
+        case SDL_EVENT_WINDOW_RESIZED:
+        case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+            {
+                auto& viewportInfo = registry_->Get<ViewportInfo>();
+                int windowW, windowH;
+                SDL_GetWindowSize(window_, &windowW, &windowH);
+                viewportInfo.width = static_cast<float>(windowW);
+                viewportInfo.height = static_cast<float>(windowH);
+                break;
+            }
         default:
             break;
         }
@@ -644,6 +657,25 @@ void Game::Render([[maybe_unused]] const float deltaTime)
 
     auto& options = gameConfig.GetEngineOptions();
     const bool editorSession = gameConfig.IsEditorMode() || !gameConfig.HasLoadedConfig();
+
+    // Update viewport info for non-editor sessions or when ImGui is disabled.
+    // In editor mode with ImGui, RenderDebugGUISystem::Render will override this with the Scene window bounds.
+    auto& viewportInfo = registry_->Get<ViewportInfo>();
+    viewportInfo.x = 0;
+    viewportInfo.y = 0;
+    int windowW, windowH;
+    SDL_GetWindowSize(window_, &windowW, &windowH);
+    viewportInfo.width = static_cast<float>(windowW);
+    viewportInfo.height = static_cast<float>(windowH);
+
+#ifdef OCTARINE_WITH_IMGUI
+    auto& io = ImGui::GetIO();
+    viewportInfo.isHovered = !io.WantCaptureMouse;
+    viewportInfo.isFocused = !io.WantCaptureKeyboard;
+#else
+    viewportInfo.isHovered = true;
+    viewportInfo.isFocused = true;
+#endif
 
     if (!IsBenchMode())
     {

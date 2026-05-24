@@ -111,7 +111,7 @@ class RenderDebugGUISystem {
   static void PerformanceProfilerWindow();
   static void HierarchyWindow(Registry* registry);
   static void ProjectSelectorWindow(Game* game, bool* p_open);
-  static void SceneWindow(SDL_Texture* gameTexture, bool* p_open);
+  static void SceneWindow(Game* game, SDL_Texture* gameTexture, bool* p_open);
   static void AssetBrowserWindow(Registry* registry);
   static void LuaConsoleWindow(sol::state& lua);
 #endif
