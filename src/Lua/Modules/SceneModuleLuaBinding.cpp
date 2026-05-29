@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 #include <SDL3_mixer/SDL_mixer.h>
 
+#include <filesystem>
 #include <string>
 #include <utility>
 
@@ -47,8 +48,27 @@ void LuaModuleBinding<SceneModule>::install(sol::state& lua, Game& game)
     lua.set_function("load_asset", [&game](sol::table assetTable)
     {
         auto* registry = game.GetRegistry();
-        LoadAsset(std::move(assetTable), registry->Get<AssetManager>(), game.GetRenderer(),
-                  registry->Get<MIX_Mixer*>());
+        auto& assetManager = registry->Get<AssetManager>();
+
+        // Under bake there is no renderer/mixer to upload to, so skip the GPU/mixer load. But
+        // load_asset is the explicit-file legacy path (it bypasses the catalog), so the bake's
+        // catalog-membership check never sees these refs — validate the file on disk here instead so
+        // a typo'd path in a direct load_asset call still fails the bake gate. The FS is real at bake.
+        if (game.IsBakeMode())
+        {
+            const std::string file = assetTable["file"].get_or<std::string>("");
+            const std::string id = assetTable["id"].get_or<std::string>("");
+            std::error_code ec;
+            if (file.empty() || !std::filesystem::exists(assetManager.GetFullPath(file), ec))
+            {
+                Logger::Error("load_asset (bake): id '" + id + "' maps to a missing file: '" +
+                    (file.empty() ? "<none>" : assetManager.GetFullPath(file)) + "'");
+                game.RecordBakeValidationFailures(1);
+            }
+            return;
+        }
+
+        LoadAsset(std::move(assetTable), assetManager, game.GetRenderer(), registry->Get<MIX_Mixer*>());
     });
     // Scan a scene table for its required asset ids (sprite/font/audio + tilemap + preload),
     // validate them against the catalog, then acquire each. The data-driven replacement for a
@@ -63,11 +83,22 @@ void LuaModuleBinding<SceneModule>::install(sol::state& lua, Game& game)
         MIX_Mixer* mixer = mixerPtr ? *mixerPtr : nullptr;
 
         const std::vector<AssetReference> refs = SceneAssetScanner::CollectRefs(scene);
-        if (const int failures = assetManager.Validate(refs); failures > 0 &&
-            registry->Get<GameConfig>().GetEngineOptions().assetValidationFatal)
+        const int failures = assetManager.Validate(refs);
+
+        // Bake: tally unresolved references across every scene the startup script loads, then keep
+        // running (don't throw on the first miss) so one bake run reports them all. No GPU upload.
+        if (game.IsBakeMode())
+        {
+            game.RecordBakeValidationFailures(failures);
+            Logger::Info("acquire_scene_assets (bake): validated " + std::to_string(refs.size()) +
+                " reference(s), " + std::to_string(failures) + " unresolved.");
+            return 0;
+        }
+
+        if (failures > 0 && registry->Get<GameConfig>().GetEngineOptions().assetValidationFatal)
         {
             throw std::runtime_error("acquire_scene_assets: " + std::to_string(failures) +
-                                     " unresolved asset reference(s); assetValidationFatal is set.");
+                " unresolved asset reference(s); assetValidationFatal is set.");
         }
 
         const int acquired = assetManager.AcquireAll(refs, game.GetRenderer(), mixer);

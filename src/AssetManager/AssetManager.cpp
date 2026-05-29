@@ -138,6 +138,10 @@ int AssetManager::AcquireAll(const std::vector<AssetReference> &refs, SDL_Render
 }
 
 int AssetManager::Validate(const std::vector<AssetReference> &refs) const {
+  // On a baked-manifest build the entry paths are relative to a read-only bundle (APK/.app) with no
+  // real filesystem to stat — the bake step already validated existence, so trust the catalog and
+  // only check membership. The on-disk check still runs for live (directory-scan) dev builds.
+  const bool checkOnDisk = !catalog_.IsFromManifest();
   int failures = 0;
   for (const auto &ref : refs) {
     const CatalogEntry *entry = catalog_.Find(ref.id);
@@ -147,6 +151,7 @@ int AssetManager::Validate(const std::vector<AssetReference> &refs) const {
       ++failures;
       continue;
     }
+    if (!checkOnDisk) continue;
     std::error_code ec;
     if (!std::filesystem::exists(entry->fullPath, ec)) {
       Logger::Error("Asset validation: id '" + ref.id + "' (referenced by " + ref.context +

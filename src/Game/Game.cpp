@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <memory>
 #include <set>
 #include <sol/sol.hpp>
@@ -11,6 +12,7 @@
 
 #include "../Events/KeyInputEvent.h"
 #include "../General/Logger.h"
+#include "AssetManager/AssetCatalog.h"
 #include "AssetManager/SceneAssetScanner.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
@@ -363,6 +365,119 @@ void Game::Destroy()
     SDL_Quit();
 }
 
+bool Game::Bake(const std::string& assetPath)
+{
+    if (assetPath.empty())
+    {
+        Logger::Error("Bake: no project path provided.");
+        return false;
+    }
+
+    // Minimal init: GameConfig::LoadConfigFromFile and the engine's file reads (SDL_IOFromFile /
+    // SDL_LoadFile) expect the library to be initialized. No video/audio subsystem is needed —
+    // the bake validates references and paths only, with no GPU/mixer upload.
+    if (!SDL_Init(0))
+    {
+        Logger::Error("Bake: SDL_Init failed: " + std::string(SDL_GetError()));
+        return false;
+    }
+
+    bool ok = false;
+    {
+        Game game; // SDL-free constructor — allocates Registry/EventBus/Renderer, opens no window.
+        game.bake_mode_ = true;
+        game.startup_mode_ = "bake";
+        ok = game.RunBakeValidation(assetPath);
+    }
+
+    SDL_Quit();
+    return ok;
+}
+
+bool Game::RunBakeValidation(const std::string& assetPath)
+{
+    registry_->Set<GameConfig>(GameConfig());
+    auto& gameConfig = registry_->Get<GameConfig>();
+    if (!gameConfig.LoadConfigFromFile(assetPath))
+    {
+        Logger::Error("Bake: failed to load config from " + assetPath);
+        return false;
+    }
+
+    // Singletons the startup script + its module globals touch at load time. This mirrors the
+    // pre-LoadGame prefix of Game::Setup but omits everything tied to a window/renderer/mixer
+    // (per-frame systems, audio, render queue producers) since the bake runs no frames.
+    const SDL_FRect camera(0, 0, static_cast<float>(gameConfig.windowWidth),
+                           static_cast<float>(gameConfig.windowHeight));
+    registry_->Set<RenderQueue>(RenderQueue());
+    registry_->Set<CameraComponent>(CameraComponent{camera});
+    registry_->Set<AssetManager>(AssetManager());
+    registry_->Set<ViewportInfo>(ViewportInfo{
+        0, 0, static_cast<float>(gameConfig.windowWidth),
+        static_cast<float>(gameConfig.windowHeight)
+    });
+    registry_->Set<SDL_Renderer*>(nullptr); // no GPU in bake; bake-mode asset globals skip it
+    registry_->Set<EventBus*>(event_bus_.get());
+
+    // EntityPoolManager before ProjectileEmitSystem::Init (Init calls RegisterPool against it),
+    // matching Setup's ordering so fire_projectile binds correctly during module install.
+    registry_->Set<EntityPoolManager>(EntityPoolManager());
+    auto& projectileEmitSystem = registry_->Set<ProjectileEmitSystem>(ProjectileEmitSystem());
+    projectileEmitSystem.Init(*registry_);
+
+    // InputSystem owns the `input.*` Lua surface the scene libs bind against (input_map.install,
+    // spawn.install_click_spawn). Set + subscribe before bindings install.
+    auto& inputSystem = registry_->Set<InputSystem>(InputSystem());
+    inputSystem.SubscribeToEvents(event_bus_, registry_.get());
+
+    RegisterAllLuaBindings();
+
+    LuaSystemRegistry::clear();
+    LuaSystemRegistry::registerSystem(inputSystem);
+
+    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
+    ScriptSystem scriptSystem;
+    scriptSystem.CreateLuaBindings(lua);
+    RegisterAllLuaModules(lua, *this);
+    LuaSystemRegistry::bindAll(lua);
+    lua["game_window_width"] = gameConfig.windowWidth;
+    lua["game_window_height"] = gameConfig.windowHeight;
+    lua["oct_startup_mode"] = startup_mode_;
+
+    auto& assetManager = registry_->Get<AssetManager>();
+    assetManager.LoadGameConfig(gameConfig);
+
+    // Always re-derive the catalog from the real files — never round-trip an existing (possibly
+    // stale) manifest sitting in the project dir.
+    if (!assetManager.GetCatalog().ScanFilesystem(assetManager.GetBasePath(), lua, gameConfig))
+    {
+        Logger::Error("Bake: catalog scan failed (id collisions). Aborting.");
+        return false;
+    }
+    assetManager.GetCatalog().InstallLuaIdTable(lua);
+
+    // Run the startup script. Its scene loads call acquire_scene_assets / load_asset, which in bake
+    // mode validate every referenced id against the catalog and tally failures on this Game instead
+    // of uploading to a GPU. This is the CI gate: a typo'd or missing asset reference fails the bake.
+    LoadGame(lua, assetManager, gameConfig);
+
+    const std::string manifestPath = (std::filesystem::path(assetPath) / "asset_manifest.lua").string();
+    const bool wrote = assetManager.GetCatalog().WriteManifest(manifestPath, assetPath);
+    if (wrote)
+    {
+        Logger::Info("Bake: wrote " + std::to_string(assetManager.GetCatalog().Size()) + " entries to " +
+            manifestPath);
+    }
+
+    if (bake_validation_failures_ > 0)
+    {
+        Logger::Error("Bake: " + std::to_string(bake_validation_failures_) +
+            " unresolved asset reference(s) across scenes. Build is broken.");
+        return false;
+    }
+    return wrote;
+}
+
 void Game::Run()
 {
     Setup();
@@ -388,8 +503,10 @@ void Game::Setup()
     registry_->Set<RenderQueue>(RenderQueue());
     registry_->Set<CameraComponent>(CameraComponent{camera});
     registry_->Set<AssetManager>(AssetManager());
-    registry_->Set<ViewportInfo>(ViewportInfo{0, 0, static_cast<float>(gameConfig.windowWidth),
-                                              static_cast<float>(gameConfig.windowHeight)});
+    registry_->Set<ViewportInfo>(ViewportInfo{
+        0, 0, static_cast<float>(gameConfig.windowWidth),
+        static_cast<float>(gameConfig.windowHeight)
+    });
 
     // Gameplay
     auto& scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
@@ -527,7 +644,7 @@ void Game::Setup()
     registry_->RegisterParallelSystem<SquarePrimitiveComponent, GlobalTransformComponent>(RenderPrimitiveSystem());
 
     // Event subscriptions (one-time)
-    event_bus_->SubscribeEvent < Game, KeyInputEvent > (this, &Game::OnKeyInputEvent);
+    event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
     // Event-driven systems with no per-frame Update — owned by the Registry instead of
     // living as parallel members on Game. Keeps the registry as the single source of truth.
     auto& uiButtonSystem = registry_->Set<UIButtonSystem>(UIButtonSystem());
@@ -865,7 +982,7 @@ void Game::LoadScene(const std::string& scenePath)
                 if (const int failures = am.Validate(refs); failures > 0)
                 {
                     Logger::Error("Scene '" + fullPath + "' has " + std::to_string(failures) +
-                                  " unresolved asset reference(s).");
+                        " unresolved asset reference(s).");
                     if (registry_->Get<GameConfig>().GetEngineOptions().assetValidationFatal)
                     {
                         Logger::Error("assetValidationFatal is set — aborting scene load.");
