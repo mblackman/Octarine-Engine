@@ -166,6 +166,8 @@ void GameConfig::LoadUserPreferences() {
 bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string> &settings) {
   bool success = true;
 
+  // LogLevel is parsed first so subsequent config-loading Logger::Info calls already honor it.
+  success &= SetValue(settings, "LogLevel", &GameConfig::SetLogLevel, false);
   success &= SetValue(settings, "Title", &GameConfig::SetGameTitle, true);
   success &= SetValue(settings, "StartupScript", &GameConfig::SetStartupScript, true);
   success &= SetValue(settings, "DefaultScalingMode", &GameConfig::SetDefaultScaleMode, false);
@@ -246,3 +248,9 @@ void GameConfig::SetDefaultScaleMode(const std::string &defaultScaleMode) {
 }
 void GameConfig::SetDefaultWidth(const int defaultWidth) { default_width_ = defaultWidth; }
 void GameConfig::SetDefaultHeight(const int defaultHeight) { default_height_ = defaultHeight; }
+
+void GameConfig::SetLogLevel(const std::string &logLevel) {
+  if (logLevel.empty()) return;
+  Logger::SetLevel(logLevel);
+  Logger::Info("Log level set to: " + logLevel);
+}

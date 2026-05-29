@@ -81,15 +81,89 @@
 constexpr Uint8 GREY_COLOR = 24;
 constexpr Uint8 BLACK_COLOR = 0;
 
+namespace
+{
+    // Read a file's bytes through SDL_IO so the same path resolves on desktop, inside an APK asset
+    // root, or inside a .app bundle. Lua's stock fopen-based loader only sees a real filesystem and
+    // misses AAssetManager-backed entries on Android.
+    std::optional<std::string> ReadFileViaSDL(const std::string& path)
+    {
+        SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
+        if (!io)
+        {
+            Logger::Error("SDL_IOFromFile failed for '" + path + "': " + std::string(SDL_GetError()));
+            return std::nullopt;
+        }
+        std::size_t size = 0;
+        void* data = SDL_LoadFile_IO(io, &size, true); // closes io
+        if (!data)
+        {
+            Logger::Error("SDL_LoadFile_IO failed for '" + path + "': " + std::string(SDL_GetError()));
+            return std::nullopt;
+        }
+        std::string out(static_cast<const char*>(data), size);
+        SDL_free(data);
+        return out;
+    }
+
+    // Raw Lua C function backing the engine's `dofile` override. Registered via lua_pushcfunction so
+    // sol2 doesn't post-process the return: we report (top_after - top_before) which Lua interprets
+    // as the number of return values from the chunk, preserving multi-return correctly.
+    int LuaDofileViaSDL(lua_State* L)
+    {
+        std::size_t plen = 0;
+        const char* p = luaL_checklstring(L, 1, &plen);
+        const std::string path(p, plen);
+
+        auto bytes = ReadFileViaSDL(path);
+        if (!bytes)
+        {
+            return luaL_error(L, "dofile: cannot open '%s'", path.c_str());
+        }
+
+        // Drop the path arg so chunk return values are the only ones above topBefore.
+        lua_settop(L, 0);
+        const int topBefore = lua_gettop(L);
+        const std::string chunkname = "@" + path;
+        if (luaL_loadbuffer(L, bytes->data(), bytes->size(), chunkname.c_str()) != 0)
+        {
+            return luaL_error(L, "dofile load '%s': %s", path.c_str(), lua_tostring(L, -1));
+        }
+        if (lua_pcall(L, 0, LUA_MULTRET, 0) != 0)
+        {
+            return luaL_error(L, "dofile run '%s': %s", path.c_str(), lua_tostring(L, -1));
+        }
+        return lua_gettop(L) - topBefore;
+    }
+
+    // Override Lua's `dofile` so chunks load through SDL_IO too. The example calls
+    // dofile(get_asset_path("scripts/lib/foo.lua")); on desktop that's an absolute path SDL_IO opens
+    // directly, on Android it's a relative path SDL_IO resolves against the APK asset root. The stock
+    // Lua loader would fall back to fopen and miss the APK on Android.
+    void InstallLuaFileLoaders(sol::state& lua)
+    {
+        lua_State* L = lua.lua_state();
+        lua_pushcfunction(L, &LuaDofileViaSDL);
+        lua_setglobal(L, "dofile");
+    }
+} // namespace
+
 inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const GameConfig& gameConfig)
 {
     const auto filePath = assetManager.GetFullPath(gameConfig.GetStartupScript());
 
     Logger::Info("Loading entry script: " + filePath);
+    auto bytes = ReadFileViaSDL(filePath);
+    if (!bytes)
+    {
+        Logger::Error("Failed to read entry script: " + filePath);
+        return;
+    }
+
     sol::protected_function_result result;
     try
     {
-        result = lua.safe_script_file(filePath);
+        result = lua.safe_script(*bytes, sol::script_pass_on_error, "@" + filePath);
     }
     catch (const std::exception& ex)
     {
@@ -99,7 +173,8 @@ inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const Ga
 
     if (!result.valid())
     {
-        Logger::Error("Failed to load entry script: " + filePath);
+        const sol::error err = result;
+        Logger::Error("Failed to load entry script '" + filePath + "': " + err.what());
         return;
     }
 
@@ -153,6 +228,12 @@ bool Game::Initialize(const std::string& assetPath)
     // No explicit path (and, in editor builds, no remembered project): default the asset base to the
     // executable/bundle location. On desktop this is the exe dir; in a .app it is Contents/Resources,
     // on iOS the bundle root. Keeps the same code path working for packaged builds with no -p argument.
+    //
+    // Android is the exception: assets live inside the APK, reached by SDL_OpenTitleStorage /
+    // SDL_IOFromFile resolving *relative* paths against the APK asset root. SDL_GetBasePath() there
+    // returns the app's internal data dir (not the APK), so the base path must stay empty and config
+    // loading must still run against that empty base.
+#ifndef __ANDROID__
     if (effectivePath.empty())
     {
         if (const char* basePath = SDL_GetBasePath())
@@ -161,9 +242,17 @@ bool Game::Initialize(const std::string& assetPath)
             Logger::Info("No project path provided; defaulting asset base path to: " + effectivePath);
         }
     }
+#else
+    Logger::Info("Android: resolving assets from the APK asset root (empty base path).");
+#endif
 
     bool projectLoaded = false;
-    if (!effectivePath.empty())
+#ifdef __ANDROID__
+    const bool attemptProjectLoad = true;  // empty base → APK title storage
+#else
+    const bool attemptProjectLoad = !effectivePath.empty();
+#endif
+    if (attemptProjectLoad)
     {
         if (gameConfig.LoadConfigFromFile(effectivePath))
         {
@@ -436,6 +525,7 @@ bool Game::RunBakeValidation(const std::string& assetPath)
     LuaSystemRegistry::registerSystem(inputSystem);
 
     lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
+    InstallLuaFileLoaders(lua);
     ScriptSystem scriptSystem;
     scriptSystem.CreateLuaBindings(lua);
     RegisterAllLuaModules(lua, *this);
@@ -532,6 +622,9 @@ void Game::Setup()
     LuaSystemRegistry::registerSystem(inputSystem);
 
     lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
+    // Re-route Lua file-loading through SDL_IO so dofile() reaches inside read-only bundles
+    // (APK/.app). Must run after open_libraries (which installs the stock dofile).
+    InstallLuaFileLoaders(lua);
     // Snapshot stdlib globals before binding so the API manifest can diff out everything the
     // engine adds. Cheap; the actual dump only fires when OCTARINE_DUMP_LUA_API is set.
     const auto preBindingGlobals = LuaApiManifest::SnapshotGlobals(lua);
@@ -930,11 +1023,23 @@ void Game::LoadScene(const std::string& scenePath)
     }
 #endif
 
-    sol::protected_function_result result = lua.safe_script_file(fullPath);
-    if (!result.valid())
+    auto sceneBytes = ReadFileViaSDL(fullPath);
+    sol::protected_function_result result;
+    if (sceneBytes)
     {
-        const sol::error err = result;
-        Logger::Error("Failed to load scene '" + fullPath + "': " + std::string(err.what()));
+        result = lua.safe_script(*sceneBytes, sol::script_pass_on_error, "@" + fullPath);
+    }
+    if (!sceneBytes || !result.valid())
+    {
+        if (!sceneBytes)
+        {
+            Logger::Error("Failed to read scene '" + fullPath + "'");
+        }
+        else
+        {
+            const sol::error err = result;
+            Logger::Error("Failed to load scene '" + fullPath + "': " + std::string(err.what()));
+        }
         releasePrevious();
     }
     else if (result.return_count() > 0)

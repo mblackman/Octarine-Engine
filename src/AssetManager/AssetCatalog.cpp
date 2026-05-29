@@ -1,5 +1,6 @@
 #include "AssetManager/AssetCatalog.h"
 
+#include <SDL3/SDL.h>
 #include <sol/sol.hpp>
 
 #include <algorithm>
@@ -175,12 +176,16 @@ bool AssetCatalog::Build(const std::string& basePath, sol::state& lua, std::opti
     // source assets can't freeze the catalog on a stale snapshot.
     if (allowManifest)
     {
-        std::error_code ec;
+        // Probe via SDL_IO so the manifest is reachable inside read-only bundles (APK assets / .app
+        // Resources / iOS bundle). std::filesystem::exists would only see a real disk path and miss
+        // AAssetManager-backed entries.
         const fs::path manifestPath = fs::path(basePath) / "asset_manifest.lua";
-        if (fs::exists(manifestPath, ec))
+        const std::string manifestStr = manifestPath.string();
+        if (SDL_IOStream* probe = SDL_IOFromFile(manifestStr.c_str(), "rb"); probe != nullptr)
         {
-            Logger::Info("AssetCatalog: baked manifest found, loading (scan skipped): " + manifestPath.string());
-            return LoadManifest(manifestPath.string(), lua, basePath);
+            SDL_CloseIO(probe);
+            Logger::Info("AssetCatalog: baked manifest found, loading (scan skipped): " + manifestStr);
+            return LoadManifest(manifestStr, lua, basePath);
         }
         Logger::Warn("AssetCatalog: manifest load allowed but no asset_manifest.lua at root; scanning.");
     }
@@ -299,7 +304,26 @@ bool AssetCatalog::LoadManifest(const std::string& manifestPath, sol::state& lua
     entries_.clear();
     from_manifest_ = false;
 
-    sol::protected_function_result result = lua.safe_script_file(manifestPath, sol::script_pass_on_error);
+    // Read manifest bytes through SDL_IO so the same path works inside an APK / .app bundle (where
+    // Lua's stock fopen-based loader cannot reach AAssetManager / bundle Resources).
+    SDL_IOStream* io = SDL_IOFromFile(manifestPath.c_str(), "rb");
+    if (!io)
+    {
+        Logger::Error("AssetCatalog: failed to open manifest '" + manifestPath + "': " + SDL_GetError());
+        return false;
+    }
+    std::size_t size = 0;
+    void* data = SDL_LoadFile_IO(io, &size, true);  // closes io
+    if (!data)
+    {
+        Logger::Error("AssetCatalog: failed to read manifest '" + manifestPath + "': " + SDL_GetError());
+        return false;
+    }
+    const std::string chunk(static_cast<const char*>(data), size);
+    SDL_free(data);
+
+    sol::protected_function_result result =
+        lua.safe_script(chunk, sol::script_pass_on_error, "@" + manifestPath);
     if (!result.valid())
     {
         const sol::error err = result;

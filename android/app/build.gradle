@@ -1,0 +1,219 @@
+plugins {
+    id 'com.android.application'
+}
+
+// --- Octarine host app ---------------------------------------------------------------------------
+// Builds the engine as the native lib (libmain.so) via CMake + the NDK, resolving SDL3 + deps from a
+// vcpkg android triplet. SDLActivity dlopens libmain.so and jumps to SDL_main (src/Main.cpp's
+// <SDL3/SDL_main.h>). SDL3 is statically linked into libmain.so, so SDLActivity.getLibraries() loads
+// only "main" — there is no separate libSDL3.so.
+//
+// Project identity (applicationId, app name, versionCode/versionName) comes from a flat
+// `project.ini` at the game project root — the cross-platform source of truth (CPack reads the same
+// file). See cmake/OctarinePackage.cmake. Resolution precedence per key:
+//   -Poctarine.<key> CLI flag   >   project.ini   >   built-in default (the example's identity)
+// so CI can hotfix-bump a version with `-Poctarine.versionCode=18` without editing the file.
+//
+// Reusable for ANY project: stage that project's tree by pointing at it, the rest derives from its
+// project.ini. e.g.:
+//   ./gradlew assembleDebug \
+//     -Poctarine.projectDir=/path/to/game \      # asset tree staged into the APK (default: example)
+//     -Poctarine.abi=x86_64                       # triplet auto-derives (x86_64 -> x64-android emulator)
+// Release signing (else falls back to the debug key): -Poctarine.storeFile/storePassword/keyAlias/keyPassword.
+// Re-bake the manifest to match the staged tree: -Poctarine.bakeExe=/path/to/desktop/OctarineEngine.
+//
+// Required environment: VCPKG_ROOT (or -Poctarine.vcpkgRoot) and an installed NDK (ANDROID_NDK_HOME,
+// or the SDK's ndk/<ndkVersion>). ANDROID_NDK_HOME is also what vcpkg's own android toolchain uses to
+// locate the NDK for its dependency builds, so it must be set in the build environment.
+def prop = { String key, Object fallback -> project.findProperty(key) ?: fallback }
+
+def vcpkgRoot = System.getenv('VCPKG_ROOT') ?: project.findProperty('octarine.vcpkgRoot')
+if (vcpkgRoot == null) {
+    throw new GradleException('Set VCPKG_ROOT (env) or -Poctarine.vcpkgRoot=<path> to the vcpkg checkout.')
+}
+
+// Resolve the game project dir up front — project.ini lives at its root.
+def gameProjectDir = prop('octarine.projectDir', "${rootDir}/../../Octarine-Engine-Example")
+
+// Load the project's identity file. Flat key=value, no sections, so java.util.Properties parses it
+// natively (no INI library needed). Returns an empty Properties when the file is absent so the
+// fallback chain still works for projects mid-bootstrap.
+def projectIni = new Properties()
+def projectIniFile = file("${gameProjectDir}/project.ini")
+if (projectIniFile.exists()) {
+    projectIniFile.withInputStream { projectIni.load(it) }
+}
+
+// CLI flag > project.ini > built-in default.
+def identityProp = { String cliKey, String iniKey, Object fallback ->
+    def cli = project.findProperty(cliKey)
+    if (cli != null) return cli
+    def ini = projectIni.getProperty(iniKey)
+    if (ini != null) return ini.trim()
+    return fallback
+}
+
+def appId      = identityProp('octarine.applicationId', 'package_id',   'com.octarine.example')
+def appName    = identityProp('octarine.appName',       'name',         'Octarine Example')
+def appVerCode = (identityProp('octarine.versionCode',  'version_code', '1')) as Integer
+def appVerName = identityProp('octarine.versionName',   'version_name', '1.0')
+
+// Validate identity on Android (always a shipping build). Mirrors the CMake-side validator in
+// cmake/OctarinePackage.cmake so a single project.ini misconfig fails the same way on every driver.
+// File absent: warn + fall through to defaults (bootstrap-friendly). File present: required keys
+// must be non-empty; package_id must be reverse-DNS.
+if (!projectIniFile.exists()) {
+    logger.warn("Octarine: shipping build with no ${projectIniFile} — using fallback identity " +
+        "('${appName}' ${appVerName}, ${appId}). Add a project.ini for a proper package identity.")
+} else {
+    def identityErrors = []
+    if (!projectIni.getProperty('name'))         identityErrors << 'missing required key: name'
+    if (!projectIni.getProperty('version_name')) identityErrors << 'missing required key: version_name'
+    def iniPkgId = projectIni.getProperty('package_id')
+    if (!iniPkgId) {
+        identityErrors << 'missing required key: package_id (Android/iOS bundle id)'
+    } else if (!(iniPkgId.trim() ==~ /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/)) {
+        identityErrors << "package_id '${iniPkgId}' must be reverse-DNS (e.g. com.studio.mygame)"
+    }
+    if (!identityErrors.isEmpty()) {
+        throw new GradleException("Octarine: project.ini validation failed (${projectIniFile}):\n  - " +
+            identityErrors.join('\n  - '))
+    }
+}
+def appMinSdk  = (prop('octarine.minSdk', '28')) as Integer   // floor pinned by the vcpkg triplet API level
+def appNdk     = prop('octarine.ndkVersion', '28.2.13676358')
+def abi        = prop('octarine.abi', 'arm64-v8a')
+
+// Triplet auto-derives from the ABI (override with -Poctarine.triplet). Keeps the emulator path a
+// one-flag change: -Poctarine.abi=x86_64 selects both the x86_64 ABI and the x64-android triplet.
+def tripletForAbi = ['arm64-v8a': 'arm64-android', 'x86_64': 'x64-android',
+                     'armeabi-v7a': 'arm-android', 'x86': 'x86-android']
+def vcpkgTriplet = prop('octarine.triplet', tripletForAbi.getOrDefault(abi, 'arm64-android'))
+
+def repoRoot = "${rootDir}/.."                                  // android/ sits at <repo>/android
+// gameProjectDir is defined above (project.ini lookup uses it).
+def bakeExe = project.findProperty('octarine.bakeExe')
+def stagedAssetsDir = "${layout.buildDirectory.get().asFile}/octarineAssets"
+
+android {
+    namespace = "org.libsdl.app"   // package of the vendored SDL java sources
+    compileSdk = 35
+    ndkVersion = appNdk
+
+    defaultConfig {
+        applicationId = appId
+        minSdk = appMinSdk
+        targetSdk = 35
+        versionCode = appVerCode
+        versionName = appVerName
+        resValue "string", "app_name", appName   // drives the manifest @string/app_name label
+        ndk {
+            abiFilters abi
+        }
+        externalNativeBuild {
+            cmake {
+                // vcpkg's android toolchain finds the NDK via ANDROID_NDK_HOME; the chainload arg
+                // below covers the engine's own configure. Compute the NDK toolchain path with the
+                // same fallback the rest of the build uses.
+                def ndkHome = System.getenv('ANDROID_NDK_HOME') ?: System.getenv('ANDROID_NDK_ROOT')
+                if (ndkHome == null) {
+                    ndkHome = "${android.sdkDirectory}/ndk/${appNdk}"
+                }
+                def ndkToolchain = "${ndkHome}/build/cmake/android.toolchain.cmake"
+                arguments "-DANDROID_PLATFORM=android-${appMinSdk}",
+                          "-DANDROID_STL=c++_shared",
+                          "-DCMAKE_TOOLCHAIN_FILE=${vcpkgRoot}/scripts/buildsystems/vcpkg.cmake",
+                          "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ndkToolchain}",
+                          "-DVCPKG_TARGET_TRIPLET=${vcpkgTriplet}",
+                          "-DVCPKG_MANIFEST_MODE=ON",
+                          // Overlay sol2 port patched for the NDK clang noexcept bug (LLVM #91362);
+                          // see vcpkg-overlay-ports/sol2. Without it the engine won't compile.
+                          "-DVCPKG_OVERLAY_PORTS=${rootDir}/vcpkg-overlay-ports"
+                targets "OctarineEngine"   // produces libmain.so (OUTPUT_NAME main)
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        // Real release keystore, only when the project supplies one (CI secrets / local props).
+        if (project.hasProperty('octarine.storeFile')) {
+            release {
+                storeFile file(project.property('octarine.storeFile'))
+                storePassword project.property('octarine.storePassword')
+                keyAlias project.property('octarine.keyAlias')
+                keyPassword project.property('octarine.keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Use the supplied keystore if present; else the debug key so `assembleRelease` still
+            // yields an installable (debug-signed) APK for testing rather than an unsigned one.
+            signingConfig project.hasProperty('octarine.storeFile') ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "${repoRoot}/CMakeLists.txt"   // the engine's root CMake
+        }
+    }
+
+    sourceSets.main {
+        jniLibs.srcDir 'libs'
+        assets.srcDirs = [stagedAssetsDir]
+    }
+
+    lint {
+        abortOnError = false
+    }
+}
+
+// Stage the game project into the APK assets before the asset merge runs.
+tasks.register('stageOctarineAssets', Copy) {
+    description = 'Copies the game project (+ baked asset_manifest.lua) into the APK assets.'
+    from(gameProjectDir) {
+        // Scratch / editor-only files never belong in a shipped bundle.
+        exclude '*.meta', 'editor_prefs.ini', 'preferences.ini', 'imgui.ini', '.git', '.git/**'
+    }
+    into stagedAssetsDir
+    doFirst {
+        if (!file(gameProjectDir).exists()) {
+            throw new GradleException("Game project dir not found: ${gameProjectDir} " +
+                "(set -Poctarine.projectDir=<path>).")
+        }
+    }
+    // Optionally re-bake the manifest from a desktop binary so it matches the staged tree exactly.
+    if (bakeExe != null) {
+        doLast {
+            exec {
+                commandLine bakeExe, stagedAssetsDir, '-m', 'bake'
+            }
+        }
+    } else {
+        doLast {
+            if (!file("${stagedAssetsDir}/asset_manifest.lua").exists()) {
+                throw new GradleException('No asset_manifest.lua in the staged project. Bake it on ' +
+                    'desktop (OctarineEngine <project> -m bake) or pass -Poctarine.bakeExe=<binary>.')
+            }
+        }
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name == 'preBuild') {
+        task.dependsOn 'stageOctarineAssets'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+}

@@ -28,13 +28,17 @@ bool AudioSystem::Init(Registry* registry, const std::unique_ptr<EventBus>& even
 {
     registry_ = registry;
 
-    const auto& engineOptions = registry_->Get<GameConfig>().GetEngineOptions();
+    auto& engineOptions = registry_->Get<GameConfig>().GetEngineOptions();
     const int trackPoolInitial = std::max(1, engineOptions.audioTrackPoolInitial);
     const int trackPoolMax = std::max(trackPoolInitial, engineOptions.audioTrackPoolMax);
 
+    // On any audio-stack init failure, flip audioEnabled off so per-frame audio gates short-circuit
+    // and AssetManager skips audio acquires silently (no per-clip "no mixer" errors). One Error +
+    // one Warn at startup is the user-visible signal; everything downstream stays quiet.
     if (!MIX_Init())
     {
         Logger::Error("MIX_Init failed: " + std::string(SDL_GetError()));
+        engineOptions.audioEnabled = false;
         return false;
     }
 
@@ -43,6 +47,7 @@ bool AudioSystem::Init(Registry* registry, const std::unique_ptr<EventBus>& even
     {
         Logger::Error("MIX_CreateMixerDevice failed: " + std::string(SDL_GetError()));
         MIX_Quit();
+        engineOptions.audioEnabled = false;
         return false;
     }
 

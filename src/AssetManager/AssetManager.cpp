@@ -80,7 +80,10 @@ bool AssetManager::LoadFromCatalog(const CatalogEntry &entry, const std::string 
       return fonts_.contains(assetId);
     case AssetType::Audio:
       if (!mixer) {
-        Logger::Error("AssetManager::Acquire: no mixer available for audio clip: " + assetId);
+        // Audio stack disabled (no mixer was Set — AudioSystem::Init failed at startup and already
+        // flipped audioEnabled off). Skip silently so we don't spam per-clip errors on platforms
+        // without an audio device (Android emulator, headless CI). Debug-level for dev diagnostics.
+        Logger::Info("AssetManager::Acquire: audio disabled, skipping clip: " + assetId);
         return false;
       }
       AddAudioClip(mixer, assetId, entry.fullPath);

@@ -26,6 +26,88 @@ set(_OCTARINE_PACKAGE_INCLUDED ON)
 # on a machine with a working NSIS install.
 option(OCTARINE_PACKAGE_NSIS "Also emit an NSIS installer on Windows (requires a working makensis)" OFF)
 
+# CLI overrides for project identity (precedence: CLI cache var > project.ini > built-in default).
+# Empty default = "not set on the CLI"; the helper falls through to the file or default.
+set(OCTARINE_PACKAGE_NAME         "" CACHE STRING "Override project.ini: name")
+set(OCTARINE_PACKAGE_VERSION_NAME "" CACHE STRING "Override project.ini: version_name")
+set(OCTARINE_PACKAGE_VERSION_CODE "" CACHE STRING "Override project.ini: version_code")
+set(OCTARINE_PACKAGE_VENDOR       "" CACHE STRING "Override project.ini: vendor")
+set(OCTARINE_PACKAGE_DESCRIPTION  "" CACHE STRING "Override project.ini: description")
+set(OCTARINE_PACKAGE_ID           "" CACHE STRING "Override project.ini: package_id (Android/iOS bundle id)")
+
+# Parse a flat key=value INI (no sections; Java Properties compatible) into ${PREFIX}_<key> vars in
+# the caller's scope. Skips blank lines and `#`-prefixed comments. Unknown keys are still set —
+# callers consume only the keys they recognize.
+function(octarine_read_project_ini PROJECT_DIR PREFIX)
+    set(_ini "${PROJECT_DIR}/project.ini")
+    if (NOT EXISTS "${_ini}")
+        return()
+    endif ()
+    file(STRINGS "${_ini}" _lines)
+    foreach (_line IN LISTS _lines)
+        # Strip surrounding whitespace by matching against a tolerant regex.
+        if (_line MATCHES "^[ \t]*#")
+            continue()
+        endif ()
+        if (_line MATCHES "^[ \t]*$")
+            continue()
+        endif ()
+        if (_line MATCHES "^[ \t]*([A-Za-z0-9_]+)[ \t]*=[ \t]*(.*)$")
+            set(_key "${CMAKE_MATCH_1}")
+            set(_val "${CMAKE_MATCH_2}")
+            # Trim trailing whitespace from the value.
+            string(REGEX REPLACE "[ \t]+$" "" _val "${_val}")
+            set("${PREFIX}_${_key}" "${_val}" PARENT_SCOPE)
+        else ()
+            message(WARNING "octarine_read_project_ini: ignoring malformed line in ${_ini}: ${_line}")
+        endif ()
+    endforeach ()
+endfunction()
+
+# Resolve a single identity key: CLI cache override > project.ini value > built-in default.
+# Sets ${OUT_VAR} in the caller's scope.
+function(_octarine_resolve_identity OUT_VAR CLI_VAL INI_VAL DEFAULT_VAL)
+    if (NOT "${CLI_VAL}" STREQUAL "")
+        set(${OUT_VAR} "${CLI_VAL}" PARENT_SCOPE)
+    elseif (NOT "${INI_VAL}" STREQUAL "")
+        set(${OUT_VAR} "${INI_VAL}" PARENT_SCOPE)
+    else ()
+        set(${OUT_VAR} "${DEFAULT_VAL}" PARENT_SCOPE)
+    endif ()
+endfunction()
+
+# Validate project identity for a shipping build. Policy:
+#  - File absent + SHIPPED → warn (the project hasn't supplied an identity; we'll use defaults).
+#  - File present + SHIPPED → required keys must be non-empty; package_id must be reverse-DNS.
+#  - SHIPPED off → no-op (dev builds don't gate on identity).
+# Fail-fast at configure time so the build doesn't burn cycles producing a misnamed package.
+function(_octarine_validate_identity PROJECT_DIR PKG_NAME PKG_ID PKG_VER SHIPPED)
+    set(_ini "${PROJECT_DIR}/project.ini")
+    if (NOT SHIPPED)
+        return()
+    endif ()
+    if (NOT EXISTS "${_ini}")
+        message(WARNING "Octarine: shipping build with no ${_ini} — using fallback identity ('${PKG_NAME}' ${PKG_VER}). Add a project.ini for a proper package identity.")
+        return()
+    endif ()
+    set(_errors "")
+    if ("${PKG_NAME}" STREQUAL "")
+        list(APPEND _errors "missing required key: name")
+    endif ()
+    if ("${PKG_VER}" STREQUAL "")
+        list(APPEND _errors "missing required key: version_name")
+    endif ()
+    if ("${PKG_ID}" STREQUAL "")
+        list(APPEND _errors "missing required key: package_id (Android/iOS bundle id)")
+    elseif (NOT "${PKG_ID}" MATCHES "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
+        list(APPEND _errors "package_id '${PKG_ID}' must be reverse-DNS (e.g. com.studio.mygame)")
+    endif ()
+    if (_errors)
+        string(REPLACE ";" "\n  - " _err_lines "${_errors}")
+        message(FATAL_ERROR "Octarine: project.ini validation failed (${_ini}):\n  - ${_err_lines}")
+    endif ()
+endfunction()
+
 function(octarine_package TARGET)
     set(options "")
     set(oneValueArgs PROJECT NAME)
@@ -43,9 +125,9 @@ function(octarine_package TARGET)
     endif ()
 
     # A packaged binary MUST load the baked manifest — it has no real FS to scan inside a bundle.
-    # Force the gate ON for the packaged engine target regardless of the cache option, so a package
-    # configured with OCTARINE_SHIPPED left OFF can't silently ship a binary that scans and dies at
-    # launch.
+    # The canonical entry is the `ship-release` CMake preset (carries OCTARINE_SHIPPED=ON); this
+    # force is the guardrail so a package configured from a non-ship preset still can't silently
+    # ship a binary that scans and dies at launch. Belt-and-suspenders with the preset.
     target_compile_definitions(${TARGET} PRIVATE OCTARINE_SHIPPED)
     message(STATUS "Octarine: packaging '${OP_NAME}' from project '${OP_PROJECT}' (OCTARINE_SHIPPED forced ON)")
 
@@ -149,10 +231,24 @@ function(octarine_package TARGET)
 
     # ---- CPack --------------------------------------------------------------------------------
     # include(CPack) below captures these from THIS scope, so set them plainly (no PARENT_SCOPE).
-    set(CPACK_PACKAGE_NAME "${OP_NAME}")
-    set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
-    set(CPACK_PACKAGE_VENDOR "Octarine")
+    #
+    # Project identity sources, in precedence order: CLI cache override > project.ini > built-in
+    # default (the latter falls back to engine metadata + OP_NAME so a project with no project.ini
+    # still packages — just under the engine's identity, which is fine for the example today).
+    octarine_read_project_ini("${OP_PROJECT}" _pi)
+    _octarine_resolve_identity(_pkg_name        "${OCTARINE_PACKAGE_NAME}"         "${_pi_name}"         "${OP_NAME}")
+    _octarine_resolve_identity(_pkg_version     "${OCTARINE_PACKAGE_VERSION_NAME}" "${_pi_version_name}" "${PROJECT_VERSION}")
+    _octarine_resolve_identity(_pkg_vendor      "${OCTARINE_PACKAGE_VENDOR}"       "${_pi_vendor}"       "Octarine")
+    _octarine_resolve_identity(_pkg_description "${OCTARINE_PACKAGE_DESCRIPTION}"  "${_pi_description}"  "${PROJECT_DESCRIPTION}")
+    # package_id isn't consumed by CPack (desktop has no native bundle id), but we resolve and
+    # validate it here so a misconfig is caught before it bites Android with the same project.ini.
+    _octarine_resolve_identity(_pkg_id          "${OCTARINE_PACKAGE_ID}"           "${_pi_package_id}"   "")
+    _octarine_validate_identity("${OP_PROJECT}" "${_pkg_name}" "${_pkg_id}" "${_pkg_version}" ON)
+    set(CPACK_PACKAGE_NAME "${_pkg_name}")
+    set(CPACK_PACKAGE_VERSION "${_pkg_version}")
+    set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${_pkg_description}")
+    set(CPACK_PACKAGE_VENDOR "${_pkg_vendor}")
+    message(STATUS "Octarine: package identity '${_pkg_name}' ${_pkg_version} (vendor: ${_pkg_vendor})")
     # Keep the default single top-level <name>-<version>/ folder: unzip yields one self-contained dir.
 
     if (WIN32)

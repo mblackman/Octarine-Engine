@@ -47,6 +47,20 @@ option(OCTARINE_SHIPPED "Build a shipped artifact: load the baked asset manifest
 # path forces OCTARINE_SHIPPED ON on the engine target regardless of the option above.
 set(OCTARINE_PACKAGE_PROJECT "" CACHE PATH "Game project dir to bundle into a packaged artifact (empty = no packaging)")
 
+# Android target. The NDK toolchain sets ANDROID/CMAKE_SYSTEM_NAME=Android. The engine cross-compiles
+# to a shared lib (libmain.so) that SDLActivity loads; there is no real filesystem to scan inside an
+# APK, so this is always a shipping config (manifest-load, no scan) with the desktop-only editor/ImGui
+# compiled out. Forced here, before the editor-forces-ImGui rule below.
+#
+# Semantically equivalent to the `ship-release` CMake preset (desktop/iOS shipping config). AGP can't
+# consume `cmake --preset`, so Android reaches the same OCTARINE_SHIPPED=ON + editor/ImGui-off state
+# through this branch instead of the preset. Keep the two in sync if either set of forced flags changes.
+if (ANDROID)
+    set(OCTARINE_WITH_EDITOR OFF CACHE BOOL "Disabled on Android" FORCE)
+    set(OCTARINE_WITH_IMGUI OFF CACHE BOOL "Disabled on Android" FORCE)
+    set(OCTARINE_SHIPPED ON CACHE BOOL "Forced ON on Android (manifest-load, no FS scan)" FORCE)
+endif ()
+
 if (OCTARINE_WITH_EDITOR)
     set(OCTARINE_WITH_IMGUI ON CACHE BOOL "Forced ON by Editor" FORCE)
 endif ()
@@ -104,7 +118,7 @@ if (OCTARINE_WITH_EDITOR)
     list(APPEND SRC_FILES src/Editor/Inspectors/RegisterAllInspectors.cpp)
 endif ()
 
-if (UNIX AND NOT APPLE)
+if (UNIX AND NOT APPLE AND NOT ANDROID)
     list(APPEND SRC_FILES src/General/SDL3_Linux_Stubs.cpp)
 endif ()
 
@@ -113,8 +127,14 @@ if (OCTARINE_WITH_IMGUI)
     add_subdirectory(libs/sol2_ImGui_Bindings)
 endif ()
 
-# Create the executable target
-add_executable(${PROJECT_NAME} ${SRC_FILES})
+# Create the engine target. On Android, SDLActivity dlopens libmain.so and jumps to SDL_main, so the
+# engine must be that shared lib (OUTPUT_NAME main → libmain.so). Everywhere else it is an executable.
+if (ANDROID)
+    add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME main)
+else ()
+    add_executable(${PROJECT_NAME} ${SRC_FILES})
+endif ()
 
 # Set target properties
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -142,6 +162,28 @@ if (OCTARINE_SHIPPED)
     target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_SHIPPED)
     message(STATUS "Octarine: SHIPPED build — asset catalog loads baked manifest (no scan)")
 endif ()
+
+# Engine log level (compile-time default baked into the binary). Policy when OCTARINE_LOG_LEVEL is
+# empty (the default):
+#   SHIPPED build  → warn   (production: errors + warnings only)
+#   Debug build    → debug  (dev: noisy)
+#   else           → info   (player-release / RelWithDebInfo)
+# Runtime can lower the bar with `LogLevel=` in config.ini — read at Game::Setup, applied via
+# Logger::SetLevel on top of this default. See src/General/Logger.cpp.
+set(OCTARINE_LOG_LEVEL "" CACHE STRING "Compile-time default engine log level (trace|debug|info|warn|error|critical|off); empty = auto-pick from build type / OCTARINE_SHIPPED")
+if (NOT OCTARINE_LOG_LEVEL)
+    if (OCTARINE_SHIPPED)
+        set(_octarine_default_log_level "warn")
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "")
+        set(_octarine_default_log_level "debug")
+    else ()
+        set(_octarine_default_log_level "info")
+    endif ()
+else ()
+    set(_octarine_default_log_level "${OCTARINE_LOG_LEVEL}")
+endif ()
+target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_LOG_LEVEL_NAME="${_octarine_default_log_level}")
+message(STATUS "Octarine: default log level = ${_octarine_default_log_level}")
 
 # Include directories
 target_include_directories(${PROJECT_NAME}
@@ -173,9 +215,15 @@ if (OCTARINE_WITH_IMGUI)
     )
 endif ()
 
+# Android NDK system libs. SDL3 (statically linked from the arm64-android vcpkg triplet) pulls in the
+# native logging and platform APIs; the linker needs them named explicitly for the shared lib.
+if (ANDROID)
+    target_link_libraries(${PROJECT_NAME} PRIVATE android log)
+endif ()
+
 # Install rules (optional). Skipped under packaging — octarine_package owns the deliverable layout
 # (binary + project files at the package root) instead of the bin/lib split used by `cmake --install`.
-if (NOT OCTARINE_PACKAGE_PROJECT)
+if (NOT OCTARINE_PACKAGE_PROJECT AND NOT ANDROID)
     install(TARGETS ${PROJECT_NAME}
             RUNTIME DESTINATION bin
             LIBRARY DESTINATION lib
@@ -183,8 +231,9 @@ if (NOT OCTARINE_PACKAGE_PROJECT)
     )
 endif ()
 
-# Packaging: wire CPack + the deliverable layout only when a project dir is supplied.
-if (OCTARINE_PACKAGE_PROJECT)
+# Packaging: wire CPack + the deliverable layout only when a project dir is supplied. Android packages
+# via Gradle (see android/), not CPack, so the desktop packaging block is skipped there.
+if (OCTARINE_PACKAGE_PROJECT AND NOT ANDROID)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/OctarinePackage.cmake)
     octarine_package(${PROJECT_NAME} PROJECT "${OCTARINE_PACKAGE_PROJECT}" NAME "${PROJECT_NAME}")
 endif ()
@@ -220,9 +269,17 @@ else ()
             -Wconversion
             -Wfatal-errors
     )
-    target_compile_options(${PROJECT_NAME} PRIVATE
-            $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
-    )
+    if (ANDROID)
+        # Cross-compile: -march=native would target the build host, not the device. -Werror is dropped
+        # because device-arch-specific warnings can't be observed/cleared from a desktop checkout.
+        target_compile_options(${PROJECT_NAME} PRIVATE
+                $<IF:$<CONFIG:Debug>,,-ffast-math>
+        )
+    else ()
+        target_compile_options(${PROJECT_NAME} PRIVATE
+                $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
+        )
+    endif ()
     # Size reduction for non-Debug builds:
     # - function/data sections + --gc-sections drops unreferenced symbols from static libs
     # - -s strips the linked binary

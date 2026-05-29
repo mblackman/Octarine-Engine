@@ -60,13 +60,26 @@
     {
       "name": "player-release",
       "inherits": "base",
-      "displayName": "Player (Shipping)",
-      "description": "Minimal optimized build. No editor, no ImGui, no profiling. For end-users.",
+      "displayName": "Player (Dev, live-scan)",
+      "description": "Optimized player with no editor/ImGui/profiling. Catalog live-scans the asset dir — fast dev iteration, NOT a shippable artifact. Use ship-release for that.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "OCTARINE_ENABLE_PROFILING": "OFF",
         "OCTARINE_WITH_IMGUI": "OFF",
         "OCTARINE_WITH_EDITOR": "OFF"
+      }
+    },
+    {
+      "name": "ship-release",
+      "inherits": "base",
+      "displayName": "Ship (Shipping, manifest-load)",
+      "description": "Shippable artifact: no editor/ImGui/profiling, loads the baked asset_manifest.lua (no FS scan). Canonical desktop/iOS shipping config; Android reaches the same state via the if(ANDROID) block in CMakeLists.txt.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "OCTARINE_ENABLE_PROFILING": "OFF",
+        "OCTARINE_WITH_IMGUI": "OFF",
+        "OCTARINE_WITH_EDITOR": "OFF",
+        "OCTARINE_SHIPPED": "ON"
       }
     }
   ],
@@ -75,6 +88,7 @@
     { "name": "editor-release", "configurePreset": "editor-release" },
     { "name": "player-debug", "configurePreset": "player-debug" },
     { "name": "player-profile", "configurePreset": "player-profile" },
-    { "name": "player-release", "configurePreset": "player-release" }
+    { "name": "player-release", "configurePreset": "player-release" },
+    { "name": "ship-release", "configurePreset": "ship-release" }
   ]
 }

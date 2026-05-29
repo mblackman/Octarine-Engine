@@ -1,7 +1,7 @@
 name: Package
 
 # Desktop packaging matrix (Windows / Linux / macOS). Each leg configures the shipping
-# player-release preset against the example project, builds, then `cpack`s a self-contained
+# ship-release preset against the example project, builds, then `cpack`s a self-contained
 # artifact via octarine_package: engine binary + staged project + baked asset_manifest.lua.
 # The manifest bake runs at install time inside cpack and is the CI gate — a broken asset
 # reference exits nonzero and fails the leg.
@@ -25,13 +25,13 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
-            pkg_glob: build/player-release/*.tar.gz
+            pkg_glob: build/ship-release/*.tar.gz
           - os: windows-latest
             platform: windows
-            pkg_glob: build/player-release/*.zip
+            pkg_glob: build/ship-release/*.zip
           - os: macos-latest
             platform: macos
-            pkg_glob: build/player-release/*.dmg
+            pkg_glob: build/ship-release/*.dmg
 
     steps:
       - name: Checkout engine
@@ -102,21 +102,21 @@ jobs:
 
       - name: Configure CMake (packaging)
         shell: bash
-        # player-release = shipping config (no editor/ImGui). OCTARINE_PACKAGE_PROJECT wires the
-        # CPack layout + forces OCTARINE_SHIPPED on the engine target so the artifact loads the
-        # baked manifest instead of scanning a read-only dir. Mixed slashes in the Windows path are
-        # fine for CMake.
-        run: cmake --preset player-release -DOCTARINE_PACKAGE_PROJECT="${{ github.workspace }}/example_repo"
+        # ship-release preset = shipping config: no editor/ImGui, OCTARINE_SHIPPED=ON so the artifact
+        # loads the baked manifest instead of scanning a read-only dir. OCTARINE_PACKAGE_PROJECT
+        # wires the CPack layout (octarine_package also force-sets OCTARINE_SHIPPED as a guardrail).
+        # Mixed slashes in the Windows path are fine for CMake.
+        run: cmake --preset ship-release -DOCTARINE_PACKAGE_PROJECT="${{ github.workspace }}/example_repo"
 
       - name: Build
-        run: cmake --build build/player-release --config Release --parallel
+        run: cmake --build build/ship-release --config Release --parallel
 
       - name: Package (cpack + manifest bake gate)
-        run: cmake --build build/player-release --target package
+        run: cmake --build build/ship-release --target package
 
       - name: List package output
         shell: bash
-        run: ls -la build/player-release | grep -Ei '\.(zip|tar\.gz|dmg)$' || (echo "no package produced" && exit 1)
+        run: ls -la build/ship-release | grep -Ei '\.(zip|tar\.gz|dmg)$' || (echo "no package produced" && exit 1)
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4

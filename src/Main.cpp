@@ -1,6 +1,12 @@
+#include <SDL3/SDL_main.h>
+
 #include "./Game/Game.h"
 #include "./General/Logger.h"
 
+// <SDL3/SDL_main.h> renames this main to SDL_main and supplies the real platform entry point. On
+// desktop that wrapper is a thin shim; on Android it is what SDLActivity calls into via JNI (the
+// activity dlopens libmain.so and invokes "SDL_main"), so the include is required for the mobile build
+// and harmless on desktop.
 int main(const int argc, char* argv[])
 {
     Logger::Init();
