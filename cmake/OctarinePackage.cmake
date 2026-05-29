@@ -49,6 +49,11 @@ set(OCTARINE_PACKAGE_VERSION_CODE "" CACHE STRING "Override project.ini: version
 set(OCTARINE_PACKAGE_VENDOR       "" CACHE STRING "Override project.ini: vendor")
 set(OCTARINE_PACKAGE_DESCRIPTION  "" CACHE STRING "Override project.ini: description")
 set(OCTARINE_PACKAGE_ID           "" CACHE STRING "Override project.ini: package_id (Android/iOS bundle id)")
+set(OCTARINE_PACKAGE_MIN_IOS      "" CACHE STRING "Override project.ini: min_ios (IPHONEOS_DEPLOYMENT_TARGET)")
+set(OCTARINE_PACKAGE_ORIENTATION  "" CACHE STRING "Override project.ini: orientation (portrait|landscape|all)")
+set(OCTARINE_PACKAGE_FULLSCREEN   "" CACHE STRING "Override project.ini: fullscreen (true|false)")
+set(OCTARINE_PACKAGE_PERMISSIONS  "" CACHE STRING "Override project.ini: permissions (comma list: internet,recording,camera,location,photos)")
+set(OCTARINE_PACKAGE_CATEGORY     "" CACHE STRING "Override project.ini: category (LSApplicationCategoryType, e.g. public.app-category.games)")
 
 # Parse a flat key=value INI (no sections; Java Properties compatible) into ${PREFIX}_<key> vars in
 # the caller's scope. Skips blank lines and `#`-prefixed comments. Unknown keys are still set —
@@ -123,10 +128,49 @@ function(_octarine_validate_identity PROJECT_DIR PKG_NAME PKG_ID PKG_VER SHIPPED
     endif ()
 endfunction()
 
+# Map a project.ini orientation value to the Info.plist's UISupportedInterfaceOrientations form
+# (space-separated list of UIInterfaceOrientation* identifiers). Unknown values yield empty,
+# which the caller treats as "don't emit the key" so Xcode's default (all four) wins.
+function(_octarine_ios_orientations_for_value OUT_VAR VALUE)
+    if (VALUE STREQUAL "portrait")
+        set(${OUT_VAR} "UIInterfaceOrientationPortrait" PARENT_SCOPE)
+    elseif (VALUE STREQUAL "landscape")
+        set(${OUT_VAR} "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight" PARENT_SCOPE)
+    elseif (VALUE STREQUAL "all")
+        set(${OUT_VAR} "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight" PARENT_SCOPE)
+    else ()
+        set(${OUT_VAR} "" PARENT_SCOPE)
+    endif ()
+endfunction()
+
+# Map a project.ini permission name to the iOS Info.plist usage-description key + a default
+# reason string. Apple rejects apps that gate hardware behind permission prompts without these
+# strings, but projects rarely care to author them — the default sentence is good enough for
+# review and the project can still override via INFOPLIST_KEY_* on the target if it cares.
+# Unknown / Android-only permissions (e.g. internet) yield empty key + reason.
+function(_octarine_ios_permission_plist_key OUT_KEY_VAR OUT_REASON_VAR NAME)
+    if (NAME STREQUAL "recording")
+        set(${OUT_KEY_VAR} "NSMicrophoneUsageDescription" PARENT_SCOPE)
+        set(${OUT_REASON_VAR} "Audio recording for gameplay." PARENT_SCOPE)
+    elseif (NAME STREQUAL "camera")
+        set(${OUT_KEY_VAR} "NSCameraUsageDescription" PARENT_SCOPE)
+        set(${OUT_REASON_VAR} "Camera input for gameplay features." PARENT_SCOPE)
+    elseif (NAME STREQUAL "location")
+        set(${OUT_KEY_VAR} "NSLocationWhenInUseUsageDescription" PARENT_SCOPE)
+        set(${OUT_REASON_VAR} "Location for gameplay features." PARENT_SCOPE)
+    elseif (NAME STREQUAL "photos")
+        set(${OUT_KEY_VAR} "NSPhotoLibraryUsageDescription" PARENT_SCOPE)
+        set(${OUT_REASON_VAR} "Photo library access for sharing features." PARENT_SCOPE)
+    else ()
+        set(${OUT_KEY_VAR} "" PARENT_SCOPE)
+        set(${OUT_REASON_VAR} "" PARENT_SCOPE)
+    endif ()
+endfunction()
+
 # iOS .app: Info.plist identity, optional codesign passthrough, staged project tree, icon/splash
 # wiring, optional host-bake step, POST_BUILD copy into the bundle root. xcodebuild handles signing
 # + .ipa archiving — this helper only owns build-time bundle setup. CPack is irrelevant here.
-function(_octarine_setup_ios_bundle TARGET PROJECT_DIR PKG_NAME PKG_ID PKG_VERSION PKG_VERSION_CODE PKG_DESCRIPTION PKG_VENDOR)
+function(_octarine_setup_ios_bundle TARGET PROJECT_DIR PKG_NAME PKG_ID PKG_VERSION PKG_VERSION_CODE PKG_DESCRIPTION PKG_VENDOR PKG_MIN_IOS PKG_ORIENTATION PKG_FULLSCREEN PKG_PERMISSIONS PKG_CATEGORY)
     set_target_properties(${TARGET} PROPERTIES
             MACOSX_BUNDLE                       ON
             MACOSX_BUNDLE_BUNDLE_NAME           "${PKG_NAME}"
@@ -156,6 +200,47 @@ function(_octarine_setup_ios_bundle TARGET PROJECT_DIR PKG_NAME PKG_ID PKG_VERSI
     if (DEFINED CACHE{OCTARINE_IOS_CODE_SIGN_IDENTITY} AND OCTARINE_IOS_CODE_SIGN_IDENTITY)
         set_target_properties(${TARGET} PROPERTIES
                 XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "${OCTARINE_IOS_CODE_SIGN_IDENTITY}")
+    endif ()
+
+    # Per-project Info.plist knobs from project.ini. Each is emitted only when the project sets
+    # the corresponding key, so an empty project.ini ships with Xcode's own defaults (Info.plist
+    # gets the engine's identity + nothing else).
+    if (PKG_MIN_IOS)
+        set_target_properties(${TARGET} PROPERTIES
+                XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "${PKG_MIN_IOS}")
+    endif ()
+    if (PKG_CATEGORY)
+        set_target_properties(${TARGET} PROPERTIES
+                XCODE_ATTRIBUTE_INFOPLIST_KEY_LSApplicationCategoryType "${PKG_CATEGORY}")
+    endif ()
+    if (PKG_FULLSCREEN STREQUAL "true")
+        set_target_properties(${TARGET} PROPERTIES
+                XCODE_ATTRIBUTE_INFOPLIST_KEY_UIRequiresFullScreen "YES")
+    elseif (PKG_FULLSCREEN STREQUAL "false")
+        set_target_properties(${TARGET} PROPERTIES
+                XCODE_ATTRIBUTE_INFOPLIST_KEY_UIRequiresFullScreen "NO")
+    endif ()
+    _octarine_ios_orientations_for_value(_orient "${PKG_ORIENTATION}")
+    if (_orient)
+        set_target_properties(${TARGET} PROPERTIES
+                XCODE_ATTRIBUTE_INFOPLIST_KEY_UISupportedInterfaceOrientations "${_orient}")
+    endif ()
+    # Permissions: comma list -> per-permission NS*UsageDescription Info.plist keys. Internet
+    # has no iOS counterpart (no permission prompt) so its mapping returns empty + is skipped.
+    if (PKG_PERMISSIONS)
+        string(REPLACE "," ";" _perms_list "${PKG_PERMISSIONS}")
+        foreach (_perm IN LISTS _perms_list)
+            string(STRIP "${_perm}" _perm)
+            string(TOLOWER "${_perm}" _perm)
+            if (_perm STREQUAL "")
+                continue()
+            endif ()
+            _octarine_ios_permission_plist_key(_pkey _preason "${_perm}")
+            if (_pkey)
+                set_target_properties(${TARGET} PROPERTIES
+                        "XCODE_ATTRIBUTE_INFOPLIST_KEY_${_pkey}" "${_preason}")
+            endif ()
+        endforeach ()
     endif ()
 
     # Stage the project to a clean dir at configure time so the POST_BUILD copy is a single
@@ -452,6 +537,16 @@ function(octarine_package TARGET)
     _octarine_resolve_identity(_pkg_id          "${OCTARINE_PACKAGE_ID}"           "${_pi_package_id}"   "")
     _octarine_validate_identity("${OP_PROJECT}" "${_pkg_name}" "${_pkg_id}" "${_pkg_version}" ON)
 
+    # ---- Per-project platform knobs ------------------------------------------------------------
+    # Same CLI > project.ini > default precedence as identity. Empty = "use the platform's own
+    # default" (no override emitted). Consumed by the iOS bundle helper below; Android reads
+    # equivalent keys directly in android/app/build.gradle via identityProp.
+    _octarine_resolve_identity(_pkg_min_ios     "${OCTARINE_PACKAGE_MIN_IOS}"      "${_pi_min_ios}"      "")
+    _octarine_resolve_identity(_pkg_orientation "${OCTARINE_PACKAGE_ORIENTATION}"  "${_pi_orientation}"  "")
+    _octarine_resolve_identity(_pkg_fullscreen  "${OCTARINE_PACKAGE_FULLSCREEN}"   "${_pi_fullscreen}"   "")
+    _octarine_resolve_identity(_pkg_permissions "${OCTARINE_PACKAGE_PERMISSIONS}"  "${_pi_permissions}"  "")
+    _octarine_resolve_identity(_pkg_category    "${OCTARINE_PACKAGE_CATEGORY}"     "${_pi_category}"     "")
+
     # ---- iOS bundle ---------------------------------------------------------------------------
     # iOS .app is a flat bundle: binary + Resources sit at the bundle root, reached by
     # SDL_GetBasePath(). Bake is NOT invoked here: a cross-compiled iOS binary can't execute on
@@ -460,7 +555,9 @@ function(octarine_package TARGET)
     if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
         _octarine_setup_ios_bundle(${TARGET} "${OP_PROJECT}"
                 "${_pkg_name}" "${_pkg_id}" "${_pkg_version}" "${_pkg_version_code}"
-                "${_pkg_description}" "${_pkg_vendor}")
+                "${_pkg_description}" "${_pkg_vendor}"
+                "${_pkg_min_ios}" "${_pkg_orientation}" "${_pkg_fullscreen}"
+                "${_pkg_permissions}" "${_pkg_category}")
         return()
     endif ()
 

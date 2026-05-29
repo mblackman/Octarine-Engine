@@ -67,10 +67,14 @@
 
          An example Java class can be found in README-android.md
     -->
+    <!-- Theme + orientation come from project.ini via manifestPlaceholders (see
+         android/app/build.gradle): `appTheme` defaults to AppTheme (fullscreen) and switches to
+         AppTheme.Windowed when project.ini sets fullscreen=false; `screenOrientation` defaults to
+         `unspecified` and follows portrait/landscape/all per the project's `orientation=` key. -->
     <application android:label="@string/app_name"
         android:icon="@mipmap/ic_launcher"
         android:allowBackup="true"
-        android:theme="@style/AppTheme"
+        android:theme="@style/${appTheme}"
         android:enableOnBackInvokedCallback="false"
         android:hardwareAccelerated="true" >
 
@@ -84,6 +88,7 @@
             android:launchMode="singleInstance"
             android:configChanges="layoutDirection|locale|grammaticalGender|fontScale|fontWeightAdjustment|orientation|uiMode|screenLayout|screenSize|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:preferMinimalPostProcessing="true"
+            android:screenOrientation="${screenOrientation}"
             android:exported="true"
             >
             <intent-filter>

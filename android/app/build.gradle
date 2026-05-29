@@ -80,9 +80,44 @@ if (!projectIniFile.exists()) {
             identityErrors.join('\n  - '))
     }
 }
-def appMinSdk  = (prop('octarine.minSdk', '28')) as Integer   // floor pinned by the vcpkg triplet API level
+def appMinSdk  = (identityProp('octarine.minSdk', 'min_android_sdk', '28').toString()) as Integer   // floor pinned by the vcpkg triplet API level
 def appNdk     = prop('octarine.ndkVersion', '28.2.13676358')
 def abi        = prop('octarine.abi', 'arm64-v8a')
+
+// Per-project platform knobs from project.ini. CLI > project.ini > default precedence, mirroring
+// the CMake side (cmake/OctarinePackage.cmake's identity block). Values become AndroidManifest
+// placeholders + a generated <uses-permission> overlay manifest below.
+def appOrientationRaw = identityProp('octarine.orientation', 'orientation', '').toString().trim().toLowerCase()
+def appFullscreenRaw  = identityProp('octarine.fullscreen',  'fullscreen',  'true').toString().trim().toLowerCase()
+def appPermissionsRaw = identityProp('octarine.permissions', 'permissions', '').toString()
+
+// Orientation map: portrait/landscape/all -> android:screenOrientation values. Anything else
+// (incl. empty) becomes `unspecified` so AGP falls back to system default.
+def androidOrientationMap = ['portrait': 'portrait', 'landscape': 'sensorLandscape', 'all': 'fullSensor']
+def androidOrientation = androidOrientationMap.getOrDefault(appOrientationRaw, 'unspecified')
+// Fullscreen toggle picks between AppTheme (fullscreen, current default) and AppTheme.Windowed
+// (status bar visible). Defaults to fullscreen so existing builds are unaffected.
+def appThemeName = (appFullscreenRaw == 'false') ? 'AppTheme.Windowed' : 'AppTheme'
+
+// Permission catalog. Maps the engine's short names (the same names the iOS Info.plist branch in
+// OctarinePackage.cmake recognizes) to fully-qualified Android permission identifiers. Unknown
+// names are dropped with a warning rather than failing the build.
+def androidPermissionMap = [
+    'internet'  : 'android.permission.INTERNET',
+    'recording' : 'android.permission.RECORD_AUDIO',
+    'camera'    : 'android.permission.CAMERA',
+    'location'  : 'android.permission.ACCESS_FINE_LOCATION',
+    'photos'    : 'android.permission.READ_MEDIA_IMAGES',
+]
+def appPermissionList = appPermissionsRaw.split(',').collect{ it.trim().toLowerCase() }.findAll{ !it.isEmpty() }
+def androidPermissions = []
+appPermissionList.each { p ->
+    if (androidPermissionMap.containsKey(p)) {
+        androidPermissions << androidPermissionMap[p]
+    } else {
+        logger.warn("Octarine: ignoring unknown permission '${p}' (catalog: ${androidPermissionMap.keySet()})")
+    }
+}
 
 // Triplet auto-derives from the ABI (override with -Poctarine.triplet). Keeps the emulator path a
 // one-flag change: -Poctarine.abi=x86_64 selects both the x86_64 ABI and the x64-android triplet.
@@ -124,6 +159,14 @@ android {
         versionCode = appVerCode
         versionName = appVerName
         resValue "string", "app_name", appName   // drives the manifest @string/app_name label
+        // Manifest placeholders consumed by android/app/src/main/AndroidManifest.xml:
+        //   ${screenOrientation} -> activity android:screenOrientation
+        //   ${appTheme}          -> application android:theme="@style/${appTheme}"
+        // Both default to no-op values when project.ini omits the keys.
+        manifestPlaceholders = [
+            screenOrientation: androidOrientation,
+            appTheme         : appThemeName,
+        ]
         ndk {
             abiFilters = abiList   // single-ABI dev mode = [abi]; -Poctarine.abis lists all 3
         }
@@ -218,6 +261,28 @@ android {
 
     lint {
         abortOnError = false
+    }
+}
+
+// Generate the <uses-permission> overlay manifest from project.ini's `permissions=` list. AGP
+// merges this into the final AndroidManifest.xml via androidComponents.onVariants below. We write
+// the file eagerly at config time because Variant.sources.manifests.addStaticFile(File) expects
+// the file to exist when called; a stale file from a previous run is overwritten unconditionally
+// so the result always tracks the current project.ini.
+def octarinePermissionsManifest = file("${layout.buildDirectory.get().asFile}/octarine_extras/AndroidManifest.xml")
+octarinePermissionsManifest.parentFile.mkdirs()
+def _perm_sb = new StringBuilder()
+_perm_sb << '<?xml version="1.0" encoding="utf-8"?>\n'
+_perm_sb << '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
+androidPermissions.each { p ->
+    _perm_sb << "    <uses-permission android:name=\"${p}\" />\n"
+}
+_perm_sb << '</manifest>\n'
+octarinePermissionsManifest.text = _perm_sb.toString()
+
+androidComponents {
+    onVariants(selector().all()) { variant ->
+        variant.sources.manifests.addStaticFile(octarinePermissionsManifest)
     }
 }
 
