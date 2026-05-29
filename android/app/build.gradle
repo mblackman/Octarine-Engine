@@ -94,6 +94,12 @@ def repoRoot = "${rootDir}/.."                                  // android/ sits
 // gameProjectDir is defined above (project.ini lookup uses it).
 def bakeExe = project.findProperty('octarine.bakeExe')
 def stagedAssetsDir = "${layout.buildDirectory.get().asFile}/octarineAssets"
+// Generated icon/splash resources (mipmap-*, values-v31, adaptive XML). Source-of-truth generator
+// is scripts/octarine-icons.cmake — same one CMake/CPack invoke on desktop + iOS. Skipped silently
+// when project.ini has no `icon=` or `magick`/`convert` aren't on PATH; existing res/mipmap-* +
+// AppTheme then ship as the fallback.
+def generatedResDir = "${layout.buildDirectory.get().asFile}/generated/octarineIcons/res"
+def iconScript      = "${repoRoot}/scripts/octarine-icons.cmake"
 
 android {
     namespace = "org.libsdl.app"   // package of the vendored SDL java sources
@@ -173,6 +179,9 @@ android {
     sourceSets.main {
         jniLibs.srcDir 'libs'
         assets.srcDirs = [stagedAssetsDir]
+        // Generated mipmap-*/values-v31 ride beside the committed res tree; AAPT2 merges them so
+        // ic_launcher.png and the splash AppTheme override land in the APK with no manual placement.
+        res.srcDir generatedResDir
     }
 
     lint {
@@ -211,9 +220,51 @@ tasks.register('stageOctarineAssets', Copy) {
     }
 }
 
+// Generate launcher icon + adaptive icon XML + Android-12 splash theme override from the project's
+// `icon=`. Runs before res processing so AAPT2 picks up the emitted mipmap-*/values-v31 trees.
+tasks.register('generateOctarineIcons', Exec) {
+    description = 'Resizes project.ini `icon=` into mipmap-* + emits adaptive icon + splash theme.'
+    // Lazy file list — bootstrap projects (and the example_repo checkout) ship with no
+    // project.ini, and Gradle 8's inputs.file(...).optional(true) still validates file existence
+    // for the provided path. A closure-evaluated inputs.files re-checks at execution time, so the
+    // task can configure cleanly when the file is absent and the CMake script falls through.
+    inputs.files({ projectIniFile.exists() ? [projectIniFile] : [] }).withPropertyName('projectIni')
+    inputs.file iconScript
+    outputs.dir generatedResDir
+    doFirst {
+        // Generator writes into OUT_DIR/android/...; AAPT2 expects res/<config>/<file>, so we point
+        // OUT_DIR at the parent and let the script create the android/ subdir AAPT2 reads.
+        def staged = file("${layout.buildDirectory.get().asFile}/generated/octarineIcons/staged")
+        staged.deleteDir(); staged.mkdirs()
+        def out = file(generatedResDir); out.deleteDir(); out.mkdirs()
+        commandLine 'cmake',
+                "-DOCTARINE_ICON_PROJECT=${gameProjectDir}",
+                '-DOCTARINE_ICON_PLATFORM=android',
+                "-DOCTARINE_ICON_OUT_DIR=${staged}",
+                '-P', iconScript
+    }
+    doLast {
+        // The script writes to <staged>/android/{mipmap-*,values,values-v31}. Move those into the
+        // res root AGP merges so AAPT2 sees them as standard resource folders.
+        def src = file("${layout.buildDirectory.get().asFile}/generated/octarineIcons/staged/android")
+        if (src.exists()) {
+            copy {
+                from src
+                into generatedResDir
+            }
+            logger.lifecycle("Octarine: generated icon/splash resources under ${generatedResDir}")
+        } else {
+            // Script skipped (no `icon=`, no magick, or no project.ini). Leave the dir empty —
+            // AGP tolerates an empty extra res srcDir and the existing res/mipmap-* defaults win.
+            logger.lifecycle("Octarine: no generated icon resources (project.ini may lack `icon=` " +
+                    "or ImageMagick may not be installed); shipping defaults.")
+        }
+    }
+}
+
 tasks.configureEach { task ->
     if (task.name == 'preBuild') {
-        task.dependsOn 'stageOctarineAssets'
+        task.dependsOn 'stageOctarineAssets', 'generateOctarineIcons'
     }
 }
 
