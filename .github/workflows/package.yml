@@ -72,64 +72,14 @@ jobs:
       # drive both stores' version numbers without editing project.ini.
       - name: Resolve version (tag push)
         id: ver
-        shell: bash
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            v="${GITHUB_REF#refs/tags/v}"
-            code=$(git rev-list --count HEAD)
-            echo "Tag push: version_name=$v version_code=$code"
-          else
-            v=""
-            code=""
-            echo "Non-tag run: version derives from project.ini"
-          fi
-          echo "version_name=$v" >> "$GITHUB_OUTPUT"
-          echo "version_code=$code" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/resolve-version
 
       - name: Export GitHub Actions cache env (vcpkg binary cache)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+        uses: ./.github/actions/vcpkg-cache-env
 
       - name: Install Linux build deps (SDL3 / X11 / Wayland)
         if: matrix.platform == 'linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            ninja-build \
-            pkg-config \
-            autoconf \
-            automake \
-            autoconf-archive \
-            libtool \
-            libltdl-dev \
-            libx11-dev \
-            libxext-dev \
-            libxrandr-dev \
-            libxcursor-dev \
-            libxtst-dev \
-            libxfixes-dev \
-            libxi-dev \
-            libxinerama-dev \
-            libxkbcommon-dev \
-            libxss-dev \
-            libwayland-dev \
-            wayland-protocols \
-            libegl1-mesa-dev \
-            libgl1-mesa-dev \
-            libgles2-mesa-dev \
-            libdbus-1-dev \
-            libibus-1.0-dev \
-            libpulse-dev \
-            libudev-dev \
-            libdrm-dev \
-            libgbm-dev \
-            libasound2-dev \
-            libpipewire-0.3-dev \
-            libsndio-dev \
-            libdecor-0-dev
+        uses: ./.github/actions/linux-build-deps
 
       - name: Install Ninja (Windows/macOS)
         if: matrix.platform != 'linux'
