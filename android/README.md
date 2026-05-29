@@ -18,6 +18,7 @@ scan, no `-p` argument).
 | Android NDK   | **`28.2.13676358`** — must match `ndkVersion` in `app/build.gradle`.      |
 | CMake         | `3.22.1` (SDK-managed) or any ≥ 3.15 on `PATH`.                            |
 | vcpkg         | `VCPKG_ROOT` set; an android triplet available (see below).               |
+| ImageMagick   | `magick` (or `convert`) on `PATH`, **only if** the project sets `icon=`.  |
 
 ### Install the SDK pieces
 
@@ -116,6 +117,20 @@ cd android
 The `stageOctarineAssets` task copies the project into the APK assets (scratch excluded) and uses its
 committed baked `asset_manifest.lua`. Pass `-Poctarine.bakeExe=<desktop binary>` to re-bake so the
 manifest matches the staged tree exactly.
+
+### Launcher icon + Android-12 splash
+
+Set `icon=<path.png>` (1024×1024 PNG, project-relative) and optionally `splash_color=#rrggbb` in
+`project.ini`. The `generateOctarineIcons` Gradle task invokes
+`scripts/octarine-icons.cmake` to produce `mipmap-*/ic_launcher.png` (legacy),
+`mipmap-*/ic_launcher_foreground.png` + `mipmap-anydpi-v26/ic_launcher.xml` (Android 8+ adaptive),
+and a `values-v31/octarine_splash.xml` override that wires `windowSplashScreenAnimatedIcon` /
+`windowSplashScreenBackground` for Android 12+. Without `icon=` (or without ImageMagick on
+`PATH`), the task warn-skips and the APK ships the green-robot defaults + a launcher-icon flash on
+12+.
+
+Adaptive icons crop the outer ~16% — leave safe padding in the source PNG so the cropped circle
+shows the same art Android 7 sees in the legacy square.
 
 ## Run
 

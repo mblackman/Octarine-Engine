@@ -21,6 +21,11 @@ if (DEFINED _OCTARINE_PACKAGE_INCLUDED)
 endif ()
 set(_OCTARINE_PACKAGE_INCLUDED ON)
 
+# Path to the shared icon/splash generator. Same script Gradle runs on Android — single source of
+# truth for sizes/manifests so iOS/desktop/Android can't drift. CMAKE_CURRENT_LIST_DIR resolves to
+# the directory of THIS file (cmake/) regardless of which CMakeLists.txt includes it.
+set(_OCTARINE_ICON_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/../scripts/octarine-icons.cmake")
+
 # NSIS is opt-in, not auto-detected: a stray/non-functional makensis on PATH (e.g. a Chocolatey
 # shim) would otherwise make plain `cpack` fail before producing the reliable ZIP. Turn this ON only
 # on a machine with a working NSIS install.
@@ -200,6 +205,43 @@ function(octarine_package TARGET)
                 PATTERN "imgui.ini" EXCLUDE
                 PATTERN "project.ini" EXCLUDE)
 
+        # Generate Assets.xcassets/AppIcon.appiconset + LaunchScreen.storyboard from the project's
+        # `icon=` / `splash_color=`. Configure-time so xcodebuild sees the files when it builds the
+        # target; rerunning configure rebuilds them. Skipped silently if the project has no icon=
+        # or ImageMagick is absent — the bundle then ships with no icon (Xcode warns) and the
+        # default black launch screen, which is fine for early bootstrap projects.
+        set(_ios_icons_root "${CMAKE_BINARY_DIR}/_octarine_ios_icons")
+        execute_process(
+                COMMAND "${CMAKE_COMMAND}"
+                        "-DOCTARINE_ICON_PROJECT=${OP_PROJECT}"
+                        "-DOCTARINE_ICON_PLATFORM=ios"
+                        "-DOCTARINE_ICON_OUT_DIR=${_ios_icons_root}"
+                        -P "${_OCTARINE_ICON_SCRIPT}"
+                RESULT_VARIABLE _icon_rc)
+        if (NOT _icon_rc EQUAL 0)
+            message(FATAL_ERROR "octarine_package: iOS icon generation failed (rc=${_icon_rc})")
+        endif ()
+        set(_xcassets "${_ios_icons_root}/ios/Assets.xcassets")
+        set(_launchscreen "${_ios_icons_root}/ios/LaunchScreen.storyboard")
+        if (EXISTS "${_xcassets}" AND EXISTS "${_launchscreen}")
+            # xcassets gets compiled by actool, storyboard by ibtool — both kick in automatically
+            # when these land as target sources with MACOSX_PACKAGE_LOCATION=Resources. INFOPLIST_KEY_*
+            # flows through Xcode into the generated Info.plist (requires CMake 3.25+ for the
+            # property mode; we're on 3.20+ for the script and a newer build is required to
+            # generate Xcode projects, so this is safe).
+            target_sources(${TARGET} PRIVATE "${_xcassets}" "${_launchscreen}")
+            set_source_files_properties("${_xcassets}" "${_launchscreen}"
+                    PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
+            set_target_properties(${TARGET} PROPERTIES
+                    XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
+                    XCODE_ATTRIBUTE_INFOPLIST_KEY_CFBundleIconName "AppIcon"
+                    XCODE_ATTRIBUTE_INFOPLIST_KEY_UILaunchStoryboardName "LaunchScreen")
+            message(STATUS "Octarine: iOS AppIcon + LaunchScreen wired (${_xcassets})")
+        else ()
+            message(STATUS "Octarine: iOS shipping with default icon/launchscreen (no `icon=` in project.ini "
+                            "or ImageMagick missing).")
+        endif ()
+
         # Optional host-bake step. Cross-compiled binary can't run on the build host, so the bake
         # needs a host-native OctarineEngine. Matches the Android `-Poctarine.bakeExe` contract.
         if (DEFINED CACHE{OCTARINE_HOST_BAKE_EXE} AND OCTARINE_HOST_BAKE_EXE)
@@ -228,6 +270,33 @@ function(octarine_package TARGET)
         return()
     endif ()
 
+    # ---- Desktop icon -------------------------------------------------------------------------
+    # Generate the per-OS icon up front. .ico for Windows (CPack NSIS picks it up), .icns for macOS
+    # (.app/Contents/Resources via MACOSX_BUNDLE_ICON_FILE), .png for Linux (.desktop-ready beside
+    # the binary). Same skip-on-missing semantics as iOS — projects without `icon=` ship CPack defaults.
+    if (WIN32)
+        set(_octarine_desktop_os "windows")
+    elseif (APPLE)
+        set(_octarine_desktop_os "macos")
+    else ()
+        set(_octarine_desktop_os "linux")
+    endif ()
+    set(_desktop_icons_root "${CMAKE_BINARY_DIR}/_octarine_desktop_icons")
+    execute_process(
+            COMMAND "${CMAKE_COMMAND}"
+                    "-DOCTARINE_ICON_PROJECT=${OP_PROJECT}"
+                    "-DOCTARINE_ICON_PLATFORM=desktop"
+                    "-DOCTARINE_ICON_DESKTOP_OS=${_octarine_desktop_os}"
+                    "-DOCTARINE_ICON_OUT_DIR=${_desktop_icons_root}"
+                    -P "${_OCTARINE_ICON_SCRIPT}"
+            RESULT_VARIABLE _icon_rc)
+    if (NOT _icon_rc EQUAL 0)
+        message(FATAL_ERROR "octarine_package: desktop icon generation failed (rc=${_icon_rc})")
+    endif ()
+    set(_desktop_ico "${_desktop_icons_root}/desktop/octarine_icon.ico")
+    set(_desktop_icns "${_desktop_icons_root}/desktop/octarine_icon.icns")
+    set(_desktop_png "${_desktop_icons_root}/desktop/octarine_icon.png")
+
     # ---- Deliverable layout (desktop) ---------------------------------------------------------
     # macOS: a .app bundle; binary in Contents/MacOS, project files in Contents/Resources.
     # Windows/Linux: flat — binary + project files share the package root so base_path_ finds them.
@@ -235,9 +304,23 @@ function(octarine_package TARGET)
         set_target_properties(${TARGET} PROPERTIES MACOSX_BUNDLE ON)
         set(_runtime_dest ".")
         set(_data_dest "${TARGET}.app/Contents/Resources")
+        # MACOSX_BUNDLE_ICON_FILE writes CFBundleIconFile into Info.plist; the .icns must land in
+        # Contents/Resources/ with the matching name. Both pieces only kick in when the generator
+        # produced an .icns (project supplied an icon).
+        if (EXISTS "${_desktop_icns}")
+            get_filename_component(_icns_name "${_desktop_icns}" NAME)
+            set_target_properties(${TARGET} PROPERTIES MACOSX_BUNDLE_ICON_FILE "${_icns_name}")
+            install(FILES "${_desktop_icns}" DESTINATION "${_data_dest}")
+        endif ()
     else ()
         set(_runtime_dest ".")
         set(_data_dest ".")
+        # Linux: ship the PNG beside the binary so a future .desktop file (or AppImage) can
+        # reference it via Icon=octarine_icon. Windows: nothing here; CPack NSIS picks the .ico
+        # through CPACK_NSIS_MUI_ICON below.
+        if (NOT WIN32 AND EXISTS "${_desktop_png}")
+            install(FILES "${_desktop_png}" DESTINATION "${_runtime_dest}")
+        endif ()
     endif ()
 
     install(TARGETS ${TARGET}
@@ -372,6 +455,14 @@ function(octarine_package TARGET)
         set(CPACK_GENERATOR "ZIP")
         if (OCTARINE_PACKAGE_NSIS)
             list(APPEND CPACK_GENERATOR "NSIS")
+            # Installer + uninstaller icons. NSIS requires absolute paths and barfs on Windows
+            # `\` separators inside CPACK_NSIS_*, so feed forward-slashed paths.
+            if (EXISTS "${_desktop_ico}")
+                file(TO_CMAKE_PATH "${_desktop_ico}" _ico_fwd)
+                set(CPACK_NSIS_MUI_ICON "${_ico_fwd}")
+                set(CPACK_NSIS_MUI_UNIICON "${_ico_fwd}")
+                set(CPACK_PACKAGE_ICON "${_ico_fwd}")
+            endif ()
         endif ()
     elseif (APPLE)
         # .app drag-installer.
