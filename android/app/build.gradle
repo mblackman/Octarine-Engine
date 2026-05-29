@@ -146,6 +146,13 @@ def stagedAssetsDir = "${layout.buildDirectory.get().asFile}/octarineAssets"
 // AppTheme then ship as the fallback.
 def generatedResDir = "${layout.buildDirectory.get().asFile}/generated/octarineIcons/res"
 def iconScript      = "${repoRoot}/scripts/octarine-icons.cmake"
+// Aggregated third-party license text (closes the App Store / Play Store attribution gap). The
+// file ships under the APK's `assets/` so a future in-app About / Open-Source-Licenses screen can
+// render it via AAssetManager — and so reviewers grep can find it without cracking the binary.
+def licenseAssetsDir = "${layout.buildDirectory.get().asFile}/generated/octarineLicenses/assets"
+def licenseOutFile   = "${licenseAssetsDir}/THIRD_PARTY_LICENSES.txt"
+def licenseScript    = "${repoRoot}/scripts/run-licenses.cmake"
+def licenseDropDir   = "${gameProjectDir}/THIRD_PARTY_LICENSES.d"
 
 android {
     namespace = "org.libsdl.app"   // package of the vendored SDL java sources
@@ -244,7 +251,7 @@ android {
         // Multi-ABI mode: per-ABI libmain.so lands under build/octarineJni/<abi>/. AGP packages
         // every <abi>/ subdir into the APK's lib/<abi>/.
         jniLibs.srcDirs = multiAbi ? ['libs', nativeBuildRoot] : ['libs']
-        assets.srcDirs = [stagedAssetsDir]
+        assets.srcDirs = [stagedAssetsDir, licenseAssetsDir]
         // Generated mipmap-*/values-v31 ride beside the committed res tree; AAPT2 merges them so
         // ic_launcher.png and the splash AppTheme override land in the APK with no manual placement.
         res.srcDir generatedResDir
@@ -430,9 +437,58 @@ if (multiAbi) {
     }
 }
 
+// Aggregate every linked dep's license text into one file the APK ships in assets/. Pulls from
+// vcpkg_installed/<triplet>/share/*/copyright, so the task needs SOMETHING to scan:
+//   - multi-ABI mode: auto-uses the first ABI's configure-dir vcpkg_installed (deterministic
+//     path inside `nativeBuildRoot/.build/<abi>/`); dependsOn the matching configure task so
+//     vcpkg has been run before the aggregator looks.
+//   - single-ABI mode: AGP's externalNativeBuild path varies per AGP version, so we don't try
+//     to discover it. Pass `-Poctarine.licenseVcpkgInstalled=<dir> -Poctarine.licenseTriplet=<t>`
+//     to point the task at an existing vcpkg_installed; otherwise the task is a no-op and
+//     `assembleDebug` ships without licenses (which is fine — dev artifact, not store-shipped).
+tasks.register('generateOctarineLicenses', Exec) {
+    description = 'Aggregates third-party licenses (vcpkg copyrights + vendored libs) into APK assets.'
+    def installedOverride = project.findProperty('octarine.licenseVcpkgInstalled')
+    def tripletOverride   = project.findProperty('octarine.licenseTriplet')
+    def installedDir = installedOverride
+    def triplet      = tripletOverride
+    if (multiAbi) {
+        def firstAbi = abiList[0]
+        def firstTriplet = tripletForAbi.getOrDefault(firstAbi, 'arm64-android')
+        installedDir = installedDir ?: "${nativeBuildRoot}/.build/${firstAbi}/vcpkg_installed"
+        triplet      = triplet ?: firstTriplet
+        dependsOn "octarineNative_${firstAbi}_configure"
+    }
+    inputs.file licenseScript
+    inputs.property 'triplet', triplet ?: ''
+    inputs.property 'installedDir', installedDir ?: ''
+    outputs.dir licenseAssetsDir
+    onlyIf {
+        if (installedDir == null || triplet == null) {
+            logger.warn('Octarine: skipping license aggregation (no vcpkg_installed location). ' +
+                'For shipping single-ABI builds, pass -Poctarine.licenseVcpkgInstalled=<dir> ' +
+                '-Poctarine.licenseTriplet=<triplet>. Multi-ABI (-Poctarine.abis=...) is automatic.')
+            return false
+        }
+        return true
+    }
+    doFirst {
+        file(licenseAssetsDir).mkdirs()
+        def cmd = ['cmake',
+                "-DOCTARINE_LICENSES_OUT=${licenseOutFile}",
+                "-DVCPKG_TARGET_TRIPLET=${triplet}",
+                "-DVCPKG_INSTALLED_DIR=${installedDir}"]
+        if (file(licenseDropDir).isDirectory()) {
+            cmd << "-DOCTARINE_LICENSES_EXTRA_DIRS=${licenseDropDir}"
+        }
+        cmd += ['-P', licenseScript]
+        commandLine cmd
+    }
+}
+
 tasks.configureEach { task ->
     if (task.name == 'preBuild') {
-        task.dependsOn 'stageOctarineAssets', 'generateOctarineIcons'
+        task.dependsOn 'stageOctarineAssets', 'generateOctarineIcons', 'generateOctarineLicenses'
         if (multiAbi) {
             task.dependsOn 'octarineNativeAll'
         }

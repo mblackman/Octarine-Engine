@@ -31,10 +31,19 @@ if (DEFINED _OCTARINE_PACKAGE_INCLUDED)
 endif ()
 set(_OCTARINE_PACKAGE_INCLUDED ON)
 
+# Capture this file's directory at include time so functions can resolve sibling paths reliably.
+# CMAKE_CURRENT_LIST_DIR inside a function reflects the caller's listfile, not the definition site.
+set(_OCTARINE_PACKAGE_DIR "${CMAKE_CURRENT_LIST_DIR}")
+
 # Path to the shared icon/splash generator. Same script Gradle runs on Android — single source of
 # truth for sizes/manifests so iOS/desktop/Android can't drift. CMAKE_CURRENT_LIST_DIR resolves to
 # the directory of THIS file (cmake/) regardless of which CMakeLists.txt includes it.
 set(_OCTARINE_ICON_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/../scripts/octarine-icons.cmake")
+
+# Third-party license aggregator. Same file lives at cmake/octarine-licenses.cmake; including it
+# here keeps the public octarine_collect_licenses() symbol available to every caller (desktop +
+# iOS branches of octarine_package both depend on it).
+include("${CMAKE_CURRENT_LIST_DIR}/octarine-licenses.cmake")
 
 # NSIS is opt-in, not auto-detected: a stray/non-functional makensis on PATH (e.g. a Chocolatey
 # shim) would otherwise make plain `cpack` fail before producing the reliable ZIP. Turn this ON only
@@ -258,6 +267,53 @@ function(_octarine_setup_ios_bundle TARGET PROJECT_DIR PKG_NAME PKG_ID PKG_VERSI
             PATTERN "imgui.ini" EXCLUDE
             PATTERN "project.ini" EXCLUDE)
 
+    # Third-party license aggregate + Settings.bundle pointer. Both ride along on the existing
+    # POST_BUILD copy_directory step that pulls `_ios_staged` into the .app — staging extra
+    # files here is one line per file.
+    set(_ios_project_drops "${PROJECT_DIR}/THIRD_PARTY_LICENSES.d")
+    set(_ios_extra_dirs "")
+    if (IS_DIRECTORY "${_ios_project_drops}")
+        list(APPEND _ios_extra_dirs "${_ios_project_drops}")
+    endif ()
+    octarine_collect_licenses("${_ios_staged}/THIRD_PARTY_LICENSES.txt" EXTRA_DIRS ${_ios_extra_dirs})
+    # iOS Settings.bundle: a minimal Root.plist points the user from Settings → app → "Acknowledgements"
+    # at the bundled THIRD_PARTY_LICENSES.txt. Per-port plist authoring was rejected (Apple caps
+    # Settings FooterText at ~4KB and we'd burn the aggregator's no-hand-maintenance win) — the
+    # pointer closes the discoverability requirement, the bundled txt carries the actual content.
+    set(_ios_settings_dir "${_ios_staged}/Settings.bundle")
+    file(MAKE_DIRECTORY "${_ios_settings_dir}")
+    file(WRITE "${_ios_settings_dir}/Root.plist"
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+            "<plist version=\"1.0\">\n"
+            "<dict>\n"
+            "  <key>StringsTable</key><string>Root</string>\n"
+            "  <key>PreferenceSpecifiers</key>\n"
+            "  <array>\n"
+            "    <dict>\n"
+            "      <key>Type</key><string>PSChildPaneSpecifier</string>\n"
+            "      <key>Title</key><string>Acknowledgements</string>\n"
+            "      <key>File</key><string>Acknowledgements</string>\n"
+            "    </dict>\n"
+            "  </array>\n"
+            "</dict>\n"
+            "</plist>\n")
+    file(WRITE "${_ios_settings_dir}/Acknowledgements.plist"
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+            "<plist version=\"1.0\">\n"
+            "<dict>\n"
+            "  <key>PreferenceSpecifiers</key>\n"
+            "  <array>\n"
+            "    <dict>\n"
+            "      <key>Type</key><string>PSGroupSpecifier</string>\n"
+            "      <key>Title</key><string>Third-Party Licenses</string>\n"
+            "      <key>FooterText</key><string>This app uses open source software. The full license texts ship in THIRD_PARTY_LICENSES.txt inside the app bundle.</string>\n"
+            "    </dict>\n"
+            "  </array>\n"
+            "</dict>\n"
+            "</plist>\n")
+
     # Generate Assets.xcassets/AppIcon.appiconset + LaunchScreen.storyboard from the project's
     # `icon=` / `splash_color=`. Configure-time so xcodebuild sees the files when it builds the
     # target; rerunning configure rebuilds them. Skipped silently if the project has no icon=
@@ -357,6 +413,25 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
             RUNTIME DESTINATION "${RUNTIME_DEST}"
             BUNDLE DESTINATION "${RUNTIME_DEST}"
     )
+
+    # Aggregate third-party license text at configure time. Desktop convention:
+    #   - macOS .app: file lands in Contents/Resources/ (DATA_DEST) so SDL_GetBasePath() can find
+    #     it from the running binary if a future about-screen surfaces it.
+    #   - Windows/Linux: file lands at the package root beside the binary (DATA_DEST == ".").
+    # Repo-root LICENSE is also installed at the package root as a stand-alone file — redundant
+    # with the aggregated copy but expected by users / store reviewers.
+    set(_licenses_out "${CMAKE_BINARY_DIR}/THIRD_PARTY_LICENSES.txt")
+    set(_project_license_drops "${PROJECT_DIR}/THIRD_PARTY_LICENSES.d")
+    set(_extra_dirs "")
+    if (IS_DIRECTORY "${_project_license_drops}")
+        list(APPEND _extra_dirs "${_project_license_drops}")
+    endif ()
+    octarine_collect_licenses("${_licenses_out}" EXTRA_DIRS ${_extra_dirs})
+    install(FILES "${_licenses_out}" DESTINATION "${DATA_DEST}")
+    set(_engine_license "${_OCTARINE_PACKAGE_DIR}/../LICENSE")
+    if (EXISTS "${_engine_license}")
+        install(FILES "${_engine_license}" DESTINATION "${RUNTIME_DEST}")
+    endif ()
 
     # install() steps run in order, so the bake CODE precedes the DIRECTORY copy below.
     install(CODE "
