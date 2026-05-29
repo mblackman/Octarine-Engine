@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Base application theme. -->
+    <!-- Base application theme. Default is fullscreen (no title bar, status bar hidden) — the
+         typical game shape. Projects that want the status bar visible set `fullscreen=false` in
+         project.ini, which makes the manifestPlaceholder `appTheme` resolve to AppTheme.Windowed. -->
     <style name="AppTheme" parent="android:Theme.NoTitleBar.Fullscreen">
         <!-- Customize your theme here. -->
+    </style>
+
+    <style name="AppTheme.Windowed" parent="android:Theme.NoTitleBar">
+        <!-- Status bar visible. Selected when project.ini sets fullscreen=false. -->
     </style>
 </resources>
