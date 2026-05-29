@@ -6,11 +6,16 @@ name: Package
 # The manifest bake runs at install time inside cpack and is the CI gate — a broken asset
 # reference exits nonzero and fails the leg.
 #
-# Triggered manually or on a version tag (release artifacts), not on every push.
+# Triggered manually, on a version tag (release artifacts), and on every PR/main push so a
+# packaging regression lands at PR time instead of release time. Vcpkg cache is shared with
+# build.yml — PRs warm-hit it (~4-6 min per leg observed; cold runs only on cache eviction).
 on:
   workflow_dispatch:
   push:
+    branches: [ main ]
     tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
 
 env:
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
