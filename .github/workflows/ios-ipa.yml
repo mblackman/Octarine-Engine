@@ -7,10 +7,15 @@ name: iOS .ipa
 # action. Signed leg is gated on codesign secrets (Apple Developer team + .p12 + provisioning
 # profile) — separate work, not blocking this gate.
 #
-# workflow_dispatch only: first run builds the entire arm64-ios vcpkg port set from source (SDL3 +
-# image/mixer/ttf + freetype + harfbuzz + libpng/ogg/vorbis), 60+ min cold. Subsequent runs hit the
-# x-gha binary cache, ~10 min. Once cached, lift to push/pull_request to gate every change.
+# vcpkg arm64-ios cache is now warm (~10 min PRs after the first cold ~60 min run), so lifted to
+# push/pull_request to gate every change. macOS runner minutes bill at 10x linux — keep an eye on
+# the monthly burn (cross-checked with the cost note in ai/DeviceShippingPlan.md). Drop back to
+# dispatch-only if cost becomes a problem.
 on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 env:
