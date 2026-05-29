@@ -224,7 +224,10 @@ tasks.register('stageOctarineAssets', Copy) {
 // `icon=`. Runs before res processing so AAPT2 picks up the emitted mipmap-*/values-v31 trees.
 tasks.register('generateOctarineIcons', Exec) {
     description = 'Resizes project.ini `icon=` into mipmap-* + emits adaptive icon + splash theme.'
-    inputs.file projectIniFile
+    // Mark project.ini optional — Gradle 8 fails task validation on a missing input.file by
+    // default, but bootstrap projects (and the example repo) sometimes ship with no project.ini.
+    // The CMake script handles absence gracefully; the task just needs to not refuse to configure.
+    inputs.file(projectIniFile).optional(true).withPropertyName('projectIni')
     inputs.file iconScript
     outputs.dir generatedResDir
     doFirst {
