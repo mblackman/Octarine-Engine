@@ -90,7 +90,12 @@ jobs:
           printf '%s' "$OCTARINE_ANDROID_KEYSTORE" | base64 --decode > "$ks"
           echo "path=$ks" >> "$GITHUB_OUTPUT"
 
-      - name: Build AAB (release bundle)
+      # Multi-ABI shipping AAB: arm64-v8a covers all modern devices, armeabi-v7a is the long-tail
+      # 32-bit floor, x86_64 lets Chromebooks + Google Play emulator deliver the right slice.
+      # -Poctarine.abis triggers the manual orchestration path in android/app/build.gradle (per-ABI
+      # cmake + vcpkg triplet); externalNativeBuild is bypassed. bundle.abi.enableSplit (also in
+      # build.gradle) lets Play deliver per-ABI APKs from the same AAB.
+      - name: Build AAB (release bundle, multi-ABI)
         working-directory: android
         env:
           OCTARINE_ANDROID_STORE_PASSWORD: ${{ secrets.OCTARINE_ANDROID_STORE_PASSWORD }}
@@ -102,6 +107,7 @@ jobs:
           export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}"
           args=(bundleRelease
                 -Poctarine.projectDir="$GITHUB_WORKSPACE/example_repo"
+                -Poctarine.abis=arm64-v8a,armeabi-v7a,x86_64
                 --no-daemon --console=plain)
           if [ -n "$KEYSTORE_PATH" ]; then
             args+=(-Poctarine.storeFile="$KEYSTORE_PATH"
@@ -110,6 +116,24 @@ jobs:
                    -Poctarine.keyPassword="$OCTARINE_ANDROID_KEY_PASSWORD")
           fi
           ./gradlew "${args[@]}"
+
+      # Sanity gate: AAB must carry all three ABIs in base/lib/<abi>/libmain.so. A regression in
+      # the multi-ABI orchestration (e.g. one triplet failing to produce libmain.so) would silently
+      # ship a partial AAB; catch it here rather than at the Play upload.
+      - name: Verify AAB carries every ABI
+        run: |
+          set -e
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          [ -f "$aab" ] || { echo "no AAB at $aab"; exit 1; }
+          echo "=== aab listing ==="
+          unzip -l "$aab"
+          for required in arm64-v8a armeabi-v7a x86_64; do
+            if ! unzip -l "$aab" | grep -q "base/lib/$required/libmain.so"; then
+              echo "FAIL: base/lib/$required/libmain.so missing from AAB"
+              exit 1
+            fi
+          done
+          echo "PASS: AAB carries libmain.so for every ABI"
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4

@@ -30,13 +30,26 @@ jobs:
         include:
           - os: ubuntu-latest
             platform: linux
+            preset: ship-release
             pkg_glob: build/ship-release/*.tar.gz
           - os: windows-latest
             platform: windows
+            preset: ship-release
             pkg_glob: build/ship-release/*.zip
           - os: macos-latest
             platform: macos
+            preset: ship-release
             pkg_glob: build/ship-release/*.dmg
+          # Universal macOS .dmg (arm64 + x86_64). Uses the universal-osx overlay triplet so vcpkg
+          # deps are fat too; cold build is ~2x the single-arch macos leg (every port compiled
+          # twice). x-gha cache is keyed on triplet so this is a fresh cold build the first time it
+          # runs — subsequent PRs hit the universal-osx cache and match the single-arch leg's wall
+          # time. Lives alongside the per-arch macos leg rather than replacing it: arm64-only ships
+          # smaller and is the common case for Apple-silicon users.
+          - os: macos-latest
+            platform: macos-universal
+            preset: ship-mac-universal
+            pkg_glob: build/ship-mac-universal/*.dmg
 
     steps:
       - name: Checkout engine
@@ -108,20 +121,43 @@ jobs:
       - name: Configure CMake (packaging)
         shell: bash
         # ship-release preset = shipping config: no editor/ImGui, OCTARINE_SHIPPED=ON so the artifact
-        # loads the baked manifest instead of scanning a read-only dir. OCTARINE_PACKAGE_PROJECT
-        # wires the CPack layout (octarine_package also force-sets OCTARINE_SHIPPED as a guardrail).
+        # loads the baked manifest instead of scanning a read-only dir. The macos-universal leg
+        # swaps in ship-mac-universal to fat-build for arm64+x86_64. OCTARINE_PACKAGE_PROJECT wires
+        # the CPack layout (octarine_package also force-sets OCTARINE_SHIPPED as a guardrail).
         # Mixed slashes in the Windows path are fine for CMake.
-        run: cmake --preset ship-release -DOCTARINE_PACKAGE_PROJECT="${{ github.workspace }}/example_repo"
+        run: cmake --preset ${{ matrix.preset }} -DOCTARINE_PACKAGE_PROJECT="${{ github.workspace }}/example_repo"
 
       - name: Build
-        run: cmake --build build/ship-release --config Release --parallel
+        run: cmake --build build/${{ matrix.preset }} --config Release --parallel
 
       - name: Package (cpack + manifest bake gate)
-        run: cmake --build build/ship-release --target package
+        run: cmake --build build/${{ matrix.preset }} --target package
 
       - name: List package output
         shell: bash
-        run: ls -la build/ship-release | grep -Ei '\.(zip|tar\.gz|dmg)$' || (echo "no package produced" && exit 1)
+        run: ls -la build/${{ matrix.preset }} | grep -Ei '\.(zip|tar\.gz|dmg)$' || (echo "no package produced" && exit 1)
+
+      # Universal leg only: assert the produced binary actually carries both slices. `lipo -archs`
+      # prints `arm64 x86_64` on a fat Mach-O; a single-arch slip-through (e.g. a port that ignored
+      # VCPKG_OSX_ARCHITECTURES) would show one entry and silently ship a non-universal .dmg. The
+      # binary lives at .app/Contents/MacOS/OctarineEngine inside the .dmg, so mount → check → eject.
+      - name: Verify universal binary (lipo)
+        if: matrix.platform == 'macos-universal'
+        shell: bash
+        run: |
+          set -e
+          dmg=$(ls build/ship-mac-universal/*.dmg | head -n 1)
+          echo "Mounting $dmg"
+          hdiutil attach "$dmg" -mountpoint /Volumes/OctarineUniversal -nobrowse
+          bin=$(find /Volumes/OctarineUniversal -name OctarineEngine -type f | head -n 1)
+          [ -n "$bin" ] || { echo "no OctarineEngine binary in mounted dmg"; ls -R /Volumes/OctarineUniversal; exit 1; }
+          archs=$(lipo -archs "$bin")
+          echo "Binary archs: $archs"
+          hdiutil detach /Volumes/OctarineUniversal
+          for required in arm64 x86_64; do
+            grep -qw "$required" <<<"$archs" || { echo "FAIL: $required slice missing from universal binary"; exit 1; }
+          done
+          echo "PASS: universal binary carries both arm64 and x86_64"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
