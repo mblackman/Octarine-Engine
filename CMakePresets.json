@@ -83,6 +83,22 @@
       }
     },
     {
+      "name": "ship-mac-universal",
+      "inherits": "ship-release",
+      "displayName": "Ship (macOS universal arm64+x86_64)",
+      "description": "Shippable macOS .app: universal binary (arm64 + x86_64) so one .dmg runs on both Apple silicon and Intel. Uses the universal-osx overlay triplet so vcpkg deps are fat too. macOS-only — vcpkg's universal triplet drives lipo'd dylibs/static archives that Linux/Windows hosts can't cross-build.",
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
+        "VCPKG_TARGET_TRIPLET": "universal-osx",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/vcpkg-overlay-triplets"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
+      }
+    },
+    {
       "name": "ios-base",
       "hidden": true,
       "generator": "Xcode",
@@ -128,6 +144,7 @@
     { "name": "player-profile", "configurePreset": "player-profile" },
     { "name": "player-release", "configurePreset": "player-release" },
     { "name": "ship-release", "configurePreset": "ship-release" },
+    { "name": "ship-mac-universal", "configurePreset": "ship-mac-universal" },
     { "name": "ship-ios-device", "configurePreset": "ship-ios-device", "configuration": "Release" },
     { "name": "ship-ios-simulator", "configurePreset": "ship-ios-simulator", "configuration": "Release" }
   ]

@@ -90,6 +90,17 @@ def tripletForAbi = ['arm64-v8a': 'arm64-android', 'x86_64': 'x64-android',
                      'armeabi-v7a': 'arm-android', 'x86': 'x86-android']
 def vcpkgTriplet = prop('octarine.triplet', tripletForAbi.getOrDefault(abi, 'arm64-android'))
 
+// Multi-ABI mode for shippable AAB. -Poctarine.abis=arm64-v8a,armeabi-v7a,x86_64 turns on the
+// manual orchestration path: AGP's externalNativeBuild is bypassed (it can only run ONE vcpkg
+// triplet per variant) and replaced by a fan-out of per-ABI cmake invocations whose libmain.so
+// outputs land under build/octarineJni/<abi>/. AAB packaging picks them up via jniLibs.srcDir.
+// Single-ABI (-Poctarine.abi or default) keeps the externalNativeBuild path for IDE friendliness.
+def abisProp     = project.findProperty('octarine.abis')
+def multiAbi     = abisProp != null && !abisProp.toString().trim().isEmpty()
+def abiList      = multiAbi ? abisProp.toString().split(',').collect{ it.trim() }.findAll{ !it.isEmpty() }
+                            : [abi]
+def nativeBuildRoot = "${layout.buildDirectory.get().asFile}/octarineJni"
+
 def repoRoot = "${rootDir}/.."                                  // android/ sits at <repo>/android
 // gameProjectDir is defined above (project.ini lookup uses it).
 def bakeExe = project.findProperty('octarine.bakeExe')
@@ -114,28 +125,34 @@ android {
         versionName = appVerName
         resValue "string", "app_name", appName   // drives the manifest @string/app_name label
         ndk {
-            abiFilters abi
+            abiFilters = abiList   // single-ABI dev mode = [abi]; -Poctarine.abis lists all 3
         }
-        externalNativeBuild {
-            cmake {
-                // vcpkg's android toolchain finds the NDK via ANDROID_NDK_HOME; the chainload arg
-                // below covers the engine's own configure. Compute the NDK toolchain path with the
-                // same fallback the rest of the build uses.
-                def ndkHome = System.getenv('ANDROID_NDK_HOME') ?: System.getenv('ANDROID_NDK_ROOT')
-                if (ndkHome == null) {
-                    ndkHome = "${android.sdkDirectory}/ndk/${appNdk}"
+        // Single-ABI: AGP runs CMake for us via externalNativeBuild (IDE-friendly path).
+        // Multi-ABI: bypassed — the custom octarineNative_<abi>_* tasks fan-out per-ABI cmake
+        // invocations, since externalNativeBuild can only carry ONE VCPKG_TARGET_TRIPLET per
+        // variant but each Android ABI needs its own triplet (arm64-android, arm-android, ...).
+        if (!multiAbi) {
+            externalNativeBuild {
+                cmake {
+                    // vcpkg's android toolchain finds the NDK via ANDROID_NDK_HOME; the chainload arg
+                    // below covers the engine's own configure. Compute the NDK toolchain path with the
+                    // same fallback the rest of the build uses.
+                    def ndkHome = System.getenv('ANDROID_NDK_HOME') ?: System.getenv('ANDROID_NDK_ROOT')
+                    if (ndkHome == null) {
+                        ndkHome = "${android.sdkDirectory}/ndk/${appNdk}"
+                    }
+                    def ndkToolchain = "${ndkHome}/build/cmake/android.toolchain.cmake"
+                    arguments "-DANDROID_PLATFORM=android-${appMinSdk}",
+                              "-DANDROID_STL=c++_shared",
+                              "-DCMAKE_TOOLCHAIN_FILE=${vcpkgRoot}/scripts/buildsystems/vcpkg.cmake",
+                              "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ndkToolchain}",
+                              "-DVCPKG_TARGET_TRIPLET=${vcpkgTriplet}",
+                              "-DVCPKG_MANIFEST_MODE=ON",
+                              // Overlay sol2 port patched for the NDK clang noexcept bug (LLVM #91362);
+                              // see vcpkg-overlay-ports/sol2. Without it the engine won't compile.
+                              "-DVCPKG_OVERLAY_PORTS=${rootDir}/vcpkg-overlay-ports"
+                    targets "OctarineEngine"   // produces libmain.so (OUTPUT_NAME main)
                 }
-                def ndkToolchain = "${ndkHome}/build/cmake/android.toolchain.cmake"
-                arguments "-DANDROID_PLATFORM=android-${appMinSdk}",
-                          "-DANDROID_STL=c++_shared",
-                          "-DCMAKE_TOOLCHAIN_FILE=${vcpkgRoot}/scripts/buildsystems/vcpkg.cmake",
-                          "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ndkToolchain}",
-                          "-DVCPKG_TARGET_TRIPLET=${vcpkgTriplet}",
-                          "-DVCPKG_MANIFEST_MODE=ON",
-                          // Overlay sol2 port patched for the NDK clang noexcept bug (LLVM #91362);
-                          // see vcpkg-overlay-ports/sol2. Without it the engine won't compile.
-                          "-DVCPKG_OVERLAY_PORTS=${rootDir}/vcpkg-overlay-ports"
-                targets "OctarineEngine"   // produces libmain.so (OUTPUT_NAME main)
             }
         }
     }
@@ -170,18 +187,33 @@ android {
         }
     }
 
-    externalNativeBuild {
-        cmake {
-            path "${repoRoot}/CMakeLists.txt"   // the engine's root CMake
+    // externalNativeBuild block only when AGP is driving CMake. Multi-ABI mode skips it (see the
+    // octarineNative_<abi>_* tasks below).
+    if (!multiAbi) {
+        externalNativeBuild {
+            cmake {
+                path "${repoRoot}/CMakeLists.txt"   // the engine's root CMake
+            }
         }
     }
 
     sourceSets.main {
-        jniLibs.srcDir 'libs'
+        // Multi-ABI mode: per-ABI libmain.so lands under build/octarineJni/<abi>/. AGP packages
+        // every <abi>/ subdir into the APK's lib/<abi>/.
+        jniLibs.srcDirs = multiAbi ? ['libs', nativeBuildRoot] : ['libs']
         assets.srcDirs = [stagedAssetsDir]
         // Generated mipmap-*/values-v31 ride beside the committed res tree; AAPT2 merges them so
         // ic_launcher.png and the splash AppTheme override land in the APK with no manual placement.
         res.srcDir generatedResDir
+    }
+
+    // AAB per-ABI splits: Play delivers an APK carrying only the device's ABI rather than the full
+    // fat AAB. Off by default in AGP — flip on so the multi-ABI shipping AAB downloads smaller.
+    // Cosmetic for single-ABI AABs (only one split bucket).
+    bundle {
+        abi {
+            enableSplit = true
+        }
     }
 
     lint {
@@ -262,9 +294,83 @@ tasks.register('generateOctarineIcons', Exec) {
     }
 }
 
+// Multi-ABI native build orchestration. Single-ABI dev path stays on AGP's externalNativeBuild
+// (see the `if (!multiAbi)` blocks above) — these tasks only register when -Poctarine.abis is
+// passed. For each ABI we fan-out three tasks: configure (cmake), build (cmake --build), stage
+// (copy libmain.so into jniLibs srcDir). The aggregator `octarineNativeAll` depends on every
+// stage task, and preBuild pulls it in so `assembleDebug` / `bundleRelease` see the .so files.
+//
+// vcpkg's android workflow needs ANDROID_NDK_HOME — propagated via the `environment` block on
+// each Exec so cmake sees the same NDK android.toolchain.cmake AGP would have used.
+if (multiAbi) {
+    def ndkHome = System.getenv('ANDROID_NDK_HOME') ?: System.getenv('ANDROID_NDK_ROOT')
+    if (ndkHome == null) {
+        ndkHome = "${android.sdkDirectory}/ndk/${appNdk}"
+    }
+    def ndkToolchain = "${ndkHome}/build/cmake/android.toolchain.cmake"
+    def stageTaskNames = []
+
+    abiList.each { iterAbi ->
+        def triplet = tripletForAbi.getOrDefault(iterAbi, 'arm64-android')
+        def configureDir = "${nativeBuildRoot}/.build/${iterAbi}"
+        def stageOutDir  = "${nativeBuildRoot}/${iterAbi}"
+        def configureTask = "octarineNative_${iterAbi}_configure"
+        def buildTask     = "octarineNative_${iterAbi}_build"
+        def stageTask     = "octarineNative_${iterAbi}_stage"
+
+        tasks.register(configureTask, Exec) {
+            description = "CMake configure for Android ABI ${iterAbi} (triplet ${triplet})."
+            doFirst {
+                file(configureDir).mkdirs()
+                file(stageOutDir).mkdirs()
+            }
+            workingDir configureDir
+            environment 'ANDROID_NDK_HOME', ndkHome
+            commandLine 'cmake',
+                    "${repoRoot}",
+                    '-G', 'Ninja',
+                    "-DANDROID_ABI=${iterAbi}",
+                    "-DANDROID_PLATFORM=android-${appMinSdk}",
+                    '-DANDROID_STL=c++_shared',
+                    "-DCMAKE_TOOLCHAIN_FILE=${vcpkgRoot}/scripts/buildsystems/vcpkg.cmake",
+                    "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ndkToolchain}",
+                    "-DVCPKG_TARGET_TRIPLET=${triplet}",
+                    '-DVCPKG_MANIFEST_MODE=ON',
+                    "-DVCPKG_OVERLAY_PORTS=${rootDir}/vcpkg-overlay-ports",
+                    '-DCMAKE_BUILD_TYPE=Release'
+        }
+
+        tasks.register(buildTask, Exec) {
+            description = "CMake build for Android ABI ${iterAbi}."
+            dependsOn configureTask
+            workingDir configureDir
+            commandLine 'cmake', '--build', '.', '--target', 'OctarineEngine', '--parallel'
+        }
+
+        tasks.register(stageTask, Copy) {
+            description = "Stage libmain.so for Android ABI ${iterAbi} into jniLibs."
+            dependsOn buildTask
+            from("${configureDir}") {
+                include 'libmain.so'
+            }
+            into stageOutDir
+        }
+
+        stageTaskNames += stageTask
+    }
+
+    tasks.register('octarineNativeAll') {
+        description = 'Build libmain.so for every ABI in -Poctarine.abis.'
+        dependsOn stageTaskNames
+    }
+}
+
 tasks.configureEach { task ->
     if (task.name == 'preBuild') {
         task.dependsOn 'stageOctarineAssets', 'generateOctarineIcons'
+        if (multiAbi) {
+            task.dependsOn 'octarineNativeAll'
+        }
     }
 }
 
