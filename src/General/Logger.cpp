@@ -11,6 +11,66 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #endif
 
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
+#if defined(__APPLE__) && TARGET_OS_IPHONE
+#include <os/log.h>
+
+#include <mutex>
+#include <spdlog/sinks/base_sink.h>
+
+namespace {
+
+// iOS app processes have no stdout/stderr attached, so spdlog's default color sink writes into the
+// void. Route through Apple's os_log so messages show up in Console.app and `xcrun simctl spawn …
+// log stream` under subsystem "com.octarine.engine".
+template <typename Mutex>
+class OsLogSink : public spdlog::sinks::base_sink<Mutex> {
+ public:
+  OsLogSink(const char* subsystem, const char* category) : log_(os_log_create(subsystem, category)) {}
+
+ protected:
+  void sink_it_(const spdlog::details::log_msg& msg) override {
+    spdlog::memory_buf_t formatted;
+    spdlog::sinks::base_sink<Mutex>::formatter_->format(msg, formatted);
+    std::string out(formatted.data(), formatted.size());
+    while (!out.empty() && (out.back() == '\n' || out.back() == '\r')) out.pop_back();
+    os_log_type_t type = OS_LOG_TYPE_DEFAULT;
+    switch (msg.level) {
+      case spdlog::level::trace:
+      case spdlog::level::debug:
+        type = OS_LOG_TYPE_DEBUG;
+        break;
+      case spdlog::level::info:
+        type = OS_LOG_TYPE_INFO;
+        break;
+      case spdlog::level::warn:
+        type = OS_LOG_TYPE_DEFAULT;
+        break;
+      case spdlog::level::err:
+        type = OS_LOG_TYPE_ERROR;
+        break;
+      case spdlog::level::critical:
+        type = OS_LOG_TYPE_FAULT;
+        break;
+      default:
+        break;
+    }
+    os_log_with_type(log_, type, "%{public}s", out.c_str());
+  }
+  void flush_() override {}
+
+ private:
+  os_log_t log_;
+};
+
+using OsLogSinkMt = OsLogSink<std::mutex>;
+
+}  // namespace
+#endif
+
 std::shared_ptr<spdlog::logger> Logger::lua_logger_;
 std::vector<std::string> Logger::history_;
 std::mutex Logger::history_mutex_;
@@ -45,8 +105,20 @@ void Logger::Init() {
   auto main_logger = spdlog::android_logger_mt("octarine", "Octarine");
   spdlog::set_default_logger(main_logger);
   lua_logger_ = spdlog::android_logger_mt("octarine-lua", "OctarineLua");
+#elif defined(__APPLE__) && TARGET_OS_IPHONE
+  // iOS: stdout goes nowhere, so route through os_log. Categories "Octarine"/"OctarineLua" mirror
+  // the Android tags — filter in Console.app or `log stream --predicate 'subsystem ==
+  // "com.octarine.engine"'`.
+  auto main_logger = std::make_shared<spdlog::logger>(
+      "octarine", std::make_shared<OsLogSinkMt>("com.octarine.engine", "Octarine"));
+  spdlog::register_logger(main_logger);
+  spdlog::set_default_logger(main_logger);
+  lua_logger_ = std::make_shared<spdlog::logger>(
+      "octarine-lua", std::make_shared<OsLogSinkMt>("com.octarine.engine", "OctarineLua"));
+  spdlog::register_logger(lua_logger_);
 #else
-  // Desktop: keep the historical stdout-color sinks so the dev terminal experience is unchanged.
+  // Desktop (incl. macOS): keep the historical stdout-color sinks so the dev terminal experience is
+  // unchanged.
   auto main_logger = spdlog::stdout_color_mt("octarine");
   spdlog::set_default_logger(main_logger);
   lua_logger_ = spdlog::stdout_color_mt("lua");

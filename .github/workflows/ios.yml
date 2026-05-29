@@ -1,0 +1,242 @@
+name: iOS
+
+# Builds the iOS .app for the example project from a clean environment — the CI gate that any
+# project on this engine still cross-compiles + links for iOS. Mirrors android.yml: vcpkg ios deps
+# from source (x-gha binary cache), the engine compiled to a Mach-O .app bundle via xcodebuild,
+# project assets staged into the bundle root by octarine_package's POST_BUILD copy.
+#
+# Simulator-only, unsigned. A device leg needs a provisioning profile + .p12 cert in the runner
+# keychain (Apple Developer account); out of scope until codesign secrets are wired. The simulator
+# build exercises the full vcpkg arm64-ios-simulator toolchain + the bundle staging path, and a
+# downstream runtime step boots a simulator, installs the .app, launches it, and asserts the
+# engine reached the manifest-load branch — catches regressions a build-only leg would miss
+# (SDL_main wiring, Metal renderer, bundle resource resolution at SDL_GetBasePath()).
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  ios:
+    name: ios (arm64-ios-simulator)
+    runs-on: macos-latest
+    # First run builds every vcpkg arm64-ios-simulator dep from source (SDL3 + image/mixer/ttf +
+    # their transitive deps: freetype, harfbuzz, libpng, libogg, libvorbis, ...). Allow a generous
+    # ceiling; subsequent runs hit the x-gha binary cache.
+    timeout-minutes: 120
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout example project
+        uses: actions/checkout@v4
+        with:
+          repository: mblackman/Octarine-Engine-Example
+          path: example_repo
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      # Host tools vcpkg needs to build ports from source on macOS. Xcode (clang, xcodebuild) is
+      # preinstalled on macos-latest; autotools chain (autoconf/automake/libtool) is what freetype
+      # + harfbuzz + libvorbis configure scripts need but is not on the default image.
+      - name: Install host build tools
+        run: brew install autoconf automake autoconf-archive libtool pkg-config
+
+      - name: Select Xcode
+        # Pin to a known-good Xcode rather than rolling with whatever the runner image flips to.
+        # macos-latest currently ships Xcode 15.4+; if a runner update breaks vcpkg's iOS triplet
+        # we want a single line to bisect against.
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      - name: Configure CMake (iOS simulator)
+        # ship-ios-simulator preset = Xcode generator + CMAKE_SYSTEM_NAME=iOS + arm64-ios-simulator
+        # triplet + shipping flags. OCTARINE_PACKAGE_PROJECT wires octarine_package's iOS branch
+        # (Info.plist from project.ini, POST_BUILD copy of the staged project into the .app).
+        # The example repo ships a baked asset_manifest.lua so no host-bake exe is needed at CI
+        # configure time (the contract documented in CLAUDE.md).
+        #
+        # Identity overrides are a belt-and-suspenders for the case where the example repo doesn't
+        # commit its project.ini — the CMake helper warns and uses engine defaults, which yields an
+        # empty CFBundleIdentifier. The CLI overrides force a valid id even then. When the example
+        # repo does commit a project.ini, these are no-ops (file > nothing, but CLI > file — so
+        # they win; keep these in sync with example_repo/project.ini if it gets committed).
+        # OCTARINE_LOG_LEVEL=info overrides the shipping-build default of `warn`, so the
+        # AssetCatalog manifest-load Info line is observable from the simulator launch assertion
+        # below (config.ini LogLevel= still wins if the example commits one).
+        run: |
+          cmake --preset ship-ios-simulator \
+            -DOCTARINE_PACKAGE_PROJECT="${{ github.workspace }}/example_repo" \
+            -DOCTARINE_PACKAGE_ID="com.octarine.example" \
+            -DOCTARINE_PACKAGE_NAME="Octarine Example" \
+            -DOCTARINE_PACKAGE_VERSION_NAME="0.1.0" \
+            -DOCTARINE_PACKAGE_VERSION_CODE="1" \
+            -DOCTARINE_PACKAGE_VENDOR="Octarine" \
+            -DOCTARINE_LOG_LEVEL=info
+
+      - name: Build
+        # xcodebuild is the underlying driver; Release configuration matches the preset's
+        # CMAKE_BUILD_TYPE. The bundle's POST_BUILD copy step runs as part of the build phase.
+        # CODE_SIGNING_ALLOWED=NO keeps the simulator build unsigned — no provisioning profile
+        # required on the runner.
+        run: cmake --build build/ship-ios-simulator --config Release -- CODE_SIGNING_ALLOWED=NO
+
+      - name: Locate built bundle
+        id: bundle
+        run: |
+          set -e
+          app=$(find build/ship-ios-simulator -name 'OctarineEngine.app' -type d -print -quit)
+          if [ -z "$app" ]; then
+            echo "no OctarineEngine.app produced"
+            exit 1
+          fi
+          echo "path=$app" >> "$GITHUB_OUTPUT"
+          echo "Bundle:"
+          ls -la "$app"
+
+      - name: Verify staged project files in bundle
+        # Sanity gate: the POST_BUILD copy should have placed config.ini + asset_manifest.lua at
+        # the bundle root (where SDL_GetBasePath() points on iOS). If the staging path regressed,
+        # catch it here rather than at a launch we can't run on CI.
+        run: |
+          set -e
+          app="${{ steps.bundle.outputs.path }}"
+          for required in config.ini asset_manifest.lua game.lua; do
+            if [ ! -f "$app/$required" ]; then
+              echo "missing $required in bundle"
+              ls -la "$app"
+              exit 1
+            fi
+          done
+          echo "Bundle staging looks good."
+
+      - name: Archive .app for upload
+        # actions/upload-artifact preserves directories but flattens executable bits / xattrs that
+        # matter on a .app. Zip preserves them and gives a single-file download. The zip lands at
+        # the workspace root because upload-artifact@v4 rejects `..` in path patterns.
+        run: |
+          cd "$(dirname '${{ steps.bundle.outputs.path }}')"
+          zip -r "$GITHUB_WORKSPACE/OctarineEngine-ios-simulator.zip" "$(basename '${{ steps.bundle.outputs.path }}')"
+
+      - name: Upload .app
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctarineEngine-ios-simulator
+          path: OctarineEngine-ios-simulator.zip
+          if-no-files-found: error
+
+      # Boot a fresh simulator + install + launch the bundle, then assert the engine reached the
+      # manifest-load branch. Catches a class of regression the build leg can't see: a .app that
+      # links but won't actually run on iOS (SDL_main missing, Metal renderer failing, bundle
+      # resources missing at runtime path, ...). We pick the first available iOS runtime + iPhone
+      # device type so a runner image flip doesn't pin us to a stale version.
+      - name: Pick simulator runtime + device type
+        id: simpick
+        # The full devicetypes list contains entries that require a newer runtime than the one
+        # installed on the runner (e.g. iPhone 17 Pro needs iOS 26+, runner ships iOS 18.5 → error
+        # 403 "Incompatible device"). Pick the device from the chosen runtime's supportedDeviceTypes
+        # so the create call is always compatible.
+        run: |
+          set -e
+          read runtime device < <(xcrun simctl list runtimes -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          rt = next(r for r in data["runtimes"] if r.get("platform") == "iOS" and r.get("isAvailable"))
+          dev = next(d for d in rt["supportedDeviceTypes"] if "iPhone" in d.get("name", ""))
+          print(rt["identifier"], dev["identifier"])
+          ')
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
+          echo "device=$device" >> "$GITHUB_OUTPUT"
+          echo "Picked runtime: $runtime"
+          echo "Picked device:  $device"
+
+      - name: Create + boot simulator
+        run: |
+          set -e
+          xcrun simctl create OctarineCI "${{ steps.simpick.outputs.device }}" "${{ steps.simpick.outputs.runtime }}"
+          xcrun simctl boot OctarineCI
+          # -b waits until the simulator finishes booting (services up, springboard ready).
+          xcrun simctl bootstatus OctarineCI -b
+
+      - name: Install + launch + assert manifest-load + audio init
+        # iOS engine logs are routed through os_log (subsystem com.octarine.engine) since
+        # ce493fa — stdout is silent, so `simctl launch --console-pty` captures nothing useful.
+        # `log stream` works but races a sub-100ms boot (the AssetCatalog manifest-load line
+        # fires during catalog build, before subscription is live, even with a pre-launch
+        # sleep). Use `log show --last` to query the unified log archive AFTER the app has
+        # had time to run — it backfills every event in the window, no race.
+        #
+        # Game::Setup ordering is catalog build → AudioSystem::Init → LoadGame, so once the
+        # audio line is in the archive the manifest line must be too.
+        #
+        # Audio acceptable as either:
+        #   - success path: "AudioSystem initialized"
+        #   - graceful-degrade path: "MIX_Init failed" / "MIX_CreateMixerDevice failed"
+        #     (sim may have no audio backend; engine flips audioEnabled off and proceeds)
+        # Either proves AudioSystem::Init ran on the iOS sim. Renderer init is implicit: a failed
+        # SDL_CreateRenderer dies before reaching catalog build, so the manifest line is itself a
+        # renderer probe.
+        run: |
+          set -e
+          app="${{ steps.bundle.outputs.path }}"
+          xcrun simctl install OctarineCI "$app"
+          xcrun simctl launch OctarineCI com.octarine.example >launch.log 2>&1 || true
+          # Poll the unified log archive. --info + --debug widen past the default level filter
+          # (our spdlog Info maps to OS_LOG_TYPE_INFO); --last grows each iteration so the
+          # snapshot always covers the launch. Up to ~90s budget.
+          audio=0
+          manifest=0
+          for i in $(seq 1 18); do
+            xcrun simctl spawn booted log show \
+              --predicate 'subsystem == "com.octarine.engine"' \
+              --style compact \
+              --info --debug \
+              --last 5m >oslog.txt 2>&1 || true
+            if grep -Eq "AudioSystem initialized|MIX_Init failed|MIX_CreateMixerDevice failed" oslog.txt; then
+              audio=1
+            fi
+            if grep -q "AssetCatalog: loaded .* entries from manifest" oslog.txt; then
+              manifest=1
+            fi
+            if [ $audio -eq 1 ] && [ $manifest -eq 1 ]; then
+              break
+            fi
+            sleep 5
+          done
+          echo "=== launch.log (stdout/stderr) ==="
+          cat launch.log || true
+          echo "=== end launch.log ==="
+          echo "=== oslog.txt (com.octarine.engine subsystem, last snapshot) ==="
+          cat oslog.txt || true
+          echo "=== end oslog.txt ==="
+          if [ $manifest -ne 1 ]; then
+            echo "FAIL: AssetCatalog manifest-load line missing within budget"
+            exit 1
+          fi
+          if [ $audio -ne 1 ]; then
+            echo "FAIL: AudioSystem init outcome missing within budget"
+            exit 1
+          fi
+          if grep -q "AudioSystem initialized" oslog.txt; then
+            echo "PASS: simulator launch reached manifest-load + AudioSystem live"
+          else
+            echo "PASS: simulator launch reached manifest-load + AudioSystem graceful-degraded (no sim audio backend)"
+          fi
+
+      - name: Tear down simulator
+        if: always()
+        run: |
+          xcrun simctl terminate OctarineCI com.octarine.example || true
+          xcrun simctl shutdown OctarineCI || true
+          xcrun simctl delete OctarineCI || true

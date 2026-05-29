@@ -131,7 +131,104 @@ function(octarine_package TARGET)
     target_compile_definitions(${TARGET} PRIVATE OCTARINE_SHIPPED)
     message(STATUS "Octarine: packaging '${OP_NAME}' from project '${OP_PROJECT}' (OCTARINE_SHIPPED forced ON)")
 
-    # ---- Deliverable layout -------------------------------------------------------------------
+    # ---- Project identity ---------------------------------------------------------------------
+    # Resolved up front so both the iOS Info.plist branch below and the desktop CPack block at the
+    # end of this function can consume it. Precedence: CLI cache override > project.ini > default.
+    octarine_read_project_ini("${OP_PROJECT}" _pi)
+    _octarine_resolve_identity(_pkg_name        "${OCTARINE_PACKAGE_NAME}"         "${_pi_name}"         "${OP_NAME}")
+    _octarine_resolve_identity(_pkg_version     "${OCTARINE_PACKAGE_VERSION_NAME}" "${_pi_version_name}" "${PROJECT_VERSION}")
+    _octarine_resolve_identity(_pkg_version_code "${OCTARINE_PACKAGE_VERSION_CODE}" "${_pi_version_code}" "1")
+    _octarine_resolve_identity(_pkg_vendor      "${OCTARINE_PACKAGE_VENDOR}"       "${_pi_vendor}"       "Octarine")
+    _octarine_resolve_identity(_pkg_description "${OCTARINE_PACKAGE_DESCRIPTION}"  "${_pi_description}"  "${PROJECT_DESCRIPTION}")
+    _octarine_resolve_identity(_pkg_id          "${OCTARINE_PACKAGE_ID}"           "${_pi_package_id}"   "")
+    _octarine_validate_identity("${OP_PROJECT}" "${_pkg_name}" "${_pkg_id}" "${_pkg_version}" ON)
+
+    # ---- iOS bundle ---------------------------------------------------------------------------
+    # iOS .app is a flat bundle: binary + Resources sit at the bundle root, reached by
+    # SDL_GetBasePath(). xcodebuild handles signing/install/.ipa archiving, so this helper only
+    # owns build-time wiring: Info.plist identity, asset staging, and the POST_BUILD copy of the
+    # baked project into the bundle. CPack is irrelevant here — `.ipa` is xcodebuild's output.
+    #
+    # Bake is NOT invoked here: a cross-compiled iOS binary can't execute on the build host. The
+    # project must ship a baked asset_manifest.lua (the Android contract, see CLAUDE.md). To
+    # automate the bake at build time, point OCTARINE_HOST_BAKE_EXE at a host-native build of
+    # OctarineEngine and we POST_BUILD-run it before the copy.
+    if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set_target_properties(${TARGET} PROPERTIES
+                MACOSX_BUNDLE                       ON
+                MACOSX_BUNDLE_BUNDLE_NAME           "${_pkg_name}"
+                MACOSX_BUNDLE_GUI_IDENTIFIER        "${_pkg_id}"
+                MACOSX_BUNDLE_SHORT_VERSION_STRING  "${_pkg_version}"
+                MACOSX_BUNDLE_BUNDLE_VERSION        "${_pkg_version_code}"
+                MACOSX_BUNDLE_INFO_STRING           "${_pkg_description}"
+                MACOSX_BUNDLE_COPYRIGHT             "${_pkg_vendor}"
+                # CMake-generated Xcode targets default to SKIP_INSTALL=YES, which makes
+                # `xcodebuild archive` succeed but leave the .xcarchive's Products/Applications/
+                # directory empty (the .app lands in UninstalledProducts/ instead). Both the
+                # signed `xcodebuild -exportArchive` path and the unsigned-archive Payload zip
+                # in scripts/build-ios-ipa.sh need the .app under Products/Applications/, so
+                # flip SKIP_INSTALL off and point INSTALL_PATH at /Applications (the iOS app
+                # install root, mirroring Xcode's default iOS-app target).
+                XCODE_ATTRIBUTE_SKIP_INSTALL        "NO"
+                XCODE_ATTRIBUTE_INSTALL_PATH        "/Applications"
+        )
+
+        # Optional codesign passthrough. If unset Xcode falls back to its own signing settings
+        # (automatic team if configured, or unsigned for the simulator). The dev team / identity
+        # are deployment concerns, not source-tree concerns — keep them out of the preset.
+        if (DEFINED CACHE{OCTARINE_IOS_DEVELOPMENT_TEAM} AND OCTARINE_IOS_DEVELOPMENT_TEAM)
+            set_target_properties(${TARGET} PROPERTIES
+                    XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${OCTARINE_IOS_DEVELOPMENT_TEAM}")
+        endif ()
+        if (DEFINED CACHE{OCTARINE_IOS_CODE_SIGN_IDENTITY} AND OCTARINE_IOS_CODE_SIGN_IDENTITY)
+            set_target_properties(${TARGET} PROPERTIES
+                    XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "${OCTARINE_IOS_CODE_SIGN_IDENTITY}")
+        endif ()
+
+        # Stage the project to a clean dir at configure time so the POST_BUILD copy is a single
+        # cmake -E copy_directory (which has no exclude flag). file(COPY ... PATTERN EXCLUDE)
+        # handles the scratch filtering; same exclusion list as the desktop install(DIRECTORY).
+        set(_ios_staged "${CMAKE_BINARY_DIR}/_octarine_ios_staged_project")
+        file(REMOVE_RECURSE "${_ios_staged}")
+        file(COPY "${OP_PROJECT}/"
+                DESTINATION "${_ios_staged}"
+                PATTERN ".git" EXCLUDE
+                PATTERN ".gitignore" EXCLUDE
+                PATTERN "*.meta" EXCLUDE
+                PATTERN "editor_prefs.ini" EXCLUDE
+                PATTERN "preferences.ini" EXCLUDE
+                PATTERN "imgui.ini" EXCLUDE
+                PATTERN "project.ini" EXCLUDE)
+
+        # Optional host-bake step. Cross-compiled binary can't run on the build host, so the bake
+        # needs a host-native OctarineEngine. Matches the Android `-Poctarine.bakeExe` contract.
+        if (DEFINED CACHE{OCTARINE_HOST_BAKE_EXE} AND OCTARINE_HOST_BAKE_EXE)
+            add_custom_command(TARGET ${TARGET} PRE_BUILD
+                    COMMAND "${OCTARINE_HOST_BAKE_EXE}" "${_ios_staged}" -m bake
+                    COMMENT "Octarine: baking asset manifest into staged project (iOS)"
+                    VERBATIM)
+        else ()
+            if (NOT EXISTS "${_ios_staged}/asset_manifest.lua")
+                message(WARNING "Octarine iOS: no asset_manifest.lua in project and OCTARINE_HOST_BAKE_EXE is unset — "
+                                "the shipped bundle will fail to load assets at launch. Either commit a baked manifest "
+                                "to ${OP_PROJECT} or set -DOCTARINE_HOST_BAKE_EXE=<path/to/desktop/OctarineEngine>.")
+            endif ()
+        endif ()
+
+        # Copy staged project into the .app at the bundle root (where SDL_GetBasePath() points on
+        # iOS). $<TARGET_BUNDLE_DIR> resolves to .../<config>/<TARGET>.app for the Xcode generator.
+        add_custom_command(TARGET ${TARGET} POST_BUILD
+                COMMAND "${CMAKE_COMMAND}" -E copy_directory
+                        "${_ios_staged}"
+                        "$<TARGET_BUNDLE_DIR:${TARGET}>"
+                COMMENT "Octarine: staging project files into ${TARGET}.app"
+                VERBATIM)
+
+        message(STATUS "Octarine: iOS bundle '${_pkg_name}' ${_pkg_version} id=${_pkg_id}")
+        return()
+    endif ()
+
+    # ---- Deliverable layout (desktop) ---------------------------------------------------------
     # macOS: a .app bundle; binary in Contents/MacOS, project files in Contents/Resources.
     # Windows/Linux: flat — binary + project files share the package root so base_path_ finds them.
     if (APPLE)
@@ -174,17 +271,48 @@ function(octarine_package TARGET)
             PATTERN "imgui.ini" EXCLUDE
     )
 
-    # Bundle the runtime DLLs (dynamic vcpkg triplet). vcpkg app-local-deploys the FULL transitive
-    # set beside the built binary (SDL + its private deps: freetype, libpng, jpeg, zlib, ...), so we
-    # copy whatever landed there rather than $<TARGET_RUNTIME_DLLS> — that genex only lists directly
-    # linked imports and would miss the transitive ones, yielding a 0xC0000135 at launch. A static
-    # triplet (x64-windows-static) leaves no DLLs and makes this a no-op. (Linux/macOS .so/.dylib
-    # bundling differs — typically system libs or static linking; not wired here yet.)
+    # Bundle vcpkg runtime libs beside the binary. The default vcpkg triplets on Linux/macOS
+    # (x64-linux, *-osx) are static — the glob hits nothing and the step is a no-op. A dynamic
+    # triplet or SHARED build of SDL3 drops .so/.dylib alongside the build-tree binary; those need
+    # to ship with the package. We glob TARGET_FILE_DIR rather than $<TARGET_RUNTIME_DLLS> for the
+    # same reason as Windows: vcpkg's app-local copy includes the FULL transitive set (freetype,
+    # libpng, jpeg, zlib, ...), and the genex only lists direct imports — missing a transitive dep
+    # yields a load-time failure (0xC0000135 on Windows; ENOENT/dyld at launch on Linux/macOS).
+    # FOLLOW_SYMLINK_CHAIN copies the libfoo.so → libfoo.so.1 → libfoo.so.1.2.3 versioned chain
+    # whole rather than dropping a dangling symlink.
     if (WIN32)
         install(CODE "
             file(GLOB _octarine_runtime_dlls \"$<TARGET_FILE_DIR:${TARGET}>/*.dll\")
             if (_octarine_runtime_dlls)
                 file(INSTALL \${_octarine_runtime_dlls} DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${_runtime_dest}\")
+            endif ()
+        ")
+    elseif (APPLE)
+        # Bundle into Contents/Frameworks; INSTALL_RPATH on the binary points the loader there.
+        # vcpkg dylibs use @rpath/... install_names, so the rpath rewrite alone is enough — no
+        # install_name_tool dance needed unless a future dep ships with an absolute install_name
+        # (at which point swap this for BundleUtilities::fixup_bundle).
+        set(_octarine_fw_dest "${TARGET}.app/Contents/Frameworks")
+        set_target_properties(${TARGET} PROPERTIES INSTALL_RPATH "@executable_path/../Frameworks")
+        install(CODE "
+            file(GLOB _octarine_runtime_libs \"$<TARGET_FILE_DIR:${TARGET}>/*.dylib\")
+            if (_octarine_runtime_libs)
+                file(INSTALL \${_octarine_runtime_libs}
+                     DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${_octarine_fw_dest}\"
+                     FOLLOW_SYMLINK_CHAIN)
+            endif ()
+        ")
+    else ()
+        # Linux: libs go beside the binary; $ORIGIN tells the dynamic linker to look there.
+        set_target_properties(${TARGET} PROPERTIES INSTALL_RPATH "$ORIGIN")
+        install(CODE "
+            file(GLOB _octarine_runtime_libs
+                 \"$<TARGET_FILE_DIR:${TARGET}>/*.so\"
+                 \"$<TARGET_FILE_DIR:${TARGET}>/*.so.*\")
+            if (_octarine_runtime_libs)
+                file(INSTALL \${_octarine_runtime_libs}
+                     DESTINATION \"\${CMAKE_INSTALL_PREFIX}/${_runtime_dest}\"
+                     FOLLOW_SYMLINK_CHAIN)
             endif ()
         ")
     endif ()
@@ -231,19 +359,7 @@ function(octarine_package TARGET)
 
     # ---- CPack --------------------------------------------------------------------------------
     # include(CPack) below captures these from THIS scope, so set them plainly (no PARENT_SCOPE).
-    #
-    # Project identity sources, in precedence order: CLI cache override > project.ini > built-in
-    # default (the latter falls back to engine metadata + OP_NAME so a project with no project.ini
-    # still packages — just under the engine's identity, which is fine for the example today).
-    octarine_read_project_ini("${OP_PROJECT}" _pi)
-    _octarine_resolve_identity(_pkg_name        "${OCTARINE_PACKAGE_NAME}"         "${_pi_name}"         "${OP_NAME}")
-    _octarine_resolve_identity(_pkg_version     "${OCTARINE_PACKAGE_VERSION_NAME}" "${_pi_version_name}" "${PROJECT_VERSION}")
-    _octarine_resolve_identity(_pkg_vendor      "${OCTARINE_PACKAGE_VENDOR}"       "${_pi_vendor}"       "Octarine")
-    _octarine_resolve_identity(_pkg_description "${OCTARINE_PACKAGE_DESCRIPTION}"  "${_pi_description}"  "${PROJECT_DESCRIPTION}")
-    # package_id isn't consumed by CPack (desktop has no native bundle id), but we resolve and
-    # validate it here so a misconfig is caught before it bites Android with the same project.ini.
-    _octarine_resolve_identity(_pkg_id          "${OCTARINE_PACKAGE_ID}"           "${_pi_package_id}"   "")
-    _octarine_validate_identity("${OP_PROJECT}" "${_pkg_name}" "${_pkg_id}" "${_pkg_version}" ON)
+    # Identity was resolved up front (see top of function) so iOS could share it; reuse those vars.
     set(CPACK_PACKAGE_NAME "${_pkg_name}")
     set(CPACK_PACKAGE_VERSION "${_pkg_version}")
     set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${_pkg_description}")

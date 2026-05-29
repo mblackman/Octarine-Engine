@@ -61,6 +61,16 @@ if (ANDROID)
     set(OCTARINE_SHIPPED ON CACHE BOOL "Forced ON on Android (manifest-load, no FS scan)" FORCE)
 endif ()
 
+# iOS target. CMAKE_SYSTEM_NAME=iOS (set by --preset ship-ios-* or by `-DCMAKE_SYSTEM_NAME=iOS`)
+# triggers the cross-compile to a .app bundle. Same shipping rationale as Android: the bundle is a
+# read-only FS, so we manifest-load with editor/ImGui compiled out. Forced here so a misconfigured
+# preset can't silently produce a non-shippable iOS binary.
+if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    set(OCTARINE_WITH_EDITOR OFF CACHE BOOL "Disabled on iOS" FORCE)
+    set(OCTARINE_WITH_IMGUI OFF CACHE BOOL "Disabled on iOS" FORCE)
+    set(OCTARINE_SHIPPED ON CACHE BOOL "Forced ON on iOS (manifest-load, no FS scan)" FORCE)
+endif ()
+
 if (OCTARINE_WITH_EDITOR)
     set(OCTARINE_WITH_IMGUI ON CACHE BOOL "Forced ON by Editor" FORCE)
 endif ()
@@ -128,10 +138,14 @@ if (OCTARINE_WITH_IMGUI)
 endif ()
 
 # Create the engine target. On Android, SDLActivity dlopens libmain.so and jumps to SDL_main, so the
-# engine must be that shared lib (OUTPUT_NAME main → libmain.so). Everywhere else it is an executable.
+# engine must be that shared lib (OUTPUT_NAME main → libmain.so). On iOS, the binary must be a .app
+# bundle (MACOSX_BUNDLE) so Xcode signs/installs it as an app and SDL_GetBasePath() resolves the
+# bundle root. Everywhere else it is a plain executable.
 if (ANDROID)
     add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
     set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME main)
+elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    add_executable(${PROJECT_NAME} MACOSX_BUNDLE ${SRC_FILES})
 else ()
     add_executable(${PROJECT_NAME} ${SRC_FILES})
 endif ()
@@ -231,8 +245,10 @@ if (NOT OCTARINE_PACKAGE_PROJECT AND NOT ANDROID)
     )
 endif ()
 
-# Packaging: wire CPack + the deliverable layout only when a project dir is supplied. Android packages
-# via Gradle (see android/), not CPack, so the desktop packaging block is skipped there.
+# Packaging: wire the deliverable layout when a project dir is supplied. Android packages via Gradle
+# (see android/) so the helper is skipped there entirely. iOS goes through the helper to get the
+# .app bundle wiring (Resources staging, Info.plist from project.ini) but skips the CPack invocation
+# at the bottom — `.ipa` production is xcodebuild's job, not CPack's.
 if (OCTARINE_PACKAGE_PROJECT AND NOT ANDROID)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/OctarinePackage.cmake)
     octarine_package(${PROJECT_NAME} PROJECT "${OCTARINE_PACKAGE_PROJECT}" NAME "${PROJECT_NAME}")
@@ -269,7 +285,7 @@ else ()
             -Wconversion
             -Wfatal-errors
     )
-    if (ANDROID)
+    if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
         # Cross-compile: -march=native would target the build host, not the device. -Werror is dropped
         # because device-arch-specific warnings can't be observed/cleared from a desktop checkout.
         target_compile_options(${PROJECT_NAME} PRIVATE

@@ -1,0 +1,89 @@
+name: iOS .ipa
+
+# Exercises scripts/build-ios-ipa.sh end-to-end on macos-latest: ship-ios-device preset (arm64-ios
+# triplet) + xcodebuild archive, then packs Payload/<App>.app from the .xcarchive into an unsigned
+# .ipa. Catches regressions the simulator leg (ios.yml) can't see: the device-target compile, the
+# device-target linker (Mach-O for iphoneos, not iphonesimulator), and the xcodebuild archive
+# action. Signed leg is gated on codesign secrets (Apple Developer team + .p12 + provisioning
+# profile) — separate work, not blocking this gate.
+#
+# workflow_dispatch only: first run builds the entire arm64-ios vcpkg port set from source (SDL3 +
+# image/mixer/ttf + freetype + harfbuzz + libpng/ogg/vorbis), 60+ min cold. Subsequent runs hit the
+# x-gha binary cache, ~10 min. Once cached, lift to push/pull_request to gate every change.
+on:
+  workflow_dispatch:
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  ipa:
+    name: ios-ipa (arm64-ios, unsigned archive)
+    runs-on: macos-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout example project
+        uses: actions/checkout@v4
+        with:
+          repository: mblackman/Octarine-Engine-Example
+          path: example_repo
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      # Same host tools the simulator leg needs — vcpkg's freetype / harfbuzz / libvorbis ports
+      # configure with autotools, which isn't on the default macos-latest image.
+      - name: Install host build tools
+        run: brew install autoconf automake autoconf-archive libtool pkg-config
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode.app
+
+      # Single call into the script — drives configure (ship-ios-device preset, arm64-ios triplet)
+      # + xcodebuild archive + Payload zip → .ipa. Identity overrides match ios.yml so the bundle
+      # gets a sane CFBundleIdentifier even if example_repo doesn't commit a project.ini.
+      - name: Build unsigned .ipa
+        run: |
+          scripts/build-ios-ipa.sh \
+            --project "${{ github.workspace }}/example_repo" \
+            --unsigned-archive \
+            --name "Octarine Example" \
+            --id "com.octarine.example" \
+            --version "0.1.0" \
+            --version-code "1" \
+            --vendor "Octarine" \
+            --output "${{ github.workspace }}/OctarineEngine-ios.ipa"
+
+      # Sanity gate: the .ipa is a zip of Payload/<App>.app. Confirm the staged project files made
+      # it into the bundle (same check as ios.yml's simulator leg). If the iOS POST_BUILD copy ever
+      # regresses, catch it here rather than at install time on a device.
+      - name: Verify .ipa contents
+        run: |
+          set -e
+          ipa="${{ github.workspace }}/OctarineEngine-ios.ipa"
+          [ -f "$ipa" ] || { echo "no .ipa at $ipa"; exit 1; }
+          echo "=== .ipa listing ==="
+          unzip -l "$ipa"
+          for required in config.ini asset_manifest.lua game.lua; do
+            if ! unzip -l "$ipa" | grep -q "Payload/OctarineEngine.app/$required"; then
+              echo "FAIL: $required missing from Payload/OctarineEngine.app/"
+              exit 1
+            fi
+          done
+          echo "PASS: .ipa contains config.ini + asset_manifest.lua + game.lua"
+
+      - name: Upload .ipa
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctarineEngine-ios-ipa-unsigned
+          path: OctarineEngine-ios.ipa
+          if-no-files-found: error
