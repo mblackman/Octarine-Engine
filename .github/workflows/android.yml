@@ -7,6 +7,7 @@ name: Android
 on:
   push:
     branches: [ main ]
+    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
@@ -24,12 +25,32 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          # Full history so `git rev-list --count HEAD` in the Resolve version step computes the
+          # monotonic versionCode on tag pushes. Default depth 1 would return 1 every release.
+          fetch-depth: 0
 
       - name: Checkout example project
         uses: actions/checkout@v4
         with:
           repository: mblackman/Octarine-Engine-Example
           path: example_repo
+
+      # Tag push v0.1.2 -> versionName=0.1.2, versionCode=<commit count>. Non-tag runs leave both
+      # blank and Gradle's identityProp helper falls through to project.ini / built-in defaults.
+      - name: Resolve version (tag push)
+        id: ver
+        run: |
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+            v="${GITHUB_REF#refs/tags/v}"
+            code=$(git rev-list --count HEAD)
+            echo "Tag push: versionName=$v versionCode=$code"
+          else
+            v=""
+            code=""
+            echo "Non-tag run: version derives from project.ini"
+          fi
+          echo "version_name=$v" >> "$GITHUB_OUTPUT"
+          echo "version_code=$code" >> "$GITHUB_OUTPUT"
 
       - name: Export GitHub Actions cache env (vcpkg binary cache)
         uses: actions/github-script@v7
@@ -62,12 +83,18 @@ jobs:
 
       - name: Build APK
         working-directory: android
+        env:
+          OCTARINE_VERSION_NAME: ${{ steps.ver.outputs.version_name }}
+          OCTARINE_VERSION_CODE: ${{ steps.ver.outputs.version_code }}
         run: |
           export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
           export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}"
-          ./gradlew assembleDebug \
-            -Poctarine.projectDir="$GITHUB_WORKSPACE/example_repo" \
-            --no-daemon --console=plain
+          args=(assembleDebug
+                -Poctarine.projectDir="$GITHUB_WORKSPACE/example_repo"
+                --no-daemon --console=plain)
+          [ -n "$OCTARINE_VERSION_NAME" ] && args+=(-Poctarine.versionName="$OCTARINE_VERSION_NAME")
+          [ -n "$OCTARINE_VERSION_CODE" ] && args+=(-Poctarine.versionCode="$OCTARINE_VERSION_CODE")
+          ./gradlew "${args[@]}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -102,6 +129,8 @@ jobs:
           OCTARINE_ANDROID_KEY_ALIAS: ${{ secrets.OCTARINE_ANDROID_KEY_ALIAS }}
           OCTARINE_ANDROID_KEY_PASSWORD: ${{ secrets.OCTARINE_ANDROID_KEY_PASSWORD }}
           KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+          OCTARINE_VERSION_NAME: ${{ steps.ver.outputs.version_name }}
+          OCTARINE_VERSION_CODE: ${{ steps.ver.outputs.version_code }}
         run: |
           export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
           export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}"
@@ -115,6 +144,8 @@ jobs:
                    -Poctarine.keyAlias="$OCTARINE_ANDROID_KEY_ALIAS"
                    -Poctarine.keyPassword="$OCTARINE_ANDROID_KEY_PASSWORD")
           fi
+          [ -n "$OCTARINE_VERSION_NAME" ] && args+=(-Poctarine.versionName="$OCTARINE_VERSION_NAME")
+          [ -n "$OCTARINE_VERSION_CODE" ] && args+=(-Poctarine.versionCode="$OCTARINE_VERSION_CODE")
           ./gradlew "${args[@]}"
 
       # Sanity gate: AAB must carry all three ABIs in base/lib/<abi>/libmain.so. A regression in
