@@ -153,7 +153,10 @@ android {
 
     buildTypes {
         release {
-            minifyEnabled false
+            // R8/ProGuard off by default — proguard-rules.pro is maintained (SDL JNI keep-rules +
+            // safety-net `native <methods>;`) so flipping this on is a probe, not a leap of faith.
+            // -Poctarine.minify=true exercises the shrunk path in CI without editing this file.
+            minifyEnabled = (prop('octarine.minify', 'false') as String).toBoolean()
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
             // Use the supplied keystore if present; else the debug key so `assembleRelease` still
             // yields an installable (debug-signed) APK for testing rather than an unsigned one.

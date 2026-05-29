@@ -75,3 +75,45 @@ jobs:
           name: OctarineEngine-android-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      # Decode the release keystore on demand. Secrets are not available to fork PRs (so HAS_KEYSTORE
+      # stays empty there), in which case bundleRelease falls back to the debug key — still a useful
+      # build-passes signal. Pinned secret names mirror the Stage 1 contract in
+      # ai/DeviceShippingPlan.md.
+      - name: Decode release keystore
+        id: keystore
+        if: env.OCTARINE_ANDROID_KEYSTORE != ''
+        env:
+          OCTARINE_ANDROID_KEYSTORE: ${{ secrets.OCTARINE_ANDROID_KEYSTORE }}
+        run: |
+          ks="$RUNNER_TEMP/release.jks"
+          printf '%s' "$OCTARINE_ANDROID_KEYSTORE" | base64 --decode > "$ks"
+          echo "path=$ks" >> "$GITHUB_OUTPUT"
+
+      - name: Build AAB (release bundle)
+        working-directory: android
+        env:
+          OCTARINE_ANDROID_STORE_PASSWORD: ${{ secrets.OCTARINE_ANDROID_STORE_PASSWORD }}
+          OCTARINE_ANDROID_KEY_ALIAS: ${{ secrets.OCTARINE_ANDROID_KEY_ALIAS }}
+          OCTARINE_ANDROID_KEY_PASSWORD: ${{ secrets.OCTARINE_ANDROID_KEY_PASSWORD }}
+          KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+        run: |
+          export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}"
+          args=(bundleRelease
+                -Poctarine.projectDir="$GITHUB_WORKSPACE/example_repo"
+                --no-daemon --console=plain)
+          if [ -n "$KEYSTORE_PATH" ]; then
+            args+=(-Poctarine.storeFile="$KEYSTORE_PATH"
+                   -Poctarine.storePassword="$OCTARINE_ANDROID_STORE_PASSWORD"
+                   -Poctarine.keyAlias="$OCTARINE_ANDROID_KEY_ALIAS"
+                   -Poctarine.keyPassword="$OCTARINE_ANDROID_KEY_PASSWORD")
+          fi
+          ./gradlew "${args[@]}"
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctarineEngine-android-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

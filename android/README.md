@@ -146,17 +146,103 @@ compile. The overlay re-installs sol2 with that (optimization-only) `noexcept` s
 one-time sol2 rebuild on first configure; nothing else changes. Desktop builds are untouched (they
 don't use the overlay).
 
+## Release signing & AAB
+
+Play Store wants an `.aab` (Android App Bundle), not an `.apk`, and it must be signed with an
+**upload key** consistent across every update — losing it means you can never update the app on
+that listing again. Treat the keystore like a secret with no expiry: back it up out-of-band the day
+you generate it.
+
+### Generate an upload keystore
+
+```powershell
+# One-time, anywhere outside the repo. Picks RSA-2048, 25-year validity (Play minimum is 25y).
+keytool -genkeypair -v `
+  -keystore octarine-upload.jks `
+  -alias octarine-upload `
+  -keyalg RSA -keysize 2048 -validity 9125 `
+  -storetype JKS
+```
+
+`keytool` prompts for two passwords (store + key) and a distinguished-name block — fill it in for
+your studio identity. Keep `octarine-upload.jks` outside the repo (e.g. a 1Password vault or
+encrypted drive). Lose the file or the passwords and the Play listing is orphaned; back both up.
+
+### Local signed build
+
+`build.gradle` reads four `-Poctarine.*` properties; supply them via `~/.gradle/gradle.properties`
+(gitignored, machine-scoped) so you don't pass passwords on the command line:
+
+```properties
+octarine.storeFile=C:\\path\\to\\octarine-upload.jks
+octarine.storePassword=...
+octarine.keyAlias=octarine-upload
+octarine.keyPassword=...
+```
+
+```powershell
+cd android
+.\gradlew.bat bundleRelease -Poctarine.projectDir=C:\path\to\MyGame
+# -> app\build\outputs\bundle\release\app-release.aab
+```
+
+Verify the result is signed with your upload key, not the debug key:
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\build-tools\35.0.0\apksigner.bat" verify --print-certs `
+  app\build\outputs\bundle\release\app-release.aab
+```
+
+### CI signing
+
+`.github/workflows/android.yml` decodes the keystore from a GitHub secret per run and forwards it
+to Gradle. Configure these repository secrets (Settings → Secrets and variables → Actions):
+
+| Secret                              | Value                                                     |
+|-------------------------------------|-----------------------------------------------------------|
+| `OCTARINE_ANDROID_KEYSTORE`         | `base64 -w0 octarine-upload.jks` output (single line).    |
+| `OCTARINE_ANDROID_STORE_PASSWORD`   | Keystore password.                                        |
+| `OCTARINE_ANDROID_KEY_ALIAS`        | Key alias (e.g. `octarine-upload`).                       |
+| `OCTARINE_ANDROID_KEY_PASSWORD`     | Key password (often same as store password).             |
+
+With the secrets set, `bundleRelease` on every push/PR signs the AAB with your upload key. With the
+secrets unset (e.g. fork PRs), the workflow falls through to the debug key — the AAB is still a
+valid build-passes signal, but it isn't Play-uploadable.
+
+### R8 / minification
+
+`minifyEnabled` defaults to `false` on the release build type. `proguard-rules.pro` already keeps
+the SDL JNI surface plus a safety-net `native <methods>;` rule, so flipping it on is a probe rather
+than a leap of faith. Run the probe locally before a release:
+
+```powershell
+.\gradlew.bat bundleRelease -Poctarine.minify=true -Poctarine.projectDir=C:\path\to\MyGame
+# Spot-check the stripped JNI symbols survived:
+& "$env:LOCALAPPDATA\Android\Sdk\ndk\28.2.13676358\toolchains\llvm\prebuilt\windows-x86_64\bin\llvm-nm.exe" `
+  -D app\build\intermediates\merged_native_libs\release\out\lib\arm64-v8a\libmain.so `
+  | Select-String 'Java_org_libsdl_app_'
+```
+
+Re-enable in `build.gradle` (or just keep `-Poctarine.minify=true` in your project's CI) once you've
+confirmed startup works on a real device for that project. Size win is modest (only the Java side
+shrinks; SDL3 + engine are in `libmain.so`, untouched).
+
 ## CI
 
-`.github/workflows/android.yml` builds the APK on every push/PR to `main` (and on demand) — the gate
-that any project still cross-compiles for Android. ubuntu runner: JDK 17, `sdkmanager` installs the
-pinned NDK + cmake, vcpkg android deps from the shared `x-gha` binary cache, `gradlew assembleDebug`
-against the example, APK uploaded as an artifact. Build-only (no device/emulator).
+`.github/workflows/android.yml` builds the APK and AAB on every push/PR to `main` (and on demand) —
+the gate that any project still cross-compiles for Android. ubuntu runner: JDK 17, `sdkmanager`
+installs the pinned NDK + cmake, vcpkg android deps from the shared `x-gha` binary cache, then runs
+`gradlew assembleDebug` (debug APK) followed by `gradlew bundleRelease` (release AAB) against the
+example. Both artifacts upload. Build-only (no device/emulator). Release signing uses the
+`OCTARINE_ANDROID_*` secrets (see above) when set; otherwise falls back to the debug key so fork
+PRs still build a complete artifact.
 
 ## Status
 
-**Builds:** `gradlew assembleDebug`/`assembleRelease` produces an APK (`com.octarine.example`,
-label `Octarine Example`, `libmain.so` + `libc++_shared.so` + staged assets/manifest, `arm64-v8a`).
-Host app is **project-generic** (`-Poctarine.*`, no per-project file edits). Emulator runtime
-verified (Pixel arm64 via Berberis, manifest-load + tilemap + sprites render — see
-`runtime-screen.png`). Release strip + JNI export survival on a stripped APK is the last open item.
+**Builds:** `gradlew assembleDebug`/`assembleRelease`/`bundleRelease` produces APK/AAB
+(`com.octarine.example`, label `Octarine Example`, `libmain.so` + `libc++_shared.so` + staged
+assets/manifest, `arm64-v8a`). Host app is **project-generic** (`-Poctarine.*`, no per-project
+file edits). Release signing wired via `-Poctarine.storeFile`/`storePassword`/`keyAlias`/
+`keyPassword` (or the matching CI secrets), debug-key fallback. R8/minify off by default,
+opt-in via `-Poctarine.minify=true`. Emulator runtime verified (Pixel arm64 via Berberis,
+manifest-load + tilemap + sprites render — see `runtime-screen.png`).

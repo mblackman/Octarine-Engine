@@ -16,6 +16,15 @@
 #   public *;
 #}
 
+# Safety net for the JNI bridge. libmain.so RegisterNatives'es methods declared `native` on
+# org.libsdl.app.*; if R8 drops a method name or renames a class, registration fails at startup
+# with NoSuchMethodError. The explicit per-method rules below cover the SDL surface SDL binds
+# today; this rule preserves the *names* of any other `native` declarations across all classes,
+# so future SDL/JNI additions don't silently break a shrunk build.
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
 -keep,includedescriptorclasses,allowoptimization class org.libsdl.app.SDLActivity {
     java.lang.String nativeGetHint(java.lang.String); # Java-side doesn't use this, so it gets minified, but C-side still tries to register it
     java.lang.String clipboardGetText();
