@@ -14,4 +14,7 @@ struct EngineOptions {
   bool isPaused = false;
   float timeScale = 1.0F;
   bool stepFrame = false;
+  // When true, a scene whose asset references fail validation aborts the load (dev gate). Off by
+  // default so players never hard-fail; the bake step is the CI enforcement point.
+  bool assetValidationFatal = false;
 };

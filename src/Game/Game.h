@@ -4,6 +4,8 @@
 
 #include <memory>
 #include <sol/sol.hpp>
+#include <string>
+#include <vector>
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/GlobalTransformComponent.h"
@@ -49,6 +51,12 @@ public:
     void ReloadScene();
     void StopScene();
 
+    // Record asset ids acquired for the current scene so StopScene/the next LoadScene releases
+    // them. Deduped against ids already tracked. Called by the C++ scene loader and by the
+    // `acquire_scene_assets` Lua global (which serves scenes that load via a side-effect script
+    // rather than returning a table). Safe to call repeatedly with overlapping sets.
+    void TrackSceneAssets(const std::vector<std::string>& assetIds);
+
     // True between a successful LoadScene/ReloadScene and the next StopScene. The editor toolbar
     // uses this to decide whether Play should resume a paused scene or (re)start a stopped one.
     [[nodiscard]] bool IsSceneRunning() const { return scene_running_; }
@@ -59,6 +67,10 @@ private:
     void Render(float deltaTime);
     [[nodiscard]] float WaitTime();
     void Setup();
+    // Clear the current scene's user entities and reset per-scene Lua input state, without
+    // touching acquired assets. Asset release is sequenced separately so a scene swap can acquire
+    // the next scene's set before releasing the previous one (acquire-before-release).
+    void clearSceneEntities();
     void OnKeyInputEvent(const KeyInputEvent& event);
     static KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);
 
@@ -68,6 +80,9 @@ private:
     static inline bool s_is_running_{false};
     bool scene_running_ = false;
     Uint64 milliseconds_previous_frame_ = 0;
+    // Asset ids acquired for the currently loaded scene. StopScene releases these; LoadScene
+    // acquires the next scene's set first (acquire-before-release) so shared assets never churn.
+    std::vector<std::string> current_scene_assets_;
 
     sol::state lua;
     std::string startup_mode_;

@@ -60,6 +60,8 @@ find_package(Threads REQUIRED)
 set(SRC_FILES
         src/Main.cpp
         src/AssetManager/AssetManager.cpp
+        src/AssetManager/AssetCatalog.cpp
+        src/AssetManager/SceneAssetScanner.cpp
         src/ECS/Registry.cpp
         src/Game/Game.cpp
         src/Game/GameConfig.cpp
@@ -360,6 +362,61 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
 
     add_test(NAME LuaApiSmokeTest COMMAND OctarineLuaApiTest)
+
+    # Asset pipeline checks (metadata defaults + catalog build). Links the full engine minus the
+    # real entry point, matching the smoke test, so later stages can exercise AssetCatalog::Build
+    # (which needs GameConfig / sol2) without re-plumbing the target.
+    set(ASSET_TEST_SRC_FILES ${SRC_FILES})
+    list(REMOVE_ITEM ASSET_TEST_SRC_FILES src/Main.cpp)
+    list(APPEND ASSET_TEST_SRC_FILES tests/AssetPipelineTest.cpp)
+
+    add_executable(OctarineAssetPipelineTest ${ASSET_TEST_SRC_FILES})
+
+    set_target_properties(OctarineAssetPipelineTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+    )
+
+    target_compile_definitions(OctarineAssetPipelineTest PRIVATE GLM_FORCE_INTRINSICS)
+    target_compile_definitions(OctarineAssetPipelineTest PRIVATE
+            ASSET_TEST_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/assets")
+    if (OCTARINE_WITH_IMGUI)
+        target_compile_definitions(OctarineAssetPipelineTest PRIVATE OCTARINE_WITH_IMGUI)
+    endif ()
+    if (OCTARINE_WITH_EDITOR)
+        target_compile_definitions(OctarineAssetPipelineTest PRIVATE OCTARINE_WITH_EDITOR)
+    endif ()
+    if (OCTARINE_ENABLE_PROFILING)
+        target_compile_definitions(OctarineAssetPipelineTest PRIVATE OCTARINE_PROFILING)
+    endif ()
+
+    target_include_directories(OctarineAssetPipelineTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs
+            ${LUA_INCLUDE_DIR}
+    )
+
+    target_link_libraries(OctarineAssetPipelineTest PRIVATE
+            glm::glm
+            SDL3::SDL3
+            SDL3_ttf::SDL3_ttf
+            $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
+            $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
+            ${LUA_LIBRARIES}
+            spdlog::spdlog
+            sol2::sol2
+            Threads::Threads
+    )
+    if (OCTARINE_WITH_IMGUI)
+        target_link_libraries(OctarineAssetPipelineTest PRIVATE imgui::imgui sol2_ImGui_Bindings)
+    endif ()
+
+    if (MSVC)
+        target_compile_options(OctarineAssetPipelineTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
+    endif ()
+
+    add_test(NAME AssetPipelineTest COMMAND OctarineAssetPipelineTest)
 
     message(STATUS "Octarine: Tests ENABLED")
 endif ()

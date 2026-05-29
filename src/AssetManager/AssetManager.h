@@ -8,6 +8,10 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <vector>
+
+#include "AssetManager/AssetCatalog.h"
+#include "AssetManager/AssetReference.h"
 
 class GameConfig;
 
@@ -17,6 +21,13 @@ class AssetManager {
   std::map<std::string, TTF_Font*> fonts_;
   std::map<std::string, MIX_Audio*> audio_clips_;
   std::optional<SDL_ScaleMode> default_scale_mode_;
+  // Index of every discoverable asset (id -> file + metadata). Loads nothing on its own;
+  // Acquire consults it to load on demand.
+  AssetCatalog catalog_;
+  // Per-id acquire count. The 0 -> 1 transition loads the underlying handle; the N -> 0
+  // transition unloads it. Assets loaded via the legacy load_asset path are adopted at refcount 1
+  // on first Acquire. Entries at zero are erased.
+  std::map<std::string, int> refcounts_;
   // Bumped whenever a texture is added or replaced. Sprite renderers compare against
   // their cached generation to know when to re-resolve a stale SDL_Texture* pointer.
   std::uint64_t texture_generation_{0};
@@ -36,6 +47,27 @@ class AssetManager {
   void LoadGameConfig(const GameConfig& config);
 
   void ClearAssets();
+
+  // Load a single catalog asset by id if it is not already resident. Returns true when the asset
+  // is available afterwards (already loaded, or freshly loaded), false when the id is unknown to
+  // the catalog or the underlying load failed. `renderer`/`mixer` feed the texture/audio loaders.
+  // Uses refcounting to manage the underlying handle.
+  bool Acquire(const std::string& assetId, SDL_Renderer* renderer, MIX_Mixer* mixer);
+
+  // Acquire the deduped set of referenced ids. Returns the count successfully acquired.
+  int AcquireAll(const std::vector<AssetReference>& refs, SDL_Renderer* renderer, MIX_Mixer* mixer);
+
+  // Drop one reference to an asset id. When the count reaches zero the underlying SDL/MIX handle
+  // is destroyed and the entry erased; unknown/untracked ids are ignored.
+  void Release(const std::string& assetId);
+  void ReleaseAll(const std::vector<std::string>& assetIds);
+
+  // Validate scene references against the catalog: an id missing from the catalog, or present but
+  // whose backing file no longer exists on disk, is logged once with the referencing context.
+  // Returns the number of failures (0 == clean). This is the authoritative miss check, replacing
+  // the per-frame warnings the Get* accessors used to emit at draw time.
+  [[nodiscard]] int Validate(const std::vector<AssetReference>& refs) const;
+
   void AddTexture(SDL_Renderer* renderer, const std::string& assetId, const std::string& path);
   [[nodiscard]] SDL_Texture* GetTexture(const std::string& assetId) const;
   void AddFont(const std::string& assetId, const std::string& path, float fontSize);
@@ -46,7 +78,23 @@ class AssetManager {
   void SetDefaultScaleMode(const std::string& scaleMode);
   [[nodiscard]] std::uint64_t TextureGeneration() const { return texture_generation_; }
 
+  [[nodiscard]] AssetCatalog& GetCatalog() { return catalog_; }
+  [[nodiscard]] const AssetCatalog& GetCatalog() const { return catalog_; }
+
+  // Current acquire count for an id (0 if untracked). Test/diagnostic aid.
+  [[nodiscard]] int RefCount(const std::string& assetId) const;
+
   [[nodiscard]] const std::map<std::string, SDL_Texture*>& GetTextures() const { return textures_; }
   [[nodiscard]] const std::map<std::string, TTF_Font*>& GetFonts() const { return fonts_; }
   [[nodiscard]] const std::map<std::string, MIX_Audio*>& GetAudioClips() const { return audio_clips_; }
+
+ private:
+  // Perform the actual SDL/MIX load for a catalog entry (no refcount bookkeeping). Returns whether
+  // the handle is resident afterwards.
+  bool LoadFromCatalog(const CatalogEntry& entry, const std::string& assetId, SDL_Renderer* renderer,
+                       MIX_Mixer* mixer);
+
+  // Destroy and erase whichever resident handle backs `assetId` (texture/font/audio). Bumps
+  // texture_generation_ when a texture is dropped so cached SDL_Texture* pointers re-resolve.
+  void UnloadAsset(const std::string& assetId);
 };

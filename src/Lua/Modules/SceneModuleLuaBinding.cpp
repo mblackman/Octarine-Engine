@@ -6,9 +6,15 @@
 #include <string>
 #include <utility>
 
+#include <set>
+#include <stdexcept>
+#include <vector>
+
 #include "AssetManager/AssetManager.h"
+#include "AssetManager/SceneAssetScanner.h"
 #include "ECS/Registry.h"
 #include "Game/Game.h"
+#include "Game/GameConfig.h"
 #include "General/Logger.h"
 #include "Lua/LuaEntityLoader.h"
 
@@ -43,6 +49,42 @@ void LuaModuleBinding<SceneModule>::install(sol::state& lua, Game& game)
         auto* registry = game.GetRegistry();
         LoadAsset(std::move(assetTable), registry->Get<AssetManager>(), game.GetRenderer(),
                   registry->Get<MIX_Mixer*>());
+    });
+    // Scan a scene table for its required asset ids (sprite/font/audio + tilemap + preload),
+    // validate them against the catalog, then acquire each. The data-driven replacement for a
+    // manual load_asset loop; scripts using a custom loader call this instead of listing assets by
+    // hand. Returns the number of assets successfully acquired. Raises a Lua error when validation
+    // fails and the assetValidationFatal dev gate is set.
+    lua.set_function("acquire_scene_assets", [&game](const sol::table& scene) -> int
+    {
+        auto* registry = game.GetRegistry();
+        auto& assetManager = registry->Get<AssetManager>();
+        auto* mixerPtr = registry->TryGet<MIX_Mixer*>();
+        MIX_Mixer* mixer = mixerPtr ? *mixerPtr : nullptr;
+
+        const std::vector<AssetReference> refs = SceneAssetScanner::CollectRefs(scene);
+        if (const int failures = assetManager.Validate(refs); failures > 0 &&
+            registry->Get<GameConfig>().GetEngineOptions().assetValidationFatal)
+        {
+            throw std::runtime_error("acquire_scene_assets: " + std::to_string(failures) +
+                                     " unresolved asset reference(s); assetValidationFatal is set.");
+        }
+
+        const int acquired = assetManager.AcquireAll(refs, game.GetRenderer(), mixer);
+
+        // Record the acquired ids on the Game so the next scene swap / StopScene releases them.
+        // Without this, scenes that load via a side-effect script (rather than returning a table
+        // the C++ loader scans) would acquire on every reload and never release — refcounts climb.
+        std::vector<std::string> ids;
+        std::set<std::string> seen;
+        for (const auto& ref : refs)
+        {
+            if (seen.insert(ref.id).second) ids.push_back(ref.id);
+        }
+        game.TrackSceneAssets(ids);
+
+        Logger::Info("acquire_scene_assets: acquired " + std::to_string(acquired) + " asset(s).");
+        return acquired;
     });
     lua.set_function("load_entity", [&game](const sol::table& assetTable)
     {

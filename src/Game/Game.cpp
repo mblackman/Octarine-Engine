@@ -4,11 +4,14 @@
 
 #include <algorithm>
 #include <memory>
+#include <set>
 #include <sol/sol.hpp>
 #include <string>
+#include <unordered_set>
 
 #include "../Events/KeyInputEvent.h"
 #include "../General/Logger.h"
+#include "AssetManager/SceneAssetScanner.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 #include "Components/BoxColliderComponent.h"
@@ -457,6 +460,16 @@ void Game::Setup()
     if (gameConfig.HasLoadedConfig())
     {
         assetManager.LoadGameConfig(gameConfig);
+
+        // Discover every available asset + its sidecar metadata up front. Loads nothing — the
+        // catalog is the index Acquire loads from. Built before LoadGame so the startup
+        // script and scene loads can resolve ids against it.
+        assetManager.GetCatalog().Build(assetManager.GetBasePath(), lua, gameConfig);
+        assetManager.GetCatalog().DumpToLog();
+
+        // Expose the global `assets` table (id -> id, raises on typo) so scripts can reference
+        // ids safely before LoadGame runs the startup script.
+        assetManager.GetCatalog().InstallLuaIdTable(lua);
     }
 
     // Audio must be live before LoadGame: the startup script may call load_asset for audio_clip
@@ -761,7 +774,16 @@ void Game::LoadScene(const std::string& scenePath)
 
     Logger::Info("Loading scene: " + fullPath);
 
-    StopScene();
+    // Acquire-before-release: stash the previous scene's tracked assets but defer releasing them
+    // until the new scene's assets are resident, so any id shared by both scenes never
+    // unloads/reloads across the swap. Entities are a different story — a scene script may spawn
+    // entities as a side effect while it runs (the no-table path), so the old entities are cleared
+    // up front, before the script executes, rather than after (which would wipe the new ones).
+    std::vector<std::string> previousSceneAssets = std::move(current_scene_assets_);
+    current_scene_assets_.clear();
+    clearSceneEntities();
+
+    auto releasePrevious = [&]() { assetManager.ReleaseAll(previousSceneAssets); };
 
 #ifdef OCTARINE_WITH_EDITOR
     if (auto* editorPersistence = registry_->TryGet<EditorPersistence>())
@@ -776,6 +798,7 @@ void Game::LoadScene(const std::string& scenePath)
     {
         const sol::error err = result;
         Logger::Error("Failed to load scene '" + fullPath + "': " + std::string(err.what()));
+        releasePrevious();
     }
     else if (result.return_count() > 0)
     {
@@ -818,6 +841,42 @@ void Game::LoadScene(const std::string& scenePath)
                 Logger::Info("Loaded " + std::to_string(assetCount) + " assets from scene table.");
             }
 
+            // 1b. Derive the scene's required asset set from its data (sprite/font/audio ids +
+            // tilemap + preload), validate every reference against the catalog, then acquire up
+            // front before entities load.
+            {
+                auto& am = registry_->Get<AssetManager>();
+                auto* mixerPtr = registry_->TryGet<MIX_Mixer*>();
+                MIX_Mixer* mixer = mixerPtr ? *mixerPtr : nullptr;
+                const std::vector<AssetReference> refs = SceneAssetScanner::CollectRefs(sceneTable);
+
+                if (const int failures = am.Validate(refs); failures > 0)
+                {
+                    Logger::Error("Scene '" + fullPath + "' has " + std::to_string(failures) +
+                                  " unresolved asset reference(s).");
+                    if (registry_->Get<GameConfig>().GetEngineOptions().assetValidationFatal)
+                    {
+                        Logger::Error("assetValidationFatal is set — aborting scene load.");
+                        releasePrevious();
+                        return;
+                    }
+                }
+
+                const int acquired = am.AcquireAll(refs, sdl_renderer_, mixer);
+                Logger::Info("Scene scan acquired " + std::to_string(acquired) + " required asset(s).");
+
+                // New scene's assets are now resident. Track them, then release the previous
+                // scene's set — ids shared by both stay loaded thanks to refcounting.
+                std::vector<std::string> newSceneAssets;
+                std::set<std::string> seen;
+                for (const auto& ref : refs)
+                {
+                    if (seen.insert(ref.id).second) newSceneAssets.push_back(ref.id);
+                }
+                TrackSceneAssets(newSceneAssets);
+                releasePrevious();
+            }
+
             // 2. Load Entities
             sol::optional<sol::table> entities = sceneTable["entities"];
             if (entities && entities->valid())
@@ -852,6 +911,9 @@ void Game::LoadScene(const std::string& scenePath)
         }
         else if (result[0].is<sol::function>())
         {
+            // No scene table to scan up front. The returned function spawns the scene (and may
+            // call acquire_scene_assets, which tracks its ids via TrackSceneAssets). Run it, then
+            // release the previous scene's assets — shared ids it already re-acquired survive.
             Logger::Info("Scene script returned a function. Calling it...");
             sol::function sceneFunc = result[0].as<sol::function>();
             auto funcResult = sceneFunc();
@@ -860,7 +922,18 @@ void Game::LoadScene(const std::string& scenePath)
                 sol::error err = funcResult;
                 Logger::Error("Failed to run scene function: " + std::string(err.what()));
             }
+            releasePrevious();
         }
+        else
+        {
+            releasePrevious();
+        }
+    }
+    else
+    {
+        // No return value: the script built the scene as a side effect while it ran (entities +
+        // any acquire_scene_assets call). Those are already in place; just release the old set.
+        releasePrevious();
     }
 
     scene_running_ = true;
@@ -879,14 +952,42 @@ void Game::ReloadScene()
     Logger::Warn("ReloadScene called but no scene is currently loaded.");
 }
 
-void Game::StopScene()
+void Game::clearSceneEntities()
 {
-    Logger::Info("Stopping current scene (clearing entities).");
     registry_->ClearUserEntities();
     if (auto* inputSystem = registry_->TryGet<InputSystem>())
     {
         inputSystem->ResetLuaState();
     }
+}
+
+void Game::TrackSceneAssets(const std::vector<std::string>& assetIds)
+{
+    for (const auto& id : assetIds)
+    {
+        if (std::ranges::find(current_scene_assets_, id) == current_scene_assets_.end())
+        {
+            current_scene_assets_.push_back(id);
+        }
+    }
+}
+
+void Game::StopScene()
+{
+    Logger::Info("Stopping current scene (clearing entities).");
+    clearSceneEntities();
+
+    // Release the assets this scene acquired. (LoadScene sequences acquire-before-release itself
+    // and does not route through here; this is the explicit-stop path.)
+    if (!current_scene_assets_.empty())
+    {
+        if (auto* assetManager = registry_->TryGet<AssetManager>())
+        {
+            assetManager->ReleaseAll(current_scene_assets_);
+        }
+        current_scene_assets_.clear();
+    }
+
     scene_running_ = false;
 }
 
