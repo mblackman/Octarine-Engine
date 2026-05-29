@@ -98,6 +98,22 @@ jobs:
           echo "Bundle:"
           ls -la "$app"
 
+      - name: Verify third-party licenses bundled
+        # iOS bundles the aggregated file at the .app root + a Settings.bundle pointer. Catches
+        # an aggregator misconfig that silently drops a dep before TestFlight review.
+        run: |
+          set -e
+          app="${{ steps.bundle.outputs.path }}"
+          lic="$app/THIRD_PARTY_LICENSES.txt"
+          [ -f "$lic" ] || { echo "FAIL: THIRD_PARTY_LICENSES.txt missing from .app"; ls -la "$app"; exit 1; }
+          for port in freetype sdl3 imgui lua sol2 spdlog glm libpng; do
+            grep -qi "^$port$" "$lic" || { echo "FAIL: section '$port' missing from iOS license aggregate"; exit 1; }
+          done
+          for plist in Settings.bundle/Root.plist Settings.bundle/Acknowledgements.plist; do
+            [ -f "$app/$plist" ] || { echo "FAIL: $plist missing from .app"; exit 1; }
+          done
+          echo "PASS: iOS .app carries license aggregate + Settings.bundle pointer."
+
       - name: Verify staged project files in bundle
         # Sanity gate: the POST_BUILD copy should have placed config.ini + asset_manifest.lua at
         # the bundle root (where SDL_GetBasePath() points on iOS). If the staging path regressed,

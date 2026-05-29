@@ -93,6 +93,18 @@ jobs:
             fi
           done
           echo "PASS: .ipa contains config.ini + asset_manifest.lua + game.lua"
+          for required in THIRD_PARTY_LICENSES.txt Settings.bundle/Root.plist Settings.bundle/Acknowledgements.plist; do
+            if ! unzip -l "$ipa" | grep -q "Payload/OctarineEngine.app/$required"; then
+              echo "FAIL: $required missing from .ipa"
+              exit 1
+            fi
+          done
+          tmp=$(mktemp -d)
+          unzip -p "$ipa" Payload/OctarineEngine.app/THIRD_PARTY_LICENSES.txt > "$tmp/licenses.txt"
+          for port in freetype sdl3 imgui lua sol2 spdlog glm libpng; do
+            grep -qi "^$port$" "$tmp/licenses.txt" || { echo "FAIL: section '$port' missing from .ipa license aggregate"; exit 1; }
+          done
+          echo "PASS: .ipa carries license aggregate + Settings.bundle pointer."
 
       - name: Upload .ipa
         uses: actions/upload-artifact@v4

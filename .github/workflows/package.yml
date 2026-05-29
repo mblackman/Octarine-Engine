@@ -141,6 +141,33 @@ jobs:
           done
           echo "PASS: universal binary carries both arm64 and x86_64"
 
+      # Asserts every shipped archive carries the aggregated third-party license file with the
+      # canonical port set. Catches a misconfigured aggregator that silently drops a dep before
+      # the artifact reaches a store reviewer.
+      - name: Verify third-party licenses bundled
+        shell: bash
+        run: |
+          set -e
+          pkg=$(ls ${{ matrix.pkg_glob }} | head -n 1)
+          echo "Inspecting $pkg"
+          scratch=$(mktemp -d)
+          case "$pkg" in
+            *.zip)    unzip -q "$pkg" -d "$scratch" ;;
+            *.tar.gz) tar -xzf "$pkg" -C "$scratch" ;;
+            *.dmg)
+              hdiutil attach "$pkg" -mountpoint /Volumes/OctarineLicenses -nobrowse
+              cp -R /Volumes/OctarineLicenses/. "$scratch/"
+              hdiutil detach /Volumes/OctarineLicenses ;;
+            *) echo "unknown package type: $pkg"; exit 1 ;;
+          esac
+          lic=$(find "$scratch" -name THIRD_PARTY_LICENSES.txt -print -quit)
+          [ -n "$lic" ] || { echo "FAIL: THIRD_PARTY_LICENSES.txt not in $pkg"; find "$scratch" -maxdepth 4; exit 1; }
+          echo "Found license file: $lic"
+          for port in freetype sdl3 imgui lua sol2 spdlog glm libpng; do
+            grep -qi "^$port$" "$lic" || { echo "FAIL: section '$port' missing from license aggregate"; exit 1; }
+          done
+          echo "PASS: license aggregate covers all canonical ports."
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
