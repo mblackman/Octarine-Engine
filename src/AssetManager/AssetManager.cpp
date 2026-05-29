@@ -160,7 +160,13 @@ int AssetManager::Validate(const std::vector<AssetReference> &refs) const {
 void AssetManager::AddTexture(SDL_Renderer *renderer, const std::string &assetId, const std::string &path) {
   const std::string fullPath = GetFullPath(path);
 
-  SDL_Texture *texture = IMG_LoadTexture(renderer, fullPath.c_str());
+  // Route through SDL IO so the same path resolves on desktop, an APK asset root, or a .app bundle.
+  SDL_IOStream *io = SDL_IOFromFile(fullPath.c_str(), "rb");
+  if (!io) {
+    Logger::Error("Failed to open texture file " + fullPath + ": " + std::string(SDL_GetError()));
+    return;
+  }
+  SDL_Texture *texture = IMG_LoadTexture_IO(renderer, io, true);  // closes the stream
   if (!texture) {
     Logger::Error("Failed to create texture: " + std::string(SDL_GetError()));
     return;
@@ -195,7 +201,12 @@ SDL_Texture *AssetManager::GetTexture(const std::string &assetId) const {
 
 void AssetManager::AddFont(const std::string &assetId, const std::string &path, const float fontSize) {
   const std::string fullPath = GetFullPath(path);
-  TTF_Font *font = TTF_OpenFont(fullPath.c_str(), fontSize);
+  SDL_IOStream *io = SDL_IOFromFile(fullPath.c_str(), "rb");
+  if (!io) {
+    Logger::Error("Failed to open font file " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
+    return;
+  }
+  TTF_Font *font = TTF_OpenFontIO(io, true, fontSize);  // closes the stream
   if (!font) {
     Logger::Error("Failed to load font " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;
@@ -219,7 +230,12 @@ void AssetManager::AddAudioClip(MIX_Mixer *mixer, const std::string &assetId, co
   }
 
   const std::string fullPath = GetFullPath(path);
-  MIX_Audio *clip = MIX_LoadAudio(mixer, fullPath.c_str(), true);
+  SDL_IOStream *io = SDL_IOFromFile(fullPath.c_str(), "rb");
+  if (!io) {
+    Logger::Error("Failed to open audio file " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
+    return;
+  }
+  MIX_Audio *clip = MIX_LoadAudio_IO(mixer, io, true, true);  // predecode + closes the stream
   if (!clip) {
     Logger::Error("Failed to load audio clip " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;

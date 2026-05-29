@@ -148,6 +148,18 @@ bool Game::Initialize(const std::string& assetPath)
     }
 #endif
 
+    // No explicit path (and, in editor builds, no remembered project): default the asset base to the
+    // executable/bundle location. On desktop this is the exe dir; in a .app it is Contents/Resources,
+    // on iOS the bundle root. Keeps the same code path working for packaged builds with no -p argument.
+    if (effectivePath.empty())
+    {
+        if (const char* basePath = SDL_GetBasePath())
+        {
+            effectivePath = basePath;
+            Logger::Info("No project path provided; defaulting asset base path to: " + effectivePath);
+        }
+    }
+
     bool projectLoaded = false;
     if (!effectivePath.empty())
     {
