@@ -122,7 +122,7 @@ int main()
         lua.open_libraries(sol::lib::base, sol::lib::table);
 
         // Scan the fixture, bake it to a manifest, then reload from that manifest re-rooted against the
-        // same base. The two catalogs must be entry-for-entry identical (Stage 6 parity guarantee).
+        // same base. The two catalogs must be entry-for-entry identical (scan/manifest parity).
         AssetCatalog scanned;
         scanned.Build(ASSET_TEST_FIXTURE_DIR, lua, std::optional<ScaleMode>(ScaleMode::Nearest));
         Check(!scanned.IsFromManifest(), "directory scan does not report manifest origin");

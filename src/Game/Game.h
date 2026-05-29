@@ -57,6 +57,11 @@ public:
     void SetStartupMode(const std::string& mode) { startup_mode_ = mode; }
     [[nodiscard]] bool IsBenchMode() const { return !startup_mode_.empty() && startup_mode_ != "editor"; }
 
+    // Dev override (--use-manifest) letting a non-shipped binary load asset_manifest.lua instead of
+    // scanning — the only way to exercise the manifest-load branch without producing a full package.
+    // In a shipped build (OCTARINE_SHIPPED) the manifest is used unconditionally and this is moot.
+    void SetUseManifest(bool useManifest) { use_manifest_ = useManifest; }
+
     [[nodiscard]] SDL_Renderer* GetRenderer() const { return sdl_renderer_; }
     [[nodiscard]] SDL_Window* GetWindow() const { return window_; }
 
@@ -101,6 +106,7 @@ private:
     static inline bool s_is_running_{false};
     bool scene_running_ = false;
     bool bake_mode_ = false;
+    bool use_manifest_ = false;
     int bake_validation_failures_ = 0;
     Uint64 milliseconds_previous_frame_ = 0;
     // Asset ids acquired for the currently loaded scene. StopScene releases these; LoadScene

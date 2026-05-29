@@ -161,21 +161,28 @@ namespace
     }
 } // namespace
 
-bool AssetCatalog::Build(const std::string& basePath, sol::state& lua, const GameConfig& gameConfig)
+bool AssetCatalog::Build(const std::string& basePath, sol::state& lua, const GameConfig& gameConfig, bool allowManifest)
 {
-    return Build(basePath, lua, DefaultScaleModeFromConfig(gameConfig));
+    return Build(basePath, lua, DefaultScaleModeFromConfig(gameConfig), allowManifest);
 }
 
-bool AssetCatalog::Build(const std::string& basePath, sol::state& lua, std::optional<ScaleMode> defaultScaleMode)
+bool AssetCatalog::Build(const std::string& basePath, sol::state& lua, std::optional<ScaleMode> defaultScaleMode,
+                         bool allowManifest)
 {
-    // Shipped builds carry a baked manifest at the root — load it and skip the filesystem walk so
-    // the same path works inside a read-only bundle. Dev builds (no manifest) fall through to scan.
-    std::error_code ec;
-    const fs::path manifestPath = fs::path(basePath) / "asset_manifest.lua";
-    if (fs::exists(manifestPath, ec))
+    // Shipped builds (allowManifest) carry a baked manifest at the root — load it and skip the
+    // filesystem walk so the same path works inside a read-only bundle. Dev builds gate this off
+    // (OCTARINE_SHIPPED=OFF, no --use-manifest) and always scan, so a stray manifest left beside
+    // source assets can't freeze the catalog on a stale snapshot.
+    if (allowManifest)
     {
-        Logger::Info("AssetCatalog: baked manifest found, loading (scan skipped): " + manifestPath.string());
-        return LoadManifest(manifestPath.string(), lua, basePath);
+        std::error_code ec;
+        const fs::path manifestPath = fs::path(basePath) / "asset_manifest.lua";
+        if (fs::exists(manifestPath, ec))
+        {
+            Logger::Info("AssetCatalog: baked manifest found, loading (scan skipped): " + manifestPath.string());
+            return LoadManifest(manifestPath.string(), lua, basePath);
+        }
+        Logger::Warn("AssetCatalog: manifest load allowed but no asset_manifest.lua at root; scanning.");
     }
     return ScanFilesystem(basePath, lua, defaultScaleMode);
 }

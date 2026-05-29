@@ -51,15 +51,19 @@ struct CatalogEntry
 class AssetCatalog
 {
 public:
-    // Populate the id -> entry map for the project at `basePath`. If a baked `asset_manifest.lua`
-    // is present at the root (shipped build), load it and skip the filesystem walk — assets resolve
-    // with no scan, which is what makes read-only APK/.app bundles work. Otherwise (dev build with
-    // `-p`) recursively scan the convention folders and parse `<file>.meta` sidecars via the borrowed
-    // `lua` state. Returns false if any id collision (scan) or malformed entry (manifest) was found.
-    // The GameConfig overload pulls the project default scale mode from config; the explicit
-    // overload takes it directly (used by tests, which avoids GameConfig's SDL-backed load path).
-    bool Build(const std::string& basePath, sol::state& lua, const GameConfig& gameConfig);
-    bool Build(const std::string& basePath, sol::state& lua, std::optional<ScaleMode> defaultScaleMode);
+    // Populate the id -> entry map for the project at `basePath`. When `allowManifest` is true and a
+    // baked `asset_manifest.lua` is present at the root, load it and skip the filesystem walk — assets
+    // resolve with no scan, which is what makes read-only APK/.app bundles work. Otherwise (dev build,
+    // or no manifest) recursively scan the convention folders and parse `<file>.meta` sidecars via the
+    // borrowed `lua` state. `allowManifest` is the dev-vs-shipped gate (OCTARINE_SHIPPED / the
+    // `--use-manifest` dev override): when false the manifest probe is skipped entirely, so a stray
+    // manifest beside dev assets can never hijack the scan. Returns false if any id collision (scan)
+    // or malformed entry (manifest) was found. The GameConfig overload pulls the project default scale
+    // mode from config; the explicit overload takes it directly (used by tests, which avoids
+    // GameConfig's SDL-backed load path).
+    bool Build(const std::string& basePath, sol::state& lua, const GameConfig& gameConfig, bool allowManifest = true);
+    bool Build(const std::string& basePath, sol::state& lua, std::optional<ScaleMode> defaultScaleMode,
+               bool allowManifest = true);
 
     // Force a live filesystem scan, ignoring any baked manifest at the root. `Build` delegates here
     // when no manifest is present; the bake step calls it directly so it always re-derives the
@@ -98,8 +102,7 @@ public:
 
     // Install a global Lua table (default name "assets") mapping every catalog id to itself, with a
     // metatable that raises on an unknown key. Lets scripts write `assets.tank` and get an error on
-    // a typo instead of silently passing a bad id string. Runtime half of the typed-id surface; the
-    // EmmyLua stub for editor autocomplete lands in Stage 7.
+    // a typo instead of silently passing a bad id string.
     void InstallLuaIdTable(sol::state& lua, const std::string& globalName = "assets") const;
 
 private:

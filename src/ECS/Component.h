@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstring>
+#include <new>
 #include <optional>
 #include <unordered_map>
 #include <vector>
@@ -62,14 +63,22 @@ inline ArchetypeID GetNextArchetypeID() {
 
 constexpr size_t kUsableSpace = kChunkSize;
 
+// Over-align chunk storage to a cache line. The default operator new[] only guarantees 16-byte
+// alignment on x64, but with /arch:AVX2 the auto-vectorizer emits 32-byte aligned moves (vmovdqa)
+// over the SoA component arrays — a 16-aligned buffer base faults (#GP -> 0xC0000005) at runtime in
+// optimized builds. 64 covers AVX/AVX2/AVX-512 and keeps each chunk on its own cache line.
+constexpr size_t kChunkAlignment = 64;
+
 class Chunk {
  public:
-  explicit Chunk() : header_(), buffer_(new unsigned char[kUsableSpace]) {
+  explicit Chunk()
+      : header_(),
+        buffer_(static_cast<unsigned char*>(::operator new[](kUsableSpace, std::align_val_t{kChunkAlignment}))) {
     header_.entity_count = 0;
     header_.active_count = 0;
   }
 
-  ~Chunk() { delete[] buffer_; }
+  ~Chunk() { ::operator delete[](buffer_, std::align_val_t{kChunkAlignment}); }
 
   Chunk(Chunk&& other) noexcept : header_(other.header_), buffer_(other.buffer_) {
     other.buffer_ = nullptr;
@@ -79,7 +88,7 @@ class Chunk {
 
   Chunk& operator=(Chunk&& other) noexcept {
     if (this != &other) {
-      delete[] buffer_;
+      ::operator delete[](buffer_, std::align_val_t{kChunkAlignment});
       header_ = other.header_;
       buffer_ = other.buffer_;
       other.buffer_ = nullptr;

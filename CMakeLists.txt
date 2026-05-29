@@ -33,6 +33,20 @@ option(OCTARINE_ENABLE_PROFILING "Enable per-system performance instrumentation"
 option(OCTARINE_WITH_IMGUI "Build with ImGui debug tools" ON)
 option(OCTARINE_WITH_EDITOR "Build with the yellowish-purple editor environment" ON)
 
+# Dev-vs-shipped asset-catalog gate. OFF (dev): the catalog always live-scans the asset dir, so a
+# stray asset_manifest.lua left beside source assets can't freeze the scan on a stale catalog. ON
+# (every packaged target — desktop package, Android, iOS): the catalog loads the baked manifest and
+# skips the filesystem walk, which is what lets it work inside a read-only APK/.app bundle. The
+# packaging path (octarine_package / CPack) forces this ON; a packaged build that leaves it OFF would
+# try to scan a read-only FS and fail at launch.
+option(OCTARINE_SHIPPED "Build a shipped artifact: load the baked asset manifest instead of scanning" OFF)
+
+# Desktop packaging. Set to a game-project dir to wire install rules + CPack that emit a
+# self-contained artifact (engine + that project's assets/lua/config + baked manifest), launchable
+# with no `-p`. Empty (default) leaves normal dev/editor builds completely untouched. The packaging
+# path forces OCTARINE_SHIPPED ON on the engine target regardless of the option above.
+set(OCTARINE_PACKAGE_PROJECT "" CACHE PATH "Game project dir to bundle into a packaged artifact (empty = no packaging)")
+
 if (OCTARINE_WITH_EDITOR)
     set(OCTARINE_WITH_IMGUI ON CACHE BOOL "Forced ON by Editor" FORCE)
 endif ()
@@ -124,6 +138,11 @@ if (OCTARINE_WITH_EDITOR)
     message(STATUS "Octarine: Editor ENABLED")
 endif ()
 
+if (OCTARINE_SHIPPED)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_SHIPPED)
+    message(STATUS "Octarine: SHIPPED build — asset catalog loads baked manifest (no scan)")
+endif ()
+
 # Include directories
 target_include_directories(${PROJECT_NAME}
         PRIVATE
@@ -154,12 +173,21 @@ if (OCTARINE_WITH_IMGUI)
     )
 endif ()
 
-# Install rules (optional)
-install(TARGETS ${PROJECT_NAME}
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-)
+# Install rules (optional). Skipped under packaging — octarine_package owns the deliverable layout
+# (binary + project files at the package root) instead of the bin/lib split used by `cmake --install`.
+if (NOT OCTARINE_PACKAGE_PROJECT)
+    install(TARGETS ${PROJECT_NAME}
+            RUNTIME DESTINATION bin
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+    )
+endif ()
+
+# Packaging: wire CPack + the deliverable layout only when a project dir is supplied.
+if (OCTARINE_PACKAGE_PROJECT)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/OctarinePackage.cmake)
+    octarine_package(${PROJECT_NAME} PROJECT "${OCTARINE_PACKAGE_PROJECT}" NAME "${PROJECT_NAME}")
+endif ()
 
 # Compiler-specific flags - Treat warnings as errors in prod builds
 if (MSVC)
@@ -364,7 +392,7 @@ if (OCTARINE_ENABLE_TESTS)
     add_test(NAME LuaApiSmokeTest COMMAND OctarineLuaApiTest)
 
     # Asset pipeline checks (metadata defaults + catalog build). Links the full engine minus the
-    # real entry point, matching the smoke test, so later stages can exercise AssetCatalog::Build
+    # real entry point, matching the smoke test, so the tests can exercise AssetCatalog::Build
     # (which needs GameConfig / sol2) without re-plumbing the target.
     set(ASSET_TEST_SRC_FILES ${SRC_FILES})
     list(REMOVE_ITEM ASSET_TEST_SRC_FILES src/Main.cpp)

@@ -7,6 +7,7 @@ int main(const int argc, char* argv[])
 
     std::string gamePath;
     std::string startupMode;
+    bool useManifest = false;
 
     // Parse command-line arguments
     for (int i = 1; i < argc; ++i)
@@ -25,6 +26,13 @@ int main(const int argc, char* argv[])
                 Logger::Error("Error: " + currentArg + " flag requires a mode argument.");
                 return 1;
             }
+        }
+        else if (currentArg == "--use-manifest")
+        {
+            // Dev override: force the manifest-load branch from a non-shipped binary (a shipped build
+            // uses it unconditionally). Lets the asset_manifest.lua path be exercised without packaging.
+            useManifest = true;
+            Logger::Info("Asset manifest loading forced ON (--use-manifest).");
         }
         else if (currentArg.starts_with("-"))
         {
@@ -46,6 +54,7 @@ int main(const int argc, char* argv[])
 
     Game game{};
     game.SetStartupMode(startupMode);
+    game.SetUseManifest(useManifest);
 
     if (game.Initialize(gamePath))
     {

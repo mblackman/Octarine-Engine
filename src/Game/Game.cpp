@@ -593,7 +593,15 @@ void Game::Setup()
         // Discover every available asset + its sidecar metadata up front. Loads nothing — the
         // catalog is the index Acquire loads from. Built before LoadGame so the startup
         // script and scene loads can resolve ids against it.
-        assetManager.GetCatalog().Build(assetManager.GetBasePath(), lua, gameConfig);
+        //
+        // Dev-vs-shipped gate: a shipped build (OCTARINE_SHIPPED) loads the baked manifest and skips
+        // the scan — required inside a read-only bundle. A dev build always scans (live files are the
+        // truth) unless --use-manifest is passed to exercise the manifest branch from a dev binary.
+        bool allowManifest = use_manifest_;
+#ifdef OCTARINE_SHIPPED
+        allowManifest = true;
+#endif
+        assetManager.GetCatalog().Build(assetManager.GetBasePath(), lua, gameConfig, allowManifest);
         assetManager.GetCatalog().DumpToLog();
 
         // Expose the global `assets` table (id -> id, raises on typo) so scripts can reference
