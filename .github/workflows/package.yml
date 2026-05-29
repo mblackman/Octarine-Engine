@@ -1,0 +1,126 @@
+name: Package
+
+# Desktop packaging matrix (Windows / Linux / macOS). Each leg configures the shipping
+# player-release preset against the example project, builds, then `cpack`s a self-contained
+# artifact via octarine_package: engine binary + staged project + baked asset_manifest.lua.
+# The manifest bake runs at install time inside cpack and is the CI gate — a broken asset
+# reference exits nonzero and fails the leg.
+#
+# Triggered manually or on a version tag (release artifacts), not on every push.
+on:
+  workflow_dispatch:
+  push:
+    tags: [ 'v*' ]
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  package:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            pkg_glob: build/player-release/*.tar.gz
+          - os: windows-latest
+            platform: windows
+            pkg_glob: build/player-release/*.zip
+          - os: macos-latest
+            platform: macos
+            pkg_glob: build/player-release/*.dmg
+
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Checkout example project
+        uses: actions/checkout@v4
+        with:
+          repository: mblackman/Octarine-Engine-Example
+          path: example_repo
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Install Linux build deps (SDL3 / X11 / Wayland)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build \
+            pkg-config \
+            autoconf \
+            automake \
+            autoconf-archive \
+            libtool \
+            libltdl-dev \
+            libx11-dev \
+            libxext-dev \
+            libxrandr-dev \
+            libxcursor-dev \
+            libxtst-dev \
+            libxfixes-dev \
+            libxi-dev \
+            libxinerama-dev \
+            libxkbcommon-dev \
+            libxss-dev \
+            libwayland-dev \
+            wayland-protocols \
+            libegl1-mesa-dev \
+            libgl1-mesa-dev \
+            libgles2-mesa-dev \
+            libdbus-1-dev \
+            libibus-1.0-dev \
+            libpulse-dev \
+            libudev-dev \
+            libdrm-dev \
+            libgbm-dev \
+            libasound2-dev \
+            libpipewire-0.3-dev \
+            libsndio-dev \
+            libdecor-0-dev
+
+      - name: Install Ninja (Windows/macOS)
+        if: matrix.platform != 'linux'
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      - name: Setup MSVC dev environment (Windows)
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure CMake (packaging)
+        shell: bash
+        # player-release = shipping config (no editor/ImGui). OCTARINE_PACKAGE_PROJECT wires the
+        # CPack layout + forces OCTARINE_SHIPPED on the engine target so the artifact loads the
+        # baked manifest instead of scanning a read-only dir. Mixed slashes in the Windows path are
+        # fine for CMake.
+        run: cmake --preset player-release -DOCTARINE_PACKAGE_PROJECT="${{ github.workspace }}/example_repo"
+
+      - name: Build
+        run: cmake --build build/player-release --config Release --parallel
+
+      - name: Package (cpack + manifest bake gate)
+        run: cmake --build build/player-release --target package
+
+      - name: List package output
+        shell: bash
+        run: ls -la build/player-release | grep -Ei '\.(zip|tar\.gz|dmg)$' || (echo "no package produced" && exit 1)
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctarineEngine-${{ matrix.platform }}
+          path: ${{ matrix.pkg_glob }}
+          if-no-files-found: error
