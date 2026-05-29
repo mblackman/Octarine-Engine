@@ -151,6 +151,25 @@ jobs:
           done
           echo "PASS: AAB carries libmain.so for every ABI"
 
+      # Third-party license attribution must ship inside base/assets/. Multi-ABI mode wires the
+      # aggregator off the first ABI's configure task, so the file lives once at base/assets/
+      # regardless of how many ABIs the AAB carries.
+      - name: Verify AAB ships third-party licenses
+        run: |
+          set -e
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          if ! unzip -l "$aab" | grep -q "base/assets/THIRD_PARTY_LICENSES.txt"; then
+            echo "FAIL: base/assets/THIRD_PARTY_LICENSES.txt missing from AAB"
+            unzip -l "$aab" | grep -i license || true
+            exit 1
+          fi
+          tmp=$(mktemp -d)
+          unzip -p "$aab" base/assets/THIRD_PARTY_LICENSES.txt > "$tmp/licenses.txt"
+          for port in freetype sdl3 imgui lua sol2 spdlog glm libpng; do
+            grep -qi "^$port$" "$tmp/licenses.txt" || { echo "FAIL: section '$port' missing from AAB license aggregate"; exit 1; }
+          done
+          echo "PASS: AAB license aggregate covers all canonical ports."
+
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
