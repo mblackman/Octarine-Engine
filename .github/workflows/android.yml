@@ -39,25 +39,10 @@ jobs:
       # blank and Gradle's identityProp helper falls through to project.ini / built-in defaults.
       - name: Resolve version (tag push)
         id: ver
-        run: |
-          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            v="${GITHUB_REF#refs/tags/v}"
-            code=$(git rev-list --count HEAD)
-            echo "Tag push: versionName=$v versionCode=$code"
-          else
-            v=""
-            code=""
-            echo "Non-tag run: version derives from project.ini"
-          fi
-          echo "version_name=$v" >> "$GITHUB_OUTPUT"
-          echo "version_code=$code" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/resolve-version
 
       - name: Export GitHub Actions cache env (vcpkg binary cache)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+        uses: ./.github/actions/vcpkg-cache-env
 
       - name: Setup JDK 17
         uses: actions/setup-java@v4

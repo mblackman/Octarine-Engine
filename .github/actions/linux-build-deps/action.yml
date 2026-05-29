@@ -1,0 +1,58 @@
+name: Install Linux build deps (SDL3 / X11 / Wayland)
+description: |
+  apt-get installs the host build tools + SDL3/X11/Wayland dev headers vcpkg's
+  Linux SDL3 port + transitive deps need to configure from source. Mirrors the
+  block originally duplicated across build.yml, package.yml, benchmark.yml.
+
+  Drift across those copies actually appeared in review (the runtime apt lists
+  diverged subtly); centralizing here is the fix. extras lets benchmark.yml
+  (self-hosted) tack on its bootstrap packages without forking the block.
+
+inputs:
+  extras:
+    description: Whitespace-separated extra apt packages (e.g. for self-hosted runners that lack the default toolchain).
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        EXTRAS: ${{ inputs.extras }}
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          ninja-build \
+          pkg-config \
+          autoconf \
+          automake \
+          autoconf-archive \
+          libtool \
+          libltdl-dev \
+          libx11-dev \
+          libxext-dev \
+          libxrandr-dev \
+          libxcursor-dev \
+          libxtst-dev \
+          libxfixes-dev \
+          libxi-dev \
+          libxinerama-dev \
+          libxkbcommon-dev \
+          libxss-dev \
+          libwayland-dev \
+          wayland-protocols \
+          libegl1-mesa-dev \
+          libgl1-mesa-dev \
+          libgles2-mesa-dev \
+          libdbus-1-dev \
+          libibus-1.0-dev \
+          libpulse-dev \
+          libudev-dev \
+          libdrm-dev \
+          libgbm-dev \
+          libasound2-dev \
+          libpipewire-0.3-dev \
+          libsndio-dev \
+          libdecor-0-dev \
+          $EXTRAS

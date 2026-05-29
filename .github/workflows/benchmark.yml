@@ -26,55 +26,12 @@ jobs:
           submodules: recursive
 
       - name: Export GitHub Actions cache env (vcpkg binary cache)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+        uses: ./.github/actions/vcpkg-cache-env
 
-      - name: Install Linux build deps (SDL3 / X11 / Wayland)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            ninja-build \
-            pkg-config \
-            autoconf \
-            automake \
-            autoconf-archive \
-            libtool \
-            libltdl-dev \
-            libx11-dev \
-            libxext-dev \
-            libxrandr-dev \
-            libxcursor-dev \
-            libxtst-dev \
-            libxfixes-dev \
-            libxi-dev \
-            libxinerama-dev \
-            libxkbcommon-dev \
-            libxss-dev \
-            libwayland-dev \
-            wayland-protocols \
-            libegl1-mesa-dev \
-            libgl1-mesa-dev \
-            libgles2-mesa-dev \
-            libdbus-1-dev \
-            libibus-1.0-dev \
-            libpulse-dev \
-            libudev-dev \
-            libdrm-dev \
-            libgbm-dev \
-            libasound2-dev \
-            libpipewire-0.3-dev \
-            libsndio-dev \
-            libdecor-0-dev \
-            cmake \
-            build-essential \
-            python3 \
-            curl \
-            zip \
-            unzip \
-            tar
+      - name: Install Linux build deps (SDL3 / X11 / Wayland + self-hosted bootstrap)
+        uses: ./.github/actions/linux-build-deps
+        with:
+          extras: cmake build-essential python3 curl zip unzip tar
 
       - name: Setup vcpkg
         run: |

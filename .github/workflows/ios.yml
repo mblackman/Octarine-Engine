@@ -42,17 +42,10 @@ jobs:
           path: example_repo
 
       - name: Export GitHub Actions cache env (vcpkg binary cache)
-        uses: actions/github-script@v7
-        with:
-          script: |
-            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
-            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+        uses: ./.github/actions/vcpkg-cache-env
 
-      # Host tools vcpkg needs to build ports from source on macOS. Xcode (clang, xcodebuild) is
-      # preinstalled on macos-latest; autotools chain (autoconf/automake/libtool) is what freetype
-      # + harfbuzz + libvorbis configure scripts need but is not on the default image.
       - name: Install host build tools
-        run: brew install autoconf automake autoconf-archive libtool pkg-config
+        uses: ./.github/actions/macos-build-deps
 
       - name: Select Xcode
         # Pin to a known-good Xcode rather than rolling with whatever the runner image flips to.
