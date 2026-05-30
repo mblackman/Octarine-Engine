@@ -11,6 +11,11 @@ name: Package
 # build.yml — PRs warm-hit it (~4-6 min per leg observed; cold runs only on cache eviction).
 on:
   workflow_dispatch:
+    inputs:
+      example_ref:
+        description: 'Octarine-Engine-Example branch/tag/SHA to build against (default: main)'
+        required: false
+        default: 'main'
   push:
     branches: [ main ]
     tags: [ 'v*' ]
@@ -64,6 +69,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           repository: mblackman/Octarine-Engine-Example
+          # Defaults to the example's `main` for push/PR runs. workflow_dispatch can target an
+          # alternate branch via the `example_ref` input.
+          ref: ${{ github.event.inputs.example_ref || 'main' }}
           path: example_repo
 
       # Tag push v0.1.2 -> OCTARINE_PACKAGE_VERSION_NAME=0.1.2, VERSION_CODE=<commit count> for
