@@ -115,6 +115,58 @@ jobs:
       - name: Package (cpack + manifest bake gate)
         run: cmake --build build/${{ matrix.preset }} --target package
 
+      # macOS notarization: tag-gated, secret-gated. The codesign + notarytool flow only fires
+      # on `v*` tag pushes and only when MACOS_DEVELOPER_ID_P12 is set (so fork PRs and
+      # pre-account state skip cleanly). Bootstrap an ephemeral keychain, import the Developer
+      # ID Application cert, then hand off to scripts/octarine-macos-notarize.sh which mounts
+      # the cpack-produced .dmg, signs the .app, submits to notarytool, staples, and rebuilds
+      # the .dmg as the shipping artifact. See ai/ShippingV1Plan.md Stage 4.
+      - name: Bootstrap macOS signing keychain
+        if: |
+          startsWith(matrix.platform, 'macos')
+          && startsWith(github.ref, 'refs/tags/v')
+          && env.MACOS_DEVELOPER_ID_P12 != ''
+        env:
+          MACOS_DEVELOPER_ID_P12: ${{ secrets.MACOS_DEVELOPER_ID_P12 }}
+          MACOS_DEVELOPER_ID_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_PASSWORD }}
+        run: |
+          set -e
+          kc="${RUNNER_TEMP}/octarine-signing.keychain-db"
+          security create-keychain -p "" "$kc"
+          security set-keychain-settings -lut 7200 "$kc"
+          security unlock-keychain -p "" "$kc"
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | sed 's/"//g')
+          printf '%s' "$MACOS_DEVELOPER_ID_P12" | base64 --decode > "${RUNNER_TEMP}/cert.p12"
+          security import "${RUNNER_TEMP}/cert.p12" -k "$kc" -P "$MACOS_DEVELOPER_ID_PASSWORD" \
+              -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$kc"
+          rm -f "${RUNNER_TEMP}/cert.p12"
+
+      - name: Notarize + staple .dmg
+        if: |
+          startsWith(matrix.platform, 'macos')
+          && startsWith(github.ref, 'refs/tags/v')
+          && env.MACOS_DEVELOPER_ID_P12 != ''
+        env:
+          MACOS_DEVELOPER_ID_P12: ${{ secrets.MACOS_DEVELOPER_ID_P12 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID_USERNAME: ${{ secrets.APPLE_ID_USERNAME }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -e
+          src=$(ls ${{ matrix.pkg_glob }} | head -n 1)
+          out="${src%.dmg}-signed.dmg"
+          bash scripts/octarine-macos-notarize.sh \
+              --input "$src" \
+              --output "$out" \
+              --team "$APPLE_TEAM_ID" \
+              --apple-id "$APPLE_ID_USERNAME" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD"
+          # Replace the unsigned .dmg with the signed+stapled one so downstream upload-artifact
+          # picks up the shipping artifact, not the unsigned intermediate.
+          mv "$out" "$src"
+          echo "Replaced unsigned dmg at $src with signed+notarized+stapled version."
+
       - name: List package output
         shell: bash
         run: ls -la build/${{ matrix.preset }} | grep -Ei '\.(zip|tar\.gz|dmg)$' || (echo "no package produced" && exit 1)

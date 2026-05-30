@@ -231,6 +231,43 @@ PROJECT <dir>)` and the wiring is gated on the top-level
 If the engine logs `scanning filesystem` instead, `OCTARINE_SHIPPED` didn't
 reach the compile — check the preset and that you used `octarine_package`.
 
+### macOS codesign + notarize + staple
+
+Tag pushes (`v*`) auto-codesign the `.dmg` with a Developer ID Application
+cert, submit to `notarytool`, and staple the ticket. Without this, Gatekeeper
+shows "unidentified developer" on every install and quarantine-flagged copies
+won't open offline. Required secrets:
+
+| Secret                              | Value                                                          |
+|-------------------------------------|----------------------------------------------------------------|
+| `MACOS_DEVELOPER_ID_P12`            | base64 of the Developer ID Application `.p12`                  |
+| `MACOS_DEVELOPER_ID_PASSWORD`       | Password protecting the `.p12`                                  |
+| `APPLE_TEAM_ID`                     | 10-char team identifier from developer.apple.com                |
+| `APPLE_ID_USERNAME`                 | Apple ID email used for notarization                            |
+| `APPLE_APP_SPECIFIC_PASSWORD`       | App-specific password generated at appleid.apple.com            |
+
+CI flow (`scripts/octarine-macos-notarize.sh`):
+
+1. Mount the cpack-produced `.dmg`, copy `.app` to a scratch dir.
+2. `codesign --deep --force --options=runtime --timestamp` over the `.app`
+   with `scripts/octarine-macos.entitlements` (hardened runtime, no exceptions).
+3. Zip the `.app` and submit to `xcrun notarytool submit --wait`.
+4. `xcrun stapler staple` embeds the ticket so first-launch on an offline
+   machine works.
+5. `hdiutil create` rebuilds the `.dmg` from the signed+stapled `.app` and
+   replaces the unsigned one inline. Downstream `upload-artifact` ships the
+   notarized version.
+6. `spctl -a -v --type execute` sanity-asserts Gatekeeper would accept it.
+
+Steps are gated on `startsWith(github.ref, 'refs/tags/v') && env.MACOS_DEVELOPER_ID_P12 != ''`,
+so non-tag pushes, PRs, and pre-account state skip without failing the leg.
+Both `macos` and `macos-universal` legs notarize.
+
+Migrating to **App Store Connect API key** auth (`AuthKey_*.p8` — no
+annual rotation) is queued as Stage 9 of `ai/ShippingV1Plan.md`. Notarytool
+accepts either `--apple-id`/`--password` or `--key`/`--key-id`/`--issuer`,
+so the swap is one script edit when the key is generated.
+
 ### NSIS installer (Windows, opt-in)
 
 ```bash
