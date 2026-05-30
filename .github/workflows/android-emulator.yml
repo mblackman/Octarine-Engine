@@ -94,11 +94,52 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      # Boot emulator → install APK → launch activity → poll logcat for the manifest-load line.
-      # Mirrors ios.yml's launch+assert step. Tag is `Octarine` (set by Logger::Init's
-      # spdlog::android_logger_mt — see CLAUDE.md). The catalog logs
-      # "AssetCatalog: loaded N entries from manifest" once the bake is consumed; absence within
-      # the budget means the APK never reached scene load.
+      # Stage the smoke script to a file. The android-emulator-runner action's `script:` input
+      # splits the value by newlines and runs each line in its OWN `sh -c` invocation — variables
+      # set in one line are not visible in the next, `set -e` only scopes its own line, etc. Write
+      # the actual script body to disk and invoke it as a single shell process from the action.
+      - name: Stage emulator smoke script
+        run: |
+          cat > "$RUNNER_TEMP/octarine-smoke.sh" <<'SH'
+          #!/usr/bin/env bash
+          # Boot emulator → install APK → launch activity → poll logcat for the manifest-load line.
+          # Mirrors ios.yml's launch+assert step. Tag is `Octarine` (set by Logger::Init's
+          # spdlog::android_logger_mt — see CLAUDE.md). The catalog logs
+          # "AssetCatalog: loaded N entries from manifest" once the bake is consumed; absence
+          # within the budget means the APK never reached scene load.
+          set -e
+          adb wait-for-device
+          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          [ -f "$apk" ] || { echo "missing APK at $apk"; exit 1; }
+          adb install -r "$apk"
+          adb logcat -c
+          # Read applicationId from project.ini fallback chain — example_repo's package_id is the
+          # canonical value; if missing, fall back to the gradle default. Component is
+          # <pkg>/org.libsdl.app.SDLActivity (SDL3's stock activity, unchanged).
+          pkg=$(awk -F= '/^[[:space:]]*package_id[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2; exit}' \
+            "$GITHUB_WORKSPACE/example_repo/project.ini" 2>/dev/null || true)
+          [ -n "$pkg" ] || pkg="com.octarine.example"
+          adb shell am start -W -n "$pkg/org.libsdl.app.SDLActivity"
+          manifest=0
+          for i in $(seq 1 24); do
+            adb logcat -d -s Octarine:I OctarineLua:I '*:S' > logcat.txt 2>&1 || true
+            if grep -q "AssetCatalog: loaded .* entries from manifest" logcat.txt; then
+              manifest=1
+              break
+            fi
+            sleep 5
+          done
+          echo "=== logcat (Octarine subsystem, last snapshot) ==="
+          cat logcat.txt || true
+          echo "=== end logcat ==="
+          if [ $manifest -ne 1 ]; then
+            echo "FAIL: AssetCatalog manifest-load line missing within budget"
+            exit 1
+          fi
+          echo "PASS: emulator launch reached manifest-load"
+          SH
+          chmod +x "$RUNNER_TEMP/octarine-smoke.sh"
+
       - name: Run APK on emulator + assert manifest-load
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -108,37 +149,7 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            set -e
-            adb wait-for-device
-            apk="android/app/build/outputs/apk/debug/app-debug.apk"
-            [ -f "$apk" ] || { echo "missing APK at $apk"; exit 1; }
-            adb install -r "$apk"
-            adb logcat -c
-            # Read applicationId from project.ini fallback chain — example_repo's package_id is the
-            # canonical value; if missing, fall back to the gradle default. Component is
-            # <pkg>/org.libsdl.app.SDLActivity (SDL3's stock activity, unchanged).
-            pkg=$(awk -F= '/^[[:space:]]*package_id[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2; exit}' \
-              "$GITHUB_WORKSPACE/example_repo/project.ini" 2>/dev/null || true)
-            [ -n "$pkg" ] || pkg="com.octarine.example"
-            adb shell am start -W -n "$pkg/org.libsdl.app.SDLActivity"
-            manifest=0
-            for i in $(seq 1 24); do
-              adb logcat -d -s Octarine:I OctarineLua:I '*:S' > logcat.txt 2>&1 || true
-              if grep -q "AssetCatalog: loaded .* entries from manifest" logcat.txt; then
-                manifest=1
-                break
-              fi
-              sleep 5
-            done
-            echo "=== logcat (Octarine subsystem, last snapshot) ==="
-            cat logcat.txt || true
-            echo "=== end logcat ==="
-            if [ $manifest -ne 1 ]; then
-              echo "FAIL: AssetCatalog manifest-load line missing within budget"
-              exit 1
-            fi
-            echo "PASS: emulator launch reached manifest-load"
+          script: bash "$RUNNER_TEMP/octarine-smoke.sh"
 
       - name: Upload logcat
         if: always()
