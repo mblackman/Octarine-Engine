@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780179486257,
+  "lastUpdate": 1780180455871,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -5652,6 +5652,114 @@ window.BENCHMARK_DATA = {
             "value": 675920.5423941502,
             "unit": "ns/iter",
             "extra": "iterations: 1038\ncpu: 675847.0105972744 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d855c81c83544002a7ba17be36fb3e0c7c8f5224",
+          "message": "Add octarine-new scaffolder for bash and PowerShell (#66)\n\nDrops a one-command path from clone to runnable project: emits project.ini,\nconfig.ini, game.lua, assets/, THIRD_PARTY_LICENSES.d/, .gitignore, README.md.\nPowerShell variant writes UTF-8 without BOM so the engine's INI parser and Lua\nloader accept the output (5.1's `Set-Content -Encoding utf8` would prepend a BOM\nthat fails both).\n\nValidates --package-id as reverse-DNS and refuses to clobber a non-empty --dir.\n\nCloses Stage 5 of ShippingV1Plan.",
+          "timestamp": "2026-05-30T15:55:53-06:00",
+          "tree_id": "b85d3541f5991291ddba3ae72abe39d8395ad1dd",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/d855c81c83544002a7ba17be36fb3e0c7c8f5224"
+        },
+        "date": 1780180446703,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4103.822771587226,
+            "unit": "ns/iter",
+            "extra": "iterations: 169762\ncpu: 4138.965310258024 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16513.04948964747,
+            "unit": "ns/iter",
+            "extra": "iterations: 42580\ncpu: 16556.48226867115 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 109314.70850111451,
+            "unit": "ns/iter",
+            "extra": "iterations: 6399\ncpu: 109363.21518987446 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 871326.557932737,
+            "unit": "ns/iter",
+            "extra": "iterations: 809\ncpu: 871299.1001236157 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1752588.2686091827,
+            "unit": "ns/iter",
+            "extra": "iterations: 404\ncpu: 1752712.7920792066 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2323.3826920721567,
+            "unit": "ns/iter",
+            "extra": "iterations: 307070\ncpu: 2317.6897873442363 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10175.673861447214,
+            "unit": "ns/iter",
+            "extra": "iterations: 69681\ncpu: 10166.723654943671 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 100888.07761957624,
+            "unit": "ns/iter",
+            "extra": "iterations: 6922\ncpu: 100874.48685351077 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 397292.16452117136,
+            "unit": "ns/iter",
+            "extra": "iterations: 1762\ncpu: 397239.0550510763 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2186.603368961688,
+            "unit": "ns/iter",
+            "extra": "iterations: 324988\ncpu: 2157.5450478201224 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6538.616107715537,
+            "unit": "ns/iter",
+            "extra": "iterations: 108519\ncpu: 6503.285489177326 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41447.75585301915,
+            "unit": "ns/iter",
+            "extra": "iterations: 16918\ncpu: 41412.085057322 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 319252.1254375171,
+            "unit": "ns/iter",
+            "extra": "iterations: 2167\ncpu: 319159.37886480027 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 634648.1456231336,
+            "unit": "ns/iter",
+            "extra": "iterations: 1103\ncpu: 634459.6174070477 ns\nthreads: 1"
           }
         ]
       }
