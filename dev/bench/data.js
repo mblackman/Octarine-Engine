@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780175732971,
+  "lastUpdate": 1780176602723,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -5436,6 +5436,114 @@ window.BENCHMARK_DATA = {
             "value": 631677.1445647422,
             "unit": "ns/iter",
             "extra": "iterations: 1104\ncpu: 631586.0253623367 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9721fbda63b5b31449299328160845b1ea78aca2",
+          "message": "Add in-app Android Acknowledgements activity for THIRD_PARTY_LICENSES.txt (#62)\n\nAdds two thin Java classes under com.octarine.host:\n\n  - MainActivity extends SDLActivity, overrides onCreateOptionsMenu /\n    onOptionsItemSelected to add an \"Acknowledgements\" entry that launches\n    LicensesActivity. Subclassing (not forking) SDLActivity keeps the engine\n    tracking upstream SDL without merge churn.\n\n  - LicensesActivity opens the bundled THIRD_PARTY_LICENSES.txt asset\n    (already staged into base/assets/ by app/build.gradle's licenseAssetsDir\n    wiring) and renders it in a selectable, monospace TextView inside a\n    ScrollView. View tree built programmatically — no new res/layout file.\n    Theme.Material.Light gives a normal title-bar+back-arrow UI instead of\n    inheriting the fullscreen game theme.\n\nAndroidManifest.xml swaps the launchable activity from the upstream\n\"SDLActivity\" to \"com.octarine.host.MainActivity\"; the manifest-class\nreference auto-keeps both new activities under R8 default rules, and the\nexisting -keep on org.libsdl.app.SDLActivity continues to cover the parent\nclass. LicensesActivity is exported=false (in-app launch only, never\nexternally surfaced).\n\nCloses the legal-attribution discoverability gap on Android: the text file\nshipped already, this gives users a way to read it without cracking the AAB.\n\nMenu access today is via openOptionsMenu() / KEYCODE_MENU. A future Lua-side\ngame.open_acknowledgements() module function can call startActivity directly\nfor projects that want a settings-screen entry point (deferred — out of\nscope for this stage per ShippingV1Plan Stage 8).",
+          "timestamp": "2026-05-30T15:23:30-06:00",
+          "tree_id": "5027bdfd607d7a9e9d78efa0546d7a24d3d72cce",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/9721fbda63b5b31449299328160845b1ea78aca2"
+        },
+        "date": 1780176593952,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4072.0606674527307,
+            "unit": "ns/iter",
+            "extra": "iterations: 169423\ncpu: 4108.3342580406015 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16352.396517987849,
+            "unit": "ns/iter",
+            "extra": "iterations: 42878\ncpu: 16396.442884463508 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 109840.38936718313,
+            "unit": "ns/iter",
+            "extra": "iterations: 6431\ncpu: 109889.11429015212 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 864395.9325467572,
+            "unit": "ns/iter",
+            "extra": "iterations: 812\ncpu: 864516.349753703 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1723018.7643104626,
+            "unit": "ns/iter",
+            "extra": "iterations: 399\ncpu: 1723180.4761904688 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2324.7457204049338,
+            "unit": "ns/iter",
+            "extra": "iterations: 308143\ncpu: 2318.8074173363584 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10390.830918764457,
+            "unit": "ns/iter",
+            "extra": "iterations: 68250\ncpu: 10382.647648356533 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 79005.01064107164,
+            "unit": "ns/iter",
+            "extra": "iterations: 6722\ncpu: 78967.67985719298 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 402005.3994269692,
+            "unit": "ns/iter",
+            "extra": "iterations: 1753\ncpu: 401957.5299486565 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2186.0360710949753,
+            "unit": "ns/iter",
+            "extra": "iterations: 324738\ncpu: 2148.1794215647274 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6482.361336162731,
+            "unit": "ns/iter",
+            "extra": "iterations: 107416\ncpu: 6447.094892755629 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 40863.12412684638,
+            "unit": "ns/iter",
+            "extra": "iterations: 17062\ncpu: 40822.752315082544 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 316761.8934411095,
+            "unit": "ns/iter",
+            "extra": "iterations: 2218\ncpu: 316657.1230838208 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 653964.0440969109,
+            "unit": "ns/iter",
+            "extra": "iterations: 1076\ncpu: 653755.7118959631 ns\nthreads: 1"
           }
         ]
       }
