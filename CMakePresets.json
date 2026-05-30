@@ -60,13 +60,42 @@
     {
       "name": "player-release",
       "inherits": "base",
-      "displayName": "Player (Shipping)",
-      "description": "Minimal optimized build. No editor, no ImGui, no profiling. For end-users.",
+      "displayName": "Player (Dev, live-scan)",
+      "description": "Optimized player with no editor/ImGui/profiling. Catalog live-scans the asset dir — fast dev iteration, NOT a shippable artifact. Use ship-release for that.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "OCTARINE_ENABLE_PROFILING": "OFF",
         "OCTARINE_WITH_IMGUI": "OFF",
         "OCTARINE_WITH_EDITOR": "OFF"
+      }
+    },
+    {
+      "name": "ship-release",
+      "inherits": "base",
+      "displayName": "Ship (Shipping, manifest-load)",
+      "description": "Shippable artifact: no editor/ImGui/profiling, loads the baked asset_manifest.lua (no FS scan). Canonical desktop shipping config; Android reaches the same state via the if(ANDROID) block in CMakeLists.txt.",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "OCTARINE_ENABLE_PROFILING": "OFF",
+        "OCTARINE_WITH_IMGUI": "OFF",
+        "OCTARINE_WITH_EDITOR": "OFF",
+        "OCTARINE_SHIPPED": "ON"
+      }
+    },
+    {
+      "name": "ship-mac-universal",
+      "inherits": "ship-release",
+      "displayName": "Ship (macOS universal arm64+x86_64)",
+      "description": "Shippable macOS .app: universal binary (arm64 + x86_64) so one .dmg runs on both Apple silicon and Intel. Uses the universal-osx overlay triplet so vcpkg deps are fat too. macOS-only — vcpkg's universal triplet drives lipo'd dylibs/static archives that Linux/Windows hosts can't cross-build.",
+      "cacheVariables": {
+        "CMAKE_OSX_ARCHITECTURES": "arm64;x86_64",
+        "VCPKG_TARGET_TRIPLET": "universal-osx",
+        "VCPKG_OVERLAY_TRIPLETS": "${sourceDir}/cmake/vcpkg-overlay-triplets"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Darwin"
       }
     }
   ],
@@ -75,6 +104,8 @@
     { "name": "editor-release", "configurePreset": "editor-release" },
     { "name": "player-debug", "configurePreset": "player-debug" },
     { "name": "player-profile", "configurePreset": "player-profile" },
-    { "name": "player-release", "configurePreset": "player-release" }
+    { "name": "player-release", "configurePreset": "player-release" },
+    { "name": "ship-release", "configurePreset": "ship-release" },
+    { "name": "ship-mac-universal", "configurePreset": "ship-mac-universal" }
   ]
 }

@@ -1,0 +1,10 @@
+// Root build file. Modern layout: repositories + the AGP version live in settings.gradle
+// (pluginManagement / dependencyResolutionManagement). Plugins are declared here `apply false` and
+// applied per-module.
+plugins {
+    id 'com.android.application' version '8.7.3' apply false
+}
+
+tasks.register('clean', Delete) {
+    delete rootProject.layout.buildDirectory
+}

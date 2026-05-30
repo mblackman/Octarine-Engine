@@ -14,6 +14,10 @@ class Logger {
 
  public:
   static void Init();
+  // Apply a runtime log level override (trace|debug|info|warn|error|critical|off). Case-insensitive;
+  // unknown values log a warning and leave the current level intact. Typically called once from
+  // Game::Setup after config.ini's `LogLevel=` is parsed, on top of the compile-time default.
+  static void SetLevel(const std::string& level);
   static void Error(const std::string& message);
   static void Warn(const std::string& message);
   static void Info(const std::string& message);

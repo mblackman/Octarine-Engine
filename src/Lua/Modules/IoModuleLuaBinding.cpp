@@ -1,6 +1,8 @@
 #include "Lua/Modules/IoModuleLuaBinding.h"
 
-#include <fstream>
+#include <SDL3/SDL.h>
+
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -8,21 +10,26 @@
 
 namespace
 {
+    // Read via SDL IO (SDL_LoadFile wraps SDL_IOFromFile) so paths resolve on desktop, an APK asset
+    // root, or a .app bundle alike.
     std::vector<std::string> ReadFileLines(const std::string& filename)
     {
         std::vector<std::string> lines;
-        if (std::ifstream file(filename); file.is_open())
+        size_t dataSize = 0;
+        void* data = SDL_LoadFile(filename.c_str(), &dataSize);
+        if (data == nullptr)
         {
-            std::string line;
-            while (std::getline(file, line))
-            {
-                lines.push_back(line);
-            }
-            file.close();
+            Logger::Error("Failed to open file: " + filename + ": " + std::string(SDL_GetError()));
+            return lines;
         }
-        else
+
+        std::istringstream stream(std::string(static_cast<char*>(data), dataSize));
+        SDL_free(data);
+
+        std::string line;
+        while (std::getline(stream, line))
         {
-            Logger::Error("Failed to open file: " + filename);
+            lines.push_back(line);
         }
         return lines;
     }

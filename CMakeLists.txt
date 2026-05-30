@@ -33,6 +33,37 @@ option(OCTARINE_ENABLE_PROFILING "Enable per-system performance instrumentation"
 option(OCTARINE_WITH_IMGUI "Build with ImGui debug tools" ON)
 option(OCTARINE_WITH_EDITOR "Build with the yellowish-purple editor environment" ON)
 
+# Dev-vs-shipped asset-catalog gate. OFF (dev): the catalog always live-scans the asset dir, so a
+# stray asset_manifest.lua left beside source assets can't freeze the scan on a stale catalog. ON
+# (every packaged target — desktop package, Android): the catalog loads the baked manifest and
+# skips the filesystem walk, which is what lets it work inside a read-only APK bundle. The
+# packaging path (octarine_package / CPack) forces this ON; a packaged build that leaves it OFF would
+# try to scan a read-only FS and fail at launch.
+option(OCTARINE_SHIPPED "Build a shipped artifact: load the baked asset manifest instead of scanning" OFF)
+
+# Desktop packaging. Set to a game-project dir to wire install rules + CPack that emit a
+# self-contained artifact (engine + that project's assets/lua/config + baked manifest), launchable
+# with no `-p`. Empty (default) leaves normal dev/editor builds completely untouched. The packaging
+# path forces OCTARINE_SHIPPED ON on the engine target regardless of the option above.
+set(OCTARINE_PACKAGE_PROJECT "" CACHE PATH "Game project dir to bundle into a packaged artifact (empty = no packaging)")
+
+# Android target. The NDK toolchain sets ANDROID/CMAKE_SYSTEM_NAME=Android. The engine cross-compiles
+# to a shared lib (libmain.so) that SDLActivity loads; there is no real filesystem to scan inside an
+# APK, so this is always a shipping config (manifest-load, no scan) with the desktop-only editor/ImGui
+# compiled out. Forced here, before the editor-forces-ImGui rule below.
+#
+# Semantically equivalent to the `ship-release` CMake preset (desktop shipping config). AGP can't
+# consume `cmake --preset`, so Android reaches the same OCTARINE_SHIPPED=ON + editor/ImGui-off state
+# through this branch instead of the preset. Keep the two in sync if either set of forced flags changes.
+if (ANDROID)
+    set(OCTARINE_WITH_EDITOR OFF CACHE BOOL "Disabled on Android" FORCE)
+    set(OCTARINE_WITH_IMGUI OFF CACHE BOOL "Disabled on Android" FORCE)
+    set(OCTARINE_SHIPPED ON CACHE BOOL "Forced ON on Android (manifest-load, no FS scan)" FORCE)
+endif ()
+
+# iOS build target is parked on the defer/ios branch pending an Apple Developer account; see
+# ai/iOSDeferralPlan.md.
+
 if (OCTARINE_WITH_EDITOR)
     set(OCTARINE_WITH_IMGUI ON CACHE BOOL "Forced ON by Editor" FORCE)
 endif ()
@@ -60,6 +91,8 @@ find_package(Threads REQUIRED)
 set(SRC_FILES
         src/Main.cpp
         src/AssetManager/AssetManager.cpp
+        src/AssetManager/AssetCatalog.cpp
+        src/AssetManager/SceneAssetScanner.cpp
         src/ECS/Registry.cpp
         src/Game/Game.cpp
         src/Game/GameConfig.cpp
@@ -88,7 +121,7 @@ if (OCTARINE_WITH_EDITOR)
     list(APPEND SRC_FILES src/Editor/Inspectors/RegisterAllInspectors.cpp)
 endif ()
 
-if (UNIX AND NOT APPLE)
+if (UNIX AND NOT APPLE AND NOT ANDROID)
     list(APPEND SRC_FILES src/General/SDL3_Linux_Stubs.cpp)
 endif ()
 
@@ -97,8 +130,15 @@ if (OCTARINE_WITH_IMGUI)
     add_subdirectory(libs/sol2_ImGui_Bindings)
 endif ()
 
-# Create the executable target
-add_executable(${PROJECT_NAME} ${SRC_FILES})
+# Create the engine target. On Android, SDLActivity dlopens libmain.so and jumps to SDL_main, so the
+# engine must be that shared lib (OUTPUT_NAME main → libmain.so). Everywhere else it is a plain
+# executable.
+if (ANDROID)
+    add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME main)
+else ()
+    add_executable(${PROJECT_NAME} ${SRC_FILES})
+endif ()
 
 # Set target properties
 set_target_properties(${PROJECT_NAME} PROPERTIES
@@ -121,6 +161,33 @@ if (OCTARINE_WITH_EDITOR)
     target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_WITH_EDITOR)
     message(STATUS "Octarine: Editor ENABLED")
 endif ()
+
+if (OCTARINE_SHIPPED)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_SHIPPED)
+    message(STATUS "Octarine: SHIPPED build — asset catalog loads baked manifest (no scan)")
+endif ()
+
+# Engine log level (compile-time default baked into the binary). Policy when OCTARINE_LOG_LEVEL is
+# empty (the default):
+#   SHIPPED build  → warn   (production: errors + warnings only)
+#   Debug build    → debug  (dev: noisy)
+#   else           → info   (player-release / RelWithDebInfo)
+# Runtime can lower the bar with `LogLevel=` in config.ini — read at Game::Setup, applied via
+# Logger::SetLevel on top of this default. See src/General/Logger.cpp.
+set(OCTARINE_LOG_LEVEL "" CACHE STRING "Compile-time default engine log level (trace|debug|info|warn|error|critical|off); empty = auto-pick from build type / OCTARINE_SHIPPED")
+if (NOT OCTARINE_LOG_LEVEL)
+    if (OCTARINE_SHIPPED)
+        set(_octarine_default_log_level "warn")
+    elseif (CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "")
+        set(_octarine_default_log_level "debug")
+    else ()
+        set(_octarine_default_log_level "info")
+    endif ()
+else ()
+    set(_octarine_default_log_level "${OCTARINE_LOG_LEVEL}")
+endif ()
+target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_LOG_LEVEL_NAME="${_octarine_default_log_level}")
+message(STATUS "Octarine: default log level = ${_octarine_default_log_level}")
 
 # Include directories
 target_include_directories(${PROJECT_NAME}
@@ -152,12 +219,28 @@ if (OCTARINE_WITH_IMGUI)
     )
 endif ()
 
-# Install rules (optional)
-install(TARGETS ${PROJECT_NAME}
-        RUNTIME DESTINATION bin
-        LIBRARY DESTINATION lib
-        ARCHIVE DESTINATION lib
-)
+# Android NDK system libs. SDL3 (statically linked from the arm64-android vcpkg triplet) pulls in the
+# native logging and platform APIs; the linker needs them named explicitly for the shared lib.
+if (ANDROID)
+    target_link_libraries(${PROJECT_NAME} PRIVATE android log)
+endif ()
+
+# Install rules (optional). Skipped under packaging — octarine_package owns the deliverable layout
+# (binary + project files at the package root) instead of the bin/lib split used by `cmake --install`.
+if (NOT OCTARINE_PACKAGE_PROJECT AND NOT ANDROID)
+    install(TARGETS ${PROJECT_NAME}
+            RUNTIME DESTINATION bin
+            LIBRARY DESTINATION lib
+            ARCHIVE DESTINATION lib
+    )
+endif ()
+
+# Packaging: wire the deliverable layout when a project dir is supplied. Android packages via Gradle
+# (see android/) so the helper is skipped there entirely.
+if (OCTARINE_PACKAGE_PROJECT AND NOT ANDROID)
+    include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/OctarinePackage.cmake)
+    octarine_package(${PROJECT_NAME} PROJECT "${OCTARINE_PACKAGE_PROJECT}" NAME "${PROJECT_NAME}")
+endif ()
 
 # Compiler-specific flags - Treat warnings as errors in prod builds
 if (MSVC)
@@ -190,9 +273,17 @@ else ()
             -Wconversion
             -Wfatal-errors
     )
-    target_compile_options(${PROJECT_NAME} PRIVATE
-            $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
-    )
+    if (ANDROID)
+        # Cross-compile: -march=native would target the build host, not the device. -Werror is dropped
+        # because device-arch-specific warnings can't be observed/cleared from a desktop checkout.
+        target_compile_options(${PROJECT_NAME} PRIVATE
+                $<IF:$<CONFIG:Debug>,,-ffast-math>
+        )
+    else ()
+        target_compile_options(${PROJECT_NAME} PRIVATE
+                $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
+        )
+    endif ()
     # Size reduction for non-Debug builds:
     # - function/data sections + --gc-sections drops unreferenced symbols from static libs
     # - -s strips the linked binary
@@ -360,6 +451,61 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
 
     add_test(NAME LuaApiSmokeTest COMMAND OctarineLuaApiTest)
+
+    # Asset pipeline checks (metadata defaults + catalog build). Links the full engine minus the
+    # real entry point, matching the smoke test, so the tests can exercise AssetCatalog::Build
+    # (which needs GameConfig / sol2) without re-plumbing the target.
+    set(ASSET_TEST_SRC_FILES ${SRC_FILES})
+    list(REMOVE_ITEM ASSET_TEST_SRC_FILES src/Main.cpp)
+    list(APPEND ASSET_TEST_SRC_FILES tests/AssetPipelineTest.cpp)
+
+    add_executable(OctarineAssetPipelineTest ${ASSET_TEST_SRC_FILES})
+
+    set_target_properties(OctarineAssetPipelineTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+    )
+
+    target_compile_definitions(OctarineAssetPipelineTest PRIVATE GLM_FORCE_INTRINSICS)
+    target_compile_definitions(OctarineAssetPipelineTest PRIVATE
+            ASSET_TEST_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/assets")
+    if (OCTARINE_WITH_IMGUI)
+        target_compile_definitions(OctarineAssetPipelineTest PRIVATE OCTARINE_WITH_IMGUI)
+    endif ()
+    if (OCTARINE_WITH_EDITOR)
+        target_compile_definitions(OctarineAssetPipelineTest PRIVATE OCTARINE_WITH_EDITOR)
+    endif ()
+    if (OCTARINE_ENABLE_PROFILING)
+        target_compile_definitions(OctarineAssetPipelineTest PRIVATE OCTARINE_PROFILING)
+    endif ()
+
+    target_include_directories(OctarineAssetPipelineTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs
+            ${LUA_INCLUDE_DIR}
+    )
+
+    target_link_libraries(OctarineAssetPipelineTest PRIVATE
+            glm::glm
+            SDL3::SDL3
+            SDL3_ttf::SDL3_ttf
+            $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
+            $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
+            ${LUA_LIBRARIES}
+            spdlog::spdlog
+            sol2::sol2
+            Threads::Threads
+    )
+    if (OCTARINE_WITH_IMGUI)
+        target_link_libraries(OctarineAssetPipelineTest PRIVATE imgui::imgui sol2_ImGui_Bindings)
+    endif ()
+
+    if (MSVC)
+        target_compile_options(OctarineAssetPipelineTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
+    endif ()
+
+    add_test(NAME AssetPipelineTest COMMAND OctarineAssetPipelineTest)
 
     message(STATUS "Octarine: Tests ENABLED")
 endif ()

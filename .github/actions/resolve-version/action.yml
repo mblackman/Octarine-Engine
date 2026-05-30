@@ -1,0 +1,57 @@
+name: Resolve release version from tag
+description: |
+  On a `refs/tags/vX.Y.Z` push, emits version_name=X.Y.Z and
+  version_code=$(git rev-list --count HEAD). On any other ref, emits the
+  configured fallbacks (default: both empty, which lets project.ini / built-in
+  defaults win).
+
+  Requires the calling job to checkout with `fetch-depth: 0` — a shallow clone
+  returns version_code=1 forever, silently breaking monotonic versioning on
+  every release.
+
+  Used by package.yml, android.yml, ios-ipa.yml — every workflow that produces
+  a store-bound deliverable. Keep one copy so a future tag format change lands
+  in one place.
+
+inputs:
+  fallback-version-name:
+    description: version_name to emit when not on a v* tag
+    required: false
+    default: ""
+  fallback-version-code:
+    description: version_code to emit when not on a v* tag
+    required: false
+    default: ""
+
+outputs:
+  version_name:
+    description: SemVer string (e.g. 0.1.2) on tag push, fallback otherwise
+    value: ${{ steps.resolve.outputs.version_name }}
+  version_code:
+    description: Monotonic int (commit count) on tag push, fallback otherwise
+    value: ${{ steps.resolve.outputs.version_code }}
+
+runs:
+  using: composite
+  steps:
+    - id: resolve
+      shell: bash
+      env:
+        FALLBACK_VERSION_NAME: ${{ inputs.fallback-version-name }}
+        FALLBACK_VERSION_CODE: ${{ inputs.fallback-version-code }}
+      run: |
+        if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
+          v="${GITHUB_REF#refs/tags/v}"
+          code=$(git rev-list --count HEAD)
+          echo "Tag push: version_name=$v version_code=$code"
+        else
+          v="$FALLBACK_VERSION_NAME"
+          code="$FALLBACK_VERSION_CODE"
+          if [ -n "$v" ] || [ -n "$code" ]; then
+            echo "Non-tag run: using fallback version_name=$v version_code=$code"
+          else
+            echo "Non-tag run: version derives from project.ini"
+          fi
+        fi
+        echo "version_name=$v" >> "$GITHUB_OUTPUT"
+        echo "version_code=$code" >> "$GITHUB_OUTPUT"

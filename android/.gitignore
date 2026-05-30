@@ -1,0 +1,12 @@
+# Gradle / Android build outputs
+.gradle/
+build/
+app/build/
+app/.cxx/
+app/libs/
+
+# Local machine config (SDK/NDK paths)
+local.properties
+
+# Staged game assets (copied from the project dir at build time)
+app/src/main/assets/

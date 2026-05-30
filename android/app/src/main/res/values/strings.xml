@@ -1,0 +1,3 @@
+<resources>
+    <!-- app_name is generated from -Poctarine.appName via resValue in app/build.gradle. -->
+</resources>

@@ -97,6 +97,9 @@ class GameConfig {
   void SetDefaultScaleMode(const std::string& defaultScaleMode);
   void SetDefaultWidth(int defaultWidth);
   void SetDefaultHeight(int defaultHeight);
+  // Runtime override of the compile-time default log level. Invoked from LoadConfig; pushes the
+  // value straight into spdlog via Logger::SetLevel, so subsequent Logger calls honor it.
+  void SetLogLevel(const std::string& logLevel);
 
   bool has_loaded_config_ = false;
 

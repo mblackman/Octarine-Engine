@@ -1,0 +1,7 @@
+# The Gradle wrapper script must stay LF so `./gradlew` runs on the Linux CI runner
+# (a CRLF shebang yields "/bin/sh^M: bad interpreter").
+gradlew             text eol=lf
+*.sh                text eol=lf
+*.bat               text eol=crlf
+gradle-wrapper.jar  binary
+*.png               binary

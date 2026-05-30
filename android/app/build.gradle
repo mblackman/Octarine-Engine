@@ -1,0 +1,507 @@
+plugins {
+    id 'com.android.application'
+}
+
+// --- Octarine host app ---------------------------------------------------------------------------
+// Builds the engine as the native lib (libmain.so) via CMake + the NDK, resolving SDL3 + deps from a
+// vcpkg android triplet. SDLActivity dlopens libmain.so and jumps to SDL_main (src/Main.cpp's
+// <SDL3/SDL_main.h>). SDL3 is statically linked into libmain.so, so SDLActivity.getLibraries() loads
+// only "main" — there is no separate libSDL3.so.
+//
+// Project identity (applicationId, app name, versionCode/versionName) comes from a flat
+// `project.ini` at the game project root — the cross-platform source of truth (CPack reads the same
+// file). See cmake/OctarinePackage.cmake. Resolution precedence per key:
+//   -Poctarine.<key> CLI flag   >   project.ini   >   built-in default (the example's identity)
+// so CI can hotfix-bump a version with `-Poctarine.versionCode=18` without editing the file.
+//
+// Reusable for ANY project: stage that project's tree by pointing at it, the rest derives from its
+// project.ini. e.g.:
+//   ./gradlew assembleDebug \
+//     -Poctarine.projectDir=/path/to/game \      # asset tree staged into the APK (default: example)
+//     -Poctarine.abi=x86_64                       # triplet auto-derives (x86_64 -> x64-android emulator)
+// Release signing (else falls back to the debug key): -Poctarine.storeFile/storePassword/keyAlias/keyPassword.
+// Re-bake the manifest to match the staged tree: -Poctarine.bakeExe=/path/to/desktop/OctarineEngine.
+//
+// Required environment: VCPKG_ROOT (or -Poctarine.vcpkgRoot) and an installed NDK (ANDROID_NDK_HOME,
+// or the SDK's ndk/<ndkVersion>). ANDROID_NDK_HOME is also what vcpkg's own android toolchain uses to
+// locate the NDK for its dependency builds, so it must be set in the build environment.
+def prop = { String key, Object fallback -> project.findProperty(key) ?: fallback }
+
+def vcpkgRoot = System.getenv('VCPKG_ROOT') ?: project.findProperty('octarine.vcpkgRoot')
+if (vcpkgRoot == null) {
+    throw new GradleException('Set VCPKG_ROOT (env) or -Poctarine.vcpkgRoot=<path> to the vcpkg checkout.')
+}
+
+// Resolve the game project dir up front — project.ini lives at its root.
+def gameProjectDir = prop('octarine.projectDir', "${rootDir}/../../Octarine-Engine-Example")
+
+// Load the project's identity file. Flat key=value, no sections, so java.util.Properties parses it
+// natively (no INI library needed). Returns an empty Properties when the file is absent so the
+// fallback chain still works for projects mid-bootstrap.
+def projectIni = new Properties()
+def projectIniFile = file("${gameProjectDir}/project.ini")
+if (projectIniFile.exists()) {
+    projectIniFile.withInputStream { projectIni.load(it) }
+}
+
+// CLI flag > project.ini > built-in default.
+def identityProp = { String cliKey, String iniKey, Object fallback ->
+    def cli = project.findProperty(cliKey)
+    if (cli != null) return cli
+    def ini = projectIni.getProperty(iniKey)
+    if (ini != null) return ini.trim()
+    return fallback
+}
+
+def appId      = identityProp('octarine.applicationId', 'package_id',   'com.octarine.example')
+def appName    = identityProp('octarine.appName',       'name',         'Octarine Example')
+def appVerCode = (identityProp('octarine.versionCode',  'version_code', '1')) as Integer
+def appVerName = identityProp('octarine.versionName',   'version_name', '1.0')
+
+// Validate identity on Android (always a shipping build). Mirrors the CMake-side validator in
+// cmake/OctarinePackage.cmake so a single project.ini misconfig fails the same way on every driver.
+// File absent: warn + fall through to defaults (bootstrap-friendly). File present: required keys
+// must be non-empty; package_id must be reverse-DNS.
+if (!projectIniFile.exists()) {
+    logger.warn("Octarine: shipping build with no ${projectIniFile} — using fallback identity " +
+        "('${appName}' ${appVerName}, ${appId}). Add a project.ini for a proper package identity.")
+} else {
+    def identityErrors = []
+    if (!projectIni.getProperty('name'))         identityErrors << 'missing required key: name'
+    if (!projectIni.getProperty('version_name')) identityErrors << 'missing required key: version_name'
+    def iniPkgId = projectIni.getProperty('package_id')
+    if (!iniPkgId) {
+        identityErrors << 'missing required key: package_id (Android/iOS bundle id)'
+    } else if (!(iniPkgId.trim() ==~ /^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/)) {
+        identityErrors << "package_id '${iniPkgId}' must be reverse-DNS (e.g. com.studio.mygame)"
+    }
+    if (!identityErrors.isEmpty()) {
+        throw new GradleException("Octarine: project.ini validation failed (${projectIniFile}):\n  - " +
+            identityErrors.join('\n  - '))
+    }
+}
+def appMinSdk  = (identityProp('octarine.minSdk', 'min_android_sdk', '28').toString()) as Integer   // floor pinned by the vcpkg triplet API level
+def appNdk     = prop('octarine.ndkVersion', '28.2.13676358')
+// Local name avoids `abi` because the android { bundle { abi { ... } } } DSL closure resolves
+// receiver methods against the enclosing closure binding first; a `def abi` in scope shadows the
+// BundleOptions `abi` method and Groovy ends up calling `String.call(closure)` (fails with
+// "No signature of method: java.lang.String.call() is applicable for argument types").
+def primaryAbi = prop('octarine.abi', 'arm64-v8a')
+
+// Per-project platform knobs from project.ini. CLI > project.ini > default precedence, mirroring
+// the CMake side (cmake/OctarinePackage.cmake's identity block). Values become AndroidManifest
+// placeholders + a generated <uses-permission> overlay manifest below.
+def appOrientationRaw = identityProp('octarine.orientation', 'orientation', '').toString().trim().toLowerCase()
+def appFullscreenRaw  = identityProp('octarine.fullscreen',  'fullscreen',  'true').toString().trim().toLowerCase()
+def appPermissionsRaw = identityProp('octarine.permissions', 'permissions', '').toString()
+
+// Orientation map: portrait/landscape/all -> android:screenOrientation values. Anything else
+// (incl. empty) becomes `unspecified` so AGP falls back to system default.
+def androidOrientationMap = ['portrait': 'portrait', 'landscape': 'sensorLandscape', 'all': 'fullSensor']
+def androidOrientation = androidOrientationMap.getOrDefault(appOrientationRaw, 'unspecified')
+// Fullscreen toggle picks between AppTheme (fullscreen, current default) and AppTheme.Windowed
+// (status bar visible). Defaults to fullscreen so existing builds are unaffected.
+def appThemeName = (appFullscreenRaw == 'false') ? 'AppTheme.Windowed' : 'AppTheme'
+
+// Permission catalog. Maps the engine's short names (the same names the iOS Info.plist branch in
+// OctarinePackage.cmake recognizes) to fully-qualified Android permission identifiers. Unknown
+// names are dropped with a warning rather than failing the build.
+def androidPermissionMap = [
+    'internet'  : 'android.permission.INTERNET',
+    'recording' : 'android.permission.RECORD_AUDIO',
+    'camera'    : 'android.permission.CAMERA',
+    'location'  : 'android.permission.ACCESS_FINE_LOCATION',
+    'photos'    : 'android.permission.READ_MEDIA_IMAGES',
+]
+def appPermissionList = appPermissionsRaw.split(',').collect{ it.trim().toLowerCase() }.findAll{ !it.isEmpty() }
+def androidPermissions = []
+appPermissionList.each { p ->
+    if (androidPermissionMap.containsKey(p)) {
+        androidPermissions << androidPermissionMap[p]
+    } else {
+        logger.warn("Octarine: ignoring unknown permission '${p}' (catalog: ${androidPermissionMap.keySet()})")
+    }
+}
+
+// Triplet auto-derives from the ABI (override with -Poctarine.triplet). Keeps the emulator path a
+// one-flag change: -Poctarine.abi=x86_64 selects both the x86_64 ABI and the x64-android triplet.
+def tripletForAbi = ['arm64-v8a': 'arm64-android', 'x86_64': 'x64-android',
+                     'armeabi-v7a': 'arm-android', 'x86': 'x86-android']
+def vcpkgTriplet = prop('octarine.triplet', tripletForAbi.getOrDefault(primaryAbi, 'arm64-android'))
+
+// Multi-ABI mode for shippable AAB. -Poctarine.abis=arm64-v8a,armeabi-v7a,x86_64 turns on the
+// manual orchestration path: AGP's externalNativeBuild is bypassed (it can only run ONE vcpkg
+// triplet per variant) and replaced by a fan-out of per-ABI cmake invocations whose libmain.so
+// outputs land under build/octarineJni/<abi>/. AAB packaging picks them up via jniLibs.srcDir.
+// Single-ABI (-Poctarine.abi or default) keeps the externalNativeBuild path for IDE friendliness.
+def abisProp     = project.findProperty('octarine.abis')
+def multiAbi     = abisProp != null && !abisProp.toString().trim().isEmpty()
+def abiList      = multiAbi ? abisProp.toString().split(',').collect{ it.trim() }.findAll{ !it.isEmpty() }
+                            : [primaryAbi]
+def nativeBuildRoot = "${layout.buildDirectory.get().asFile}/octarineJni"
+
+def repoRoot = "${rootDir}/.."                                  // android/ sits at <repo>/android
+// gameProjectDir is defined above (project.ini lookup uses it).
+def bakeExe = project.findProperty('octarine.bakeExe')
+def stagedAssetsDir = "${layout.buildDirectory.get().asFile}/octarineAssets"
+// Generated icon/splash resources (mipmap-*, values-v31, adaptive XML). Source-of-truth generator
+// is scripts/octarine-icons.cmake — same one CMake/CPack invoke on desktop + iOS. Skipped silently
+// when project.ini has no `icon=` or `magick`/`convert` aren't on PATH; existing res/mipmap-* +
+// AppTheme then ship as the fallback.
+def generatedResDir = "${layout.buildDirectory.get().asFile}/generated/octarineIcons/res"
+def iconScript      = "${repoRoot}/scripts/octarine-icons.cmake"
+// Aggregated third-party license text (closes the App Store / Play Store attribution gap). The
+// file ships under the APK's `assets/` so a future in-app About / Open-Source-Licenses screen can
+// render it via AAssetManager — and so reviewers grep can find it without cracking the binary.
+def licenseAssetsDir = "${layout.buildDirectory.get().asFile}/generated/octarineLicenses/assets"
+def licenseOutFile   = "${licenseAssetsDir}/THIRD_PARTY_LICENSES.txt"
+def licenseScript    = "${repoRoot}/scripts/run-licenses.cmake"
+def licenseDropDir   = "${gameProjectDir}/THIRD_PARTY_LICENSES.d"
+
+android {
+    namespace = "org.libsdl.app"   // package of the vendored SDL java sources
+    compileSdk = 35
+    ndkVersion = appNdk
+
+    defaultConfig {
+        applicationId = appId
+        minSdk = appMinSdk
+        targetSdk = 35
+        versionCode = appVerCode
+        versionName = appVerName
+        resValue "string", "app_name", appName   // drives the manifest @string/app_name label
+        // Manifest placeholders consumed by android/app/src/main/AndroidManifest.xml:
+        //   ${screenOrientation} -> activity android:screenOrientation
+        //   ${appTheme}          -> application android:theme="@style/${appTheme}"
+        // Both default to no-op values when project.ini omits the keys.
+        manifestPlaceholders = [
+            screenOrientation: androidOrientation,
+            appTheme         : appThemeName,
+        ]
+        ndk {
+            abiFilters = abiList   // single-ABI dev mode = [abi]; -Poctarine.abis lists all 3
+        }
+        // Single-ABI: AGP runs CMake for us via externalNativeBuild (IDE-friendly path).
+        // Multi-ABI: bypassed — the custom octarineNative_<abi>_* tasks fan-out per-ABI cmake
+        // invocations, since externalNativeBuild can only carry ONE VCPKG_TARGET_TRIPLET per
+        // variant but each Android ABI needs its own triplet (arm64-android, arm-android, ...).
+        if (!multiAbi) {
+            externalNativeBuild {
+                cmake {
+                    // vcpkg's android toolchain finds the NDK via ANDROID_NDK_HOME; the chainload arg
+                    // below covers the engine's own configure. Compute the NDK toolchain path with the
+                    // same fallback the rest of the build uses.
+                    def ndkHome = System.getenv('ANDROID_NDK_HOME') ?: System.getenv('ANDROID_NDK_ROOT')
+                    if (ndkHome == null) {
+                        ndkHome = "${android.sdkDirectory}/ndk/${appNdk}"
+                    }
+                    def ndkToolchain = "${ndkHome}/build/cmake/android.toolchain.cmake"
+                    arguments "-DANDROID_PLATFORM=android-${appMinSdk}",
+                              "-DANDROID_STL=c++_shared",
+                              "-DCMAKE_TOOLCHAIN_FILE=${vcpkgRoot}/scripts/buildsystems/vcpkg.cmake",
+                              "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ndkToolchain}",
+                              "-DVCPKG_TARGET_TRIPLET=${vcpkgTriplet}",
+                              "-DVCPKG_MANIFEST_MODE=ON",
+                              // Overlay sol2 port patched for the NDK clang noexcept bug (LLVM #91362);
+                              // see vcpkg-overlay-ports/sol2. Without it the engine won't compile.
+                              "-DVCPKG_OVERLAY_PORTS=${rootDir}/vcpkg-overlay-ports"
+                    targets "OctarineEngine"   // produces libmain.so (OUTPUT_NAME main)
+                }
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    signingConfigs {
+        // Real release keystore, only when the project supplies one (CI secrets / local props).
+        if (project.hasProperty('octarine.storeFile')) {
+            release {
+                storeFile file(project.property('octarine.storeFile'))
+                storePassword project.property('octarine.storePassword')
+                keyAlias project.property('octarine.keyAlias')
+                keyPassword project.property('octarine.keyPassword')
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            // R8/ProGuard off by default — proguard-rules.pro is maintained (SDL JNI keep-rules +
+            // safety-net `native <methods>;`) so flipping this on is a probe, not a leap of faith.
+            // -Poctarine.minify=true exercises the shrunk path in CI without editing this file.
+            minifyEnabled = (prop('octarine.minify', 'false') as String).toBoolean()
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            // Use the supplied keystore if present; else the debug key so `assembleRelease` still
+            // yields an installable (debug-signed) APK for testing rather than an unsigned one.
+            signingConfig project.hasProperty('octarine.storeFile') ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+
+    // externalNativeBuild block only when AGP is driving CMake. Multi-ABI mode skips it (see the
+    // octarineNative_<abi>_* tasks below).
+    if (!multiAbi) {
+        externalNativeBuild {
+            cmake {
+                path "${repoRoot}/CMakeLists.txt"   // the engine's root CMake
+            }
+        }
+    }
+
+    sourceSets.main {
+        // Multi-ABI mode: per-ABI libmain.so lands under build/octarineJni/<abi>/. AGP packages
+        // every <abi>/ subdir into the APK's lib/<abi>/.
+        jniLibs.srcDirs = multiAbi ? ['libs', nativeBuildRoot] : ['libs']
+        assets.srcDirs = [stagedAssetsDir, licenseAssetsDir]
+        // Generated mipmap-*/values-v31 ride beside the committed res tree; AAPT2 merges them so
+        // ic_launcher.png and the splash AppTheme override land in the APK with no manual placement.
+        res.srcDir generatedResDir
+        // Permissions overlay manifest written at config time below. Pointing
+        // sourceSets.main.manifest.srcFile here replaces the committed src/main/AndroidManifest.xml
+        // for the build; the overlay generator copies the committed file + injects project.ini
+        // <uses-permission> entries, so the staged file is a strict superset.
+        manifest.srcFile "${layout.buildDirectory.get().asFile}/octarine_extras/AndroidManifest.xml"
+    }
+
+    // AAB per-ABI splits: Play delivers an APK carrying only the device's ABI rather than the full
+    // fat AAB. Off by default in AGP — flip on so the multi-ABI shipping AAB downloads smaller.
+    // Cosmetic for single-ABI AABs (only one split bucket).
+    bundle {
+        abi {
+            enableSplit = true
+        }
+    }
+
+    lint {
+        abortOnError = false
+    }
+}
+
+// Generate the staged AndroidManifest.xml from the committed src/main/AndroidManifest.xml plus
+// project.ini's `permissions=` list. The staged file becomes sourceSets.main.manifest.srcFile
+// (see above) so AGP sees one merged manifest source — bypasses the AGP 8.5+
+// Variant.sources.manifests.addStaticFile API whose signature has churned across point releases
+// (File / String / Provider<RegularFile> have all been rejected at different times in 8.7.x).
+// Written eagerly at config time so AGP's manifest pipeline picks it up on its first read.
+def octarinePermissionsManifest = file("${layout.buildDirectory.get().asFile}/octarine_extras/AndroidManifest.xml")
+octarinePermissionsManifest.parentFile.mkdirs()
+def _committed_manifest = file('src/main/AndroidManifest.xml').text
+def _perm_xml = new StringBuilder()
+androidPermissions.each { p ->
+    _perm_xml << "    <uses-permission android:name=\"${p}\" />\n"
+}
+// Inject the project-driven permissions immediately before </manifest>. The committed manifest
+// already declares VIBRATE under <manifest> root; project.ini permissions append below it.
+def _injected = _committed_manifest.replaceFirst(
+    /(?s)(\s*)<\/manifest>\s*$/,
+    "\n${_perm_xml.toString()}\$1</manifest>\n")
+octarinePermissionsManifest.text = _injected
+
+// Stage the game project into the APK assets before the asset merge runs.
+tasks.register('stageOctarineAssets', Copy) {
+    description = 'Copies the game project (+ baked asset_manifest.lua) into the APK assets.'
+    from(gameProjectDir) {
+        // Scratch / editor-only files never belong in a shipped bundle.
+        exclude '*.meta', 'editor_prefs.ini', 'preferences.ini', 'imgui.ini', '.git', '.git/**'
+    }
+    into stagedAssetsDir
+    doFirst {
+        if (!file(gameProjectDir).exists()) {
+            throw new GradleException("Game project dir not found: ${gameProjectDir} " +
+                "(set -Poctarine.projectDir=<path>).")
+        }
+    }
+    // Optionally re-bake the manifest from a desktop binary so it matches the staged tree exactly.
+    if (bakeExe != null) {
+        doLast {
+            exec {
+                commandLine bakeExe, stagedAssetsDir, '-m', 'bake'
+            }
+        }
+    } else {
+        doLast {
+            if (!file("${stagedAssetsDir}/asset_manifest.lua").exists()) {
+                throw new GradleException('No asset_manifest.lua in the staged project. Bake it on ' +
+                    'desktop (OctarineEngine <project> -m bake) or pass -Poctarine.bakeExe=<binary>.')
+            }
+        }
+    }
+}
+
+// Generate launcher icon + adaptive icon XML + Android-12 splash theme override from the project's
+// `icon=`. Runs before res processing so AAPT2 picks up the emitted mipmap-*/values-v31 trees.
+tasks.register('generateOctarineIcons', Exec) {
+    description = 'Resizes project.ini `icon=` into mipmap-* + emits adaptive icon + splash theme.'
+    // Lazy file list — bootstrap projects (and the example_repo checkout) ship with no
+    // project.ini, and Gradle 8's inputs.file(...).optional(true) still validates file existence
+    // for the provided path. A closure-evaluated inputs.files re-checks at execution time, so the
+    // task can configure cleanly when the file is absent and the CMake script falls through.
+    inputs.files({ projectIniFile.exists() ? [projectIniFile] : [] }).withPropertyName('projectIni')
+    inputs.file iconScript
+    outputs.dir generatedResDir
+    doFirst {
+        // Generator writes into OUT_DIR/android/...; AAPT2 expects res/<config>/<file>, so we point
+        // OUT_DIR at the parent and let the script create the android/ subdir AAPT2 reads.
+        def staged = file("${layout.buildDirectory.get().asFile}/generated/octarineIcons/staged")
+        staged.deleteDir(); staged.mkdirs()
+        def out = file(generatedResDir); out.deleteDir(); out.mkdirs()
+        commandLine 'cmake',
+                "-DOCTARINE_ICON_PROJECT=${gameProjectDir}",
+                '-DOCTARINE_ICON_PLATFORM=android',
+                "-DOCTARINE_ICON_OUT_DIR=${staged}",
+                '-P', iconScript
+    }
+    doLast {
+        // The script writes to <staged>/android/{mipmap-*,values,values-v31}. Move those into the
+        // res root AGP merges so AAPT2 sees them as standard resource folders.
+        def src = file("${layout.buildDirectory.get().asFile}/generated/octarineIcons/staged/android")
+        if (src.exists()) {
+            copy {
+                from src
+                into generatedResDir
+            }
+            logger.lifecycle("Octarine: generated icon/splash resources under ${generatedResDir}")
+        } else {
+            // Script skipped (no `icon=`, no magick, or no project.ini). Leave the dir empty —
+            // AGP tolerates an empty extra res srcDir and the existing res/mipmap-* defaults win.
+            logger.lifecycle("Octarine: no generated icon resources (project.ini may lack `icon=` " +
+                    "or ImageMagick may not be installed); shipping defaults.")
+        }
+    }
+}
+
+// Multi-ABI native build orchestration. Single-ABI dev path stays on AGP's externalNativeBuild
+// (see the `if (!multiAbi)` blocks above) — these tasks only register when -Poctarine.abis is
+// passed. For each ABI we fan-out three tasks: configure (cmake), build (cmake --build), stage
+// (copy libmain.so into jniLibs srcDir). The aggregator `octarineNativeAll` depends on every
+// stage task, and preBuild pulls it in so `assembleDebug` / `bundleRelease` see the .so files.
+//
+// vcpkg's android workflow needs ANDROID_NDK_HOME — propagated via the `environment` block on
+// each Exec so cmake sees the same NDK android.toolchain.cmake AGP would have used.
+if (multiAbi) {
+    def ndkHome = System.getenv('ANDROID_NDK_HOME') ?: System.getenv('ANDROID_NDK_ROOT')
+    if (ndkHome == null) {
+        ndkHome = "${android.sdkDirectory}/ndk/${appNdk}"
+    }
+    def ndkToolchain = "${ndkHome}/build/cmake/android.toolchain.cmake"
+    def stageTaskNames = []
+
+    abiList.each { iterAbi ->
+        def triplet = tripletForAbi.getOrDefault(iterAbi, 'arm64-android')
+        def configureDir = "${nativeBuildRoot}/.build/${iterAbi}"
+        def stageOutDir  = "${nativeBuildRoot}/${iterAbi}"
+        def configureTask = "octarineNative_${iterAbi}_configure"
+        def buildTask     = "octarineNative_${iterAbi}_build"
+        def stageTask     = "octarineNative_${iterAbi}_stage"
+
+        tasks.register(configureTask, Exec) {
+            description = "CMake configure for Android ABI ${iterAbi} (triplet ${triplet})."
+            doFirst {
+                file(configureDir).mkdirs()
+                file(stageOutDir).mkdirs()
+            }
+            workingDir configureDir
+            environment 'ANDROID_NDK_HOME', ndkHome
+            commandLine 'cmake',
+                    "${repoRoot}",
+                    '-G', 'Ninja',
+                    "-DANDROID_ABI=${iterAbi}",
+                    "-DANDROID_PLATFORM=android-${appMinSdk}",
+                    '-DANDROID_STL=c++_shared',
+                    "-DCMAKE_TOOLCHAIN_FILE=${vcpkgRoot}/scripts/buildsystems/vcpkg.cmake",
+                    "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ndkToolchain}",
+                    "-DVCPKG_TARGET_TRIPLET=${triplet}",
+                    '-DVCPKG_MANIFEST_MODE=ON',
+                    "-DVCPKG_OVERLAY_PORTS=${rootDir}/vcpkg-overlay-ports",
+                    '-DCMAKE_BUILD_TYPE=Release'
+        }
+
+        tasks.register(buildTask, Exec) {
+            description = "CMake build for Android ABI ${iterAbi}."
+            dependsOn configureTask
+            workingDir configureDir
+            commandLine 'cmake', '--build', '.', '--target', 'OctarineEngine', '--parallel'
+        }
+
+        tasks.register(stageTask, Copy) {
+            description = "Stage libmain.so for Android ABI ${iterAbi} into jniLibs."
+            dependsOn buildTask
+            from("${configureDir}") {
+                include 'libmain.so'
+            }
+            into stageOutDir
+        }
+
+        stageTaskNames += stageTask
+    }
+
+    tasks.register('octarineNativeAll') {
+        description = 'Build libmain.so for every ABI in -Poctarine.abis.'
+        dependsOn stageTaskNames
+    }
+}
+
+// Aggregate every linked dep's license text into one file the APK ships in assets/. Pulls from
+// vcpkg_installed/<triplet>/share/*/copyright, so the task needs SOMETHING to scan:
+//   - multi-ABI mode: auto-uses the first ABI's configure-dir vcpkg_installed (deterministic
+//     path inside `nativeBuildRoot/.build/<abi>/`); dependsOn the matching configure task so
+//     vcpkg has been run before the aggregator looks.
+//   - single-ABI mode: AGP's externalNativeBuild path varies per AGP version, so we don't try
+//     to discover it. Pass `-Poctarine.licenseVcpkgInstalled=<dir> -Poctarine.licenseTriplet=<t>`
+//     to point the task at an existing vcpkg_installed; otherwise the task is a no-op and
+//     `assembleDebug` ships without licenses (which is fine — dev artifact, not store-shipped).
+tasks.register('generateOctarineLicenses', Exec) {
+    description = 'Aggregates third-party licenses (vcpkg copyrights + vendored libs) into APK assets.'
+    def installedOverride = project.findProperty('octarine.licenseVcpkgInstalled')
+    def tripletOverride   = project.findProperty('octarine.licenseTriplet')
+    def installedDir = installedOverride
+    def triplet      = tripletOverride
+    if (multiAbi) {
+        def firstAbi = abiList[0]
+        def firstTriplet = tripletForAbi.getOrDefault(firstAbi, 'arm64-android')
+        installedDir = installedDir ?: "${nativeBuildRoot}/.build/${firstAbi}/vcpkg_installed"
+        triplet      = triplet ?: firstTriplet
+        dependsOn "octarineNative_${firstAbi}_configure"
+    }
+    inputs.file licenseScript
+    inputs.property 'triplet', triplet ?: ''
+    inputs.property 'installedDir', installedDir ?: ''
+    outputs.dir licenseAssetsDir
+    onlyIf {
+        if (installedDir == null || triplet == null) {
+            logger.warn('Octarine: skipping license aggregation (no vcpkg_installed location). ' +
+                'For shipping single-ABI builds, pass -Poctarine.licenseVcpkgInstalled=<dir> ' +
+                '-Poctarine.licenseTriplet=<triplet>. Multi-ABI (-Poctarine.abis=...) is automatic.')
+            return false
+        }
+        return true
+    }
+    doFirst {
+        file(licenseAssetsDir).mkdirs()
+        def cmd = ['cmake',
+                "-DOCTARINE_LICENSES_OUT=${licenseOutFile}",
+                "-DVCPKG_TARGET_TRIPLET=${triplet}",
+                "-DVCPKG_INSTALLED_DIR=${installedDir}"]
+        if (file(licenseDropDir).isDirectory()) {
+            cmd << "-DOCTARINE_LICENSES_EXTRA_DIRS=${licenseDropDir}"
+        }
+        cmd += ['-P', licenseScript]
+        commandLine cmd
+    }
+}
+
+tasks.configureEach { task ->
+    if (task.name == 'preBuild') {
+        task.dependsOn 'stageOctarineAssets', 'generateOctarineIcons', 'generateOctarineLicenses'
+        if (multiAbi) {
+            task.dependsOn 'octarineNativeAll'
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+}

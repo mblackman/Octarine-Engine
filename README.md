@@ -18,6 +18,19 @@ Octarine Engine is a lightweight, high-performance 2D game engine built with C++
 
 ---
 
+## Third-Party Licenses
+
+Octarine Engine itself is MIT-licensed (see [`LICENSE`](LICENSE)). Every shipped package
+(desktop ZIP/TGZ/DMG, Android AAB) ships a build-time-aggregated
+`THIRD_PARTY_LICENSES.txt` covering every linked dependency. The aggregator and shipping
+contract live in [`ai/LicenseShippingPlan.md`](ai/LicenseShippingPlan.md).
+
+Portions of this software are copyright © The FreeType Project (www.freetype.org). All rights
+reserved. FreeType is used under the terms of the FreeType License (FTL); see the bundled
+`THIRD_PARTY_LICENSES.txt` for the full text and for every other linked dependency.
+
+---
+
 ## Prerequisites
 
 - **CMake:** Version 3.15+

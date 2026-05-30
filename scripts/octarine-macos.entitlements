@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        Hardened runtime opt-ins. Empty dict = stock hardened runtime, which is what App Store /
+        notarization require by default. Add exceptions here only when something actually breaks:
+          - com.apple.security.cs.allow-jit       — if a future scripting/runtime needs JIT pages
+          - com.apple.security.cs.allow-unsigned-executable-memory — JIT w/o the above
+          - com.apple.security.cs.disable-library-validation — load dylibs from outside the bundle
+          - com.apple.security.cs.allow-dyld-environment-variables — DYLD_* for debugging
+        SDL3 + Lua (interpreter, no JIT) + statically-linked deps don't need any of the above.
+    -->
+</dict>
+</plist>

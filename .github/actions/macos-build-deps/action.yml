@@ -1,0 +1,16 @@
+name: Install macOS build deps (autotools for vcpkg ports)
+description: |
+  brew installs the autotools chain vcpkg's freetype / harfbuzz / libvorbis
+  ports need to configure from source. Xcode (clang, xcodebuild) is
+  preinstalled on macos-latest; this fills the gaps.
+
+  Used by ios.yml + ios-ipa.yml + (potentially) any future macOS vcpkg leg.
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      # imagemagick is needed by scripts/octarine-icons.cmake to emit the .icns/.ico/PNG icon
+      # ladder from project.ini's icon= source; without it the icon helper warn-skips and the
+      # .app/.dmg ships the generic CPack icon.
+      run: brew install autoconf automake autoconf-archive libtool pkg-config imagemagick

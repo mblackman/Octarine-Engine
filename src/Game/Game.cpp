@@ -3,12 +3,17 @@
 #include <SDL3/SDL.h>
 
 #include <algorithm>
+#include <filesystem>
 #include <memory>
+#include <set>
 #include <sol/sol.hpp>
 #include <string>
+#include <unordered_set>
 
 #include "../Events/KeyInputEvent.h"
 #include "../General/Logger.h"
+#include "AssetManager/AssetCatalog.h"
+#include "AssetManager/SceneAssetScanner.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 #include "Components/BoxColliderComponent.h"
@@ -76,15 +81,89 @@
 constexpr Uint8 GREY_COLOR = 24;
 constexpr Uint8 BLACK_COLOR = 0;
 
+namespace
+{
+    // Read a file's bytes through SDL_IO so the same path resolves on desktop, inside an APK asset
+    // root, or inside a .app bundle. Lua's stock fopen-based loader only sees a real filesystem and
+    // misses AAssetManager-backed entries on Android.
+    std::optional<std::string> ReadFileViaSDL(const std::string& path)
+    {
+        SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
+        if (!io)
+        {
+            Logger::Error("SDL_IOFromFile failed for '" + path + "': " + std::string(SDL_GetError()));
+            return std::nullopt;
+        }
+        std::size_t size = 0;
+        void* data = SDL_LoadFile_IO(io, &size, true); // closes io
+        if (!data)
+        {
+            Logger::Error("SDL_LoadFile_IO failed for '" + path + "': " + std::string(SDL_GetError()));
+            return std::nullopt;
+        }
+        std::string out(static_cast<const char*>(data), size);
+        SDL_free(data);
+        return out;
+    }
+
+    // Raw Lua C function backing the engine's `dofile` override. Registered via lua_pushcfunction so
+    // sol2 doesn't post-process the return: we report (top_after - top_before) which Lua interprets
+    // as the number of return values from the chunk, preserving multi-return correctly.
+    int LuaDofileViaSDL(lua_State* L)
+    {
+        std::size_t plen = 0;
+        const char* p = luaL_checklstring(L, 1, &plen);
+        const std::string path(p, plen);
+
+        auto bytes = ReadFileViaSDL(path);
+        if (!bytes)
+        {
+            return luaL_error(L, "dofile: cannot open '%s'", path.c_str());
+        }
+
+        // Drop the path arg so chunk return values are the only ones above topBefore.
+        lua_settop(L, 0);
+        const int topBefore = lua_gettop(L);
+        const std::string chunkname = "@" + path;
+        if (luaL_loadbuffer(L, bytes->data(), bytes->size(), chunkname.c_str()) != 0)
+        {
+            return luaL_error(L, "dofile load '%s': %s", path.c_str(), lua_tostring(L, -1));
+        }
+        if (lua_pcall(L, 0, LUA_MULTRET, 0) != 0)
+        {
+            return luaL_error(L, "dofile run '%s': %s", path.c_str(), lua_tostring(L, -1));
+        }
+        return lua_gettop(L) - topBefore;
+    }
+
+    // Override Lua's `dofile` so chunks load through SDL_IO too. The example calls
+    // dofile(get_asset_path("scripts/lib/foo.lua")); on desktop that's an absolute path SDL_IO opens
+    // directly, on Android it's a relative path SDL_IO resolves against the APK asset root. The stock
+    // Lua loader would fall back to fopen and miss the APK on Android.
+    void InstallLuaFileLoaders(sol::state& lua)
+    {
+        lua_State* L = lua.lua_state();
+        lua_pushcfunction(L, &LuaDofileViaSDL);
+        lua_setglobal(L, "dofile");
+    }
+} // namespace
+
 inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const GameConfig& gameConfig)
 {
     const auto filePath = assetManager.GetFullPath(gameConfig.GetStartupScript());
 
     Logger::Info("Loading entry script: " + filePath);
+    auto bytes = ReadFileViaSDL(filePath);
+    if (!bytes)
+    {
+        Logger::Error("Failed to read entry script: " + filePath);
+        return;
+    }
+
     sol::protected_function_result result;
     try
     {
-        result = lua.safe_script_file(filePath);
+        result = lua.safe_script(*bytes, sol::script_pass_on_error, "@" + filePath);
     }
     catch (const std::exception& ex)
     {
@@ -94,7 +173,8 @@ inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const Ga
 
     if (!result.valid())
     {
-        Logger::Error("Failed to load entry script: " + filePath);
+        const sol::error err = result;
+        Logger::Error("Failed to load entry script '" + filePath + "': " + err.what());
         return;
     }
 
@@ -145,8 +225,34 @@ bool Game::Initialize(const std::string& assetPath)
     }
 #endif
 
+    // No explicit path (and, in editor builds, no remembered project): default the asset base to the
+    // executable/bundle location. On desktop this is the exe dir; in a .app it is Contents/Resources,
+    // on iOS the bundle root. Keeps the same code path working for packaged builds with no -p argument.
+    //
+    // Android is the exception: assets live inside the APK, reached by SDL_OpenTitleStorage /
+    // SDL_IOFromFile resolving *relative* paths against the APK asset root. SDL_GetBasePath() there
+    // returns the app's internal data dir (not the APK), so the base path must stay empty and config
+    // loading must still run against that empty base.
+#ifndef __ANDROID__
+    if (effectivePath.empty())
+    {
+        if (const char* basePath = SDL_GetBasePath())
+        {
+            effectivePath = basePath;
+            Logger::Info("No project path provided; defaulting asset base path to: " + effectivePath);
+        }
+    }
+#else
+    Logger::Info("Android: resolving assets from the APK asset root (empty base path).");
+#endif
+
     bool projectLoaded = false;
-    if (!effectivePath.empty())
+#ifdef __ANDROID__
+    const bool attemptProjectLoad = true;  // empty base → APK title storage
+#else
+    const bool attemptProjectLoad = !effectivePath.empty();
+#endif
+    if (attemptProjectLoad)
     {
         if (gameConfig.LoadConfigFromFile(effectivePath))
         {
@@ -348,6 +454,120 @@ void Game::Destroy()
     SDL_Quit();
 }
 
+bool Game::Bake(const std::string& assetPath)
+{
+    if (assetPath.empty())
+    {
+        Logger::Error("Bake: no project path provided.");
+        return false;
+    }
+
+    // Minimal init: GameConfig::LoadConfigFromFile and the engine's file reads (SDL_IOFromFile /
+    // SDL_LoadFile) expect the library to be initialized. No video/audio subsystem is needed —
+    // the bake validates references and paths only, with no GPU/mixer upload.
+    if (!SDL_Init(0))
+    {
+        Logger::Error("Bake: SDL_Init failed: " + std::string(SDL_GetError()));
+        return false;
+    }
+
+    bool ok = false;
+    {
+        Game game; // SDL-free constructor — allocates Registry/EventBus/Renderer, opens no window.
+        game.bake_mode_ = true;
+        game.startup_mode_ = "bake";
+        ok = game.RunBakeValidation(assetPath);
+    }
+
+    SDL_Quit();
+    return ok;
+}
+
+bool Game::RunBakeValidation(const std::string& assetPath)
+{
+    registry_->Set<GameConfig>(GameConfig());
+    auto& gameConfig = registry_->Get<GameConfig>();
+    if (!gameConfig.LoadConfigFromFile(assetPath))
+    {
+        Logger::Error("Bake: failed to load config from " + assetPath);
+        return false;
+    }
+
+    // Singletons the startup script + its module globals touch at load time. This mirrors the
+    // pre-LoadGame prefix of Game::Setup but omits everything tied to a window/renderer/mixer
+    // (per-frame systems, audio, render queue producers) since the bake runs no frames.
+    const SDL_FRect camera(0, 0, static_cast<float>(gameConfig.windowWidth),
+                           static_cast<float>(gameConfig.windowHeight));
+    registry_->Set<RenderQueue>(RenderQueue());
+    registry_->Set<CameraComponent>(CameraComponent{camera});
+    registry_->Set<AssetManager>(AssetManager());
+    registry_->Set<ViewportInfo>(ViewportInfo{
+        0, 0, static_cast<float>(gameConfig.windowWidth),
+        static_cast<float>(gameConfig.windowHeight)
+    });
+    registry_->Set<SDL_Renderer*>(nullptr); // no GPU in bake; bake-mode asset globals skip it
+    registry_->Set<EventBus*>(event_bus_.get());
+
+    // EntityPoolManager before ProjectileEmitSystem::Init (Init calls RegisterPool against it),
+    // matching Setup's ordering so fire_projectile binds correctly during module install.
+    registry_->Set<EntityPoolManager>(EntityPoolManager());
+    auto& projectileEmitSystem = registry_->Set<ProjectileEmitSystem>(ProjectileEmitSystem());
+    projectileEmitSystem.Init(*registry_);
+
+    // InputSystem owns the `input.*` Lua surface the scene libs bind against (input_map.install,
+    // spawn.install_click_spawn). Set + subscribe before bindings install.
+    auto& inputSystem = registry_->Set<InputSystem>(InputSystem());
+    inputSystem.SubscribeToEvents(event_bus_, registry_.get());
+
+    RegisterAllLuaBindings();
+
+    LuaSystemRegistry::clear();
+    LuaSystemRegistry::registerSystem(inputSystem);
+
+    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
+    InstallLuaFileLoaders(lua);
+    ScriptSystem scriptSystem;
+    scriptSystem.CreateLuaBindings(lua);
+    RegisterAllLuaModules(lua, *this);
+    LuaSystemRegistry::bindAll(lua);
+    lua["game_window_width"] = gameConfig.windowWidth;
+    lua["game_window_height"] = gameConfig.windowHeight;
+    lua["oct_startup_mode"] = startup_mode_;
+
+    auto& assetManager = registry_->Get<AssetManager>();
+    assetManager.LoadGameConfig(gameConfig);
+
+    // Always re-derive the catalog from the real files — never round-trip an existing (possibly
+    // stale) manifest sitting in the project dir.
+    if (!assetManager.GetCatalog().ScanFilesystem(assetManager.GetBasePath(), lua, gameConfig))
+    {
+        Logger::Error("Bake: catalog scan failed (id collisions). Aborting.");
+        return false;
+    }
+    assetManager.GetCatalog().InstallLuaIdTable(lua);
+
+    // Run the startup script. Its scene loads call acquire_scene_assets / load_asset, which in bake
+    // mode validate every referenced id against the catalog and tally failures on this Game instead
+    // of uploading to a GPU. This is the CI gate: a typo'd or missing asset reference fails the bake.
+    LoadGame(lua, assetManager, gameConfig);
+
+    const std::string manifestPath = (std::filesystem::path(assetPath) / "asset_manifest.lua").string();
+    const bool wrote = assetManager.GetCatalog().WriteManifest(manifestPath, assetPath);
+    if (wrote)
+    {
+        Logger::Info("Bake: wrote " + std::to_string(assetManager.GetCatalog().Size()) + " entries to " +
+            manifestPath);
+    }
+
+    if (bake_validation_failures_ > 0)
+    {
+        Logger::Error("Bake: " + std::to_string(bake_validation_failures_) +
+            " unresolved asset reference(s) across scenes. Build is broken.");
+        return false;
+    }
+    return wrote;
+}
+
 void Game::Run()
 {
     Setup();
@@ -373,8 +593,10 @@ void Game::Setup()
     registry_->Set<RenderQueue>(RenderQueue());
     registry_->Set<CameraComponent>(CameraComponent{camera});
     registry_->Set<AssetManager>(AssetManager());
-    registry_->Set<ViewportInfo>(ViewportInfo{0, 0, static_cast<float>(gameConfig.windowWidth),
-                                              static_cast<float>(gameConfig.windowHeight)});
+    registry_->Set<ViewportInfo>(ViewportInfo{
+        0, 0, static_cast<float>(gameConfig.windowWidth),
+        static_cast<float>(gameConfig.windowHeight)
+    });
 
     // Gameplay
     auto& scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
@@ -400,6 +622,9 @@ void Game::Setup()
     LuaSystemRegistry::registerSystem(inputSystem);
 
     lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
+    // Re-route Lua file-loading through SDL_IO so dofile() reaches inside read-only bundles
+    // (APK/.app). Must run after open_libraries (which installs the stock dofile).
+    InstallLuaFileLoaders(lua);
     // Snapshot stdlib globals before binding so the API manifest can diff out everything the
     // engine adds. Cheap; the actual dump only fires when OCTARINE_DUMP_LUA_API is set.
     const auto preBindingGlobals = LuaApiManifest::SnapshotGlobals(lua);
@@ -457,6 +682,24 @@ void Game::Setup()
     if (gameConfig.HasLoadedConfig())
     {
         assetManager.LoadGameConfig(gameConfig);
+
+        // Discover every available asset + its sidecar metadata up front. Loads nothing — the
+        // catalog is the index Acquire loads from. Built before LoadGame so the startup
+        // script and scene loads can resolve ids against it.
+        //
+        // Dev-vs-shipped gate: a shipped build (OCTARINE_SHIPPED) loads the baked manifest and skips
+        // the scan — required inside a read-only bundle. A dev build always scans (live files are the
+        // truth) unless --use-manifest is passed to exercise the manifest branch from a dev binary.
+        bool allowManifest = use_manifest_;
+#ifdef OCTARINE_SHIPPED
+        allowManifest = true;
+#endif
+        assetManager.GetCatalog().Build(assetManager.GetBasePath(), lua, gameConfig, allowManifest);
+        assetManager.GetCatalog().DumpToLog();
+
+        // Expose the global `assets` table (id -> id, raises on typo) so scripts can reference
+        // ids safely before LoadGame runs the startup script.
+        assetManager.GetCatalog().InstallLuaIdTable(lua);
     }
 
     // Audio must be live before LoadGame: the startup script may call load_asset for audio_clip
@@ -502,7 +745,7 @@ void Game::Setup()
     registry_->RegisterParallelSystem<SquarePrimitiveComponent, GlobalTransformComponent>(RenderPrimitiveSystem());
 
     // Event subscriptions (one-time)
-    event_bus_->SubscribeEvent < Game, KeyInputEvent > (this, &Game::OnKeyInputEvent);
+    event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
     // Event-driven systems with no per-frame Update — owned by the Registry instead of
     // living as parallel members on Game. Keeps the registry as the single source of truth.
     auto& uiButtonSystem = registry_->Set<UIButtonSystem>(UIButtonSystem());
@@ -761,7 +1004,16 @@ void Game::LoadScene(const std::string& scenePath)
 
     Logger::Info("Loading scene: " + fullPath);
 
-    StopScene();
+    // Acquire-before-release: stash the previous scene's tracked assets but defer releasing them
+    // until the new scene's assets are resident, so any id shared by both scenes never
+    // unloads/reloads across the swap. Entities are a different story — a scene script may spawn
+    // entities as a side effect while it runs (the no-table path), so the old entities are cleared
+    // up front, before the script executes, rather than after (which would wipe the new ones).
+    std::vector<std::string> previousSceneAssets = std::move(current_scene_assets_);
+    current_scene_assets_.clear();
+    clearSceneEntities();
+
+    auto releasePrevious = [&]() { assetManager.ReleaseAll(previousSceneAssets); };
 
 #ifdef OCTARINE_WITH_EDITOR
     if (auto* editorPersistence = registry_->TryGet<EditorPersistence>())
@@ -771,11 +1023,24 @@ void Game::LoadScene(const std::string& scenePath)
     }
 #endif
 
-    sol::protected_function_result result = lua.safe_script_file(fullPath);
-    if (!result.valid())
+    auto sceneBytes = ReadFileViaSDL(fullPath);
+    sol::protected_function_result result;
+    if (sceneBytes)
     {
-        const sol::error err = result;
-        Logger::Error("Failed to load scene '" + fullPath + "': " + std::string(err.what()));
+        result = lua.safe_script(*sceneBytes, sol::script_pass_on_error, "@" + fullPath);
+    }
+    if (!sceneBytes || !result.valid())
+    {
+        if (!sceneBytes)
+        {
+            Logger::Error("Failed to read scene '" + fullPath + "'");
+        }
+        else
+        {
+            const sol::error err = result;
+            Logger::Error("Failed to load scene '" + fullPath + "': " + std::string(err.what()));
+        }
+        releasePrevious();
     }
     else if (result.return_count() > 0)
     {
@@ -818,6 +1083,42 @@ void Game::LoadScene(const std::string& scenePath)
                 Logger::Info("Loaded " + std::to_string(assetCount) + " assets from scene table.");
             }
 
+            // 1b. Derive the scene's required asset set from its data (sprite/font/audio ids +
+            // tilemap + preload), validate every reference against the catalog, then acquire up
+            // front before entities load.
+            {
+                auto& am = registry_->Get<AssetManager>();
+                auto* mixerPtr = registry_->TryGet<MIX_Mixer*>();
+                MIX_Mixer* mixer = mixerPtr ? *mixerPtr : nullptr;
+                const std::vector<AssetReference> refs = SceneAssetScanner::CollectRefs(sceneTable);
+
+                if (const int failures = am.Validate(refs); failures > 0)
+                {
+                    Logger::Error("Scene '" + fullPath + "' has " + std::to_string(failures) +
+                        " unresolved asset reference(s).");
+                    if (registry_->Get<GameConfig>().GetEngineOptions().assetValidationFatal)
+                    {
+                        Logger::Error("assetValidationFatal is set — aborting scene load.");
+                        releasePrevious();
+                        return;
+                    }
+                }
+
+                const int acquired = am.AcquireAll(refs, sdl_renderer_, mixer);
+                Logger::Info("Scene scan acquired " + std::to_string(acquired) + " required asset(s).");
+
+                // New scene's assets are now resident. Track them, then release the previous
+                // scene's set — ids shared by both stay loaded thanks to refcounting.
+                std::vector<std::string> newSceneAssets;
+                std::set<std::string> seen;
+                for (const auto& ref : refs)
+                {
+                    if (seen.insert(ref.id).second) newSceneAssets.push_back(ref.id);
+                }
+                TrackSceneAssets(newSceneAssets);
+                releasePrevious();
+            }
+
             // 2. Load Entities
             sol::optional<sol::table> entities = sceneTable["entities"];
             if (entities && entities->valid())
@@ -852,6 +1153,9 @@ void Game::LoadScene(const std::string& scenePath)
         }
         else if (result[0].is<sol::function>())
         {
+            // No scene table to scan up front. The returned function spawns the scene (and may
+            // call acquire_scene_assets, which tracks its ids via TrackSceneAssets). Run it, then
+            // release the previous scene's assets — shared ids it already re-acquired survive.
             Logger::Info("Scene script returned a function. Calling it...");
             sol::function sceneFunc = result[0].as<sol::function>();
             auto funcResult = sceneFunc();
@@ -860,7 +1164,18 @@ void Game::LoadScene(const std::string& scenePath)
                 sol::error err = funcResult;
                 Logger::Error("Failed to run scene function: " + std::string(err.what()));
             }
+            releasePrevious();
         }
+        else
+        {
+            releasePrevious();
+        }
+    }
+    else
+    {
+        // No return value: the script built the scene as a side effect while it ran (entities +
+        // any acquire_scene_assets call). Those are already in place; just release the old set.
+        releasePrevious();
     }
 
     scene_running_ = true;
@@ -879,14 +1194,42 @@ void Game::ReloadScene()
     Logger::Warn("ReloadScene called but no scene is currently loaded.");
 }
 
-void Game::StopScene()
+void Game::clearSceneEntities()
 {
-    Logger::Info("Stopping current scene (clearing entities).");
     registry_->ClearUserEntities();
     if (auto* inputSystem = registry_->TryGet<InputSystem>())
     {
         inputSystem->ResetLuaState();
     }
+}
+
+void Game::TrackSceneAssets(const std::vector<std::string>& assetIds)
+{
+    for (const auto& id : assetIds)
+    {
+        if (std::ranges::find(current_scene_assets_, id) == current_scene_assets_.end())
+        {
+            current_scene_assets_.push_back(id);
+        }
+    }
+}
+
+void Game::StopScene()
+{
+    Logger::Info("Stopping current scene (clearing entities).");
+    clearSceneEntities();
+
+    // Release the assets this scene acquired. (LoadScene sequences acquire-before-release itself
+    // and does not route through here; this is the explicit-stop path.)
+    if (!current_scene_assets_.empty())
+    {
+        if (auto* assetManager = registry_->TryGet<AssetManager>())
+        {
+            assetManager->ReleaseAll(current_scene_assets_);
+        }
+        current_scene_assets_.clear();
+    }
+
     scene_running_ = false;
 }
 

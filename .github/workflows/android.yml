@@ -1,0 +1,344 @@
+name: Android
+
+# Builds the Android APK for the example project from a clean environment — the CI gate that any
+# project on this engine still cross-compiles + links for Android. Mirrors build.yml/package.yml:
+# vcpkg android deps from source (x-gha binary cache), the engine compiled to libmain.so by the NDK,
+# project assets staged into the APK. No device/emulator — build-only (see android/README.md).
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      example_ref:
+        description: 'Octarine-Engine-Example branch/tag/SHA to build against (default: main)'
+        required: false
+        default: 'main'
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  OCTARINE_NDK_VERSION: "28.2.13676358"
+
+jobs:
+  android:
+    name: android (arm64-v8a)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # Full history so `git rev-list --count HEAD` in the Resolve version step computes the
+          # monotonic versionCode on tag pushes. Default depth 1 would return 1 every release.
+          fetch-depth: 0
+
+      - name: Checkout example project
+        uses: actions/checkout@v4
+        with:
+          repository: mblackman/Octarine-Engine-Example
+          # Defaults to the example's `main` for push/PR runs. workflow_dispatch can target an
+          # alternate branch via the `example_ref` input — used for staging downstream-side
+          # changes (e.g. icon commits) against engine CI before merging both branches.
+          ref: ${{ github.event.inputs.example_ref || 'main' }}
+          path: example_repo
+
+      # Tag push v0.1.2 -> versionName=0.1.2, versionCode=<commit count>. Non-tag runs leave both
+      # blank and Gradle's identityProp helper falls through to project.ini / built-in defaults.
+      - name: Resolve version (tag push)
+        id: ver
+        uses: ./.github/actions/resolve-version
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: ./.github/actions/vcpkg-cache-env
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Host tools vcpkg needs to build some android deps from source (freetype/libpng/etc.).
+      - name: Install host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config autoconf automake autoconf-archive libtool libltdl-dev
+
+      # Puts cmdline-tools (sdkmanager) on PATH, exports ANDROID_SDK_ROOT/ANDROID_HOME, accepts licenses.
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages (pinned NDK + cmake)
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" \
+                     "ndk;${OCTARINE_NDK_VERSION}" "cmake;3.22.1"
+
+      - name: Build APK
+        working-directory: android
+        env:
+          OCTARINE_VERSION_NAME: ${{ steps.ver.outputs.version_name }}
+          OCTARINE_VERSION_CODE: ${{ steps.ver.outputs.version_code }}
+        run: |
+          export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}"
+          args=(assembleDebug
+                -Poctarine.projectDir="$GITHUB_WORKSPACE/example_repo"
+                --no-daemon --console=plain)
+          [ -n "$OCTARINE_VERSION_NAME" ] && args+=(-Poctarine.versionName="$OCTARINE_VERSION_NAME")
+          [ -n "$OCTARINE_VERSION_CODE" ] && args+=(-Poctarine.versionCode="$OCTARINE_VERSION_CODE")
+          ./gradlew "${args[@]}"
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctarineEngine-android-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      # Decode the release keystore on demand. Secrets are not available to fork PRs (so HAS_KEYSTORE
+      # stays empty there), in which case bundleRelease falls back to the debug key — still a useful
+      # build-passes signal. Pinned secret names mirror the Stage 1 contract in
+      # ai/DeviceShippingPlan.md.
+      - name: Decode release keystore
+        id: keystore
+        if: env.OCTARINE_ANDROID_KEYSTORE != ''
+        env:
+          OCTARINE_ANDROID_KEYSTORE: ${{ secrets.OCTARINE_ANDROID_KEYSTORE }}
+        run: |
+          ks="$RUNNER_TEMP/release.jks"
+          printf '%s' "$OCTARINE_ANDROID_KEYSTORE" | base64 --decode > "$ks"
+          echo "path=$ks" >> "$GITHUB_OUTPUT"
+
+      # Multi-ABI shipping AAB: arm64-v8a covers every modern Android device; x86_64 lets
+      # Chromebooks + Google Play emulator deliver the right slice. armeabi-v7a (32-bit ARM)
+      # is intentionally dropped — NDK r28's arm-android vcpkg triplet fails detect_compiler
+      # ("CMake was unable to find a build program corresponding to Ninja" via vcpkg's nested
+      # cmake invocation) and 32-bit ARM is <1% of Play Store install base in 2026. Re-add
+      # armeabi-v7a only if downstream telemetry justifies the bake-time cost + the toolchain
+      # gets a working arm-android path.
+      # -Poctarine.abis triggers the manual orchestration path in android/app/build.gradle (per-ABI
+      # cmake + vcpkg triplet); externalNativeBuild is bypassed. bundle.abi.enableSplit (also in
+      # build.gradle) lets Play deliver per-ABI APKs from the same AAB.
+      - name: Build AAB (release bundle, multi-ABI)
+        working-directory: android
+        env:
+          OCTARINE_ANDROID_STORE_PASSWORD: ${{ secrets.OCTARINE_ANDROID_STORE_PASSWORD }}
+          OCTARINE_ANDROID_KEY_ALIAS: ${{ secrets.OCTARINE_ANDROID_KEY_ALIAS }}
+          OCTARINE_ANDROID_KEY_PASSWORD: ${{ secrets.OCTARINE_ANDROID_KEY_PASSWORD }}
+          KEYSTORE_PATH: ${{ steps.keystore.outputs.path }}
+          OCTARINE_VERSION_NAME: ${{ steps.ver.outputs.version_name }}
+          OCTARINE_VERSION_CODE: ${{ steps.ver.outputs.version_code }}
+        run: |
+          export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}"
+          args=(bundleRelease
+                -Poctarine.projectDir="$GITHUB_WORKSPACE/example_repo"
+                -Poctarine.abis=arm64-v8a,x86_64
+                --no-daemon --console=plain)
+          if [ -n "$KEYSTORE_PATH" ]; then
+            args+=(-Poctarine.storeFile="$KEYSTORE_PATH"
+                   -Poctarine.storePassword="$OCTARINE_ANDROID_STORE_PASSWORD"
+                   -Poctarine.keyAlias="$OCTARINE_ANDROID_KEY_ALIAS"
+                   -Poctarine.keyPassword="$OCTARINE_ANDROID_KEY_PASSWORD")
+          fi
+          [ -n "$OCTARINE_VERSION_NAME" ] && args+=(-Poctarine.versionName="$OCTARINE_VERSION_NAME")
+          [ -n "$OCTARINE_VERSION_CODE" ] && args+=(-Poctarine.versionCode="$OCTARINE_VERSION_CODE")
+          ./gradlew "${args[@]}"
+
+      # Sanity gate: AAB must carry all three ABIs in base/lib/<abi>/libmain.so. A regression in
+      # the multi-ABI orchestration (e.g. one triplet failing to produce libmain.so) would silently
+      # ship a partial AAB; catch it here rather than at the Play upload.
+      - name: Verify AAB carries every ABI
+        run: |
+          set -e
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          [ -f "$aab" ] || { echo "no AAB at $aab"; exit 1; }
+          echo "=== aab listing ==="
+          unzip -l "$aab"
+          for required in arm64-v8a x86_64; do
+            if ! unzip -l "$aab" | grep -q "base/lib/$required/libmain.so"; then
+              echo "FAIL: base/lib/$required/libmain.so missing from AAB"
+              exit 1
+            fi
+          done
+          echo "PASS: AAB carries libmain.so for every ABI"
+
+      # SDL JNI bridge depends on libmain.so exporting Java_org_libsdl_app_* symbols (the C side
+      # calls RegisterNatives against them at SDL_main). A regression in the build config or NDK
+      # toolchain that strips them would ship a binary that crashes at SDL init; assert presence
+      # here so the failure lands in CI, not on a user's device. Probe arm64-v8a only — the same
+      # CMake invocation produces every ABI's libmain.so, so one slice covers the regression.
+      - name: Verify libmain.so retains SDL JNI exports
+        run: |
+          set -e
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          tmp=$(mktemp -d)
+          unzip -p "$aab" base/lib/arm64-v8a/libmain.so > "$tmp/libmain.so"
+          nm="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          # --dynamic targets .dynsym (the dynamic symbol table dlsym walks at JNI registration);
+          # Release-stripped libmain.so has no .symtab so the default nm output is empty even
+          # though the SDL JNI exports are present + callable.
+          count=$("$nm" --dynamic --defined-only --extern-only "$tmp/libmain.so" | grep -c ' T Java_org_libsdl_app_' || true)
+          echo "Java_org_libsdl_app_* symbol count: $count"
+          if [ "$count" -lt 20 ]; then
+            echo "FAIL: SDL JNI symbol count ($count) suspiciously low — expected >=20"
+            "$nm" --dynamic --defined-only --extern-only "$tmp/libmain.so" | grep ' T Java_' || true
+            exit 1
+          fi
+          echo "PASS: $count SDL JNI exports present in libmain.so"
+
+      # Third-party license attribution must ship inside base/assets/. Multi-ABI mode wires the
+      # aggregator off the first ABI's configure task, so the file lives once at base/assets/
+      # regardless of how many ABIs the AAB carries.
+      - name: Verify AAB ships third-party licenses
+        run: |
+          set -e
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          if ! unzip -l "$aab" | grep -q "base/assets/THIRD_PARTY_LICENSES.txt"; then
+            echo "FAIL: base/assets/THIRD_PARTY_LICENSES.txt missing from AAB"
+            unzip -l "$aab" | grep -i license || true
+            exit 1
+          fi
+          tmp=$(mktemp -d)
+          unzip -p "$aab" base/assets/THIRD_PARTY_LICENSES.txt > "$tmp/licenses.txt"
+          for port in freetype sdl3 imgui lua sol2 spdlog glm libpng; do
+            grep -qi "^$port$" "$tmp/licenses.txt" || { echo "FAIL: section '$port' missing from AAB license aggregate"; exit 1; }
+          done
+          echo "PASS: AAB license aggregate covers all canonical ports."
+
+      # Once the example project declares `icon=` in project.ini, every shipped mipmap must diverge
+      # from the SDL green-robot template. The verifier skips when icon= is unset (legitimate
+      # fallback path); once the example commits a real icon, this becomes a regression gate.
+      - name: Verify AAB ships project icon (not SDL template)
+        run: |
+          bash scripts/verify-icons.sh \
+            --project "$GITHUB_WORKSPACE/example_repo" \
+            --aab android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctarineEngine-android-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      # Tag-gated Play Store internal-track upload. Requires PLAY_SERVICE_ACCOUNT_JSON secret
+      # (raw JSON contents, not base64) — service account must hold Release Manager on the
+      # com.octarine.example Play Console entry. Skipped on non-tag pushes and on fork PRs
+      # (secrets unavailable there). Downstream projects fork this workflow and substitute
+      # packageName; the engine CI uploads the example app under its canonical id.
+      - name: Upload AAB to Play internal track
+        if: startsWith(github.ref, 'refs/tags/v') && env.PLAY_SERVICE_ACCOUNT_JSON != ''
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.octarine.example
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+
+  # R8/ProGuard probe — keep-rules in android/app/proguard-rules.pro must preserve every
+  # Java_org_libsdl_app_* JNI export plus the descriptor classes SDL's RegisterNatives walks.
+  # The default android job ships with minify off (safe baseline); this job exercises the shrunk
+  # path with -Poctarine.minify=true and asserts the JNI surface survives. Push/dispatch only —
+  # the second AAB build is the slowest leg in the file and the keep-rules don't churn on every PR.
+  android-minify-probe:
+    name: android (minify probe)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Checkout example project
+        uses: actions/checkout@v4
+        with:
+          repository: mblackman/Octarine-Engine-Example
+          ref: ${{ github.event.inputs.example_ref || 'main' }}
+          path: example_repo
+
+      - name: Resolve version (tag push)
+        id: ver
+        uses: ./.github/actions/resolve-version
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: ./.github/actions/vcpkg-cache-env
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config autoconf automake autoconf-archive libtool libltdl-dev
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages (pinned NDK + cmake)
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" \
+                     "ndk;${OCTARINE_NDK_VERSION}" "cmake;3.22.1"
+
+      # Single-ABI build keeps probe runtime down; the R8/ProGuard step operates on Java bytecode
+      # before native libs are merged, so arm64-v8a alone proves the keep-rules. Debug-signed —
+      # the probe doesn't ship; we just need a build that completes R8.
+      - name: Build minified AAB (arm64-v8a, probe)
+        working-directory: android
+        env:
+          OCTARINE_VERSION_NAME: ${{ steps.ver.outputs.version_name }}
+          OCTARINE_VERSION_CODE: ${{ steps.ver.outputs.version_code }}
+        run: |
+          export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}"
+          args=(bundleRelease
+                -Poctarine.projectDir="$GITHUB_WORKSPACE/example_repo"
+                -Poctarine.abi=arm64-v8a
+                -Poctarine.minify=true
+                --no-daemon --console=plain)
+          [ -n "$OCTARINE_VERSION_NAME" ] && args+=(-Poctarine.versionName="$OCTARINE_VERSION_NAME")
+          [ -n "$OCTARINE_VERSION_CODE" ] && args+=(-Poctarine.versionCode="$OCTARINE_VERSION_CODE")
+          ./gradlew "${args[@]}"
+
+      # Same assertion the main job runs against the non-minified AAB — counted-symbol gate proves
+      # R8 didn't strip the SDL JNI surface. If this fails, expand keep-rules in
+      # android/app/proguard-rules.pro.
+      - name: Verify minified AAB retains SDL JNI exports
+        run: |
+          set -e
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          [ -f "$aab" ] || { echo "no AAB at $aab"; exit 1; }
+          tmp=$(mktemp -d)
+          unzip -p "$aab" base/lib/arm64-v8a/libmain.so > "$tmp/libmain.so"
+          nm="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          # --dynamic targets .dynsym (the dynamic symbol table dlsym walks at JNI registration);
+          # Release-stripped libmain.so has no .symtab so the default nm output is empty even
+          # though the SDL JNI exports are present + callable.
+          count=$("$nm" --dynamic --defined-only --extern-only "$tmp/libmain.so" | grep -c ' T Java_org_libsdl_app_' || true)
+          size=$(stat -c %s "$tmp/libmain.so")
+          echo "minified libmain.so size: $size bytes"
+          echo "Java_org_libsdl_app_* symbol count (minified): $count"
+          if [ "$count" -lt 20 ]; then
+            echo "FAIL: keep-rules dropped SDL JNI exports — expand android/app/proguard-rules.pro"
+            "$nm" --dynamic --defined-only --extern-only "$tmp/libmain.so" | grep ' T Java_' || true
+            exit 1
+          fi
+          echo "PASS: keep-rules preserved $count SDL JNI exports under R8/ProGuard"
+
+      - name: Upload minified AAB (probe artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctarineEngine-android-aab-minified
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

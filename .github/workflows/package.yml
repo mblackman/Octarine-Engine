@@ -1,0 +1,246 @@
+name: Package
+
+# Desktop packaging matrix (Windows / Linux / macOS). Each leg configures the shipping
+# ship-release preset against the example project, builds, then `cpack`s a self-contained
+# artifact via octarine_package: engine binary + staged project + baked asset_manifest.lua.
+# The manifest bake runs at install time inside cpack and is the CI gate — a broken asset
+# reference exits nonzero and fails the leg.
+#
+# Triggered manually, on a version tag (release artifacts), and on every PR/main push so a
+# packaging regression lands at PR time instead of release time. Vcpkg cache is shared with
+# build.yml — PRs warm-hit it (~4-6 min per leg observed; cold runs only on cache eviction).
+on:
+  workflow_dispatch:
+    inputs:
+      example_ref:
+        description: 'Octarine-Engine-Example branch/tag/SHA to build against (default: main)'
+        required: false
+        default: 'main'
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  package:
+    name: ${{ matrix.platform }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            preset: ship-release
+            pkg_glob: build/ship-release/*.tar.gz
+          - os: windows-latest
+            platform: windows
+            preset: ship-release
+            pkg_glob: build/ship-release/*.zip
+          - os: macos-latest
+            platform: macos
+            preset: ship-release
+            pkg_glob: build/ship-release/*.dmg
+          # macos-universal leg is intentionally dropped — the universal-osx triplet ran into a
+          # chain of vcpkg ports with hand-rolled per-arch assembly (libpng PNG_ARM_NEON_OPT,
+          # libjpeg-turbo "CMAKE_OSX_ARCHITECTURES cannot be multi-valued", almost certainly
+          # SDL3 + freetype too). Disabling each port's SIMD/NEON one by one became a yak shave
+          # of unknown depth, and per-arch macos legs (arm64-only) already ship via the `macos`
+          # entry above; Apple-silicon users get the arm64 .dmg, Intel users get x86_64 via the
+          # arch-swapped preset. Re-add macos-universal only when either (a) vcpkg upstream
+          # supports per-arch port builds + auto-lipo, or (b) we vendor a `multi_arch` overlay
+          # that builds each port per-arch + lipo'es the final outputs. Until then, the
+          # ship-mac-universal preset stays in tree for local opt-in builds; CI just doesn't
+          # exercise it. See ai/ShippingV1Plan.md note + ai/DeviceShippingPlan.md stage 5.
+
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          # Full history so `git rev-list --count HEAD` in the Resolve version step computes the
+          # monotonic version_code on tag pushes. Default depth 1 returns 1 for every release.
+          fetch-depth: 0
+
+      - name: Checkout example project
+        uses: actions/checkout@v4
+        with:
+          repository: mblackman/Octarine-Engine-Example
+          # Defaults to the example's `main` for push/PR runs. workflow_dispatch can target an
+          # alternate branch via the `example_ref` input.
+          ref: ${{ github.event.inputs.example_ref || 'main' }}
+          path: example_repo
+
+      # Tag push v0.1.2 -> OCTARINE_PACKAGE_VERSION_NAME=0.1.2, VERSION_CODE=<commit count> for
+      # every release-producing CMake configure below. Non-tag runs leave both blank, in which
+      # case octarine_package falls back to project.ini (or its built-in default). Lets a tag
+      # drive both stores' version numbers without editing project.ini.
+      - name: Resolve version (tag push)
+        id: ver
+        uses: ./.github/actions/resolve-version
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: ./.github/actions/vcpkg-cache-env
+
+      - name: Install Linux build deps (SDL3 / X11 / Wayland)
+        if: matrix.platform == 'linux'
+        uses: ./.github/actions/linux-build-deps
+
+      - name: Install Ninja (Windows/macOS)
+        if: matrix.platform != 'linux'
+        uses: seanmiddleditch/gha-setup-ninja@v6
+
+      # imagemagick is needed by scripts/octarine-icons.cmake on the macos leg to emit the
+      # .icns + adaptive PNG ladder from project.ini's icon= source; macos-latest runners do
+      # not ship it preinstalled. Windows runners do (Chocolatey ships magick on the runner
+      # image); Linux is handled by the linux-build-deps composite above.
+      - name: Install ImageMagick (macOS)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: brew install imagemagick
+
+      - name: Setup MSVC dev environment (Windows)
+        if: matrix.platform == 'windows'
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: Configure CMake (packaging)
+        shell: bash
+        # ship-release preset = shipping config: no editor/ImGui, OCTARINE_SHIPPED=ON so the artifact
+        # loads the baked manifest instead of scanning a read-only dir. The macos-universal leg
+        # swaps in ship-mac-universal to fat-build for arm64+x86_64. OCTARINE_PACKAGE_PROJECT wires
+        # the CPack layout (octarine_package also force-sets OCTARINE_SHIPPED as a guardrail).
+        # Mixed slashes in the Windows path are fine for CMake.
+        env:
+          OCTARINE_VERSION_NAME: ${{ steps.ver.outputs.version_name }}
+          OCTARINE_VERSION_CODE: ${{ steps.ver.outputs.version_code }}
+        run: |
+          extra=()
+          [ -n "$OCTARINE_VERSION_NAME" ] && extra+=(-DOCTARINE_PACKAGE_VERSION_NAME="$OCTARINE_VERSION_NAME")
+          [ -n "$OCTARINE_VERSION_CODE" ] && extra+=(-DOCTARINE_PACKAGE_VERSION_CODE="$OCTARINE_VERSION_CODE")
+          cmake --preset ${{ matrix.preset }} \
+            -DOCTARINE_PACKAGE_PROJECT="${{ github.workspace }}/example_repo" \
+            "${extra[@]}"
+
+      - name: Build
+        run: cmake --build build/${{ matrix.preset }} --config Release --parallel
+
+      - name: Package (cpack + manifest bake gate)
+        run: cmake --build build/${{ matrix.preset }} --target package
+
+      # macOS notarization: tag-gated, secret-gated. The codesign + notarytool flow only fires
+      # on `v*` tag pushes and only when MACOS_DEVELOPER_ID_P12 is set (so fork PRs and
+      # pre-account state skip cleanly). Bootstrap an ephemeral keychain, import the Developer
+      # ID Application cert, then hand off to scripts/octarine-macos-notarize.sh which mounts
+      # the cpack-produced .dmg, signs the .app, submits to notarytool, staples, and rebuilds
+      # the .dmg as the shipping artifact. See ai/ShippingV1Plan.md Stage 4.
+      - name: Bootstrap macOS signing keychain
+        if: |
+          startsWith(matrix.platform, 'macos')
+          && startsWith(github.ref, 'refs/tags/v')
+          && env.MACOS_DEVELOPER_ID_P12 != ''
+        env:
+          MACOS_DEVELOPER_ID_P12: ${{ secrets.MACOS_DEVELOPER_ID_P12 }}
+          MACOS_DEVELOPER_ID_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_PASSWORD }}
+        run: |
+          set -e
+          kc="${RUNNER_TEMP}/octarine-signing.keychain-db"
+          security create-keychain -p "" "$kc"
+          security set-keychain-settings -lut 7200 "$kc"
+          security unlock-keychain -p "" "$kc"
+          security list-keychains -d user -s "$kc" $(security list-keychains -d user | sed 's/"//g')
+          printf '%s' "$MACOS_DEVELOPER_ID_P12" | base64 --decode > "${RUNNER_TEMP}/cert.p12"
+          security import "${RUNNER_TEMP}/cert.p12" -k "$kc" -P "$MACOS_DEVELOPER_ID_PASSWORD" \
+              -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" "$kc"
+          rm -f "${RUNNER_TEMP}/cert.p12"
+
+      - name: Notarize + staple .dmg
+        if: |
+          startsWith(matrix.platform, 'macos')
+          && startsWith(github.ref, 'refs/tags/v')
+          && env.MACOS_DEVELOPER_ID_P12 != ''
+        env:
+          MACOS_DEVELOPER_ID_P12: ${{ secrets.MACOS_DEVELOPER_ID_P12 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID_USERNAME: ${{ secrets.APPLE_ID_USERNAME }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+        run: |
+          set -e
+          src=$(ls ${{ matrix.pkg_glob }} | head -n 1)
+          out="${src%.dmg}-signed.dmg"
+          bash scripts/octarine-macos-notarize.sh \
+              --input "$src" \
+              --output "$out" \
+              --team "$APPLE_TEAM_ID" \
+              --apple-id "$APPLE_ID_USERNAME" \
+              --password "$APPLE_APP_SPECIFIC_PASSWORD"
+          # Replace the unsigned .dmg with the signed+stapled one so downstream upload-artifact
+          # picks up the shipping artifact, not the unsigned intermediate.
+          mv "$out" "$src"
+          echo "Replaced unsigned dmg at $src with signed+notarized+stapled version."
+
+      - name: List package output
+        shell: bash
+        run: ls -la build/${{ matrix.preset }} | grep -Ei '\.(zip|tar\.gz|dmg)$' || (echo "no package produced" && exit 1)
+
+      # Universal leg only: assert the produced binary actually carries both slices. `lipo -archs`
+      # prints `arm64 x86_64` on a fat Mach-O; a single-arch slip-through (e.g. a port that ignored
+      # VCPKG_OSX_ARCHITECTURES) would show one entry and silently ship a non-universal .dmg. The
+      # binary lives at .app/Contents/MacOS/OctarineEngine inside the .dmg, so mount → check → eject.
+      - name: Verify universal binary (lipo)
+        if: matrix.platform == 'macos-universal'
+        shell: bash
+        run: |
+          set -e
+          dmg=$(ls build/ship-mac-universal/*.dmg | head -n 1)
+          echo "Mounting $dmg"
+          hdiutil attach "$dmg" -mountpoint /Volumes/OctarineUniversal -nobrowse
+          bin=$(find /Volumes/OctarineUniversal -name OctarineEngine -type f | head -n 1)
+          [ -n "$bin" ] || { echo "no OctarineEngine binary in mounted dmg"; ls -R /Volumes/OctarineUniversal; exit 1; }
+          archs=$(lipo -archs "$bin")
+          echo "Binary archs: $archs"
+          hdiutil detach /Volumes/OctarineUniversal
+          for required in arm64 x86_64; do
+            grep -qw "$required" <<<"$archs" || { echo "FAIL: $required slice missing from universal binary"; exit 1; }
+          done
+          echo "PASS: universal binary carries both arm64 and x86_64"
+
+      # Asserts every shipped archive carries the aggregated third-party license file with the
+      # canonical port set. Catches a misconfigured aggregator that silently drops a dep before
+      # the artifact reaches a store reviewer.
+      - name: Verify third-party licenses bundled
+        shell: bash
+        run: |
+          set -e
+          pkg=$(ls ${{ matrix.pkg_glob }} | head -n 1)
+          echo "Inspecting $pkg"
+          scratch=$(mktemp -d)
+          case "$pkg" in
+            *.zip)    unzip -q "$pkg" -d "$scratch" ;;
+            *.tar.gz) tar -xzf "$pkg" -C "$scratch" ;;
+            *.dmg)
+              hdiutil attach "$pkg" -mountpoint /Volumes/OctarineLicenses -nobrowse
+              cp -R /Volumes/OctarineLicenses/. "$scratch/"
+              hdiutil detach /Volumes/OctarineLicenses ;;
+            *) echo "unknown package type: $pkg"; exit 1 ;;
+          esac
+          lic=$(find "$scratch" -name THIRD_PARTY_LICENSES.txt -print -quit)
+          [ -n "$lic" ] || { echo "FAIL: THIRD_PARTY_LICENSES.txt not in $pkg"; find "$scratch" -maxdepth 4; exit 1; }
+          echo "Found license file: $lic"
+          for port in freetype sdl3 imgui lua sol2 spdlog glm libpng; do
+            grep -qi "^$port$" "$lic" || { echo "FAIL: section '$port' missing from license aggregate"; exit 1; }
+          done
+          echo "PASS: license aggregate covers all canonical ports."
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctarineEngine-${{ matrix.platform }}
+          path: ${{ matrix.pkg_glob }}
+          if-no-files-found: error
