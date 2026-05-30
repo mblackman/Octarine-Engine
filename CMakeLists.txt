@@ -127,6 +127,13 @@ if (UNIX AND NOT APPLE AND NOT ANDROID)
     list(APPEND SRC_FILES src/General/SDL3_Linux_Stubs.cpp)
 endif ()
 
+# AtlasBaker.cpp is the single TU that emits the stb_image / stb_image_write / stb_rect_pack
+# implementations. The vendored headers don't satisfy the engine's `-Wconversion -Werror`
+# baseline (int -> short_int, int -> size_t, etc.), so disable warnings just for this file. The
+# user-authored code at the bottom of the .cpp is small enough to eyeball without -Wall help.
+set_source_files_properties(src/AssetManager/AtlasBaker.cpp PROPERTIES
+        COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/w,-w>")
+
 # Add packaged libs
 if (OCTARINE_WITH_IMGUI)
     add_subdirectory(libs/sol2_ImGui_Bindings)
