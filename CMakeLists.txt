@@ -93,6 +93,8 @@ set(SRC_FILES
         src/AssetManager/AssetManager.cpp
         src/AssetManager/AssetCatalog.cpp
         src/AssetManager/AssetPak.cpp
+        src/AssetManager/AtlasBaker.cpp
+        src/AssetManager/GlyphAtlas.cpp
         src/AssetManager/SceneAssetScanner.cpp
         src/ECS/Registry.cpp
         src/Game/Game.cpp

@@ -38,9 +38,13 @@ public:
 
     // Pack every entry in `catalog` into a single .pak at `outPath`. Each entry's `fullPath` is
     // read and stored under its project-relative form (`fullPath` re-rooted against `basePath`,
-    // forward-slashed). Returns false on any I/O failure; partially-written paks are removed.
+    // forward-slashed). `extraFiles` lets the bake step include derived artifacts (glyph atlases,
+    // audio bakes, etc.) that don't live in the asset catalog — each is read + stored under its
+    // own project-relative form. Duplicates against catalog entries are silently dropped (first
+    // write wins). Returns false on any I/O failure; partially-written paks are removed.
     static bool Pack(const AssetCatalog& catalog, const std::string& outPath,
-                     const std::string& basePath);
+                     const std::string& basePath,
+                     const std::vector<std::string>& extraFiles = {});
 
     // Open a pak file from disk into memory. Returns true on success. The instance owns the
     // backing buffer until destruction.
