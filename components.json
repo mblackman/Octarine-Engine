@@ -1,0 +1,101 @@
+{
+  "_generated_by": "OctarineLuaApiTest via LuaApiManifest::WriteComponentsJson",
+  "components": [
+    {
+      "lua_key": "animation",
+      "usertype": "animation_component",
+      "has_accessor": "registry.has_animation",
+      "get_accessor": "registry.get_animation"
+    },
+    {
+      "lua_key": "audio_source",
+      "usertype": "audio_source_component",
+      "has_accessor": "registry.has_audio_source",
+      "get_accessor": "registry.get_audio_source"
+    },
+    {
+      "lua_key": "box_collider",
+      "usertype": "box_collider_component",
+      "has_accessor": "registry.has_box_collider",
+      "get_accessor": "registry.get_box_collider"
+    },
+    {
+      "lua_key": "camera_follow",
+      "usertype": "camera_follow_component",
+      "has_accessor": "registry.has_camera_follow",
+      "get_accessor": "registry.get_camera_follow"
+    },
+    {
+      "lua_key": "health",
+      "usertype": "health_component",
+      "has_accessor": "registry.has_health",
+      "get_accessor": "registry.get_health"
+    },
+    {
+      "lua_key": "name",
+      "usertype": "name_component",
+      "has_accessor": "registry.has_name",
+      "get_accessor": "registry.get_name"
+    },
+    {
+      "lua_key": "position",
+      "usertype": "position_component",
+      "has_accessor": "registry.has_position",
+      "get_accessor": "registry.get_position"
+    },
+    {
+      "lua_key": "projectile_emitter",
+      "usertype": "projectile_emitter_component",
+      "has_accessor": "registry.has_projectile_emitter",
+      "get_accessor": "registry.get_projectile_emitter"
+    },
+    {
+      "lua_key": "rigidbody",
+      "usertype": "rigidbody_component",
+      "has_accessor": "registry.has_rigidbody",
+      "get_accessor": "registry.get_rigidbody"
+    },
+    {
+      "lua_key": "rotation",
+      "usertype": "rotation_component",
+      "has_accessor": "registry.has_rotation",
+      "get_accessor": "registry.get_rotation"
+    },
+    {
+      "lua_key": "scale",
+      "usertype": "scale_component",
+      "has_accessor": "registry.has_scale",
+      "get_accessor": "registry.get_scale"
+    },
+    {
+      "lua_key": "script",
+      "usertype": "script_component",
+      "has_accessor": "registry.has_script",
+      "get_accessor": "registry.get_script"
+    },
+    {
+      "lua_key": "sprite",
+      "usertype": "sprite_component",
+      "has_accessor": "registry.has_sprite",
+      "get_accessor": "registry.get_sprite"
+    },
+    {
+      "lua_key": "square",
+      "usertype": "square_primitive_component",
+      "has_accessor": "registry.has_square",
+      "get_accessor": "registry.get_square"
+    },
+    {
+      "lua_key": "text_label",
+      "usertype": "text_label_component",
+      "has_accessor": "registry.has_text_label",
+      "get_accessor": "registry.get_text_label"
+    },
+    {
+      "lua_key": "ui_button",
+      "usertype": "ui_button_component",
+      "has_accessor": "registry.has_ui_button",
+      "get_accessor": "registry.get_ui_button"
+    }
+  ]
+}

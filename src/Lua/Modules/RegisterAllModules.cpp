@@ -9,13 +9,17 @@
 #include "Lua/Modules/LuaModule.h"
 #include "Lua/Modules/SceneModuleLuaBinding.h"
 
+const std::vector<LuaModuleDescriptor> kLuaModules = {
+    {"Log",    &LuaModuleBinding<LogModule>::install},
+    {"Io",     &LuaModuleBinding<IoModule>::install},
+    {"Assets", &LuaModuleBinding<AssetsModule>::install},
+    {"Audio",  &LuaModuleBinding<AudioModule>::install},
+    {"Entity", &LuaModuleBinding<EntityModule>::install},
+    {"Scene",  &LuaModuleBinding<SceneModule>::install},
+    {"Game",   &LuaModuleBinding<GameModule>::install},
+};
+
 void RegisterAllLuaModules(sol::state& lua, Game& game)
 {
-    LuaModuleBinding<LogModule>::install(lua, game);
-    LuaModuleBinding<IoModule>::install(lua, game);
-    LuaModuleBinding<AssetsModule>::install(lua, game);
-    LuaModuleBinding<AudioModule>::install(lua, game);
-    LuaModuleBinding<EntityModule>::install(lua, game);
-    LuaModuleBinding<SceneModule>::install(lua, game);
-    LuaModuleBinding<GameModule>::install(lua, game);
+    for (const auto& m : kLuaModules) m.install(lua, game);
 }
