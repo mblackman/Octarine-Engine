@@ -177,11 +177,14 @@ jobs:
           tmp=$(mktemp -d)
           unzip -p "$aab" base/lib/arm64-v8a/libmain.so > "$tmp/libmain.so"
           nm="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-          count=$("$nm" --defined-only --extern-only "$tmp/libmain.so" | grep -c ' T Java_org_libsdl_app_' || true)
+          # --dynamic targets .dynsym (the dynamic symbol table dlsym walks at JNI registration);
+          # Release-stripped libmain.so has no .symtab so the default nm output is empty even
+          # though the SDL JNI exports are present + callable.
+          count=$("$nm" --dynamic --defined-only --extern-only "$tmp/libmain.so" | grep -c ' T Java_org_libsdl_app_' || true)
           echo "Java_org_libsdl_app_* symbol count: $count"
           if [ "$count" -lt 20 ]; then
             echo "FAIL: SDL JNI symbol count ($count) suspiciously low — expected >=20"
-            "$nm" --defined-only --extern-only "$tmp/libmain.so" | grep ' T Java_' || true
+            "$nm" --dynamic --defined-only --extern-only "$tmp/libmain.so" | grep ' T Java_' || true
             exit 1
           fi
           echo "PASS: $count SDL JNI exports present in libmain.so"
@@ -319,13 +322,16 @@ jobs:
           tmp=$(mktemp -d)
           unzip -p "$aab" base/lib/arm64-v8a/libmain.so > "$tmp/libmain.so"
           nm="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
-          count=$("$nm" --defined-only --extern-only "$tmp/libmain.so" | grep -c ' T Java_org_libsdl_app_' || true)
+          # --dynamic targets .dynsym (the dynamic symbol table dlsym walks at JNI registration);
+          # Release-stripped libmain.so has no .symtab so the default nm output is empty even
+          # though the SDL JNI exports are present + callable.
+          count=$("$nm" --dynamic --defined-only --extern-only "$tmp/libmain.so" | grep -c ' T Java_org_libsdl_app_' || true)
           size=$(stat -c %s "$tmp/libmain.so")
           echo "minified libmain.so size: $size bytes"
           echo "Java_org_libsdl_app_* symbol count (minified): $count"
           if [ "$count" -lt 20 ]; then
             echo "FAIL: keep-rules dropped SDL JNI exports — expand android/app/proguard-rules.pro"
-            "$nm" --defined-only --extern-only "$tmp/libmain.so" | grep ' T Java_' || true
+            "$nm" --dynamic --defined-only --extern-only "$tmp/libmain.so" | grep ' T Java_' || true
             exit 1
           fi
           echo "PASS: keep-rules preserved $count SDL JNI exports under R8/ProGuard"
