@@ -12,6 +12,7 @@
 #include "../Game/GameConfig.h"
 #include "../General/Logger.h"
 #include "AssetManager/AssetPak.h"
+#include "AssetManager/GlyphAtlas.h"
 
 AssetManager::~AssetManager() { ClearAssets(); }
 
@@ -245,6 +246,27 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
   }
 
   Logger::Info("Added font: " + assetId + " from path: " + fullPath);
+
+  // Probe for a glyph-atlas sidecar pair (Stage 14 B3). The bake step writes them under
+  // <basePath>/atlases/<asset_id>.atlas.{png,lua}; presence is the opt-in. SDL_IOFromFile is used
+  // for the existence check so the probe transparently resolves through a shipped pak too.
+  if (base_path_.empty()) return;
+  const std::filesystem::path atlasPng =
+      std::filesystem::path(base_path_) / "atlases" / (assetId + ".atlas.png");
+  const std::filesystem::path atlasLua =
+      std::filesystem::path(base_path_) / "atlases" / (assetId + ".atlas.lua");
+  SDL_IOStream *probe = SDL_IOFromFile(atlasPng.string().c_str(), "rb");
+  if (probe == nullptr) return;
+  SDL_CloseIO(probe);
+  auto atlas = std::make_unique<GlyphAtlas>();
+  if (atlas->Load(atlasPng.string(), atlasLua.string())) {
+    glyph_atlases_[assetId] = std::move(atlas);
+  }
+}
+
+const GlyphAtlas *AssetManager::GetGlyphAtlas(const std::string &fontAssetId) const {
+  const auto it = glyph_atlases_.find(fontAssetId);
+  return it == glyph_atlases_.end() ? nullptr : it->second.get();
 }
 
 void AssetManager::AddAudioClip(MIX_Mixer *mixer, const std::string &assetId, const std::string &path,

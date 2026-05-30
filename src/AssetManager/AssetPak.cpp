@@ -8,6 +8,8 @@
 
 #include <SDL3/SDL.h>
 
+#include <algorithm>
+
 #include "AssetManager/AssetCatalog.h"
 #include "General/Logger.h"
 
@@ -53,7 +55,8 @@ AssetPak::~AssetPak() {
 }
 
 bool AssetPak::Pack(const AssetCatalog& catalog, const std::string& outPath,
-                    const std::string& basePath) {
+                    const std::string& basePath,
+                    const std::vector<std::string>& extraFiles) {
     std::ofstream out(outPath, std::ios::binary | std::ios::trunc);
     if (!out) {
         Logger::Error("AssetPak::Pack: failed to open " + outPath + " for writing");
@@ -99,6 +102,34 @@ bool AssetPak::Pack(const AssetCatalog& catalog, const std::string& outPath,
             }
         }
         staged.push_back({MakeRelPath(entry.fullPath, basePath), offset, size});
+    }
+
+    // Append any extra (non-catalog) files in the same shape. Bake passes derived artifacts —
+    // glyph atlases, audio bakes — here so they ride in the same pak.
+    for (const std::string& extraPath : extraFiles) {
+        const std::string rel = MakeRelPath(extraPath, basePath);
+        const bool dup = std::any_of(staged.begin(), staged.end(),
+                                     [&](const StagedEntry& s) { return s.relPath == rel; });
+        if (dup) continue;
+        std::ifstream in(extraPath, std::ios::binary);
+        if (!in) {
+            Logger::Error("AssetPak::Pack: failed to read extra " + extraPath);
+            out.close();
+            std::error_code ec;
+            std::filesystem::remove(outPath, ec);
+            return false;
+        }
+        const std::uint64_t offset = static_cast<std::uint64_t>(out.tellp());
+        std::uint64_t size = 0;
+        while (in) {
+            in.read(buf.data(), static_cast<std::streamsize>(buf.size()));
+            const std::streamsize got = in.gcount();
+            if (got > 0) {
+                out.write(buf.data(), got);
+                size += static_cast<std::uint64_t>(got);
+            }
+        }
+        staged.push_back({rel, offset, size});
     }
 
     // TOC.

@@ -21,8 +21,12 @@
 #include "AssetManager/AssetMetadata.h"
 #include "AssetManager/AssetPak.h"
 #include "AssetManager/AssetReference.h"
+#include "AssetManager/AtlasBaker.h"
+#include "AssetManager/GlyphAtlas.h"
+#include "stb/stb_image_write.h"  // header-only; IMPL lives in AtlasBaker.cpp
 #include "AssetManager/SceneAssetScanner.h"
 #include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
 
 namespace
 {
@@ -315,6 +319,58 @@ int main()
         }
         Check(compared == static_cast<int>(catalog.Size()), "every catalog entry resolves through the pak");
         Check(mismatch == 0, "every pak entry's bytes match the source file exactly");
+
+        std::filesystem::remove_all(tmpDir, ec);
+        SDL_Quit();
+    }
+
+    std::cout << "[glyph atlas] synthetic Lua + PNG round-trip\n";
+    {
+        // AtlasBaker against a real TTF is exercised by the bake smoke against
+        // Octarine-Engine-Example in CI — the fixture font under tests/fixtures/assets/fonts/
+        // is a stub ASCII placeholder, not a real face. Here we test only the GlyphAtlas loader
+        // shape: a synthetic 4×4 RGBA PNG + a hand-rolled metrics Lua file should round-trip
+        // through `GlyphAtlas::Load` cleanly.
+        SDL_Init(0);
+
+        const std::filesystem::path tmpDir =
+            std::filesystem::temp_directory_path() / "octarine_atlas_synthetic_test";
+        std::error_code ec;
+        std::filesystem::create_directories(tmpDir, ec);
+        const std::string pngPath = (tmpDir / "synth.atlas.png").string();
+        const std::string luaPath = (tmpDir / "synth.atlas.lua").string();
+
+        // 4×4 fully-opaque white via stbi_write — easier than handcrafting a PNG byte stream.
+        {
+            std::vector<unsigned char> pixels(4 * 4 * 4, 255);
+            Check(stbi_write_png(pngPath.c_str(), 4, 4, 4, pixels.data(), 16) != 0,
+                  "synthetic 4x4 atlas PNG written via stbi_write_png");
+        }
+        {
+            std::ofstream lua(luaPath);
+            lua << "return {\n"
+                << "  size = 16,\n  atlas_width = 4,\n  atlas_height = 4,\n  line_skip = 16,\n"
+                << "  glyphs = {\n"
+                << "    [65] = { x=0, y=0, w=4, h=4, advance=5, minx=0, miny=0 },\n"
+                << "  },\n}\n";
+        }
+
+        GlyphAtlas atlas;
+        Check(atlas.Load(pngPath, luaPath), "GlyphAtlas::Load round-trips synthetic atlas");
+        Check(atlas.IsLoaded(), "GlyphAtlas::IsLoaded true after Load");
+        Check(atlas.Size() == 1, "synthetic atlas reports exactly one glyph");
+        Check(atlas.Contains(static_cast<std::uint32_t>('A')), "synthetic atlas contains 'A'");
+        Check(!atlas.Contains(static_cast<std::uint32_t>('B')), "synthetic atlas correctly excludes 'B'");
+        Check(atlas.AtlasWidth() == 4 && atlas.AtlasHeight() == 4, "synthetic atlas reports 4x4 dims");
+        Check(atlas.LineSkip() == 16, "synthetic atlas reports line_skip=16");
+
+        const GlyphAtlas::Glyph* gA = atlas.Find(static_cast<std::uint32_t>('A'));
+        Check(gA != nullptr && gA->advance == 5.0F, "'A' glyph advance round-trips");
+
+        // AtlasBaker's DefaultAsciiPrintable helper is independent of TTF availability.
+        const auto cps = AtlasBaker::DefaultAsciiPrintable();
+        Check(cps.size() == 95, "DefaultAsciiPrintable returns 95 codepoints (0x20..0x7E)");
+        Check(cps.front() == 0x20 && cps.back() == 0x7E, "DefaultAsciiPrintable spans space..tilde");
 
         std::filesystem::remove_all(tmpDir, ec);
         SDL_Quit();

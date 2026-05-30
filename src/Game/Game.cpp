@@ -14,7 +14,9 @@
 #include "../General/Logger.h"
 #include "AssetManager/AssetCatalog.h"
 #include "AssetManager/AssetPak.h"
+#include "AssetManager/AtlasBaker.h"
 #include "AssetManager/SceneAssetScanner.h"
+#include <SDL3_ttf/SDL_ttf.h>
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 #include "Components/BoxColliderComponent.h"
@@ -560,14 +562,48 @@ bool Game::RunBakeValidation(const std::string& assetPath)
             manifestPath);
     }
 
-    // Pack every cataloged asset into a single asset_bundle.pak alongside the manifest. Shipped
-    // builds (OCTARINE_SHIPPED) open this in place of the loose asset tree; dev builds ignore it
-    // and read the original files. Manifest write is the source-of-truth gate — if that failed,
-    // skip the pak so a stale archive doesn't ship.
+    // Glyph atlas pass (Stage 14 B3): for every Font catalog entry, rasterize ASCII printable
+    // into a packed PNG + Lua metrics sidecar under `<basePath>/atlases/<asset_id>.atlas.{png,lua}`.
+    // Runtime probes for those alongside the .ttf and renders from the atlas when present, falling
+    // back to TTF_RenderText_Blended when missing. TTF needs explicit init in bake (Bake() opens
+    // SDL_Init(0) only — no video/audio subsystems).
+    std::vector<std::string> atlasFiles;
+    if (wrote && TTF_Init())
+    {
+        const std::filesystem::path atlasDir = std::filesystem::path(assetPath) / "atlases";
+        std::error_code ec;
+        std::filesystem::create_directories(atlasDir, ec);
+        const auto codepoints = AtlasBaker::DefaultAsciiPrintable();
+        for (const auto& [id, entry] : assetManager.GetCatalog().Entries())
+        {
+            if (entry.type != AssetType::Font) continue;
+            TTF_Font* font = TTF_OpenFont(entry.fullPath.c_str(), entry.fontSize);
+            if (font == nullptr)
+            {
+                Logger::Warn("Bake: TTF_OpenFont failed for " + entry.fullPath + " @ " +
+                             std::to_string(entry.fontSize) + " — skipping atlas.");
+                continue;
+            }
+            const std::string pngPath = (atlasDir / (id + ".atlas.png")).string();
+            const std::string luaPath = (atlasDir / (id + ".atlas.lua")).string();
+            if (AtlasBaker::Bake(font, entry.fontSize, codepoints, pngPath, luaPath))
+            {
+                atlasFiles.push_back(pngPath);
+                atlasFiles.push_back(luaPath);
+            }
+            TTF_CloseFont(font);
+        }
+        TTF_Quit();
+    }
+
+    // Pack every cataloged asset (+ any derived atlas files) into a single asset_bundle.pak
+    // alongside the manifest. Shipped builds (OCTARINE_SHIPPED) open this in place of the loose
+    // asset tree; dev builds ignore it. Manifest write is the source-of-truth gate — if that
+    // failed, skip the pak so a stale archive doesn't ship.
     if (wrote)
     {
         const std::string pakPath = (std::filesystem::path(assetPath) / "asset_bundle.pak").string();
-        if (!AssetPak::Pack(assetManager.GetCatalog(), pakPath, assetPath))
+        if (!AssetPak::Pack(assetManager.GetCatalog(), pakPath, assetPath, atlasFiles))
         {
             Logger::Error("Bake: AssetPak::Pack failed for " + pakPath);
             return false;

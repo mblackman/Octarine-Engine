@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -15,6 +16,7 @@
 
 class AssetPak;
 class GameConfig;
+class GlyphAtlas;
 
 class AssetManager {
   std::string base_path_;
@@ -36,6 +38,11 @@ class AssetManager {
   // asset's bytes from the pak over the loose file at `fullPath`. Non-owning — the Registry owns
   // the AssetPak instance.
   const AssetPak* asset_pak_{nullptr};
+  // Per-font glyph atlases (Stage 14 / B3) keyed by catalog asset id (e.g. "main-16"). Populated
+  // lazily inside AddFont when a `<basePath>/atlases/<id>.atlas.{png,lua}` sidecar pair is present;
+  // consumed by RenderTextSystem's compose path. unique_ptr to keep GlyphAtlas pinned across the
+  // map's rehashes (the surface wraps a vector<uint8_t> that must not be moved underneath SDL).
+  std::map<std::string, std::unique_ptr<GlyphAtlas>> glyph_atlases_;
 
  public:
   AssetManager() = default;
@@ -96,6 +103,10 @@ class AssetManager {
   // owns the AssetPak instance.
   void SetAssetPak(const AssetPak* pak) { asset_pak_ = pak; }
   [[nodiscard]] const AssetPak* GetAssetPak() const { return asset_pak_; }
+
+  // Resident glyph atlas for the given font catalog id, or nullptr if none has been loaded.
+  // RenderTextSystem consults this before falling back to TTF_RenderText_Blended.
+  [[nodiscard]] const GlyphAtlas* GetGlyphAtlas(const std::string& fontAssetId) const;
 
   // Current acquire count for an id (0 if untracked). Test/diagnostic aid.
   [[nodiscard]] int RefCount(const std::string& assetId) const;
