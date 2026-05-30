@@ -94,6 +94,15 @@ jobs:
         if: matrix.platform != 'linux'
         uses: seanmiddleditch/gha-setup-ninja@v6
 
+      # imagemagick is needed by scripts/octarine-icons.cmake on the macos leg to emit the
+      # .icns + adaptive PNG ladder from project.ini's icon= source; macos-latest runners do
+      # not ship it preinstalled. Windows runners do (Chocolatey ships magick on the runner
+      # image); Linux is handled by the linux-build-deps composite above.
+      - name: Install ImageMagick (macOS)
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: brew install imagemagick
+
       - name: Setup MSVC dev environment (Windows)
         if: matrix.platform == 'windows'
         uses: ilammy/msvc-dev-cmd@v1

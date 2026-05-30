@@ -10,4 +10,7 @@ runs:
   using: composite
   steps:
     - shell: bash
-      run: brew install autoconf automake autoconf-archive libtool pkg-config
+      # imagemagick is needed by scripts/octarine-icons.cmake to emit the .icns/.ico/PNG icon
+      # ladder from project.ini's icon= source; without it the icon helper warn-skips and the
+      # .app/.dmg ships the generic CPack icon.
+      run: brew install autoconf automake autoconf-archive libtool pkg-config imagemagick
