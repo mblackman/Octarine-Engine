@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780172728460,
+  "lastUpdate": 1780175240395,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -5220,6 +5220,114 @@ window.BENCHMARK_DATA = {
             "value": 640025.9996825544,
             "unit": "ns/iter",
             "extra": "iterations: 1096\ncpu: 639930.9890511011 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0074068dddf84e0817ff7bb9d15795906d677ce4",
+          "message": "Fix Registry singleton lookup across TUs (typeid(T).name() string_view key) (#60)\n\nAndroid NDK clang with default -fvisibility=hidden + libc++ makes typeinfo\nfor template-instantiated opaque-type pointers (e.g. MIX_Mixer*, forward-\ndeclared as `typedef struct MIX_Mixer MIX_Mixer;`) TU-local. The result:\n`std::type_index(typeid(MIX_Mixer*))` produces a different value in each\ntranslation unit. `Set<MIX_Mixer*>` in AudioSystem.cpp keyed singleton\nstorage under TU-A's type_index; `TryGet<MIX_Mixer*>` in SceneModuleLuaBinding.cpp\nlooked up under TU-B's type_index → silent null return → audio assets\nall skipped → \"Clip not found: helicopter\" warning at play time.\n\nComplete types like `AssetManager` work because their full class definition\nin a single .cpp creates a single canonical typeinfo all TUs reference;\nopaque-type pointers have no such anchor.\n\nFix: key singleton_components_ by `typeid(T).name()` as a std::string_view\ninto static storage. The mangled name string CONTENTS are identical across\nTUs even when the const char* addresses aren't; string_view compares\ncontents, hashes contents, and avoids per-lookup allocation. Lifetime is\nsafe — typeid().name() returns pointer to static storage that outlives the\nprocess.\n\nSurgical: only singleton_components_ keys change. type_to_entity_ (used by\nComponent<T>() in ECS hot paths for complete types) is untouched.\n\nDiagnostic proof (next emulator dispatch):\n  AudioSystem::Init Set<MIX_Mixer*>: registry=0x7bd13821fe50 mixer=0x7bd1a822aaf0\n  acquire_scene_assets TryGet<MIX_Mixer*>: registry=0x7bd13821fe50 mixerPtr=<non-null> mixer=<same as Init>",
+          "timestamp": "2026-05-30T14:55:24-06:00",
+          "tree_id": "9e71d1dee036c4bb1bc28f56c79cb7ea89d60a95",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/0074068dddf84e0817ff7bb9d15795906d677ce4"
+        },
+        "date": 1780175231643,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4049.959942749187,
+            "unit": "ns/iter",
+            "extra": "iterations: 166912\ncpu: 4083.4776109563213 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16293.656719183764,
+            "unit": "ns/iter",
+            "extra": "iterations: 43252\ncpu: 16335.955493388698 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 107758.87594993637,
+            "unit": "ns/iter",
+            "extra": "iterations: 6542\ncpu: 107810.42983796544 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 872557.773542257,
+            "unit": "ns/iter",
+            "extra": "iterations: 810\ncpu: 872501.2987654146 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1749503.3886246006,
+            "unit": "ns/iter",
+            "extra": "iterations: 396\ncpu: 1749630.2398989652 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2291.484031821741,
+            "unit": "ns/iter",
+            "extra": "iterations: 305170\ncpu: 2283.705626372037 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10014.709599986667,
+            "unit": "ns/iter",
+            "extra": "iterations: 69945\ncpu: 10005.780327398546 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 70372.17230043082,
+            "unit": "ns/iter",
+            "extra": "iterations: 9654\ncpu: 70346.81810648504 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 401828.09557454387,
+            "unit": "ns/iter",
+            "extra": "iterations: 1735\ncpu: 401805.48933718225 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2183.8268289795133,
+            "unit": "ns/iter",
+            "extra": "iterations: 324700\ncpu: 2153.0971265781677 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6550.533608152155,
+            "unit": "ns/iter",
+            "extra": "iterations: 105629\ncpu: 6516.047392287929 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41506.53708517375,
+            "unit": "ns/iter",
+            "extra": "iterations: 16950\ncpu: 41473.71592921466 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 320735.99940612295,
+            "unit": "ns/iter",
+            "extra": "iterations: 2178\ncpu: 320596.80899907986 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 643701.9900070525,
+            "unit": "ns/iter",
+            "extra": "iterations: 1099\ncpu: 643509.5040945789 ns\nthreads: 1"
           }
         ]
       }
