@@ -24,7 +24,12 @@ env:
 
 jobs:
   emulator:
-    name: android-emulator (x86_64, api ${{ env.OCTARINE_API_LEVEL }})
+    # Hardcoded API level in the name: `env.*` context is NOT available in `jobs.<id>.name` at
+    # workflow-load time (per GHA expression docs — only github/needs/vars/inputs/matrix/strategy
+    # are valid here). Using `${{ env.OCTARINE_API_LEVEL }}` makes GitHub reject the whole
+    # workflow with a "workflow file issue" and no jobs ever start. Keep the env var for use
+    # inside steps below; mirror its value into this label by hand when bumping.
+    name: android-emulator (x86_64, api 35)
     # ubuntu-latest 4-core enables KVM, which the reactivecircus/android-emulator-runner action
     # needs for headless x86_64 boot. macOS runners ship without KVM and would fall back to a slow
     # software emulator.
