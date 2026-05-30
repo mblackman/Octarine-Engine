@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780151495353,
+  "lastUpdate": 1780154329569,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -4356,6 +4356,114 @@ window.BENCHMARK_DATA = {
             "value": 636732.5819893808,
             "unit": "ns/iter",
             "extra": "iterations: 1104\ncpu: 636629.4927535824 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dc3e116a2631578e94361d2fe7bc7695d24cddce",
+          "message": "Stop interpolating env in android-emulator job name (#43)\n\n`env.OCTARINE_API_LEVEL` reference in `jobs.<id>.name` is rejected at\nworkflow-load time — GHA only allows github/needs/vars/inputs/matrix/strategy\ncontexts in that field, not env. Result: GitHub failed the whole workflow\nwith \"workflow file issue\" and zero jobs ever started, so the emulator\nruntime smoke never ran. Surfaced as soon as the workflow first fired on\nan actual push to main (post asset-pipeline merge); earlier non-main pushes\nhid the failure as a UX quirk.\n\nHardcode the API level in the job name + leave the env var in place for\nstep bodies. Comment in the file calls out the manual-mirror requirement\nwhen bumping.",
+          "timestamp": "2026-05-30T09:12:13-06:00",
+          "tree_id": "dee2e800a47b2e7ce13a7c5a90bd808c150adabf",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/dc3e116a2631578e94361d2fe7bc7695d24cddce"
+        },
+        "date": 1780154320850,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 3967.4004417055326,
+            "unit": "ns/iter",
+            "extra": "iterations: 174384\ncpu: 3989.439908478016 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16006.54920608045,
+            "unit": "ns/iter",
+            "extra": "iterations: 44760\ncpu: 16045.43161304653 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 106570.07427675396,
+            "unit": "ns/iter",
+            "extra": "iterations: 6585\ncpu: 106611.97433560934 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 841142.8819136055,
+            "unit": "ns/iter",
+            "extra": "iterations: 828\ncpu: 841312.7705314002 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1684291.42098136,
+            "unit": "ns/iter",
+            "extra": "iterations: 414\ncpu: 1684431.0531401078 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2266.124950646799,
+            "unit": "ns/iter",
+            "extra": "iterations: 311305\ncpu: 2253.1241515556076 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 9820.432587030708,
+            "unit": "ns/iter",
+            "extra": "iterations: 71251\ncpu: 9805.6122159648 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 100284.42812660139,
+            "unit": "ns/iter",
+            "extra": "iterations: 9419\ncpu: 100266.40917294669 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 397366.43086638657,
+            "unit": "ns/iter",
+            "extra": "iterations: 1761\ncpu: 397324.03520730353 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2178.7314470740944,
+            "unit": "ns/iter",
+            "extra": "iterations: 329540\ncpu: 2149.112857315308 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6523.439485957357,
+            "unit": "ns/iter",
+            "extra": "iterations: 106453\ncpu: 6488.07525387239 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41045.648994613206,
+            "unit": "ns/iter",
+            "extra": "iterations: 17076\ncpu: 41008.82788710426 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 317714.5356629171,
+            "unit": "ns/iter",
+            "extra": "iterations: 2205\ncpu: 317608.3229025416 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 637724.2660210452,
+            "unit": "ns/iter",
+            "extra": "iterations: 1108\ncpu: 637134.4350180759 ns\nthreads: 1"
           }
         ]
       }
