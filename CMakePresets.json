@@ -73,7 +73,7 @@
       "name": "ship-release",
       "inherits": "base",
       "displayName": "Ship (Shipping, manifest-load)",
-      "description": "Shippable artifact: no editor/ImGui/profiling, loads the baked asset_manifest.lua (no FS scan). Canonical desktop/iOS shipping config; Android reaches the same state via the if(ANDROID) block in CMakeLists.txt.",
+      "description": "Shippable artifact: no editor/ImGui/profiling, loads the baked asset_manifest.lua (no FS scan). Canonical desktop shipping config; Android reaches the same state via the if(ANDROID) block in CMakeLists.txt.",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "OCTARINE_ENABLE_PROFILING": "OFF",
@@ -97,44 +97,6 @@
         "lhs": "${hostSystemName}",
         "rhs": "Darwin"
       }
-    },
-    {
-      "name": "ios-base",
-      "hidden": true,
-      "generator": "Xcode",
-      "binaryDir": "${sourceDir}/build/${presetName}",
-      "toolchainFile": "${sourceDir}/cmake/vcpkg-toolchain.cmake",
-      "cacheVariables": {
-        "CMAKE_SYSTEM_NAME": "iOS",
-        "CMAKE_OSX_DEPLOYMENT_TARGET": "14.0",
-        "CMAKE_BUILD_TYPE": "Release",
-        "OCTARINE_ENABLE_PROFILING": "OFF",
-        "OCTARINE_WITH_IMGUI": "OFF",
-        "OCTARINE_WITH_EDITOR": "OFF",
-        "OCTARINE_SHIPPED": "ON"
-      }
-    },
-    {
-      "name": "ship-ios-device",
-      "inherits": "ios-base",
-      "displayName": "Ship iOS (device, arm64)",
-      "description": "Cross-compile a signed iOS .app for arm64 devices. xcodebuild archives the .app into a .ipa; codesign identity/team set via -DOCTARINE_IOS_DEVELOPMENT_TEAM= and -DOCTARINE_IOS_CODE_SIGN_IDENTITY=. Set OCTARINE_PACKAGE_PROJECT to wire the bundle.",
-      "cacheVariables": {
-        "CMAKE_OSX_ARCHITECTURES": "arm64",
-        "CMAKE_OSX_SYSROOT": "iphoneos",
-        "VCPKG_TARGET_TRIPLET": "arm64-ios"
-      }
-    },
-    {
-      "name": "ship-ios-simulator",
-      "inherits": "ios-base",
-      "displayName": "Ship iOS (simulator, arm64)",
-      "description": "iOS Simulator build for an Apple-silicon mac. Unsigned. For an Intel host use VCPKG_TARGET_TRIPLET=x64-ios-simulator + CMAKE_OSX_ARCHITECTURES=x86_64.",
-      "cacheVariables": {
-        "CMAKE_OSX_ARCHITECTURES": "arm64",
-        "CMAKE_OSX_SYSROOT": "iphonesimulator",
-        "VCPKG_TARGET_TRIPLET": "arm64-ios-simulator"
-      }
     }
   ],
   "buildPresets": [
@@ -144,8 +106,6 @@
     { "name": "player-profile", "configurePreset": "player-profile" },
     { "name": "player-release", "configurePreset": "player-release" },
     { "name": "ship-release", "configurePreset": "ship-release" },
-    { "name": "ship-mac-universal", "configurePreset": "ship-mac-universal" },
-    { "name": "ship-ios-device", "configurePreset": "ship-ios-device", "configuration": "Release" },
-    { "name": "ship-ios-simulator", "configurePreset": "ship-ios-simulator", "configuration": "Release" }
+    { "name": "ship-mac-universal", "configurePreset": "ship-mac-universal" }
   ]
 }

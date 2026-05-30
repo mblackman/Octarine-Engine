@@ -1,8 +1,8 @@
 # Device Builds
 
 End-to-end reference for producing shippable artifacts on every platform Octarine
-targets: Windows, Linux, macOS (per-arch and universal), Android (APK + AAB), and
-iOS (simulator `.app` + device `.ipa`, signed or unsigned).
+targets: Windows, Linux, macOS (per-arch and universal), and Android (APK + AAB).
+(iOS work is parked on `defer/ios` — see `ai/iOSDeferralPlan.md`.)
 
 This document covers:
 
@@ -35,29 +35,27 @@ packed in the platform's native bundle shape:
 ```
 
 `SDL_GetBasePath()` returns the location of that bundle on every platform
-(the exe dir on desktop, `Contents/Resources/` inside a `.app` on macOS, the
-`.app` root on iOS, and the APK asset root via SDL's `AAssetManager` shim on
-Android). The engine resolves *every* asset path against this base, so the
-same C++ code works in all four environments without per-platform branches in
-the asset loaders.
+(the exe dir on desktop, `Contents/Resources/` inside a `.app` on macOS, and
+the APK asset root via SDL's `AAssetManager` shim on Android). The engine
+resolves *every* asset path against this base, so the same C++ code works in
+all three environments without per-platform branches in the asset loaders.
 
 The two pieces that make this work end to end:
 
 1. **`OCTARINE_SHIPPED`** is a build-time define. When on, the engine loads
    `asset_manifest.lua` instead of scanning the filesystem. The scan code
    path is not viable inside a read-only APK or `.app`, so every device build
-   must set this. The `ship-release` CMake preset sets it; Android and iOS
-   force it on inside `CMakeLists.txt`; `octarine_package` re-forces it on the
-   packaged target as a guardrail.
+   must set this. The `ship-release` CMake preset sets it; Android forces it
+   on inside `CMakeLists.txt`; `octarine_package` re-forces it on the packaged
+   target as a guardrail.
 2. **`asset_manifest.lua`** is produced by `OctarineEngine <project> -m bake`.
    The bake runs the project headless, executes its startup script to gather
    every referenced asset id, validates each one, and emits a dofile-able Lua
    table with paths relative to the project root. On desktop CPack runs this
    as an install-time step — a broken asset reference fails the package. On
-   Android and iOS the bake cannot run on the host (cross-compiled binary
-   can't execute), so the **project commits its `asset_manifest.lua`** or
-   passes a host-native binary via `-Poctarine.bakeExe=` / CMake
-   `-DOCTARINE_HOST_BAKE_EXE=`.
+   Android the bake cannot run on the host (cross-compiled binary can't
+   execute), so the **project commits its `asset_manifest.lua`** or passes a
+   host-native binary via `-Poctarine.bakeExe=`.
 
 Read `CLAUDE.md` for the broader engine architecture; this doc is strictly
 about how the build system reaches a shippable artifact.
@@ -70,19 +68,19 @@ Every game project ships a flat key=value `project.ini` at its root:
 
 ```ini
 name         = My Game
-package_id   = com.studio.mygame   # reverse-DNS; Android/iOS bundle id, NSIS publisher
+package_id   = com.studio.mygame   # reverse-DNS; Android bundle id, NSIS publisher
 version_name = 0.3.1               # CFBundleShortVersionString, AGP versionName
 version_code = 12                  # CFBundleVersion, AGP versionCode (integer)
 vendor       = Studio Name         # MACOSX_BUNDLE_COPYRIGHT, CPack vendor
 description  = Short tagline.      # MACOSX_BUNDLE_INFO_STRING, CPack description
 icon         = images/icon.png     # 1024x1024 PNG, project-relative (see § 4)
-splash_color = #0a0a18             # iOS LaunchScreen background; defaults to #000000
+splash_color = #0a0a18             # Android splash background; defaults to #000000
 ```
 
 The same file drives:
 
 - `cmake/OctarinePackage.cmake` (`octarine_read_project_ini` + `_octarine_resolve_identity`)
-  — desktop CPack and the iOS `.app` Info.plist.
+  — desktop CPack.
 - `android/app/build.gradle` (`identityProp` helper) — Android `applicationId`,
   `versionCode`, `versionName`, launcher label.
 - `scripts/octarine-icons.cmake` — generates icons and splash assets from
@@ -130,18 +128,12 @@ for shipping builds. The desktop CPack path runs this at install time inside
 `cmake --build … --target package`, so a broken reference fails the package
 rather than the runtime.
 
-On Android and iOS the bake cannot run on the host (cross-compiled binary).
-Options:
+On Android the bake cannot run on the host (cross-compiled binary). Options:
 
 - **Commit the manifest** to the project repo. Cheap, always works, matches
   what most games already do.
-- **Pass `-Poctarine.bakeExe=…` (Gradle) or `-DOCTARINE_HOST_BAKE_EXE=…` (CMake
-  iOS)** pointing at a host-native `OctarineEngine` binary. Gradle's
-  `stageOctarineAssets` runs it as a `doLast`; iOS adds a `PRE_BUILD` step
-  before the bundle is signed.
-
-If neither holds, iOS fails at CMake configure (`FATAL_ERROR`) with a clear
-message rather than producing a `.app` that dies at first scene load.
+- **Pass `-Poctarine.bakeExe=…`** pointing at a host-native `OctarineEngine`
+  binary. Gradle's `stageOctarineAssets` runs it as a `doLast`.
 
 The `--use-manifest` CLI flag forces a non-shipped engine binary to load the
 manifest, for verifying the manifest-load branch from a dev build.
@@ -160,19 +152,17 @@ metadata from that single input:
   ic_launcher.xml` (Android 8+ adaptive), and `values-v31/octarine_splash.xml`
   wiring `windowSplashScreenAnimatedIcon` / `windowSplashScreenBackground`
   for the Android 12+ splash API.
-- **iOS:** `Assets.xcassets/AppIcon.appiconset/` with the full 20/29/40/60/76/
-  83.5/1024 ladder, and a `LaunchScreen.storyboard` whose background uses
-  `splash_color` (default `#000000`).
 - **Desktop:** Windows `.ico` (NSIS installer + EXE), macOS `.icns` (placed in
   `Contents/Resources/`, referenced via `CFBundleIconFile`), Linux `.png`
   (placed beside the binary for `.desktop` `Icon=` consumption).
 
+(iOS `AppIcon.appiconset` + `LaunchScreen.storyboard` emitter lives on
+`defer/ios`.)
+
 **ImageMagick is required.** Install `magick` (or the older `convert`) on
 `PATH`. With ImageMagick missing or `icon=` unset, the script skip-warns and
 the build ships platform defaults: Android keeps the green-robot launcher,
-iOS gets no icon (Xcode warns) and a black launch screen, desktop ships no
-icon. This is fine for early bootstrap projects but is **not Apple App
-Store-acceptable** — Apple rejects submissions without an `AppIcon` set.
+desktop ships no icon.
 
 Adaptive icons crop the outer ~16% of the source PNG. Leave safe padding so
 the cropped circle on Android matches the legacy square on Android 7.
@@ -443,153 +433,14 @@ traits from `__cpp_noexcept_function_type` and breaks differently.
 
 ---
 
-## 7. iOS — simulator `.app` + device `.ipa`
+## 7. iOS — parked
 
-### Prerequisites
-
-- macOS host (Xcode toolchain). Linux/Windows cannot cross-compile iOS.
-- Xcode 15.4+ (`sudo xcode-select -s /Applications/Xcode.app`).
-- Autotools chain for vcpkg ports (`brew install autoconf automake
-  autoconf-archive libtool pkg-config`). freetype / harfbuzz / libvorbis
-  configure scripts need them.
-- `VCPKG_ROOT` env var pointing at the vcpkg checkout.
-- ImageMagick on `PATH` if `icon=` is set.
-
-For a **signed device build** you additionally need (see § 7.4):
-
-- Apple Developer Program membership ($99/yr).
-- An installed signing identity (`.p12`) in your keychain.
-- A provisioning profile matching the `package_id`.
-
-### Presets
-
-- `ship-ios-simulator` — Xcode generator, `CMAKE_SYSTEM_NAME=iOS`,
-  `CMAKE_OSX_SYSROOT=iphonesimulator`, triplet `arm64-ios-simulator` (on
-  Intel macs swap to `x64-ios-simulator` + `CMAKE_OSX_ARCHITECTURES=x86_64`).
-- `ship-ios-device` — same shape but `iphoneos` sysroot, `arm64-ios` triplet.
-
-Both inherit from the hidden `ios-base` preset which sets the shipping
-flags + `CMAKE_OSX_DEPLOYMENT_TARGET=14.0`.
-
-### Simulator `.app`
-
-```bash
-cmake --preset ship-ios-simulator \
-      -DOCTARINE_PACKAGE_PROJECT=/path/to/MyGame
-cmake --build build/ship-ios-simulator --config Release -- CODE_SIGNING_ALLOWED=NO
-```
-
-Output: `build/ship-ios-simulator/Release-iphonesimulator/<Target>.app`.
-Install + launch in a booted simulator:
-
-```bash
-xcrun simctl boot "iPhone 16"
-xcrun simctl install booted build/ship-ios-simulator/Release-iphonesimulator/OctarineEngine.app
-xcrun simctl launch booted com.studio.mygame
-xcrun simctl spawn booted log stream --predicate 'subsystem == "com.octarine.engine"'
-```
-
-iOS routes engine logs through `os_log` (subsystem `com.octarine.engine`,
-categories `Octarine` / `OctarineLua`) since there's no terminal attached to
-stdout. Watch them in Console.app or via `log stream` as above.
-
-### Device `.ipa` — `scripts/build-ios-ipa.sh`
-
-This script wraps the `xcodebuild archive` + `-exportArchive` pipeline that
-turns the device-target `.app` into a distributable `.ipa`. CMake/CPack
-doesn't do this — `xcodebuild` owns archiving on iOS.
-
-```bash
-scripts/build-ios-ipa.sh \
-  --project /path/to/MyGame \
-  --team   ABCDE12345 \
-  --method development \
-  --output build/MyGame.ipa
-```
-
-Flags:
-
-| Flag                       | Purpose                                                                   |
-|----------------------------|---------------------------------------------------------------------------|
-| `--project DIR` *(req)*    | Game project root.                                                        |
-| `--team ID`                | Apple Developer team id; required unless `--unsigned-archive`.            |
-| `--identity STR`           | `CODE_SIGN_IDENTITY` (e.g. `Apple Distribution: Studio (TEAMID)`).        |
-| `--method M`               | `development` *(default)* / `ad-hoc` / `app-store` / `enterprise`.        |
-| `--build-dir DIR`          | Default: `build/ship-ios-device`.                                         |
-| `--output PATH`            | Final `.ipa` destination.                                                 |
-| `--host-bake-exe PATH`     | Host-native `OctarineEngine` for the PRE_BUILD asset bake.                |
-| `--skip-configure`         | Re-archive without re-running CMake configure (faster iteration).         |
-| `--unsigned-archive`       | Skip `exportArchive`; pack `Payload/<App>.app` from the `.xcarchive`.     |
-| `--name / --id / --version / --version-code / --vendor / --description` | Override `project.ini` identity. |
-
-Env fallbacks mirror the flags: `OCTARINE_IOS_TEAM`, `OCTARINE_IOS_IDENTITY`,
-`OCTARINE_IOS_METHOD`, `OCTARINE_PROJECT`, `OCTARINE_HOST_BAKE_EXE`.
-
-#### Unsigned archive — what it's for
-
-`--unsigned-archive` is a CI smoke test: it runs the full `ship-ios-device`
-configure + the `xcodebuild archive` action with `CODE_SIGNING_ALLOWED=NO`,
-then copies `Products/Applications/<App>.app` out of the `.xcarchive` and
-zips it into a `Payload/`-shaped `.ipa`. The result is a valid `.ipa`
-**shape** that will not install on a real device without resigning — but it
-proves the device-target compile/link/archive end-to-end without any Apple
-secrets. The `ios-ipa.yml` CI leg runs it on every PR.
-
-To produce a signed device `.ipa`, drop `--unsigned-archive` and pass
-`--team`. The script:
-
-1. Configures the `ship-ios-device` preset (octarine_package wires
-   `Info.plist`, stages the project, sets the codesign passthrough).
-2. Runs `xcodebuild archive` → `.xcarchive`.
-3. Writes an `ExportOptions.plist` with the chosen `method` + `teamID` +
-   `signingStyle=automatic`.
-4. Runs `xcodebuild -exportArchive` → `.ipa` at `--output`.
-
-Method picks who can install:
-
-- **development** — only on team-registered UDIDs (your test devices).
-- **ad-hoc** — wider internal distribution to enrolled devices.
-- **app-store** — for TestFlight / App Store Connect upload.
-- **enterprise** — Apple Enterprise program only.
-
-### Bake on iOS
-
-A cross-compiled iOS binary can't run on the build host, so the bake doesn't
-happen at package time the way desktop CPack does. Two options:
-
-- **Commit `asset_manifest.lua`** to the project repo (the same contract as
-  Android). The example repo commits its manifest, gitignored on desktop
-  projects, opt-in elsewhere.
-- **Pass `-DOCTARINE_HOST_BAKE_EXE=/path/to/desktop/OctarineEngine`** at
-  configure (or `--host-bake-exe` on the script). The iOS branch of
-  `octarine_package` adds a `PRE_BUILD` step that re-bakes the staged
-  project before xcodebuild signs the bundle.
-
-If neither is true, configure fails with a clear `FATAL_ERROR` rather than
-shipping a `.app` that dies at first scene load.
-
-### Codesign passthrough — CMake cache vars
-
-The iOS branch of `octarine_package` reads two cache vars:
-
-- `OCTARINE_IOS_DEVELOPMENT_TEAM` → `XCODE_ATTRIBUTE_DEVELOPMENT_TEAM`
-- `OCTARINE_IOS_CODE_SIGN_IDENTITY` → `XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY`
-
-These are pure passthroughs; the dev team/identity are deployment concerns
-and live outside the source tree.
-
-### Signed CI — what's missing
-
-`ios-ipa.yml` runs unsigned today. The signed flip is:
-
-1. Add GitHub Actions secrets: `APPLE_TEAM_ID`, base64
-   `IOS_P12` + `IOS_P12_PASSWORD`, base64 `IOS_PROVISIONING_PROFILE`.
-2. Add a keychain bootstrap step that imports the `.p12` and drops the
-   provisioning profile into `~/Library/MobileDevice/Provisioning Profiles/`.
-3. Drop `--unsigned-archive` from the script invocation, add
-   `--team "${{ secrets.APPLE_TEAM_ID }}"`.
-
-See `ai/DeviceShippingPlan.md` § Stage 3 for the keychain bootstrap commands.
+iOS build target (`ship-ios-*` presets, `_octarine_setup_ios_bundle`,
+`scripts/build-ios-ipa.sh`, `os_log` sink, `.github/workflows/ios*.yml`,
+the `Settings.bundle` license pointer) is parked on the `defer/ios` branch
+pending an Apple Developer account. Reattachment recipe in
+`ai/iOSDeferralPlan.md`; snapshot tag `ios-snapshot-2026-05-29` points at
+the last known-good commit.
 
 ---
 
@@ -599,8 +450,6 @@ See `ai/DeviceShippingPlan.md` § Stage 3 for the keychain bootstrap commands.
 |-----------------------------|-----------------|-----------------------------------------|------------------------------------------------|
 | `.github/workflows/package.yml`  | matrix (win/linux/mac/mac-universal) | dispatch + push to `main` + tags `v*` + PRs | per-OS ZIP/TGZ/DMG                |
 | `.github/workflows/android.yml`  | ubuntu-latest   | dispatch + push/PR to `main` + tags `v*` | debug APK + signed release AAB (multi-ABI)   |
-| `.github/workflows/ios.yml`      | macos-latest    | dispatch + push/PR to `main`            | simulator `.app` + simctl launch assertion    |
-| `.github/workflows/ios-ipa.yml`  | macos-latest    | dispatch + push/PR to `main` + tags `v*` | unsigned device `.ipa`                       |
 
 ### Common machinery
 
@@ -635,36 +484,8 @@ The AAB step uses the GitHub-secret-driven keystore if available, else falls
 back to the debug key. A sanity step `unzip -l` the AAB and asserts
 `base/lib/<abi>/libmain.so` is present for every ABI.
 
-### `ios.yml` — simulator
-
-macos-latest: brew autotools, `ship-ios-simulator` configure, build via
-`cmake --build` with `CODE_SIGNING_ALLOWED=NO`. Sanity-checks bundle
-contents, then runs the **simulator launch assertion**:
-
-- `xcrun simctl create OctarineCI` against the first available iOS runtime
-  + iPhone device type pulled from the runtime's `supportedDeviceTypes`
-  (avoids picking a device that needs a newer runtime than the one
-  installed).
-- `boot`, `bootstatus -b`, `install`, `launch`.
-- `xcrun simctl spawn booted log show --predicate 'subsystem ==
-  "com.octarine.engine"'` polled up to ~90 seconds.
-- Passes if both `AssetCatalog: loaded N entries from manifest` *and* an
-  `AudioSystem initialized` (or graceful-degrade `MIX_…` line) appear.
-
-This catches a class of regression a build-only leg can't see: a `.app`
-that links but won't actually run (SDL_main missing, Metal renderer
-failing, bundle resource resolution at `SDL_GetBasePath()` broken).
-
-### `ios-ipa.yml` — unsigned device archive
-
-macos-latest: identical prereqs, runs `scripts/build-ios-ipa.sh
---unsigned-archive` against the example. Sanity-check `unzip -l` the
-`.ipa` and asserts `Payload/OctarineEngine.app/{config.ini,asset_manifest.lua,
-game.lua}` is present. Exercises the **device-target** compile/link/archive
-which the simulator leg can't reach (different sysroot, different vcpkg
-triplet, Mach-O for `iphoneos` not `iphonesimulator`).
-
-A signed device leg is one step away once codesign secrets exist; see § 7.5.
+(iOS CI legs — `ios.yml` simulator launch assertion + `ios-ipa.yml`
+unsigned device archive — live on `defer/ios`.)
 
 ---
 
@@ -679,9 +500,9 @@ AssetCatalog: loaded N entries from manifest
 ```
 
 If you see `scanning filesystem` instead, the engine compiled without
-`OCTARINE_SHIPPED` defined. Inside a read-only bundle (APK / iOS `.app`)
-the next scene load will fail; on desktop the binary will run but isn't
-shippable (it's reading loose files from a dev tree, not the manifest).
+`OCTARINE_SHIPPED` defined. Inside a read-only APK the next scene load
+will fail; on desktop the binary will run but isn't shippable (it's
+reading loose files from a dev tree, not the manifest).
 
 ### Platform-specific verifies
 
@@ -691,11 +512,6 @@ shippable (it's reading loose files from a dev tree, not the manifest).
 - **Android:** `adb install -r app-release.apk`, then `adb logcat -s SDL
   Octarine OctarineLua` while you launch. The pinned ABI must match the
   device (`adb shell getprop ro.product.cpu.abilist`).
-- **iOS simulator:** `xcrun simctl spawn booted log stream --predicate
-  'subsystem == "com.octarine.engine"'`.
-- **iOS device (signed):** install via Xcode `Devices and Simulators` or via
-  Apple Configurator; logs in Console.app filtered on the
-  `com.octarine.engine` subsystem.
 
 ### Sanity checks worth running before a release
 
@@ -713,10 +529,6 @@ shippable (it's reading loose files from a dev tree, not the manifest).
   ```powershell
   apksigner verify --print-certs app-release.aab
   ```
-- iOS bundle contains the manifest + startup script:
-  ```bash
-  ls OctarineEngine.app/{config.ini,asset_manifest.lua,game.lua}
-  ```
 
 ---
 
@@ -725,8 +537,8 @@ shippable (it's reading loose files from a dev tree, not the manifest).
 ### `AssetCatalog` scanned the filesystem in a shipped build
 
 `OCTARINE_SHIPPED` was off at compile time. Verify the preset
-(`ship-release`, `ship-ios-*`) or that you called `octarine_package`
-(which force-defines `OCTARINE_SHIPPED` on the packaged target).
+(`ship-release`) or that you called `octarine_package` (which
+force-defines `OCTARINE_SHIPPED` on the packaged target).
 
 ### Desktop binary crashes with `0xC0000135` (Windows)
 
@@ -772,20 +584,6 @@ the AAB is debug-signed (still installable, not Play-uploadable).
 release `buildType`. Spot-check with `llvm-nm -D libmain.so | grep
 Java_org_libsdl_app_`.
 
-### iOS configure fails: `no asset_manifest.lua in project and OCTARINE_HOST_BAKE_EXE is unset`
-
-The project doesn't ship a baked manifest and you didn't point at a
-host-native binary to bake at build time. Either commit the manifest, or
-pass `-DOCTARINE_HOST_BAKE_EXE=/path/to/desktop/OctarineEngine`.
-
-### iOS `.xcarchive` has empty `Products/Applications/`
-
-CMake-generated Xcode targets default to `SKIP_INSTALL=YES`, so the `.app`
-lands in `UninstalledProducts/iphoneos/` instead. The iOS branch of
-`octarine_package` sets `XCODE_ATTRIBUTE_SKIP_INSTALL=NO` +
-`XCODE_ATTRIBUTE_INSTALL_PATH=/Applications` to fix this. If you're
-configuring iOS without `octarine_package`, set those attributes yourself.
-
 ### vcpkg first-run is very slow
 
 Expected — first run for a new triplet builds every dep from source.
@@ -793,12 +591,6 @@ SDL3 + image/mixer/ttf + freetype/harfbuzz/libpng/libogg/libvorbis is
 ~20–60 minutes. The GitHub Actions binary cache (`x-gha`) makes subsequent
 CI runs ~5–10 minutes per leg; locally, set `VCPKG_BINARY_SOURCES` to a
 shared `files` cache to amortize across checkouts.
-
-### iOS simulator runs but logs are empty
-
-iOS routes engine logs through `os_log`, not stdout. Use Console.app or
-`log stream --predicate 'subsystem == "com.octarine.engine"'`. Console
-filtering on the `Octarine` / `OctarineLua` categories narrows it further.
 
 ---
 
@@ -846,46 +638,20 @@ cd android
 # -> android/app/build/outputs/bundle/release/app-release.aab
 ```
 
-**Local iOS unsigned device `.ipa`:**
-
-```bash
-scripts/build-ios-ipa.sh \
-  --project /path/to/MyGame \
-  --unsigned-archive \
-  --output build/MyGame-unsigned.ipa
-```
-
-**Local iOS signed device `.ipa`** (requires Apple Developer team + cert +
-profile):
-
-```bash
-scripts/build-ios-ipa.sh \
-  --project /path/to/MyGame \
-  --team ABCDE12345 \
-  --method development \
-  --output build/MyGame.ipa
-```
-
 **Push a release tag** and CI produces the shipping artifacts:
 
 ```bash
 git tag v0.1.0 && git push --tags
 ```
 
-Tag push fires three workflows:
+Tag push fires two workflows:
 
 - `package.yml` — per-OS ZIP/TGZ/DMG + universal macOS DMG.
 - `android.yml` — debug APK + signed multi-ABI AAB (debug-key fallback
   when the keystore secrets aren't wired).
-- `ios-ipa.yml` — unsigned device `.ipa` (swap to signed once the codesign
-  secrets land; see § 7.5).
 
-`ios.yml` (simulator launch assertion) runs on push/PR to `main` only — no
-tag trigger, since the simulator `.app` isn't a shipping artifact. Add
-`tags: ['v*']` to its `on:` block if you want a tag-driven sim build too.
-
-Drop the shipping artifacts into Steam / Play Store / TestFlight once
-distribution automation lands (see `ai/DeviceShippingPlan.md` § Stage 6).
+Drop the shipping artifacts into Steam / Play Store once distribution
+automation lands (see `ai/DeviceShippingPlan.md` § Stage 6).
 
 ---
 
@@ -894,15 +660,14 @@ distribution automation lands (see `ai/DeviceShippingPlan.md` § Stage 6).
 | Concern                          | File                                                  |
 |----------------------------------|-------------------------------------------------------|
 | CMake presets                    | `CMakePresets.json`                                   |
-| Android / iOS shipping flag forces | `CMakeLists.txt` (`if (ANDROID)` / iOS blocks)      |
-| Desktop + iOS packaging          | `cmake/OctarinePackage.cmake`                         |
+| Android shipping flag force      | `CMakeLists.txt` (`if (ANDROID)` block)               |
+| Desktop packaging                | `cmake/OctarinePackage.cmake`                         |
 | Icon / splash generator          | `scripts/octarine-icons.cmake`                        |
-| iOS `.ipa` wrap script           | `scripts/build-ios-ipa.sh`                            |
 | Android host app                 | `android/app/build.gradle`, `android/README.md`       |
 | Asset bake mode                  | `Game::Bake` + `acquire_scene_assets` / `load_asset`  |
 | Manifest load gate               | `AssetCatalog::Build` (`allowManifest` parameter)     |
 | `project.ini` parsers            | `OctarinePackage.cmake` `octarine_read_project_ini`, `build.gradle` `identityProp` |
-| Logger sink selection            | `src/General/Logger.cpp` (`android_logger` / `os_log` / stdout) |
+| Logger sink selection            | `src/General/Logger.cpp` (`android_logger` / stdout)  |
 
 For the historical plan and the rationale behind each stage, see
 `ai/AssetPipelineAndDeviceBuildsPlan.md` (closed) and

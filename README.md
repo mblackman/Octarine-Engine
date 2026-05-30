@@ -21,7 +21,7 @@ Octarine Engine is a lightweight, high-performance 2D game engine built with C++
 ## Third-Party Licenses
 
 Octarine Engine itself is MIT-licensed (see [`LICENSE`](LICENSE)). Every shipped package
-(desktop ZIP/TGZ/DMG, Android AAB, iOS `.app`/`.ipa`) ships a build-time-aggregated
+(desktop ZIP/TGZ/DMG, Android AAB) ships a build-time-aggregated
 `THIRD_PARTY_LICENSES.txt` covering every linked dependency. The aggregator and shipping
 contract live in [`ai/LicenseShippingPlan.md`](ai/LicenseShippingPlan.md).
 

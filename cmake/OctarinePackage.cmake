@@ -1,4 +1,4 @@
-# OctarinePackage.cmake — desktop + iOS packaging.
+# OctarinePackage.cmake — desktop packaging (Android packages via Gradle; iOS parked on defer/ios).
 #
 # Produces a self-contained, double-clickable artifact per OS that launches with NO `-p` argument:
 # the engine binary sits beside a baked game project (assets + lua + config + asset_manifest.lua),
@@ -19,7 +19,6 @@
 #   octarine_read_project_ini         — flat key=value INI -> ${PREFIX}_<key> vars (public; gradle mirrors)
 #   _octarine_resolve_identity        — CLI cache > project.ini > default precedence per identity key
 #   _octarine_validate_identity       — shipping-build identity gate (FATAL on bad/missing required keys)
-#   _octarine_setup_ios_bundle        — iOS .app: Info.plist + icons + project staging + POST_BUILD copy
 #   _octarine_generate_desktop_icons  — runs scripts/octarine-icons.cmake for the host OS
 #   _octarine_setup_desktop_install   — install(TARGETS) + bake CODE step + project DIRECTORY copy
 #   _octarine_bundle_runtime_libs     — vcpkg dylibs/sos/DLLs + MSVC CRT redist beside the binary
@@ -36,13 +35,13 @@ set(_OCTARINE_PACKAGE_INCLUDED ON)
 set(_OCTARINE_PACKAGE_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
 # Path to the shared icon/splash generator. Same script Gradle runs on Android — single source of
-# truth for sizes/manifests so iOS/desktop/Android can't drift. CMAKE_CURRENT_LIST_DIR resolves to
+# truth for sizes/manifests so desktop/Android can't drift. CMAKE_CURRENT_LIST_DIR resolves to
 # the directory of THIS file (cmake/) regardless of which CMakeLists.txt includes it.
 set(_OCTARINE_ICON_SCRIPT "${CMAKE_CURRENT_LIST_DIR}/../scripts/octarine-icons.cmake")
 
 # Third-party license aggregator. Same file lives at cmake/octarine-licenses.cmake; including it
-# here keeps the public octarine_collect_licenses() symbol available to every caller (desktop +
-# iOS branches of octarine_package both depend on it).
+# here keeps the public octarine_collect_licenses() symbol available to the desktop branch of
+# octarine_package.
 include("${CMAKE_CURRENT_LIST_DIR}/octarine-licenses.cmake")
 
 # NSIS is opt-in, not auto-detected: a stray/non-functional makensis on PATH (e.g. a Chocolatey
@@ -57,12 +56,11 @@ set(OCTARINE_PACKAGE_VERSION_NAME "" CACHE STRING "Override project.ini: version
 set(OCTARINE_PACKAGE_VERSION_CODE "" CACHE STRING "Override project.ini: version_code")
 set(OCTARINE_PACKAGE_VENDOR       "" CACHE STRING "Override project.ini: vendor")
 set(OCTARINE_PACKAGE_DESCRIPTION  "" CACHE STRING "Override project.ini: description")
-set(OCTARINE_PACKAGE_ID           "" CACHE STRING "Override project.ini: package_id (Android/iOS bundle id)")
-set(OCTARINE_PACKAGE_MIN_IOS      "" CACHE STRING "Override project.ini: min_ios (IPHONEOS_DEPLOYMENT_TARGET)")
+set(OCTARINE_PACKAGE_ID           "" CACHE STRING "Override project.ini: package_id (Android bundle id)")
 set(OCTARINE_PACKAGE_ORIENTATION  "" CACHE STRING "Override project.ini: orientation (portrait|landscape|all)")
 set(OCTARINE_PACKAGE_FULLSCREEN   "" CACHE STRING "Override project.ini: fullscreen (true|false)")
 set(OCTARINE_PACKAGE_PERMISSIONS  "" CACHE STRING "Override project.ini: permissions (comma list: internet,recording,camera,location,photos)")
-set(OCTARINE_PACKAGE_CATEGORY     "" CACHE STRING "Override project.ini: category (LSApplicationCategoryType, e.g. public.app-category.games)")
+set(OCTARINE_PACKAGE_CATEGORY     "" CACHE STRING "Override project.ini: category (reserved for Android category surfaces; currently informational)")
 
 # Parse a flat key=value INI (no sections; Java Properties compatible) into ${PREFIX}_<key> vars in
 # the caller's scope. Skips blank lines and `#`-prefixed comments. Unknown keys are still set —
@@ -127,7 +125,7 @@ function(_octarine_validate_identity PROJECT_DIR PKG_NAME PKG_ID PKG_VER SHIPPED
         list(APPEND _errors "missing required key: version_name")
     endif ()
     if ("${PKG_ID}" STREQUAL "")
-        list(APPEND _errors "missing required key: package_id (Android/iOS bundle id)")
+        list(APPEND _errors "missing required key: package_id (Android bundle id)")
     elseif (NOT "${PKG_ID}" MATCHES "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$")
         list(APPEND _errors "package_id '${PKG_ID}' must be reverse-DNS (e.g. com.studio.mygame)")
     endif ()
@@ -137,250 +135,8 @@ function(_octarine_validate_identity PROJECT_DIR PKG_NAME PKG_ID PKG_VER SHIPPED
     endif ()
 endfunction()
 
-# Map a project.ini orientation value to the Info.plist's UISupportedInterfaceOrientations form
-# (space-separated list of UIInterfaceOrientation* identifiers). Unknown values yield empty,
-# which the caller treats as "don't emit the key" so Xcode's default (all four) wins.
-function(_octarine_ios_orientations_for_value OUT_VAR VALUE)
-    if (VALUE STREQUAL "portrait")
-        set(${OUT_VAR} "UIInterfaceOrientationPortrait" PARENT_SCOPE)
-    elseif (VALUE STREQUAL "landscape")
-        set(${OUT_VAR} "UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight" PARENT_SCOPE)
-    elseif (VALUE STREQUAL "all")
-        set(${OUT_VAR} "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight" PARENT_SCOPE)
-    else ()
-        set(${OUT_VAR} "" PARENT_SCOPE)
-    endif ()
-endfunction()
-
-# Map a project.ini permission name to the iOS Info.plist usage-description key + a default
-# reason string. Apple rejects apps that gate hardware behind permission prompts without these
-# strings, but projects rarely care to author them — the default sentence is good enough for
-# review and the project can still override via INFOPLIST_KEY_* on the target if it cares.
-# Unknown / Android-only permissions (e.g. internet) yield empty key + reason.
-function(_octarine_ios_permission_plist_key OUT_KEY_VAR OUT_REASON_VAR NAME)
-    if (NAME STREQUAL "recording")
-        set(${OUT_KEY_VAR} "NSMicrophoneUsageDescription" PARENT_SCOPE)
-        set(${OUT_REASON_VAR} "Audio recording for gameplay." PARENT_SCOPE)
-    elseif (NAME STREQUAL "camera")
-        set(${OUT_KEY_VAR} "NSCameraUsageDescription" PARENT_SCOPE)
-        set(${OUT_REASON_VAR} "Camera input for gameplay features." PARENT_SCOPE)
-    elseif (NAME STREQUAL "location")
-        set(${OUT_KEY_VAR} "NSLocationWhenInUseUsageDescription" PARENT_SCOPE)
-        set(${OUT_REASON_VAR} "Location for gameplay features." PARENT_SCOPE)
-    elseif (NAME STREQUAL "photos")
-        set(${OUT_KEY_VAR} "NSPhotoLibraryUsageDescription" PARENT_SCOPE)
-        set(${OUT_REASON_VAR} "Photo library access for sharing features." PARENT_SCOPE)
-    else ()
-        set(${OUT_KEY_VAR} "" PARENT_SCOPE)
-        set(${OUT_REASON_VAR} "" PARENT_SCOPE)
-    endif ()
-endfunction()
-
-# iOS .app: Info.plist identity, optional codesign passthrough, staged project tree, icon/splash
-# wiring, optional host-bake step, POST_BUILD copy into the bundle root. xcodebuild handles signing
-# + .ipa archiving — this helper only owns build-time bundle setup. CPack is irrelevant here.
-function(_octarine_setup_ios_bundle TARGET PROJECT_DIR PKG_NAME PKG_ID PKG_VERSION PKG_VERSION_CODE PKG_DESCRIPTION PKG_VENDOR PKG_MIN_IOS PKG_ORIENTATION PKG_FULLSCREEN PKG_PERMISSIONS PKG_CATEGORY)
-    set_target_properties(${TARGET} PROPERTIES
-            MACOSX_BUNDLE                       ON
-            MACOSX_BUNDLE_BUNDLE_NAME           "${PKG_NAME}"
-            MACOSX_BUNDLE_GUI_IDENTIFIER        "${PKG_ID}"
-            MACOSX_BUNDLE_SHORT_VERSION_STRING  "${PKG_VERSION}"
-            MACOSX_BUNDLE_BUNDLE_VERSION        "${PKG_VERSION_CODE}"
-            MACOSX_BUNDLE_INFO_STRING           "${PKG_DESCRIPTION}"
-            MACOSX_BUNDLE_COPYRIGHT             "${PKG_VENDOR}"
-            # CMake-generated Xcode targets default to SKIP_INSTALL=YES, which makes
-            # `xcodebuild archive` succeed but leave the .xcarchive's Products/Applications/
-            # directory empty (the .app lands in UninstalledProducts/ instead). Both the
-            # signed `xcodebuild -exportArchive` path and the unsigned-archive Payload zip
-            # in scripts/build-ios-ipa.sh need the .app under Products/Applications/, so
-            # flip SKIP_INSTALL off and point INSTALL_PATH at /Applications (the iOS app
-            # install root, mirroring Xcode's default iOS-app target).
-            XCODE_ATTRIBUTE_SKIP_INSTALL        "NO"
-            XCODE_ATTRIBUTE_INSTALL_PATH        "/Applications"
-    )
-
-    # Optional codesign passthrough. If unset Xcode falls back to its own signing settings
-    # (automatic team if configured, or unsigned for the simulator). The dev team / identity
-    # are deployment concerns, not source-tree concerns — keep them out of the preset.
-    if (DEFINED CACHE{OCTARINE_IOS_DEVELOPMENT_TEAM} AND OCTARINE_IOS_DEVELOPMENT_TEAM)
-        set_target_properties(${TARGET} PROPERTIES
-                XCODE_ATTRIBUTE_DEVELOPMENT_TEAM "${OCTARINE_IOS_DEVELOPMENT_TEAM}")
-    endif ()
-    if (DEFINED CACHE{OCTARINE_IOS_CODE_SIGN_IDENTITY} AND OCTARINE_IOS_CODE_SIGN_IDENTITY)
-        set_target_properties(${TARGET} PROPERTIES
-                XCODE_ATTRIBUTE_CODE_SIGN_IDENTITY "${OCTARINE_IOS_CODE_SIGN_IDENTITY}")
-    endif ()
-
-    # Per-project Info.plist knobs from project.ini. Each is emitted only when the project sets
-    # the corresponding key, so an empty project.ini ships with Xcode's own defaults (Info.plist
-    # gets the engine's identity + nothing else).
-    if (PKG_MIN_IOS)
-        set_target_properties(${TARGET} PROPERTIES
-                XCODE_ATTRIBUTE_IPHONEOS_DEPLOYMENT_TARGET "${PKG_MIN_IOS}")
-    endif ()
-    if (PKG_CATEGORY)
-        set_target_properties(${TARGET} PROPERTIES
-                XCODE_ATTRIBUTE_INFOPLIST_KEY_LSApplicationCategoryType "${PKG_CATEGORY}")
-    endif ()
-    if (PKG_FULLSCREEN STREQUAL "true")
-        set_target_properties(${TARGET} PROPERTIES
-                XCODE_ATTRIBUTE_INFOPLIST_KEY_UIRequiresFullScreen "YES")
-    elseif (PKG_FULLSCREEN STREQUAL "false")
-        set_target_properties(${TARGET} PROPERTIES
-                XCODE_ATTRIBUTE_INFOPLIST_KEY_UIRequiresFullScreen "NO")
-    endif ()
-    _octarine_ios_orientations_for_value(_orient "${PKG_ORIENTATION}")
-    if (_orient)
-        set_target_properties(${TARGET} PROPERTIES
-                XCODE_ATTRIBUTE_INFOPLIST_KEY_UISupportedInterfaceOrientations "${_orient}")
-    endif ()
-    # Permissions: comma list -> per-permission NS*UsageDescription Info.plist keys. Internet
-    # has no iOS counterpart (no permission prompt) so its mapping returns empty + is skipped.
-    if (PKG_PERMISSIONS)
-        string(REPLACE "," ";" _perms_list "${PKG_PERMISSIONS}")
-        foreach (_perm IN LISTS _perms_list)
-            string(STRIP "${_perm}" _perm)
-            string(TOLOWER "${_perm}" _perm)
-            if (_perm STREQUAL "")
-                continue()
-            endif ()
-            _octarine_ios_permission_plist_key(_pkey _preason "${_perm}")
-            if (_pkey)
-                set_target_properties(${TARGET} PROPERTIES
-                        "XCODE_ATTRIBUTE_INFOPLIST_KEY_${_pkey}" "${_preason}")
-            endif ()
-        endforeach ()
-    endif ()
-
-    # Stage the project to a clean dir at configure time so the POST_BUILD copy is a single
-    # cmake -E copy_directory (which has no exclude flag). file(COPY ... PATTERN EXCLUDE)
-    # handles the scratch filtering; same exclusion list as the desktop install(DIRECTORY).
-    set(_ios_staged "${CMAKE_BINARY_DIR}/_octarine_ios_staged_project")
-    file(REMOVE_RECURSE "${_ios_staged}")
-    file(COPY "${PROJECT_DIR}/"
-            DESTINATION "${_ios_staged}"
-            PATTERN ".git" EXCLUDE
-            PATTERN ".gitignore" EXCLUDE
-            PATTERN "*.meta" EXCLUDE
-            PATTERN "editor_prefs.ini" EXCLUDE
-            PATTERN "preferences.ini" EXCLUDE
-            PATTERN "imgui.ini" EXCLUDE
-            PATTERN "project.ini" EXCLUDE)
-
-    # Third-party license aggregate + Settings.bundle pointer. Both ride along on the existing
-    # POST_BUILD copy_directory step that pulls `_ios_staged` into the .app — staging extra
-    # files here is one line per file.
-    set(_ios_project_drops "${PROJECT_DIR}/THIRD_PARTY_LICENSES.d")
-    set(_ios_extra_dirs "")
-    if (IS_DIRECTORY "${_ios_project_drops}")
-        list(APPEND _ios_extra_dirs "${_ios_project_drops}")
-    endif ()
-    octarine_collect_licenses("${_ios_staged}/THIRD_PARTY_LICENSES.txt" EXTRA_DIRS ${_ios_extra_dirs})
-    # iOS Settings.bundle: a minimal Root.plist points the user from Settings → app → "Acknowledgements"
-    # at the bundled THIRD_PARTY_LICENSES.txt. Per-port plist authoring was rejected (Apple caps
-    # Settings FooterText at ~4KB and we'd burn the aggregator's no-hand-maintenance win) — the
-    # pointer closes the discoverability requirement, the bundled txt carries the actual content.
-    set(_ios_settings_dir "${_ios_staged}/Settings.bundle")
-    file(MAKE_DIRECTORY "${_ios_settings_dir}")
-    file(WRITE "${_ios_settings_dir}/Root.plist"
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-            "<plist version=\"1.0\">\n"
-            "<dict>\n"
-            "  <key>StringsTable</key><string>Root</string>\n"
-            "  <key>PreferenceSpecifiers</key>\n"
-            "  <array>\n"
-            "    <dict>\n"
-            "      <key>Type</key><string>PSChildPaneSpecifier</string>\n"
-            "      <key>Title</key><string>Acknowledgements</string>\n"
-            "      <key>File</key><string>Acknowledgements</string>\n"
-            "    </dict>\n"
-            "  </array>\n"
-            "</dict>\n"
-            "</plist>\n")
-    file(WRITE "${_ios_settings_dir}/Acknowledgements.plist"
-            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-            "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-            "<plist version=\"1.0\">\n"
-            "<dict>\n"
-            "  <key>PreferenceSpecifiers</key>\n"
-            "  <array>\n"
-            "    <dict>\n"
-            "      <key>Type</key><string>PSGroupSpecifier</string>\n"
-            "      <key>Title</key><string>Third-Party Licenses</string>\n"
-            "      <key>FooterText</key><string>This app uses open source software. The full license texts ship in THIRD_PARTY_LICENSES.txt inside the app bundle.</string>\n"
-            "    </dict>\n"
-            "  </array>\n"
-            "</dict>\n"
-            "</plist>\n")
-
-    # Generate Assets.xcassets/AppIcon.appiconset + LaunchScreen.storyboard from the project's
-    # `icon=` / `splash_color=`. Configure-time so xcodebuild sees the files when it builds the
-    # target; rerunning configure rebuilds them. Skipped silently if the project has no icon=
-    # or ImageMagick is absent — the bundle then ships with no icon (Xcode warns) and the
-    # default black launch screen, which is fine for early bootstrap projects.
-    set(_ios_icons_root "${CMAKE_BINARY_DIR}/_octarine_ios_icons")
-    execute_process(
-            COMMAND "${CMAKE_COMMAND}"
-                    "-DOCTARINE_ICON_PROJECT=${PROJECT_DIR}"
-                    "-DOCTARINE_ICON_PLATFORM=ios"
-                    "-DOCTARINE_ICON_OUT_DIR=${_ios_icons_root}"
-                    -P "${_OCTARINE_ICON_SCRIPT}"
-            RESULT_VARIABLE _icon_rc)
-    if (NOT _icon_rc EQUAL 0)
-        message(FATAL_ERROR "octarine_package: iOS icon generation failed (rc=${_icon_rc})")
-    endif ()
-    set(_xcassets "${_ios_icons_root}/ios/Assets.xcassets")
-    set(_launchscreen "${_ios_icons_root}/ios/LaunchScreen.storyboard")
-    if (EXISTS "${_xcassets}" AND EXISTS "${_launchscreen}")
-        # xcassets gets compiled by actool, storyboard by ibtool — both kick in automatically
-        # when these land as target sources with MACOSX_PACKAGE_LOCATION=Resources. INFOPLIST_KEY_*
-        # flows through Xcode into the generated Info.plist (requires CMake 3.25+ for the
-        # property mode; we're on 3.20+ for the script and a newer build is required to
-        # generate Xcode projects, so this is safe).
-        target_sources(${TARGET} PRIVATE "${_xcassets}" "${_launchscreen}")
-        set_source_files_properties("${_xcassets}" "${_launchscreen}"
-                PROPERTIES MACOSX_PACKAGE_LOCATION Resources)
-        set_target_properties(${TARGET} PROPERTIES
-                XCODE_ATTRIBUTE_ASSETCATALOG_COMPILER_APPICON_NAME "AppIcon"
-                XCODE_ATTRIBUTE_INFOPLIST_KEY_CFBundleIconName "AppIcon"
-                XCODE_ATTRIBUTE_INFOPLIST_KEY_UILaunchStoryboardName "LaunchScreen")
-        message(STATUS "Octarine: iOS AppIcon + LaunchScreen wired (${_xcassets})")
-    else ()
-        message(STATUS "Octarine: iOS shipping with default icon/launchscreen (no `icon=` in project.ini "
-                        "or ImageMagick missing).")
-    endif ()
-
-    # Optional host-bake step. Cross-compiled binary can't run on the build host, so the bake
-    # needs a host-native OctarineEngine. Matches the Android `-Poctarine.bakeExe` contract.
-    if (DEFINED CACHE{OCTARINE_HOST_BAKE_EXE} AND OCTARINE_HOST_BAKE_EXE)
-        add_custom_command(TARGET ${TARGET} PRE_BUILD
-                COMMAND "${OCTARINE_HOST_BAKE_EXE}" "${_ios_staged}" -m bake
-                COMMENT "Octarine: baking asset manifest into staged project (iOS)"
-                VERBATIM)
-    else ()
-        if (NOT EXISTS "${_ios_staged}/asset_manifest.lua")
-            # Shipping iOS without a manifest produces a .app that dies at first scene load —
-            # OCTARINE_SHIPPED is forced ON above, so the catalog hits its manifest-load branch
-            # against a missing file. Fail at configure rather than letting the bad bundle
-            # reach install/TestFlight.
-            message(FATAL_ERROR "Octarine iOS: no asset_manifest.lua in project and OCTARINE_HOST_BAKE_EXE is unset. "
-                            "Either commit a baked manifest to ${PROJECT_DIR} or set "
-                            "-DOCTARINE_HOST_BAKE_EXE=<path/to/desktop/OctarineEngine>.")
-        endif ()
-    endif ()
-
-    # Copy staged project into the .app at the bundle root (where SDL_GetBasePath() points on
-    # iOS). $<TARGET_BUNDLE_DIR> resolves to .../<config>/<TARGET>.app for the Xcode generator.
-    add_custom_command(TARGET ${TARGET} POST_BUILD
-            COMMAND "${CMAKE_COMMAND}" -E copy_directory
-                    "${_ios_staged}"
-                    "$<TARGET_BUNDLE_DIR:${TARGET}>"
-            COMMENT "Octarine: staging project files into ${TARGET}.app"
-            VERBATIM)
-
-    message(STATUS "Octarine: iOS bundle '${PKG_NAME}' ${PKG_VERSION} id=${PKG_ID}")
-endfunction()
+# iOS bundle helper, orientation/permission Info.plist mappers, and Settings.bundle wiring are
+# parked on the defer/ios branch pending an Apple Developer account; see ai/iOSDeferralPlan.md.
 
 # Generate per-OS icon files (.ico/.icns/.png) under ${OUT_DIR}/desktop. Sets ${ICO_VAR},
 # ${ICNS_VAR}, ${PNG_VAR} in the caller's scope to the conventional output paths (callers test
@@ -608,8 +364,7 @@ function(octarine_package TARGET)
     message(STATUS "Octarine: packaging '${OP_NAME}' from project '${OP_PROJECT}' (OCTARINE_SHIPPED forced ON)")
 
     # ---- Project identity ---------------------------------------------------------------------
-    # Resolved up front so both the iOS bundle helper and the desktop CPack helper consume the
-    # same values. Precedence: CLI cache override > project.ini > default.
+    # Precedence: CLI cache override > project.ini > default.
     octarine_read_project_ini("${OP_PROJECT}" _pi)
     _octarine_resolve_identity(_pkg_name        "${OCTARINE_PACKAGE_NAME}"         "${_pi_name}"         "${OP_NAME}")
     _octarine_resolve_identity(_pkg_version     "${OCTARINE_PACKAGE_VERSION_NAME}" "${_pi_version_name}" "${PROJECT_VERSION}")
@@ -620,28 +375,14 @@ function(octarine_package TARGET)
     _octarine_validate_identity("${OP_PROJECT}" "${_pkg_name}" "${_pkg_id}" "${_pkg_version}" ON)
 
     # ---- Per-project platform knobs ------------------------------------------------------------
-    # Same CLI > project.ini > default precedence as identity. Empty = "use the platform's own
-    # default" (no override emitted). Consumed by the iOS bundle helper below; Android reads
-    # equivalent keys directly in android/app/build.gradle via identityProp.
-    _octarine_resolve_identity(_pkg_min_ios     "${OCTARINE_PACKAGE_MIN_IOS}"      "${_pi_min_ios}"      "")
+    # Same CLI > project.ini > default precedence as identity. Resolved here so the desktop branch
+    # (orientation/fullscreen reserved for downstream consumers) and the Android Gradle host
+    # (which reads project.ini directly via identityProp) stay in sync on key names. The iOS
+    # bundle helper that consumed min_ios/permissions/category is parked on defer/ios.
     _octarine_resolve_identity(_pkg_orientation "${OCTARINE_PACKAGE_ORIENTATION}"  "${_pi_orientation}"  "")
     _octarine_resolve_identity(_pkg_fullscreen  "${OCTARINE_PACKAGE_FULLSCREEN}"   "${_pi_fullscreen}"   "")
     _octarine_resolve_identity(_pkg_permissions "${OCTARINE_PACKAGE_PERMISSIONS}"  "${_pi_permissions}"  "")
     _octarine_resolve_identity(_pkg_category    "${OCTARINE_PACKAGE_CATEGORY}"     "${_pi_category}"     "")
-
-    # ---- iOS bundle ---------------------------------------------------------------------------
-    # iOS .app is a flat bundle: binary + Resources sit at the bundle root, reached by
-    # SDL_GetBasePath(). Bake is NOT invoked here: a cross-compiled iOS binary can't execute on
-    # the build host. The project must ship a baked asset_manifest.lua (the Android contract,
-    # see CLAUDE.md), or point OCTARINE_HOST_BAKE_EXE at a host-native build of OctarineEngine.
-    if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-        _octarine_setup_ios_bundle(${TARGET} "${OP_PROJECT}"
-                "${_pkg_name}" "${_pkg_id}" "${_pkg_version}" "${_pkg_version_code}"
-                "${_pkg_description}" "${_pkg_vendor}"
-                "${_pkg_min_ios}" "${_pkg_orientation}" "${_pkg_fullscreen}"
-                "${_pkg_permissions}" "${_pkg_category}")
-        return()
-    endif ()
 
     # ---- Desktop ------------------------------------------------------------------------------
     # macOS: a .app bundle; binary in Contents/MacOS, project files in Contents/Resources.

@@ -1,25 +1,23 @@
 # octarine-icons.cmake — single-source-of-truth icon/splash generator.
 #
 # Invoked from two callers via `cmake -P` (so Gradle and CMake share one implementation):
-#   • cmake/OctarinePackage.cmake (iOS + desktop install paths)
+#   • cmake/OctarinePackage.cmake (desktop install paths)
 #   • android/app/build.gradle    (Android pre-build res generation)
 #
 # Inputs (pass via -D...):
 #   OCTARINE_ICON_PROJECT   absolute path to the game project dir (contains project.ini)
-#   OCTARINE_ICON_PLATFORM  one of: android | ios | desktop
+#   OCTARINE_ICON_PLATFORM  one of: android | desktop
 #   OCTARINE_ICON_OUT_DIR   output root; per-platform layout written below it
 #   OCTARINE_ICON_DESKTOP_OS (desktop only) windows | macos | linux
 #
 # project.ini keys consumed:
 #   icon            path relative to project dir; should be a 1024×1024 PNG with safe padding
 #                   (Android adaptive icons crop the outer ~16% — reserve it in your art).
-#   splash_color    `#rrggbb` background for the iOS LaunchScreen and the Android 12+ splash.
-#                   Defaults to `#000000` when unset.
+#   splash_color    `#rrggbb` background for the Android 12+ splash. Defaults to `#000000`.
 #
 # Behavior on missing inputs (each is a non-fatal skip, so projects mid-bootstrap still build):
 #   • icon= absent           → status message, no files emitted (platform falls back to template
-#                              defaults: SDL green robot on Android, black launch screen on iOS,
-#                              CPack default icons on desktop).
+#                              defaults: SDL green robot on Android, CPack default icons on desktop).
 #   • magick/convert absent  → warning, no files emitted (same fallback path).
 #   • icon file missing      → fatal error (a typoed path is a misconfig, not a fallback).
 #
@@ -30,11 +28,9 @@
 #     mipmap-anydpi-v26/ic_launcher.xml
 #     values/octarine_icon_colors.xml
 #     values-v31/octarine_splash.xml           (overrides AppTheme w/ splash attrs on API 31+)
-#   ios/
-#     Assets.xcassets/Contents.json
-#     Assets.xcassets/AppIcon.appiconset/Contents.json + icon-*.png ladder
-#     LaunchScreen.storyboard                  (solid splash_color background)
 #   desktop/
+#     (iOS Assets.xcassets/AppIcon.appiconset + LaunchScreen.storyboard emitter is parked on
+#     defer/ios pending an Apple Developer account; see ai/iOSDeferralPlan.md.)
 #     octarine_icon.ico                        (Windows; multi-resolution embed)
 #     octarine_icon.icns                       (macOS; magick writes the .icns directly)
 #     octarine_icon.png                        (Linux; 256×256 PNG for .desktop)
@@ -89,7 +85,7 @@ if (NOT EXISTS "${_icon_src}")
     message(FATAL_ERROR "octarine-icons: icon `${_icon_rel}` from project.ini not found at ${_icon_src}")
 endif ()
 
-# Validate splash_color and split into 0..1 floats for storyboard color insertion. We use
+# Validate splash_color — Android XML consumes the `#rrggbb` literal directly. We use
 # string(REGEX MATCH) over `if(... MATCHES ...)` because CMake's `if(<var> MATCHES <re>)` mode
 # treats the rhs as needing the var to be a quoted string, but a literal-looking value like
 # "#112233" can be re-evaluated as a variable reference whose contents are then matched against
@@ -99,16 +95,6 @@ string(REGEX MATCH "^#[0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-9A-Fa-f][0-
 if (NOT _sc_match)
     message(FATAL_ERROR "octarine-icons: splash_color `${_splash_color}` must be #rrggbb")
 endif ()
-string(SUBSTRING "${_splash_color}" 1 2 _hex_r)
-string(SUBSTRING "${_splash_color}" 3 2 _hex_g)
-string(SUBSTRING "${_splash_color}" 5 2 _hex_b)
-math(EXPR _i_r "0x${_hex_r}")
-math(EXPR _i_g "0x${_hex_g}")
-math(EXPR _i_b "0x${_hex_b}")
-# CMake math() is integer-only; emit color floats as "N / 255" strings the storyboard XML can hold.
-set(_f_r "${_i_r}")
-set(_f_g "${_i_g}")
-set(_f_b "${_i_b}")
 
 # ---- ImageMagick locate -------------------------------------------------------------------------
 
@@ -208,122 +194,6 @@ if (OCTARINE_ICON_PLATFORM STREQUAL "android")
 ")
 
     message(STATUS "octarine-icons: android resources emitted under ${_root}")
-
-elseif (OCTARINE_ICON_PLATFORM STREQUAL "ios")
-    set(_root "${OCTARINE_ICON_OUT_DIR}/ios")
-    set(_xcassets "${_root}/Assets.xcassets")
-    set(_appicon "${_xcassets}/AppIcon.appiconset")
-    file(MAKE_DIRECTORY "${_appicon}")
-
-    # AppIcon ladder. App Store review requires the 1024 marketing icon; device sizes round out the
-    # ladder so a tap on a home screen, settings, spotlight, or notification picks the right asset.
-    # Format: idiom, scale, size_pt, px (size_pt*scale), filename.
-    set(_icons
-        "iphone 2x 20 40 icon-20@2x.png"
-        "iphone 3x 20 60 icon-20@3x.png"
-        "iphone 2x 29 58 icon-29@2x.png"
-        "iphone 3x 29 87 icon-29@3x.png"
-        "iphone 2x 40 80 icon-40@2x.png"
-        "iphone 3x 40 120 icon-40@3x.png"
-        "iphone 2x 60 120 icon-60@2x.png"
-        "iphone 3x 60 180 icon-60@3x.png"
-        "ipad 1x 20 20 icon-ipad-20.png"
-        "ipad 2x 20 40 icon-ipad-20@2x.png"
-        "ipad 1x 29 29 icon-ipad-29.png"
-        "ipad 2x 29 58 icon-ipad-29@2x.png"
-        "ipad 1x 40 40 icon-ipad-40.png"
-        "ipad 2x 40 80 icon-ipad-40@2x.png"
-        "ipad 1x 76 76 icon-ipad-76.png"
-        "ipad 2x 76 152 icon-ipad-76@2x.png"
-        "ipad 2x 83.5 167 icon-ipad-83.5@2x.png"
-        "ios-marketing 1x 1024 1024 icon-marketing.png")
-
-    set(_contents_imgs "")
-    foreach (_row IN LISTS _icons)
-        string(REPLACE " " ";" _parts "${_row}")
-        list(GET _parts 0 _idiom)
-        list(GET _parts 1 _scale)
-        list(GET _parts 2 _size_pt)
-        list(GET _parts 3 _size_px)
-        list(GET _parts 4 _fname)
-        _octarine_emit_png("${_appicon}/${_fname}" ${_size_px})
-        # Build Contents.json entry. Marketing icon uses platform=ios; the rest use idiom only.
-        if (_idiom STREQUAL "ios-marketing")
-            set(_entry "    {\n      \"idiom\" : \"${_idiom}\",\n      \"size\" : \"${_size_pt}x${_size_pt}\",\n      \"scale\" : \"${_scale}\",\n      \"filename\" : \"${_fname}\"\n    }")
-        else ()
-            set(_entry "    {\n      \"idiom\" : \"${_idiom}\",\n      \"size\" : \"${_size_pt}x${_size_pt}\",\n      \"scale\" : \"${_scale}\",\n      \"filename\" : \"${_fname}\"\n    }")
-        endif ()
-        list(APPEND _contents_imgs "${_entry}")
-    endforeach ()
-    string(REPLACE ";" ",\n" _images_block "${_contents_imgs}")
-    file(WRITE "${_appicon}/Contents.json"
-"{
-  \"images\" : [
-${_images_block}
-  ],
-  \"info\" : {
-    \"author\" : \"octarine\",
-    \"version\" : 1
-  }
-}
-")
-    file(WRITE "${_xcassets}/Contents.json"
-"{
-  \"info\" : {
-    \"author\" : \"octarine\",
-    \"version\" : 1
-  }
-}
-")
-
-    # LaunchScreen: solid splash_color background. Apple just needs a valid storyboard to suppress
-    # the default black launch flash; branding lives in the icon itself once the app draws.
-    # Storyboard colors are 0..1 floats — emit as `N / 255.0` strings (Xcode accepts arithmetic? no,
-    # needs floats). CMake has no float type, so format manually.
-    function(_int_to_float OUT IN)
-        # IN is 0..255; emit "x.yyy" string.
-        math(EXPR _whole "${IN} * 1000 / 255")
-        math(EXPR _w "${_whole} / 1000")
-        math(EXPR _f "${_whole} - (${_w} * 1000)")
-        # Zero-pad the fractional part to 3 digits so 0.05 doesn't round-trip as 0.5.
-        if (_f LESS 10)
-            set(_f "00${_f}")
-        elseif (_f LESS 100)
-            set(_f "0${_f}")
-        endif ()
-        set(${OUT} "${_w}.${_f}" PARENT_SCOPE)
-    endfunction()
-    _int_to_float(_fr ${_i_r})
-    _int_to_float(_fg ${_i_g})
-    _int_to_float(_fb ${_i_b})
-
-    file(WRITE "${_root}/LaunchScreen.storyboard"
-"<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<document type=\"com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB\" version=\"3.0\" toolsVersion=\"22155\" targetRuntime=\"iOS.CocoaTouch\" propertyAccessControl=\"none\" useAutolayout=\"YES\" launchScreen=\"YES\" useTraitCollections=\"YES\" useSafeAreas=\"YES\" colorMatched=\"YES\" initialViewController=\"01J-lp-oVM\">
-    <device id=\"retina6_1\" orientation=\"portrait\" appearance=\"light\"/>
-    <dependencies>
-        <plugIn identifier=\"com.apple.InterfaceBuilder.IBCocoaTouchPlugin\" version=\"22131\"/>
-        <capability name=\"Safe area layout guides\" minToolsVersion=\"9.0\"/>
-        <capability name=\"documents saved in the Xcode 8 format\" minToolsVersion=\"8.0\"/>
-    </dependencies>
-    <scenes>
-        <scene sceneID=\"EHf-IW-A2E\">
-            <objects>
-                <viewController id=\"01J-lp-oVM\" sceneMemberID=\"viewController\">
-                    <view key=\"view\" contentMode=\"scaleToFill\" id=\"Ze5-6b-2t3\">
-                        <rect key=\"frame\" x=\"0.0\" y=\"0.0\" width=\"375\" height=\"667\"/>
-                        <autoresizingMask key=\"autoresizingMask\" widthSizable=\"YES\" heightSizable=\"YES\"/>
-                        <viewLayoutGuide key=\"safeArea\" id=\"Bcu-3y-fUS\"/>
-                        <color key=\"backgroundColor\" red=\"${_fr}\" green=\"${_fg}\" blue=\"${_fb}\" alpha=\"1\" colorSpace=\"custom\" customColorSpace=\"sRGB\"/>
-                    </view>
-                </viewController>
-                <placeholder placeholderIdentifier=\"IBFirstResponder\" id=\"iYj-Kq-Ea1\" userLabel=\"First Responder\" sceneMemberID=\"firstResponder\"/>
-            </objects>
-        </scene>
-    </scenes>
-</document>
-")
-    message(STATUS "octarine-icons: iOS appiconset + LaunchScreen emitted under ${_root}")
 
 elseif (OCTARINE_ICON_PLATFORM STREQUAL "desktop")
     if (NOT DEFINED OCTARINE_ICON_DESKTOP_OS)

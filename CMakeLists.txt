@@ -35,8 +35,8 @@ option(OCTARINE_WITH_EDITOR "Build with the yellowish-purple editor environment"
 
 # Dev-vs-shipped asset-catalog gate. OFF (dev): the catalog always live-scans the asset dir, so a
 # stray asset_manifest.lua left beside source assets can't freeze the scan on a stale catalog. ON
-# (every packaged target — desktop package, Android, iOS): the catalog loads the baked manifest and
-# skips the filesystem walk, which is what lets it work inside a read-only APK/.app bundle. The
+# (every packaged target — desktop package, Android): the catalog loads the baked manifest and
+# skips the filesystem walk, which is what lets it work inside a read-only APK bundle. The
 # packaging path (octarine_package / CPack) forces this ON; a packaged build that leaves it OFF would
 # try to scan a read-only FS and fail at launch.
 option(OCTARINE_SHIPPED "Build a shipped artifact: load the baked asset manifest instead of scanning" OFF)
@@ -52,7 +52,7 @@ set(OCTARINE_PACKAGE_PROJECT "" CACHE PATH "Game project dir to bundle into a pa
 # APK, so this is always a shipping config (manifest-load, no scan) with the desktop-only editor/ImGui
 # compiled out. Forced here, before the editor-forces-ImGui rule below.
 #
-# Semantically equivalent to the `ship-release` CMake preset (desktop/iOS shipping config). AGP can't
+# Semantically equivalent to the `ship-release` CMake preset (desktop shipping config). AGP can't
 # consume `cmake --preset`, so Android reaches the same OCTARINE_SHIPPED=ON + editor/ImGui-off state
 # through this branch instead of the preset. Keep the two in sync if either set of forced flags changes.
 if (ANDROID)
@@ -61,15 +61,8 @@ if (ANDROID)
     set(OCTARINE_SHIPPED ON CACHE BOOL "Forced ON on Android (manifest-load, no FS scan)" FORCE)
 endif ()
 
-# iOS target. CMAKE_SYSTEM_NAME=iOS (set by --preset ship-ios-* or by `-DCMAKE_SYSTEM_NAME=iOS`)
-# triggers the cross-compile to a .app bundle. Same shipping rationale as Android: the bundle is a
-# read-only FS, so we manifest-load with editor/ImGui compiled out. Forced here so a misconfigured
-# preset can't silently produce a non-shippable iOS binary.
-if (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    set(OCTARINE_WITH_EDITOR OFF CACHE BOOL "Disabled on iOS" FORCE)
-    set(OCTARINE_WITH_IMGUI OFF CACHE BOOL "Disabled on iOS" FORCE)
-    set(OCTARINE_SHIPPED ON CACHE BOOL "Forced ON on iOS (manifest-load, no FS scan)" FORCE)
-endif ()
+# iOS build target is parked on the defer/ios branch pending an Apple Developer account; see
+# ai/iOSDeferralPlan.md.
 
 if (OCTARINE_WITH_EDITOR)
     set(OCTARINE_WITH_IMGUI ON CACHE BOOL "Forced ON by Editor" FORCE)
@@ -138,14 +131,11 @@ if (OCTARINE_WITH_IMGUI)
 endif ()
 
 # Create the engine target. On Android, SDLActivity dlopens libmain.so and jumps to SDL_main, so the
-# engine must be that shared lib (OUTPUT_NAME main → libmain.so). On iOS, the binary must be a .app
-# bundle (MACOSX_BUNDLE) so Xcode signs/installs it as an app and SDL_GetBasePath() resolves the
-# bundle root. Everywhere else it is a plain executable.
+# engine must be that shared lib (OUTPUT_NAME main → libmain.so). Everywhere else it is a plain
+# executable.
 if (ANDROID)
     add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
     set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME main)
-elseif (CMAKE_SYSTEM_NAME STREQUAL "iOS")
-    add_executable(${PROJECT_NAME} MACOSX_BUNDLE ${SRC_FILES})
 else ()
     add_executable(${PROJECT_NAME} ${SRC_FILES})
 endif ()
@@ -246,9 +236,7 @@ if (NOT OCTARINE_PACKAGE_PROJECT AND NOT ANDROID)
 endif ()
 
 # Packaging: wire the deliverable layout when a project dir is supplied. Android packages via Gradle
-# (see android/) so the helper is skipped there entirely. iOS goes through the helper to get the
-# .app bundle wiring (Resources staging, Info.plist from project.ini) but skips the CPack invocation
-# at the bottom — `.ipa` production is xcodebuild's job, not CPack's.
+# (see android/) so the helper is skipped there entirely.
 if (OCTARINE_PACKAGE_PROJECT AND NOT ANDROID)
     include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/OctarinePackage.cmake)
     octarine_package(${PROJECT_NAME} PROJECT "${OCTARINE_PACKAGE_PROJECT}" NAME "${PROJECT_NAME}")
@@ -285,7 +273,7 @@ else ()
             -Wconversion
             -Wfatal-errors
     )
-    if (ANDROID OR CMAKE_SYSTEM_NAME STREQUAL "iOS")
+    if (ANDROID)
         # Cross-compile: -march=native would target the build host, not the device. -Werror is dropped
         # because device-arch-specific warnings can't be observed/cleared from a desktop checkout.
         target_compile_options(${PROJECT_NAME} PRIVATE
