@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780164745086,
+  "lastUpdate": 1780168484568,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -4896,6 +4896,114 @@ window.BENCHMARK_DATA = {
             "value": 634877.1371478105,
             "unit": "ns/iter",
             "extra": "iterations: 1109\ncpu: 634767.5879170509 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fee102f860e681cf04d71beead0335c072dbe27c",
+          "message": "Promote AssetCatalog manifest-load logs to warn level (#57)\n\nTwo bootstrap signals from shipped builds were being suppressed by the\ndefault warn-level log: \"baked manifest found, loading\" and \"loaded N\nentries from manifest\". On Android the warn-level default (forced by\nthe `if (ANDROID)` block in CMakeLists.txt, per BuildConfigUnificationPlan\nphase 3) meant neither line ever reached logcat, so:\n\n- The android-emulator gate's grep for \"AssetCatalog: loaded .* entries\n  from manifest\" couldn't ever match — the gate failed silently against a\n  presumably-loading catalog.\n- On-device support repros had no visibility into whether the shipped\n  binary loaded its baked manifest or fell through somewhere.\n\nThese are single-line-per-launch startup-confirmation signals, not noise\n— same justification we'd give to a \"Server started on port X\" warn log.\nLift both to Warn so they survive the shipped log level.\n\nDiagnostic step toward closing the android-emulator runtime smoke gate;\nif the gate still red-fails after this, the warn output will surface the\nactual root cause.",
+          "timestamp": "2026-05-30T13:08:14-06:00",
+          "tree_id": "4eb299a9d20d5d34486893a97f89bdb9cf6f58c2",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/fee102f860e681cf04d71beead0335c072dbe27c"
+        },
+        "date": 1780168475792,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4056.1470389000106,
+            "unit": "ns/iter",
+            "extra": "iterations: 170976\ncpu: 4074.2104622872125 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16256.594697771112,
+            "unit": "ns/iter",
+            "extra": "iterations: 44173\ncpu: 16287.484798407286 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 106131.99300957337,
+            "unit": "ns/iter",
+            "extra": "iterations: 6635\ncpu: 106178.28605877826 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 840741.3758319414,
+            "unit": "ns/iter",
+            "extra": "iterations: 824\ncpu: 840826.8822815347 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1683917.3031834567,
+            "unit": "ns/iter",
+            "extra": "iterations: 410\ncpu: 1683952.5878048993 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2341.799193320125,
+            "unit": "ns/iter",
+            "extra": "iterations: 300545\ncpu: 2329.8141276684264 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10026.720558424362,
+            "unit": "ns/iter",
+            "extra": "iterations: 69666\ncpu: 10013.645092295288 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 102175.79029146748,
+            "unit": "ns/iter",
+            "extra": "iterations: 6740\ncpu: 102163.13442134335 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 411226.8216305698,
+            "unit": "ns/iter",
+            "extra": "iterations: 1769\ncpu: 411181.64217074227 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2184.679350618922,
+            "unit": "ns/iter",
+            "extra": "iterations: 328466\ncpu: 2131.369526829024 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6526.25404720617,
+            "unit": "ns/iter",
+            "extra": "iterations: 108977\ncpu: 6463.812162205643 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41666.27932900644,
+            "unit": "ns/iter",
+            "extra": "iterations: 16775\ncpu: 41599.501162453205 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 319325.6650724167,
+            "unit": "ns/iter",
+            "extra": "iterations: 2189\ncpu: 319182.0406578165 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 655946.1627791567,
+            "unit": "ns/iter",
+            "extra": "iterations: 1066\ncpu: 655805.6660412208 ns\nthreads: 1"
           }
         ]
       }
