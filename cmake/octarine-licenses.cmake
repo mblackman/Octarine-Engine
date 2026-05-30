@@ -26,23 +26,94 @@ set(_OCTARINE_LICENSES_INCLUDED ON)
 
 set(_OCTARINE_LICENSES_SCRIPT_DIR "${CMAKE_CURRENT_LIST_DIR}")
 
-# Default required-port list. Matches the engine's vcpkg.json dep tree (transitively pulls
-# libpng + libjpeg-turbo + zlib via sdl3-image and freetype). harfbuzz/libogg/libvorbis are
-# optional sdl3-ttf / sdl3-mixer features the engine doesn't currently use — not required.
-set(_OCTARINE_LICENSES_DEFAULT_REQUIRED
-        freetype
-        glm
-        imgui
-        libjpeg-turbo
-        libpng
-        lua
-        sdl3
-        sdl3-image
-        sdl3-mixer
-        sdl3-ttf
-        sol2
-        spdlog
-        zlib)
+# Ports listed in vcpkg.json that are NOT linked into shipped binaries. Removed from the
+# vcpkg-driven required list so the gate doesn't fire on deps the user never receives.
+#   - benchmark: consumed only by the OctarineLuaApiTest target.
+set(_OCTARINE_LICENSES_SKIP_REQUIRED
+        benchmark)
+
+# Parse the engine's vcpkg.json manifest at configure time and derive the required-port list
+# from its top-level `dependencies[]`. Each top-level dep is a port the engine asks vcpkg to
+# install, which means its copyright text must be present in the share dir or we have a
+# misconfigured triplet. Drops the need for a hard-coded list that drifts every time
+# vcpkg.json gains or loses a dep.
+#
+# Behavior:
+#   - Reads <engine_root>/vcpkg.json.
+#   - Iterates `dependencies[].name`, lowercases, dedupes (sdl3 appears twice — once base,
+#     once linux-platform-gated).
+#   - Drops names in _OCTARINE_LICENSES_SKIP_REQUIRED (test-only / unshipped ports).
+#   - If a top-level `features.<feat>.dependencies[]` is added later, recurses into it only
+#     when OCTARINE_WITH_<FEAT> evaluates truthy. Today vcpkg.json declares no top-level
+#     features so this loop is a no-op — wired ahead of time to stay drift-free.
+#
+# Sets <OUT_VAR> in PARENT_SCOPE.
+function(_octarine_licenses_required_from_vcpkg OUT_VAR ENGINE_ROOT)
+    set(_manifest "${ENGINE_ROOT}/vcpkg.json")
+    if (NOT EXISTS "${_manifest}")
+        message(FATAL_ERROR "octarine_collect_licenses: vcpkg.json not found at ${_manifest}; "
+                "cannot derive required-port whitelist.")
+    endif ()
+
+    file(READ "${_manifest}" _manifest_json)
+
+    set(_required "")
+
+    # Top-level dependencies[].
+    string(JSON _dep_count ERROR_VARIABLE _err LENGTH "${_manifest_json}" dependencies)
+    if (_err)
+        message(FATAL_ERROR "octarine_collect_licenses: failed to parse vcpkg.json dependencies: ${_err}")
+    endif ()
+    if (_dep_count GREATER 0)
+        math(EXPR _last "${_dep_count} - 1")
+        foreach (_i RANGE 0 ${_last})
+            string(JSON _name GET "${_manifest_json}" dependencies ${_i} name)
+            string(TOLOWER "${_name}" _name_lc)
+            list(APPEND _required "${_name_lc}")
+        endforeach ()
+    endif ()
+
+    # Optional top-level features.<feat>.dependencies[], gated on OCTARINE_WITH_<FEAT>.
+    string(JSON _features_type ERROR_VARIABLE _ftype_err TYPE "${_manifest_json}" features)
+    if (NOT _ftype_err AND _features_type STREQUAL "OBJECT")
+        string(JSON _feat_count LENGTH "${_manifest_json}" features)
+        if (_feat_count GREATER 0)
+            math(EXPR _flast "${_feat_count} - 1")
+            foreach (_fi RANGE 0 ${_flast})
+                string(JSON _feat_name MEMBER "${_manifest_json}" features ${_fi})
+                string(TOUPPER "${_feat_name}" _feat_uc)
+                if (NOT OCTARINE_WITH_${_feat_uc})
+                    continue()
+                endif ()
+                string(JSON _fdep_type ERROR_VARIABLE _fdt_err TYPE
+                        "${_manifest_json}" features "${_feat_name}" dependencies)
+                if (_fdt_err OR NOT _fdep_type STREQUAL "ARRAY")
+                    continue()
+                endif ()
+                string(JSON _fdep_count LENGTH "${_manifest_json}" features "${_feat_name}" dependencies)
+                if (_fdep_count EQUAL 0)
+                    continue()
+                endif ()
+                math(EXPR _fdlast "${_fdep_count} - 1")
+                foreach (_fdi RANGE 0 ${_fdlast})
+                    string(JSON _fdname GET "${_manifest_json}"
+                            features "${_feat_name}" dependencies ${_fdi} name)
+                    string(TOLOWER "${_fdname}" _fdname_lc)
+                    list(APPEND _required "${_fdname_lc}")
+                endforeach ()
+            endforeach ()
+        endif ()
+    endif ()
+
+    list(REMOVE_DUPLICATES _required)
+    foreach (_skip IN LISTS _OCTARINE_LICENSES_SKIP_REQUIRED)
+        string(TOLOWER "${_skip}" _skip_lc)
+        list(REMOVE_ITEM _required "${_skip_lc}")
+    endforeach ()
+    list(SORT _required)
+
+    set(${OUT_VAR} "${_required}" PARENT_SCOPE)
+endfunction()
 
 # Section heading written as a horizontal-rule sandwich, ASCII-only so any text viewer renders it.
 function(_octarine_licenses_append_section OUT_FILE TITLE BODY_FILE)
@@ -81,7 +152,7 @@ function(octarine_collect_licenses OUT_FILE)
         get_filename_component(OCL_ENGINE_ROOT "${_OCTARINE_LICENSES_SCRIPT_DIR}/.." ABSOLUTE)
     endif ()
     if (NOT OCL_REQUIRED_PORTS)
-        set(OCL_REQUIRED_PORTS ${_OCTARINE_LICENSES_DEFAULT_REQUIRED})
+        _octarine_licenses_required_from_vcpkg(OCL_REQUIRED_PORTS "${OCL_ENGINE_ROOT}")
     endif ()
 
     if (NOT OCL_TRIPLET)
