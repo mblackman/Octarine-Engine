@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780176646223,
+  "lastUpdate": 1780179442742,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -5544,6 +5544,114 @@ window.BENCHMARK_DATA = {
             "value": 653964.0440969109,
             "unit": "ns/iter",
             "extra": "iterations: 1076\ncpu: 653755.7118959631 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2349714f4dc42f9c6fb119e7617d8164982a7ae7",
+          "message": "Add C++ project.ini reader for editor surfaces (#64)\n\nThird corner alongside the CMake parser (octarine_read_project_ini) and\nthe Gradle parser (java.util.Properties in android/app/build.gradle).\nMirrors the same flat key=value schema and the shipping-build identity\nvalidation rules: required name/version_name/package_id with reverse-DNS\nregex on package_id. Editor uses it to surface project identity in\npanels and to fail fast before Export Build spawns a packaging script.\n\nOctarineProjectIniTest registered with ctest covers parsing tolerance\n(comments, malformed lines, unknown keys preserved) and validation\npositives + negatives.",
+          "timestamp": "2026-05-30T15:48:29-06:00",
+          "tree_id": "14555b9f3d30b3862467a5fd352e0d1037deb5b7",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/2349714f4dc42f9c6fb119e7617d8164982a7ae7"
+        },
+        "date": 1780179433960,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4081.8124283623033,
+            "unit": "ns/iter",
+            "extra": "iterations: 169721\ncpu: 4122.362948603803 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16364.480858568959,
+            "unit": "ns/iter",
+            "extra": "iterations: 42193\ncpu: 16411.96020666805 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 108107.64478969522,
+            "unit": "ns/iter",
+            "extra": "iterations: 6437\ncpu: 108177.23147428979 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 856627.307613909,
+            "unit": "ns/iter",
+            "extra": "iterations: 819\ncpu: 856772.9633699592 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1716986.4355202983,
+            "unit": "ns/iter",
+            "extra": "iterations: 408\ncpu: 1717023.3382352781 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2344.071057030712,
+            "unit": "ns/iter",
+            "extra": "iterations: 299996\ncpu: 2334.440012533385 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10039.5136332942,
+            "unit": "ns/iter",
+            "extra": "iterations: 70069\ncpu: 10031.407241431845 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 85073.7238037576,
+            "unit": "ns/iter",
+            "extra": "iterations: 8223\ncpu: 85065.59370060352 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 404996.2615836476,
+            "unit": "ns/iter",
+            "extra": "iterations: 1738\ncpu: 404905.7531645928 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2229.838829730052,
+            "unit": "ns/iter",
+            "extra": "iterations: 315749\ncpu: 2193.7775004815876 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6844.5327994924455,
+            "unit": "ns/iter",
+            "extra": "iterations: 102335\ncpu: 6799.047823323263 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 43789.28880178772,
+            "unit": "ns/iter",
+            "extra": "iterations: 16030\ncpu: 43740.39887712508 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 338176.3916018788,
+            "unit": "ns/iter",
+            "extra": "iterations: 2073\ncpu: 338064.349734673 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 675920.5423941502,
+            "unit": "ns/iter",
+            "extra": "iterations: 1038\ncpu: 675847.0105972744 ns\nthreads: 1"
           }
         ]
       }
