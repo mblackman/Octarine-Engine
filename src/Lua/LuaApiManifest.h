@@ -24,4 +24,14 @@ namespace LuaApiManifest
     // Value is the output path; the literal "1" maps to "lua_api.lua" in the working directory.
     // No-op (returns false) when the var is unset. Called from Game::Setup.
     bool MaybeDumpFromEnv(sol::state& lua, const std::unordered_set<std::string>& before);
+
+    // Emit a machine-readable JSON index of every component registered with LuaComponentRegistry:
+    // lua_key, usertype name, and accessor function names exposed on the `registry` table. Agents
+    // grep this instead of crawling src/Lua/Bindings/. Returns false if the file cannot be opened.
+    bool WriteComponentsJson(const std::string& outPath);
+
+    // Emit a machine-readable JSON index of every Lua free-function module registered with
+    // LuaModuleRegistry: module name + the globals it installed into sol::state. Returns false
+    // if the file cannot be opened.
+    bool WriteModulesJson(const std::string& outPath);
 } // namespace LuaApiManifest

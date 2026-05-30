@@ -26,6 +26,7 @@
 #include "Lua/Bindings/LuaSystemRegistry.h"
 #include "Lua/Bindings/RegisterAllBindings.h"
 #include "Lua/LuaApiManifest.h"
+#include "Lua/Modules/LuaModuleRegistry.h"
 #include "Lua/Modules/RegisterAllModules.h"
 #include "Systems/InputSystem.h"
 #include "Systems/ScriptSystem.h"
@@ -79,7 +80,21 @@ int main()
     ScriptSystem scriptSystem;
     scriptSystem.CreateLuaBindings(lua); // primitives + component usertypes
 
-    RegisterAllLuaModules(lua, game); // free-function globals + the `registry` accessor table
+    // Install modules one at a time, snapshotting globals around each call so LuaModuleRegistry
+    // ends up with an exact "what globals did each module install" record — fed to modules.json.
+    LuaModuleRegistry::clear();
+    for (const auto& m : kLuaModules)
+    {
+        const auto before = LuaApiManifest::SnapshotGlobals(lua);
+        m.install(lua, game);
+        const auto after = LuaApiManifest::SnapshotGlobals(lua);
+        std::vector<std::string> added;
+        for (const auto& name : after)
+        {
+            if (before.find(name) == before.end()) added.push_back(name);
+        }
+        LuaModuleRegistry::registerModule(m.name, std::move(added));
+    }
 
     InputSystem inputSystem;
     LuaSystemRegistry::clear();
@@ -122,15 +137,13 @@ int main()
     }
 #endif
 
-    std::cout << "[modules] one sentinel global per module\n";
-    // If a module is dropped from RegisterAllModules.cpp, its sentinel disappears and this fails.
-    const std::vector<std::pair<std::string, std::string>> moduleSentinels = {
-        {"Log", "log"},     {"Io", "read_file_lines"}, {"Assets", "get_asset_path"}, {"Audio", "play_sound"},
-        {"Entity", "blam"}, {"Scene", "load_scene"},   {"Game", "fire_projectile"},
-    };
-    for (const auto& [module, global] : moduleSentinels)
+    std::cout << "[modules] each module installs at least one global\n";
+    // If a module's install body becomes empty (or was removed), its captured global list is empty
+    // and this fails. Catches "dropped from RegisterAllModules.cpp" without naming sentinels by hand.
+    Check(!LuaModuleRegistry::all().empty(), "module registry is non-empty");
+    for (const auto& m : LuaModuleRegistry::all())
     {
-        Check(IsFunction(lua, global), module + "Module installed (" + global + ")");
+        Check(!m.globals.empty(), m.name + "Module installed at least one global");
     }
 
     std::cout << "[primitives + systems]\n";
@@ -146,6 +159,13 @@ int main()
     const std::string smokeOutPath = "lua_api.smoke.lua";
 #endif
     Check(LuaApiManifest::Write(lua, preBinding, smokeOutPath), "manifest written");
+
+#ifdef LUA_API_COMPONENTS_OUTPUT
+    Check(LuaApiManifest::WriteComponentsJson(LUA_API_COMPONENTS_OUTPUT), "components.json written");
+#endif
+#ifdef LUA_API_MODULES_OUTPUT
+    Check(LuaApiManifest::WriteModulesJson(LUA_API_MODULES_OUTPUT), "modules.json written");
+#endif
 
     if (g_failures == 0)
     {

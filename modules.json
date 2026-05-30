@@ -1,0 +1,40 @@
+{
+  "_generated_by": "OctarineLuaApiTest via LuaApiManifest::WriteModulesJson",
+  "modules": [
+    {
+      "name": "Log",
+      "binding_header": "src/Lua/Modules/LogModuleLuaBinding.h",
+      "globals": ["log", "log_e", "log_i", "log_w"]
+    },
+    {
+      "name": "Io",
+      "binding_header": "src/Lua/Modules/IoModuleLuaBinding.h",
+      "globals": ["read_file_lines"]
+    },
+    {
+      "name": "Assets",
+      "binding_header": "src/Lua/Modules/AssetsModuleLuaBinding.h",
+      "globals": ["get_asset_path"]
+    },
+    {
+      "name": "Audio",
+      "binding_header": "src/Lua/Modules/AudioModuleLuaBinding.h",
+      "globals": ["play_sound"]
+    },
+    {
+      "name": "Entity",
+      "binding_header": "src/Lua/Modules/EntityModuleLuaBinding.h",
+      "globals": ["blam", "find_entity_by_name", "get_name", "get_position", "registry", "set_name", "set_position", "set_sprite_src_rect"]
+    },
+    {
+      "name": "Scene",
+      "binding_header": "src/Lua/Modules/SceneModuleLuaBinding.h",
+      "globals": ["acquire_scene_assets", "clear_scene", "load_asset", "load_entity", "load_scene", "reload_scene", "stop_scene"]
+    },
+    {
+      "name": "Game",
+      "binding_header": "src/Lua/Modules/GameModuleLuaBinding.h",
+      "globals": ["fire_projectile", "get_camera_position", "get_game_map_dimensions", "quit_game", "set_game_map_dimensions"]
+    }
+  ]
+}
