@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780180498837,
+  "lastUpdate": 1780180930236,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -5760,6 +5760,114 @@ window.BENCHMARK_DATA = {
             "value": 634648.1456231336,
             "unit": "ns/iter",
             "extra": "iterations: 1103\ncpu: 634459.6174070477 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d3546fffc9de482108fb00442ee03e1b7495cecd",
+          "message": "Replace ImageMagick icon pipeline with vendored stb host tool (#65)\n\n* Replace ImageMagick icon pipeline with vendored stb-based host tool\n\noctarine-icons.cmake no longer shells out to magick/convert for icon resize +\n.ico encoding. Replaces it with scripts/octarine-icon-tool — a tiny standalone\nC++17 host exe built from vendored stb single-headers (stb_image.h,\nstb_image_write.h, stb_image_resize2.h under libs/stb/).\n\noctarine-icons.cmake configures + builds the tool on demand under\nOCTARINE_ICON_OUT_DIR/_octarine_icon_tool_build/, then execs it for each\nPNG resize and the Windows multi-resolution .ico. Single -P invocation\namortizes the configure + compile across android+desktop emits.\n\nmacOS .icns generation switches from a single-image magick output to\niconutil over a fully staged iconset (icon_16x16 through icon_512x512@2x),\nmatching Apple's recommended ladder for crisp Finder thumbnails at every\ndensity. iconutil is the only remaining external dep on the macOS path,\nships with Xcode command-line tools.\n\nCI cleanup: drops the imagemagick apt entry from\n.github/actions/linux-build-deps and the brew install imagemagick step from\npackage.yml's macOS leg. Both are now dead weight. Windows CI never needed\nit (Chocolatey ships magick on the runner image, but we no longer call it).\n\nDocs: device-builds.md + android/README.md + the gradle task comments now\ndescribe the C++17-host requirement and iconutil dep instead of pointing\ncontributors at the legacy ImageMagick install. The legacy fallback path\n(no magick on PATH -> skip-warn) is gone — the tool is always available.\n\nVerified locally against Octarine-Engine-Example:\n  - android leg emits the full mipmap-{m,h,xh,xxh,xxxh}dpi ladder for both\n    ic_launcher.png + ic_launcher_foreground.png at correct dimensions.\n  - desktop windows leg emits a valid 6-entry octarine_icon.ico\n    (256/128/64/48/32/16) — verified via `file`.\n  - desktop linux leg emits the 256x256 PNG.\n  - macOS path requires iconutil; left for CI macOS leg to validate.\n\nstb headers vendored at SHA 31c1ad37456438565541f4919958214b6e762fb4 with\nLICENSE + VENDORED.txt recording the pin. libs/stb/LICENSE rides along\nthrough cmake/octarine-licenses.cmake's libs/*/LICENSE* glob.\n\n* Drop committed Android mipmap PNGs (now generated from project.ini icon=)\n\nBefore this branch the icon generator could not run on the Android CI leg\n(ImageMagick wasn't installed), so the committed app/src/main/res/mipmap-*/\nic_launcher.png files were the de-facto shipping launcher icons. With the\nstb-based host tool always available, generateOctarineIcons now emits the same\nmipmap ladder under build/generated/octarineIcons/res, which AGP's resource\nmerger flags as duplicates of the committed set.\n\nDelete the committed PNGs so the generator's output is the single source of\ntruth. Bootstrap projects without `icon=` in project.ini will now hit a clear\nAAPT2 \"@mipmap/ic_launcher unresolved\" error — actionable, and a follow-up\nwill teach the scaffolder to drop a default icon.",
+          "timestamp": "2026-05-30T16:04:44-06:00",
+          "tree_id": "f203b24b9e32b32000819a9eb20e97110bcba2ab",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/d3546fffc9de482108fb00442ee03e1b7495cecd"
+        },
+        "date": 1780180921454,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4064.6089165819662,
+            "unit": "ns/iter",
+            "extra": "iterations: 168903\ncpu: 4111.251866455767 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16301.605209954083,
+            "unit": "ns/iter",
+            "extra": "iterations: 43697\ncpu: 16356.871043779114 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 111441.19500997275,
+            "unit": "ns/iter",
+            "extra": "iterations: 6389\ncpu: 111478.65644075729 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 859410.479814375,
+            "unit": "ns/iter",
+            "extra": "iterations: 797\ncpu: 859543.4604767899 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1736053.3182612215,
+            "unit": "ns/iter",
+            "extra": "iterations: 407\ncpu: 1736076.103194107 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2264.8426295396553,
+            "unit": "ns/iter",
+            "extra": "iterations: 308674\ncpu: 2254.107381897676 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10147.175433526545,
+            "unit": "ns/iter",
+            "extra": "iterations: 68905\ncpu: 10138.649865752299 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 74383.06154912879,
+            "unit": "ns/iter",
+            "extra": "iterations: 8703\ncpu: 74352.28852118601 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 397945.3434464383,
+            "unit": "ns/iter",
+            "extra": "iterations: 1748\ncpu: 397927.59324944444 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2174.8106988821232,
+            "unit": "ns/iter",
+            "extra": "iterations: 320604\ncpu: 2145.9613136422663 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6551.166112253203,
+            "unit": "ns/iter",
+            "extra": "iterations: 107776\ncpu: 6516.920845083272 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 40915.82192079581,
+            "unit": "ns/iter",
+            "extra": "iterations: 17020\ncpu: 40882.415217408474 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 317025.8351217479,
+            "unit": "ns/iter",
+            "extra": "iterations: 2206\ncpu: 316929.560743443 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 648375.6409225051,
+            "unit": "ns/iter",
+            "extra": "iterations: 1108\ncpu: 648254.480144347 ns\nthreads: 1"
           }
         ]
       }
