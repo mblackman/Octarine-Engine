@@ -77,7 +77,11 @@ class AssetManager {
   [[nodiscard]] SDL_Texture* GetTexture(const std::string& assetId) const;
   void AddFont(const std::string& assetId, const std::string& path, float fontSize);
   [[nodiscard]] TTF_Font* GetFont(const std::string& assetId) const;
-  void AddAudioClip(MIX_Mixer* mixer, const std::string& assetId, const std::string& path);
+  // `stream` plumbs the catalog's `meta.stream` flag into SDL_mixer's predecode toggle: false for
+  // SFX (eager decode = predictable play latency), true for long music + ambient beds (lazy decode
+  // = decode-as-played, keeps the loading footprint flat at the cost of a touch more per-play cost).
+  void AddAudioClip(MIX_Mixer* mixer, const std::string& assetId, const std::string& path,
+                    bool stream = false);
   [[nodiscard]] MIX_Audio* GetAudioClip(const std::string& assetId) const;
   [[nodiscard]] std::string GetFullPath(const std::string& relativePath) const;
   void SetDefaultScaleMode(const std::string& scaleMode);

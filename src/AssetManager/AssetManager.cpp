@@ -101,7 +101,7 @@ bool AssetManager::LoadFromCatalog(const CatalogEntry &entry, const std::string 
         Logger::Info("AssetManager::Acquire: audio disabled, skipping clip: " + assetId);
         return false;
       }
-      AddAudioClip(mixer, assetId, entry.fullPath);
+      AddAudioClip(mixer, assetId, entry.fullPath, entry.stream);
       return audio_clips_.contains(assetId);
   }
   return false;
@@ -247,7 +247,8 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
   Logger::Info("Added font: " + assetId + " from path: " + fullPath);
 }
 
-void AssetManager::AddAudioClip(MIX_Mixer *mixer, const std::string &assetId, const std::string &path) {
+void AssetManager::AddAudioClip(MIX_Mixer *mixer, const std::string &assetId, const std::string &path,
+                                const bool stream) {
   if (!mixer) {
     Logger::Error("AddAudioClip called with null mixer for: " + assetId);
     return;
@@ -259,7 +260,10 @@ void AssetManager::AddAudioClip(MIX_Mixer *mixer, const std::string &assetId, co
     Logger::Error("Failed to open audio file " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;
   }
-  MIX_Audio *clip = MIX_LoadAudio_IO(mixer, io, true, true);  // predecode + closes the stream
+  // predecode=true is the default for short SFX — full PCM in RAM at load time, lowest play-call
+  // latency. predecode=false (meta.stream=true on the source) keeps the file compressed and
+  // decodes on demand; pays back as flat memory for long-form music + ambient beds.
+  MIX_Audio *clip = MIX_LoadAudio_IO(mixer, io, !stream, true);  // closes the stream regardless
   if (!clip) {
     Logger::Error("Failed to load audio clip " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;
