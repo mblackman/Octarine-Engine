@@ -151,6 +151,27 @@ jobs:
           done
           echo "PASS: AAB carries libmain.so for every ABI"
 
+      # SDL JNI bridge depends on libmain.so exporting Java_org_libsdl_app_* symbols (the C side
+      # calls RegisterNatives against them at SDL_main). A regression in the build config or NDK
+      # toolchain that strips them would ship a binary that crashes at SDL init; assert presence
+      # here so the failure lands in CI, not on a user's device. Probe arm64-v8a only — the same
+      # CMake invocation produces every ABI's libmain.so, so one slice covers the regression.
+      - name: Verify libmain.so retains SDL JNI exports
+        run: |
+          set -e
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          tmp=$(mktemp -d)
+          unzip -p "$aab" base/lib/arm64-v8a/libmain.so > "$tmp/libmain.so"
+          nm="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          count=$("$nm" --defined-only --extern-only "$tmp/libmain.so" | grep -c ' T Java_org_libsdl_app_' || true)
+          echo "Java_org_libsdl_app_* symbol count: $count"
+          if [ "$count" -lt 20 ]; then
+            echo "FAIL: SDL JNI symbol count ($count) suspiciously low — expected >=20"
+            "$nm" --defined-only --extern-only "$tmp/libmain.so" | grep ' T Java_' || true
+            exit 1
+          fi
+          echo "PASS: $count SDL JNI exports present in libmain.so"
+
       # Third-party license attribution must ship inside base/assets/. Multi-ABI mode wires the
       # aggregator off the first ABI's configure task, so the file lives once at base/assets/
       # regardless of how many ABIs the AAB carries.
@@ -170,9 +191,133 @@ jobs:
           done
           echo "PASS: AAB license aggregate covers all canonical ports."
 
+      # Once the example project declares `icon=` in project.ini, every shipped mipmap must diverge
+      # from the SDL green-robot template. The verifier skips when icon= is unset (legitimate
+      # fallback path); once the example commits a real icon, this becomes a regression gate.
+      - name: Verify AAB ships project icon (not SDL template)
+        run: |
+          bash scripts/verify-icons.sh \
+            --project "$GITHUB_WORKSPACE/example_repo" \
+            --aab android/app/build/outputs/bundle/release/app-release.aab
+
       - name: Upload AAB
         uses: actions/upload-artifact@v4
         with:
           name: OctarineEngine-android-aab
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+      # Tag-gated Play Store internal-track upload. Requires PLAY_SERVICE_ACCOUNT_JSON secret
+      # (raw JSON contents, not base64) — service account must hold Release Manager on the
+      # com.octarine.example Play Console entry. Skipped on non-tag pushes and on fork PRs
+      # (secrets unavailable there). Downstream projects fork this workflow and substitute
+      # packageName; the engine CI uploads the example app under its canonical id.
+      - name: Upload AAB to Play internal track
+        if: startsWith(github.ref, 'refs/tags/v') && env.PLAY_SERVICE_ACCOUNT_JSON != ''
+        env:
+          PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+        uses: r0adkll/upload-google-play@v1
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: com.octarine.example
+          releaseFiles: android/app/build/outputs/bundle/release/app-release.aab
+          track: internal
+          status: completed
+
+  # R8/ProGuard probe — keep-rules in android/app/proguard-rules.pro must preserve every
+  # Java_org_libsdl_app_* JNI export plus the descriptor classes SDL's RegisterNatives walks.
+  # The default android job ships with minify off (safe baseline); this job exercises the shrunk
+  # path with -Poctarine.minify=true and asserts the JNI surface survives. Push/dispatch only —
+  # the second AAB build is the slowest leg in the file and the keep-rules don't churn on every PR.
+  android-minify-probe:
+    name: android (minify probe)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout engine
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Checkout example project
+        uses: actions/checkout@v4
+        with:
+          repository: mblackman/Octarine-Engine-Example
+          path: example_repo
+
+      - name: Resolve version (tag push)
+        id: ver
+        uses: ./.github/actions/resolve-version
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: ./.github/actions/vcpkg-cache-env
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install host build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            ninja-build pkg-config autoconf automake autoconf-archive libtool libltdl-dev
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android SDK packages (pinned NDK + cmake)
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" \
+                     "ndk;${OCTARINE_NDK_VERSION}" "cmake;3.22.1"
+
+      # Single-ABI build keeps probe runtime down; the R8/ProGuard step operates on Java bytecode
+      # before native libs are merged, so arm64-v8a alone proves the keep-rules. Debug-signed —
+      # the probe doesn't ship; we just need a build that completes R8.
+      - name: Build minified AAB (arm64-v8a, probe)
+        working-directory: android
+        env:
+          OCTARINE_VERSION_NAME: ${{ steps.ver.outputs.version_name }}
+          OCTARINE_VERSION_CODE: ${{ steps.ver.outputs.version_code }}
+        run: |
+          export VCPKG_ROOT="$VCPKG_INSTALLATION_ROOT"
+          export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}"
+          args=(bundleRelease
+                -Poctarine.projectDir="$GITHUB_WORKSPACE/example_repo"
+                -Poctarine.abi=arm64-v8a
+                -Poctarine.minify=true
+                --no-daemon --console=plain)
+          [ -n "$OCTARINE_VERSION_NAME" ] && args+=(-Poctarine.versionName="$OCTARINE_VERSION_NAME")
+          [ -n "$OCTARINE_VERSION_CODE" ] && args+=(-Poctarine.versionCode="$OCTARINE_VERSION_CODE")
+          ./gradlew "${args[@]}"
+
+      # Same assertion the main job runs against the non-minified AAB — counted-symbol gate proves
+      # R8 didn't strip the SDL JNI surface. If this fails, expand keep-rules in
+      # android/app/proguard-rules.pro.
+      - name: Verify minified AAB retains SDL JNI exports
+        run: |
+          set -e
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          [ -f "$aab" ] || { echo "no AAB at $aab"; exit 1; }
+          tmp=$(mktemp -d)
+          unzip -p "$aab" base/lib/arm64-v8a/libmain.so > "$tmp/libmain.so"
+          nm="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-nm"
+          count=$("$nm" --defined-only --extern-only "$tmp/libmain.so" | grep -c ' T Java_org_libsdl_app_' || true)
+          size=$(stat -c %s "$tmp/libmain.so")
+          echo "minified libmain.so size: $size bytes"
+          echo "Java_org_libsdl_app_* symbol count (minified): $count"
+          if [ "$count" -lt 20 ]; then
+            echo "FAIL: keep-rules dropped SDL JNI exports — expand android/app/proguard-rules.pro"
+            "$nm" --defined-only --extern-only "$tmp/libmain.so" | grep ' T Java_' || true
+            exit 1
+          fi
+          echo "PASS: keep-rules preserved $count SDL JNI exports under R8/ProGuard"
+
+      - name: Upload minified AAB (probe artifact)
+        uses: actions/upload-artifact@v4
+        with:
+          name: OctarineEngine-android-aab-minified
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error

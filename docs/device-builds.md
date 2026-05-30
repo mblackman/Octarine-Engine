@@ -407,6 +407,23 @@ properties to Gradle. With the secrets unset (fork PRs), `bundleRelease`
 falls back to the debug key — still a useful build-passes signal, not
 Play-uploadable.
 
+### Play Store upload (internal track)
+
+Tag pushes (`v*`) auto-upload the AAB to the **Play Store internal track** via
+`r0adkll/upload-google-play@v1`. Requires a Google Cloud service account with
+**Release Manager** on the `com.octarine.example` Play Console entry. Secret:
+
+| Secret                              | Value                                              |
+|-------------------------------------|----------------------------------------------------|
+| `PLAY_SERVICE_ACCOUNT_JSON`         | Full JSON key contents (NOT base64).               |
+
+Generate the key at Google Cloud Console → IAM & Admin → Service Accounts →
+Keys tab → Add Key → JSON. Paste the file contents into the GitHub secret.
+Non-tag pushes and missing-secret runs skip the upload step cleanly. Internal
+track is the only track this workflow targets — promote to closed/open/
+production manually from the Play Console release dashboard. Downstream
+projects fork the workflow and substitute their own `packageName`.
+
 ### R8 / minification
 
 `minifyEnabled = false` on the release build type by default.

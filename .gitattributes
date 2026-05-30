@@ -1,0 +1,3 @@
+# Shell scripts must stay LF so they run on Linux/macOS CI runners — a CRLF shebang yields
+# "/bin/sh^M: bad interpreter" inside the container.
+*.sh    text eol=lf

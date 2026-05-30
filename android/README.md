@@ -224,11 +224,41 @@ With the secrets set, `bundleRelease` on every push/PR signs the AAB with your u
 secrets unset (e.g. fork PRs), the workflow falls through to the debug key — the AAB is still a
 valid build-passes signal, but it isn't Play-uploadable.
 
+### Play Store upload (internal track)
+
+Tag pushes (`v*`) auto-upload the AAB to the Play Store **internal track** via
+`r0adkll/upload-google-play@v1`. Requires a Google Cloud service account with **Release Manager**
+on the `com.octarine.example` Play Console entry (Play Console → Users and permissions → Invite
+new user → service-account email → grant app-level Release Manager).
+
+| Secret                              | Value                                                     |
+|-------------------------------------|-----------------------------------------------------------|
+| `PLAY_SERVICE_ACCOUNT_JSON`         | Full JSON key contents from Google Cloud (NOT base64).    |
+
+Generate the key: Google Cloud Console → IAM & Admin → Service Accounts → create account → Keys
+tab → Add Key → JSON. Paste the full file contents into the GitHub secret.
+
+The upload step is gated on `startsWith(github.ref, 'refs/tags/v')`, so non-tag pushes and PRs
+never burn upload quota or accidentally promote a build. When the secret is unset (fork PRs,
+pre-account state), the step skips with no error.
+
+**Rotation.** Service-account keys don't expire by default, but rotate annually as hygiene:
+generate a new key, update `PLAY_SERVICE_ACCOUNT_JSON`, then delete the old key from the Service
+Accounts console. The Play Console permission grant is on the *account*, not the key — no Play-side
+change needed.
+
+**Track promotion.** Internal track is the only track this workflow targets. Promote
+internal → closed → open → production manually from the Play Console release dashboard once a
+build is QA'd. Adding a `track` matrix axis is straightforward if the workflow needs to push to
+multiple tracks per release.
+
 ### R8 / minification
 
 `minifyEnabled` defaults to `false` on the release build type. `proguard-rules.pro` already keeps
 the SDL JNI surface plus a safety-net `native <methods>;` rule, so flipping it on is a probe rather
-than a leap of faith. Run the probe locally before a release:
+than a leap of faith. CI runs the probe automatically on every push/dispatch via the
+`android (minify probe)` job (single-ABI arm64-v8a `bundleRelease -Poctarine.minify=true` plus
+SDL JNI symbol assertion). Run it locally before a release:
 
 ```powershell
 .\gradlew.bat bundleRelease -Poctarine.minify=true -Poctarine.projectDir=C:\path\to\MyGame
