@@ -33,6 +33,14 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Checkout example project (bake smoke)
+        if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
+        uses: actions/checkout@v4
+        with:
+          repository: mblackman/Octarine-Engine-Example
+          ref: main
+          path: example_repo
+
       - name: Export GitHub Actions cache env (vcpkg binary cache)
         uses: ./.github/actions/vcpkg-cache-env
 
@@ -60,6 +68,17 @@ jobs:
       - name: Run engine tests (ctest)
         if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
         run: ctest --test-dir build/${{ matrix.preset }} --output-on-failure
+
+      # Headless bake against the example project. Catches unresolved-asset regressions and
+      # AssetCatalog::Build / startup-script breakage on every PR — the bake walks the catalog,
+      # runs the startup script, and emits asset_manifest.lua. Non-zero exit fails the job;
+      # an empty manifest means the catalog produced no entries, which is also a regression.
+      - name: Bake smoke (example project)
+        if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
+        shell: bash
+        run: |
+          ./build/${{ matrix.preset }}/bin/release/OctarineEngine "$GITHUB_WORKSPACE/example_repo" -m bake
+          test -s "$GITHUB_WORKSPACE/example_repo/asset_manifest.lua"
 
       - name: Check Lua API artifact drift
         id: lua_drift
