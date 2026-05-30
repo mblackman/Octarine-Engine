@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780175283343,
+  "lastUpdate": 1780175689102,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -5328,6 +5328,114 @@ window.BENCHMARK_DATA = {
             "value": 643701.9900070525,
             "unit": "ns/iter",
             "extra": "iterations: 1099\ncpu: 643509.5040945789 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "040ebbe812e442f184cf2c7ee04962622e65c14d",
+          "message": "Derive license aggregator required-port list from vcpkg.json (#61)\n\nReplace the hard-coded _OCTARINE_LICENSES_DEFAULT_REQUIRED list with a\nparse of vcpkg.json's top-level dependencies[].name array, run at configure\ntime via string(JSON ...). A small _OCTARINE_LICENSES_SKIP_REQUIRED list\nstrips ports vcpkg.json declares but the shipped binary never links\n(currently just benchmark, consumed only by OctarineLuaApiTest).\n\nBumping or removing a dep in vcpkg.json now updates the required list\nautomatically; previously every edit risked silent drift between the\nmanifest and the hard-coded gate.\n\nForward-compat: if vcpkg.json gains a top-level features.<feat>.dependencies[]\nblock, the helper recurses into it only when OCTARINE_WITH_<FEAT> is on.\nNo-op today (manifest declares no features).\n\nTrade-off: transitive deps that previously appeared in the hard-coded list\n(libpng, libjpeg-turbo, zlib) are no longer required-checked since they\naren't top-level vcpkg.json entries. Their copyright text still flows into\nTHIRD_PARTY_LICENSES.txt via the unconditional share/*/copyright glob; we\njust stop hard-failing if they vanish from the triplet. Catching upstream\nremoval at the SDL3-image link step or runtime PNG load is fine signal.\n\nVerified with cmake -P standalone parse: produces\nfreetype;glm;imgui;lua;sdl3;sdl3-image;sdl3-mixer;sdl3-ttf;sol2;spdlog\nfrom the current manifest.",
+          "timestamp": "2026-05-30T15:04:40-06:00",
+          "tree_id": "24e3977962db2b5a6a1f96a929296c181250d444",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/040ebbe812e442f184cf2c7ee04962622e65c14d"
+        },
+        "date": 1780175680351,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4068.2374801664464,
+            "unit": "ns/iter",
+            "extra": "iterations: 168663\ncpu: 4106.532452286612 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16316.522887059458,
+            "unit": "ns/iter",
+            "extra": "iterations: 43633\ncpu: 16361.600508789023 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 109898.46967304249,
+            "unit": "ns/iter",
+            "extra": "iterations: 6436\ncpu: 109956.68598508101 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 870301.9298325441,
+            "unit": "ns/iter",
+            "extra": "iterations: 803\ncpu: 870446.5404732343 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1733157.5555726886,
+            "unit": "ns/iter",
+            "extra": "iterations: 400\ncpu: 1733303.1575000102 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2278.8138283045673,
+            "unit": "ns/iter",
+            "extra": "iterations: 308771\ncpu: 2264.463991112162 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10035.194412502908,
+            "unit": "ns/iter",
+            "extra": "iterations: 70492\ncpu: 10018.420813710847 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 103304.82497053265,
+            "unit": "ns/iter",
+            "extra": "iterations: 6880\ncpu: 103293.94360465968 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 399305.666975451,
+            "unit": "ns/iter",
+            "extra": "iterations: 1747\ncpu: 399271.1144819768 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2181.2021712247465,
+            "unit": "ns/iter",
+            "extra": "iterations: 326473\ncpu: 2142.9231146228994 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6517.178837734494,
+            "unit": "ns/iter",
+            "extra": "iterations: 108246\ncpu: 6476.237800928348 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41298.74379490001,
+            "unit": "ns/iter",
+            "extra": "iterations: 16961\ncpu: 41257.49336713631 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 320900.3808990216,
+            "unit": "ns/iter",
+            "extra": "iterations: 2202\ncpu: 320770.14123529167 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 631677.1445647422,
+            "unit": "ns/iter",
+            "extra": "iterations: 1104\ncpu: 631586.0253623367 ns\nthreads: 1"
           }
         ]
       }
