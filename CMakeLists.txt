@@ -107,6 +107,7 @@ set(SRC_FILES
         src/Lua/Modules/IoModuleLuaBinding.cpp
         src/Lua/Modules/LogModuleLuaBinding.cpp
         src/Lua/Modules/SceneModuleLuaBinding.cpp
+        src/Project/ProjectIni.cpp
         src/Renderer/Renderer.cpp
         src/Systems/AudioSystem.cpp
 )
@@ -512,6 +513,29 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
 
     add_test(NAME AssetPipelineTest COMMAND OctarineAssetPipelineTest)
+
+    # project.ini reader smoke test: standalone — no engine sources required. Validates parse +
+    # shipping-identity rules (mirrors cmake/OctarinePackage.cmake + android/app/build.gradle).
+    add_executable(OctarineProjectIniTest
+            src/Project/ProjectIni.cpp
+            tests/ProjectIniTest.cpp
+    )
+
+    set_target_properties(OctarineProjectIniTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+    )
+
+    target_include_directories(OctarineProjectIniTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    if (MSVC)
+        target_compile_options(OctarineProjectIniTest PRIVATE /W4 /permissive- /MP /EHsc)
+    endif ()
+
+    add_test(NAME ProjectIniTest COMMAND OctarineProjectIniTest)
 
     message(STATUS "Octarine: Tests ENABLED")
 endif ()
