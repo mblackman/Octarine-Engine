@@ -184,7 +184,10 @@ bool AssetCatalog::Build(const std::string& basePath, sol::state& lua, std::opti
         if (SDL_IOStream* probe = SDL_IOFromFile(manifestStr.c_str(), "rb"); probe != nullptr)
         {
             SDL_CloseIO(probe);
-            Logger::Info("AssetCatalog: baked manifest found, loading (scan skipped): " + manifestStr);
+            // Warn-level on purpose — same rationale as the "loaded N entries" line below: this is
+            // the bootstrap path a shipped (warn-level) build needs visible so the manifest-vs-scan
+            // gate is observable in CI + on-device support repros.
+            Logger::Warn("AssetCatalog: baked manifest found, loading (scan skipped): " + manifestStr);
             return LoadManifest(manifestStr, lua, basePath);
         }
         Logger::Warn("AssetCatalog: manifest load allowed but no asset_manifest.lua at root; scanning.");
@@ -388,7 +391,12 @@ bool AssetCatalog::LoadManifest(const std::string& manifestPath, sol::state& lua
     }
 
     from_manifest_ = true;
-    Logger::Info("AssetCatalog: loaded " + std::to_string(entries_.size()) + " entries from manifest " + manifestPath +
+    // Warn-level on purpose: this is the single bootstrap signal that a shipped build is loading
+    // its baked catalog (vs scanning). Shipped builds default to warn-level logging (per
+    // BuildConfigUnificationPlan phase 3), so an Info log here would be suppressed and the
+    // android-emulator gate's manifest-load assertion would never match. Keep as a single line
+    // per launch — it's a startup confirmation, not noise.
+    Logger::Warn("AssetCatalog: loaded " + std::to_string(entries_.size()) + " entries from manifest " + manifestPath +
         (ok ? "" : " (with malformed entries skipped)"));
     return ok;
 }
