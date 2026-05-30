@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780168527372,
+  "lastUpdate": 1780171413842,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -5004,6 +5004,114 @@ window.BENCHMARK_DATA = {
             "value": 655946.1627791567,
             "unit": "ns/iter",
             "extra": "iterations: 1066\ncpu: 655805.6660412208 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ad946283e397c607c1d82d10125dea3aad99719e",
+          "message": "Emit components.json and modules.json from the Lua API smoke test (#58)\n\nOctarineLuaApiTest now writes two new machine-readable indexes alongside lua_api.smoke.lua: components.json (every component registered with LuaComponentRegistry, with lua_key, usertype, and registry accessor names) and modules.json (every Lua free-function module with the globals it installs into sol::state, auto-discovered by snapshotting around each install call).\n\nRegisterAllModules.cpp now exposes kLuaModules — a descriptor array of {name, install} pairs that captures the canonical module install order in one place. RegisterAllLuaModules iterates it for production setup; the smoke test iterates the same list with per-module snapshots to populate the new LuaModuleRegistry that WriteModulesJson consumes. Replaces the previous hand-maintained module-sentinel list in the test with an assertion that each module installed at least one new global.\n\nCI drift gate extended to all three artifacts; drift on any one fails the build and uploads the regenerated copies as an artifact for inspection.",
+          "timestamp": "2026-05-30T13:50:55-06:00",
+          "tree_id": "53603c391ad7ce0dde476f9745574f867fef75a3",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/ad946283e397c607c1d82d10125dea3aad99719e"
+        },
+        "date": 1780171405098,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4061.864047623488,
+            "unit": "ns/iter",
+            "extra": "iterations: 170318\ncpu: 4092.2909381275535 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16214.97079578333,
+            "unit": "ns/iter",
+            "extra": "iterations: 43220\ncpu: 16260.000161961956 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 107423.26310717127,
+            "unit": "ns/iter",
+            "extra": "iterations: 6507\ncpu: 107476.5063777511 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 848178.6646320058,
+            "unit": "ns/iter",
+            "extra": "iterations: 823\ncpu: 848295.6111786196 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1682321.637355048,
+            "unit": "ns/iter",
+            "extra": "iterations: 406\ncpu: 1682437.4679803343 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2276.5849023899623,
+            "unit": "ns/iter",
+            "extra": "iterations: 296196\ncpu: 2261.8849579343055 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 9979.76276078508,
+            "unit": "ns/iter",
+            "extra": "iterations: 70308\ncpu: 9959.754124709729 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 102531.01831337778,
+            "unit": "ns/iter",
+            "extra": "iterations: 7663\ncpu: 102519.49771630309 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 398773.5585186701,
+            "unit": "ns/iter",
+            "extra": "iterations: 1751\ncpu: 398762.64877214096 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2194.2181649889485,
+            "unit": "ns/iter",
+            "extra": "iterations: 324757\ncpu: 2153.178601231212 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6589.365716190824,
+            "unit": "ns/iter",
+            "extra": "iterations: 107399\ncpu: 6544.253065667686 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41594.99851654434,
+            "unit": "ns/iter",
+            "extra": "iterations: 16904\ncpu: 41547.0447231303 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 318168.64087906503,
+            "unit": "ns/iter",
+            "extra": "iterations: 2198\ncpu: 318057.91492261126 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 635153.2540362726,
+            "unit": "ns/iter",
+            "extra": "iterations: 1066\ncpu: 635096.8977486244 ns\nthreads: 1"
           }
         ]
       }
