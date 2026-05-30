@@ -6,6 +6,8 @@
 
 Octarine Engine is a lightweight, high-performance 2D game engine built with C++20. It features a custom archetype-based Entity-Component System (ECS), integrated Lua scripting, and a unique yellowish-purple aesthetic.
 
+New here? Start with [`docs/QUICKSTART.md`](docs/QUICKSTART.md) — the shortest path from a fresh clone to a verified code change.
+
 ## Tech Stack
 
 - **Graphics:** SDL3
