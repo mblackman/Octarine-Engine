@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780159169425,
+  "lastUpdate": 1780162757514,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -4680,6 +4680,114 @@ window.BENCHMARK_DATA = {
             "value": 640370.9967062556,
             "unit": "ns/iter",
             "extra": "iterations: 1098\ncpu: 640255.4125683 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0315e2fa5e1a87abb0dc1e26b02289842c1de558",
+          "message": "Track Lua API stub at repo root and gate CI on drift (#55)\n\nOctarineLuaApiTest now writes lua_api.smoke.lua to the source tree via the LUA_API_SMOKE_OUTPUT compile def, the file is tracked in git, and a new CI step on the linux editor-release leg fails the build if a regenerated stub differs from the committed copy. LuaApiManifest::Write filters sol2-internal metatable entries (typeid-stringified names containing :: or <, and the recycle marker) so the stub stays stable across MSVC and libstdc++.\n\nAdds .agent/ to .gitignore as a local-only scratchpad for agent/LLM-facing docs that should not ship with the repo.",
+          "timestamp": "2026-05-30T11:32:50-06:00",
+          "tree_id": "f9232ca347ef9d0f53b837e0deb3a1dcd0c4e32a",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/0315e2fa5e1a87abb0dc1e26b02289842c1de558"
+        },
+        "date": 1780162748767,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4290.336910738845,
+            "unit": "ns/iter",
+            "extra": "iterations: 162333\ncpu: 4302.783851712026 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 17131.79638446861,
+            "unit": "ns/iter",
+            "extra": "iterations: 40824\ncpu: 17157.1223544975 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 111322.64171349502,
+            "unit": "ns/iter",
+            "extra": "iterations: 6296\ncpu: 111360.66248411682 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 887355.0987602035,
+            "unit": "ns/iter",
+            "extra": "iterations: 790\ncpu: 887470.1278480791 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1801437.8803143948,
+            "unit": "ns/iter",
+            "extra": "iterations: 394\ncpu: 1801597.720812187 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2551.651879330858,
+            "unit": "ns/iter",
+            "extra": "iterations: 264014\ncpu: 2539.1813426566905 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10423.459515784703,
+            "unit": "ns/iter",
+            "extra": "iterations: 67383\ncpu: 10407.566359466464 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 71773.90034242337,
+            "unit": "ns/iter",
+            "extra": "iterations: 9739\ncpu: 71739.3918266717 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 404911.01461673045,
+            "unit": "ns/iter",
+            "extra": "iterations: 1731\ncpu: 404880.2102830618 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2189.7983087513376,
+            "unit": "ns/iter",
+            "extra": "iterations: 325033\ncpu: 2148.580661041226 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6610.8072266388735,
+            "unit": "ns/iter",
+            "extra": "iterations: 107325\ncpu: 6558.563242488466 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 42389.26194639801,
+            "unit": "ns/iter",
+            "extra": "iterations: 16510\ncpu: 42336.33519077176 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 320771.8080162129,
+            "unit": "ns/iter",
+            "extra": "iterations: 2184\ncpu: 320587.5032051436 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 637679.8095964435,
+            "unit": "ns/iter",
+            "extra": "iterations: 1104\ncpu: 637602.4166666106 ns\nthreads: 1"
           }
         ]
       }
