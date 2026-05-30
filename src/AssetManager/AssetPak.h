@@ -40,11 +40,15 @@ public:
     // read and stored under its project-relative form (`fullPath` re-rooted against `basePath`,
     // forward-slashed). `extraFiles` lets the bake step include derived artifacts (glyph atlases,
     // audio bakes, etc.) that don't live in the asset catalog — each is read + stored under its
-    // own project-relative form. Duplicates against catalog entries are silently dropped (first
+    // own project-relative form. `pathOverrides` re-routes a catalog entry's *source* bytes to an
+    // alternative path while keeping the original relPath in the pak — used by the audio
+    // normalize pass to swap normalized WAVs in for their originals at packing time without
+    // mutating the source tree. Duplicates against catalog entries are silently dropped (first
     // write wins). Returns false on any I/O failure; partially-written paks are removed.
     static bool Pack(const AssetCatalog& catalog, const std::string& outPath,
                      const std::string& basePath,
-                     const std::vector<std::string>& extraFiles = {});
+                     const std::vector<std::string>& extraFiles = {},
+                     const std::map<std::string, std::string>& pathOverrides = {});
 
     // Open a pak file from disk into memory. Returns true on success. The instance owns the
     // backing buffer until destruction.

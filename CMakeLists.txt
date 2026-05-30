@@ -94,6 +94,7 @@ set(SRC_FILES
         src/AssetManager/AssetCatalog.cpp
         src/AssetManager/AssetPak.cpp
         src/AssetManager/AtlasBaker.cpp
+        src/AssetManager/AudioNormalizer.cpp
         src/AssetManager/GlyphAtlas.cpp
         src/AssetManager/SceneAssetScanner.cpp
         src/ECS/Registry.cpp

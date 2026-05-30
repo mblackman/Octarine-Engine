@@ -15,6 +15,7 @@
 #include "AssetManager/AssetCatalog.h"
 #include "AssetManager/AssetPak.h"
 #include "AssetManager/AtlasBaker.h"
+#include "AssetManager/AudioNormalizer.h"
 #include "AssetManager/SceneAssetScanner.h"
 #include <SDL3_ttf/SDL_ttf.h>
 #include "../Renderer/RenderQueue.h"
@@ -596,14 +597,39 @@ bool Game::RunBakeValidation(const std::string& assetPath)
         TTF_Quit();
     }
 
-    // Pack every cataloged asset (+ any derived atlas files) into a single asset_bundle.pak
-    // alongside the manifest. Shipped builds (OCTARINE_SHIPPED) open this in place of the loose
-    // asset tree; dev builds ignore it. Manifest write is the source-of-truth gate — if that
-    // failed, skip the pak so a stale archive doesn't ship.
+    // Audio normalize pass (Stage 14 B2): for every Audio catalog entry with `meta.normalize=true`,
+    // run BS.1770 integrated loudness measurement + apply the gain to land at -16 LUFS, writing
+    // the normalized WAV to `<basePath>/normalized/<rel>.wav`. The pak override map then routes
+    // the catalog's original relPath to read bytes from the normalized variant — so shipped
+    // builds carry the loudness-aligned audio while dev tree (and dev runs) stay untouched.
+    std::map<std::string, std::string> audioOverrides;
+    if (wrote)
+    {
+        const std::filesystem::path normRoot = std::filesystem::path(assetPath) / "normalized";
+        for (const auto& [id, entry] : assetManager.GetCatalog().Entries())
+        {
+            if (entry.type != AssetType::Audio || !entry.normalize) continue;
+            const std::filesystem::path src(entry.fullPath);
+            const std::filesystem::path rel = std::filesystem::relative(src, std::filesystem::path(assetPath));
+            const std::filesystem::path dst = normRoot / rel;
+            std::error_code ec;
+            std::filesystem::create_directories(dst.parent_path(), ec);
+            if (AudioNormalizer::NormalizeWav(entry.fullPath, dst.string()))
+            {
+                audioOverrides[rel.generic_string()] = dst.string();
+            }
+        }
+    }
+
+    // Pack every cataloged asset (+ any derived atlas files, w/ optional normalized-audio
+    // overrides) into a single asset_bundle.pak alongside the manifest. Shipped builds
+    // (OCTARINE_SHIPPED) open this in place of the loose asset tree; dev builds ignore it.
+    // Manifest write is the source-of-truth gate — if that failed, skip the pak so a stale
+    // archive doesn't ship.
     if (wrote)
     {
         const std::string pakPath = (std::filesystem::path(assetPath) / "asset_bundle.pak").string();
-        if (!AssetPak::Pack(assetManager.GetCatalog(), pakPath, assetPath, atlasFiles))
+        if (!AssetPak::Pack(assetManager.GetCatalog(), pakPath, assetPath, atlasFiles, audioOverrides))
         {
             Logger::Error("Bake: AssetPak::Pack failed for " + pakPath);
             return false;
