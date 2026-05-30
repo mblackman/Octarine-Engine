@@ -1,5 +1,8 @@
 plugins {
     id 'com.android.application'
+    // Repo-local plugin: multi-ABI native fan-out via buildSrc/. No-op when octarineNative.abis
+    // is empty (single-ABI dev path stays on AGP's externalNativeBuild).
+    id 'octarine-native'
 }
 
 // --- Octarine host app ---------------------------------------------------------------------------
@@ -253,9 +256,11 @@ android {
     }
 
     sourceSets.main {
-        // Multi-ABI mode: per-ABI libmain.so lands under build/octarineJni/<abi>/. AGP packages
-        // every <abi>/ subdir into the APK's lib/<abi>/.
-        jniLibs.srcDirs = multiAbi ? ['libs', nativeBuildRoot] : ['libs']
+        // Single-ABI dev mode: AGP's externalNativeBuild puts libmain.so where AGP wants it.
+        // Multi-ABI: the octarine-native plugin (buildSrc/) registers each ABI's stage task and
+        // calls `variant.sources.jniLibs.addGeneratedSourceDirectory(...)`, so no static srcDir
+        // entry is needed here.
+        jniLibs.srcDirs = ['libs']
         assets.srcDirs = [stagedAssetsDir, licenseAssetsDir]
         // Generated mipmap-*/values-v31 ride beside the committed res tree; AAPT2 merges them so
         // ic_launcher.png and the splash AppTheme override land in the APK with no manual placement.
@@ -374,74 +379,33 @@ tasks.register('generateOctarineIcons', Exec) {
     }
 }
 
-// Multi-ABI native build orchestration. Single-ABI dev path stays on AGP's externalNativeBuild
-// (see the `if (!multiAbi)` blocks above) — these tasks only register when -Poctarine.abis is
-// passed. For each ABI we fan-out three tasks: configure (cmake), build (cmake --build), stage
-// (copy libmain.so into jniLibs srcDir). The aggregator `octarineNativeAll` depends on every
-// stage task, and preBuild pulls it in so `assembleDebug` / `bundleRelease` see the .so files.
-//
-// vcpkg's android workflow needs ANDROID_NDK_HOME — propagated via the `environment` block on
-// each Exec so cmake sees the same NDK android.toolchain.cmake AGP would have used.
+// Multi-ABI native build orchestration lives in the octarine-native plugin (buildSrc/). It reads
+// the values below, fans out per-ABI cmake configure/build/stage tasks, and wires the .so outputs
+// into each variant's jniLibs via androidComponents.onVariants — no preBuild.dependsOn glue.
+// Single-ABI mode keeps the externalNativeBuild path above (faster IDE inner loop).
 if (multiAbi) {
     def ndkHome = System.getenv('ANDROID_NDK_HOME') ?: System.getenv('ANDROID_NDK_ROOT')
     if (ndkHome == null) {
         ndkHome = "${android.sdkDirectory}/ndk/${appNdk}"
     }
-    def ndkToolchain = "${ndkHome}/build/cmake/android.toolchain.cmake"
-    def stageTaskNames = []
-
-    abiList.each { iterAbi ->
-        def triplet = tripletForAbi.getOrDefault(iterAbi, 'arm64-android')
-        def configureDir = "${nativeBuildRoot}/.build/${iterAbi}"
-        def stageOutDir  = "${nativeBuildRoot}/${iterAbi}"
-        def configureTask = "octarineNative_${iterAbi}_configure"
-        def buildTask     = "octarineNative_${iterAbi}_build"
-        def stageTask     = "octarineNative_${iterAbi}_stage"
-
-        tasks.register(configureTask, Exec) {
-            description = "CMake configure for Android ABI ${iterAbi} (triplet ${triplet})."
-            doFirst {
-                file(configureDir).mkdirs()
-                file(stageOutDir).mkdirs()
-            }
-            workingDir configureDir
-            environment 'ANDROID_NDK_HOME', ndkHome
-            commandLine 'cmake',
-                    "${repoRoot}",
-                    '-G', 'Ninja',
-                    "-DANDROID_ABI=${iterAbi}",
-                    "-DANDROID_PLATFORM=android-${appMinSdk}",
-                    '-DANDROID_STL=c++_shared',
-                    "-DCMAKE_TOOLCHAIN_FILE=${vcpkgRoot}/scripts/buildsystems/vcpkg.cmake",
-                    "-DVCPKG_CHAINLOAD_TOOLCHAIN_FILE=${ndkToolchain}",
-                    "-DVCPKG_TARGET_TRIPLET=${triplet}",
-                    '-DVCPKG_MANIFEST_MODE=ON',
-                    "-DVCPKG_OVERLAY_PORTS=${rootDir}/vcpkg-overlay-ports",
-                    '-DCMAKE_BUILD_TYPE=Release'
-        }
-
-        tasks.register(buildTask, Exec) {
-            description = "CMake build for Android ABI ${iterAbi}."
-            dependsOn configureTask
-            workingDir configureDir
-            commandLine 'cmake', '--build', '.', '--target', 'OctarineEngine', '--parallel'
-        }
-
-        tasks.register(stageTask, Copy) {
-            description = "Stage libmain.so for Android ABI ${iterAbi} into jniLibs."
-            dependsOn buildTask
-            from("${configureDir}") {
-                include 'libmain.so'
-            }
-            into stageOutDir
-        }
-
-        stageTaskNames += stageTask
-    }
-
-    tasks.register('octarineNativeAll') {
-        description = 'Build libmain.so for every ABI in -Poctarine.abis.'
-        dependsOn stageTaskNames
+    // Bind locals first — every name below also appears on the extension, and Groovy's
+    // OWNER_FIRST resolution inside the `octarineNative { ... }` closure would otherwise route
+    // every RHS through the extension property instead of the script-local def.
+    def _abiList     = abiList
+    def _vcpkgRoot   = vcpkgRoot.toString()
+    def _ndkHome     = ndkHome
+    def _repoRoot    = repoRoot.toString()
+    def _overlay     = "${rootDir}/vcpkg-overlay-ports".toString()
+    def _minSdk      = appMinSdk
+    def _tripletMap  = tripletForAbi
+    octarineNative { ext ->
+        ext.abis.set(_abiList)
+        ext.vcpkgRoot.set(_vcpkgRoot)
+        ext.ndkHome.set(_ndkHome)
+        ext.repoRoot.set(_repoRoot)
+        ext.vcpkgOverlayPorts.set(_overlay)
+        ext.minSdk.set(_minSdk)
+        ext.tripletForAbi.set(_tripletMap)
     }
 }
 
@@ -496,10 +460,10 @@ tasks.register('generateOctarineLicenses', Exec) {
 
 tasks.configureEach { task ->
     if (task.name == 'preBuild') {
+        // Asset / icon / license generators stay on the preBuild edge — their outputs land in
+        // sourceSet srcDirs that AGP reads at merge time. Multi-ABI native libs use AGP's variant
+        // jniLibs.addGeneratedSourceDirectory wiring from the octarine-native plugin instead.
         task.dependsOn 'stageOctarineAssets', 'generateOctarineIcons', 'generateOctarineLicenses'
-        if (multiAbi) {
-            task.dependsOn 'octarineNativeAll'
-        }
     }
 }
 
