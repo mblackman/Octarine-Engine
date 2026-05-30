@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780181379051,
+  "lastUpdate": 1780181422093,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -43169,6 +43169,660 @@ window.BENCHMARK_DATA = {
           {
             "name": "Registry::Update (pending blam/despawn) [max]",
             "value": 0.003,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 5"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a4e67bca3e0db043f72aafcc5f7a9e9f46f365bc",
+          "message": "Extract Android multi-ABI native fan-out into octarine-native plugin (#68)\n\nThe bespoke `octarineNative_<abi>_{configure,build,stage}` task tree + the\n`tasks.configureEach { if (task.name == 'preBuild') task.dependsOn ... }`\nshim that wired libmain.so into the AAB lived inline in app/build.gradle.\nCleaner home for the orchestration is a proper Gradle plugin under\nandroid/buildSrc/, applied via `id 'octarine-native'`.\n\nThe plugin uses AGP's `androidComponents.onVariants` API (per the Stage 12\nplan in ai/ShippingV1Plan.md): for each ABI it registers the same three\ntasks and then calls\n`variant.sources.jniLibs.addGeneratedSourceDirectory(stageTask, OctarineStageNativeTask::outputDirectory)`,\nwhich lets AGP derive the assembleX→stage dependency edge + the\nlib/<abi>/libmain.so packaging mapping automatically. Drops the static\n`jniLibs.srcDirs = multiAbi ? [...] : ['libs']` hack and the manual\npreBuild.dependsOn 'octarineNativeAll' wiring.\n\nSingle-ABI dev path (no -Poctarine.abis) keeps externalNativeBuild — plugin\nno-ops when the abis ListProperty is empty, so the IDE inner loop is\nunchanged.\n\nValidated via gradlew --dry-run:\n  bundleRelease -Poctarine.abis=arm64-v8a,x86_64 includes both\n    octarineNative_{arm64-v8a,x86_64}_{configure,build,stage} +\n    mergeReleaseJniLibFolders + packageReleaseBundle in the task graph.\n  assembleDebug (single-ABI) runs configureCMakeDebug[arm64-v8a] only;\n    no octarineNative_* tasks fire.\n\nCloses Stage 12 of ai/ShippingV1Plan.md.",
+          "timestamp": "2026-05-30T16:31:06-06:00",
+          "tree_id": "6aee81dd792dc33bcb400fa4246db9579677c202",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/a4e67bca3e0db043f72aafcc5f7a9e9f46f365bc"
+        },
+        "date": 1780181422023,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "Render: Present [p95]",
+            "value": 0.331,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 373"
+          },
+          {
+            "name": "Render: Present [p99]",
+            "value": 0.367,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 373"
+          },
+          {
+            "name": "Render: Present [max]",
+            "value": 0.449,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 373"
+          },
+          {
+            "name": "Game::Render (total) [p95]",
+            "value": 7.729,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 373"
+          },
+          {
+            "name": "Game::Render (total) [p99]",
+            "value": 8.456,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 373"
+          },
+          {
+            "name": "Game::Render (total) [max]",
+            "value": 12.497,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 373"
+          },
+          {
+            "name": "Game::ProcessInput [p95]",
+            "value": 0.012,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::ProcessInput [p99]",
+            "value": 0.014,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::ProcessInput [max]",
+            "value": 0.016,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::WaitTime [p95]",
+            "value": 9.074,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::WaitTime [p99]",
+            "value": 9.077,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::WaitTime [max]",
+            "value": 9.126,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ScriptSystem [p95]",
+            "value": 0.119,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ScriptSystem [p99]",
+            "value": 0.608,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ScriptSystem [max]",
+            "value": 0.664,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "CommandBuffer::Playback [p95]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 1116"
+          },
+          {
+            "name": "CommandBuffer::Playback [p99]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 1116"
+          },
+          {
+            "name": "CommandBuffer::Playback [max]",
+            "value": 0.001,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 1116"
+          },
+          {
+            "name": "AudioSystem [p95]",
+            "value": 0.007,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AudioSystem [p99]",
+            "value": 0.01,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AudioSystem [max]",
+            "value": 0.017,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AnimationSystem [p95]",
+            "value": 0.002,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AnimationSystem [p99]",
+            "value": 0.003,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AnimationSystem [max]",
+            "value": 0.003,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ProjectileLifecycleSystem [p95]",
+            "value": 0.005,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ProjectileLifecycleSystem [p99]",
+            "value": 0.008,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ProjectileLifecycleSystem [max]",
+            "value": 0.015,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "VelocityIntegrationSystem [p95]",
+            "value": 0.076,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "VelocityIntegrationSystem [p99]",
+            "value": 0.41,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "VelocityIntegrationSystem [max]",
+            "value": 0.711,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "OffScreenDespawnSystem [p95]",
+            "value": 0.141,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "OffScreenDespawnSystem [p99]",
+            "value": 0.228,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "OffScreenDespawnSystem [max]",
+            "value": 0.539,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (roots rebuild + walk start) [p95]",
+            "value": 0.04,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (roots rebuild + walk start) [p99]",
+            "value": 0.048,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (roots rebuild + walk start) [max]",
+            "value": 0.059,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (descendants walk) [p95]",
+            "value": 0.001,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (descendants walk) [p99]",
+            "value": 0.002,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (descendants walk) [max]",
+            "value": 0.003,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow [p95]",
+            "value": 0.05,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow [p99]",
+            "value": 0.059,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow [max]",
+            "value": 0.071,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem [p95]",
+            "value": 0.056,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem [p99]",
+            "value": 0.065,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem [max]",
+            "value": 0.074,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Emit Events [p95]",
+            "value": 0.006,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Emit Events [p99]",
+            "value": 0.009,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Emit Events [max]",
+            "value": 0.011,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Gather Boxes [p95]",
+            "value": 0.048,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Gather Boxes [p99]",
+            "value": 0.092,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Gather Boxes [max]",
+            "value": 0.184,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Collision System Update [p95]",
+            "value": 0.115,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Collision System Update [p99]",
+            "value": 0.159,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Collision System Update [max]",
+            "value": 0.316,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "CollisionSystem [p95]",
+            "value": 0.122,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 376"
+          },
+          {
+            "name": "CollisionSystem [p99]",
+            "value": 0.166,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 376"
+          },
+          {
+            "name": "CollisionSystem [max]",
+            "value": 0.329,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 376"
+          },
+          {
+            "name": "CameraFollowSystem [p95]",
+            "value": 0.005,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 396"
+          },
+          {
+            "name": "CameraFollowSystem [p99]",
+            "value": 0.032,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 396"
+          },
+          {
+            "name": "CameraFollowSystem [max]",
+            "value": 0.037,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 396"
+          },
+          {
+            "name": "Brute Force Intersection [p95]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Brute Force Intersection [p99]",
+            "value": 0.001,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Brute Force Intersection [max]",
+            "value": 0.002,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderSpriteSystem [p95]",
+            "value": 0.097,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderSpriteSystem [p99]",
+            "value": 0.125,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderSpriteSystem [max]",
+            "value": 0.139,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderTextSystem [p95]",
+            "value": 0.014,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderTextSystem [p99]",
+            "value": 0.017,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderTextSystem [max]",
+            "value": 0.02,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderPrimitiveSystem [p95]",
+            "value": 0.035,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderPrimitiveSystem [p99]",
+            "value": 0.047,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderPrimitiveSystem [max]",
+            "value": 0.053,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Registry::Update (total) [p95]",
+            "value": 0.699,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Registry::Update (total) [p99]",
+            "value": 1.1,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Registry::Update (total) [max]",
+            "value": 1.16,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::Update (total) [p95]",
+            "value": 0.706,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::Update (total) [p99]",
+            "value": 1.104,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::Update (total) [max]",
+            "value": 1.165,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Sort [p95]",
+            "value": 0.02,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Sort [p99]",
+            "value": 0.024,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Sort [max]",
+            "value": 0.037,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Draw [p95]",
+            "value": 0.067,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Draw [p99]",
+            "value": 0.07,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Draw [max]",
+            "value": 0.077,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Query::Update [p95]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 25"
+          },
+          {
+            "name": "Query::Update [p99]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 25"
+          },
+          {
+            "name": "Query::Update [max]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 25"
+          },
+          {
+            "name": "Registry::Update (pending blam/despawn) [p95]",
+            "value": 0.008,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 5"
+          },
+          {
+            "name": "Registry::Update (pending blam/despawn) [p99]",
+            "value": 0.008,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 5"
+          },
+          {
+            "name": "Registry::Update (pending blam/despawn) [max]",
+            "value": 0.008,
             "range": "0",
             "unit": "ms",
             "extra": "Samples: 5"
