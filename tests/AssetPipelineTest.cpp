@@ -22,10 +22,12 @@
 #include "AssetManager/AssetPak.h"
 #include "AssetManager/AssetReference.h"
 #include "AssetManager/AtlasBaker.h"
+#include "AssetManager/AudioNormalizer.h"
 #include "AssetManager/GlyphAtlas.h"
 #include "stb/stb_image_write.h"  // header-only; IMPL lives in AtlasBaker.cpp
 #include "AssetManager/SceneAssetScanner.h"
 #include <SDL3/SDL.h>
+#include <cmath>
 #include <SDL3_ttf/SDL_ttf.h>
 
 namespace
@@ -374,6 +376,72 @@ int main()
 
         std::filesystem::remove_all(tmpDir, ec);
         SDL_Quit();
+    }
+
+    std::cout << "[audio normalize] BS.1770 measure + gain round-trip\n";
+    {
+        // Synthesize 2 seconds of a quiet 1 kHz sine wave (amplitude 0.1 in [-1,1], 48 kHz mono),
+        // measure its loudness, normalize to -16 LUFS, measure again. The bake step writes WAVs
+        // via AudioNormalizer's same path, so this exercises ReadWav/WriteWav + the full BS.1770
+        // chain end-to-end.
+        const std::filesystem::path tmpDir =
+            std::filesystem::temp_directory_path() / "octarine_audio_norm_test";
+        std::error_code ec;
+        std::filesystem::create_directories(tmpDir, ec);
+        const std::string srcPath = (tmpDir / "quiet_tone.wav").string();
+        const std::string dstPath = (tmpDir / "normalized.wav").string();
+
+        {
+            constexpr std::uint32_t sampleRate = 48000;
+            constexpr std::uint32_t frames = sampleRate * 2;  // 2 seconds
+            constexpr double amplitude = 0.1;
+            constexpr double freq = 1000.0;
+            std::vector<std::int16_t> samples(frames);
+            for (std::uint32_t i = 0; i < frames; ++i) {
+                const double t = static_cast<double>(i) / sampleRate;
+                const double v = amplitude * std::sin(2.0 * 3.14159265358979323846 * freq * t);
+                samples[i] = static_cast<std::int16_t>(std::lrint(v * 32767.0));
+            }
+            // Hand-rolled minimal WAV writer mirroring AudioNormalizer's expected shape.
+            std::ofstream f(srcPath, std::ios::binary);
+            const std::uint32_t dataBytes = static_cast<std::uint32_t>(samples.size() * 2);
+            const std::uint32_t fileSize = 36 + dataBytes;
+            const std::uint16_t numChannels = 1;
+            const std::uint16_t bitsPerSample = 16;
+            const std::uint16_t blockAlign = numChannels * (bitsPerSample / 8);
+            const std::uint32_t byteRate = sampleRate * blockAlign;
+            const std::uint16_t audioFormat = 1;
+            const std::uint32_t fmtSize = 16;
+            f.write("RIFF", 4);
+            f.write(reinterpret_cast<const char*>(&fileSize), 4);
+            f.write("WAVE", 4);
+            f.write("fmt ", 4);
+            f.write(reinterpret_cast<const char*>(&fmtSize), 4);
+            f.write(reinterpret_cast<const char*>(&audioFormat), 2);
+            f.write(reinterpret_cast<const char*>(&numChannels), 2);
+            f.write(reinterpret_cast<const char*>(&sampleRate), 4);
+            f.write(reinterpret_cast<const char*>(&byteRate), 4);
+            f.write(reinterpret_cast<const char*>(&blockAlign), 2);
+            f.write(reinterpret_cast<const char*>(&bitsPerSample), 2);
+            f.write("data", 4);
+            f.write(reinterpret_cast<const char*>(&dataBytes), 4);
+            f.write(reinterpret_cast<const char*>(samples.data()), dataBytes);
+        }
+
+        const double preLufs = AudioNormalizer::MeasureWavLufs(srcPath);
+        Check(std::isfinite(preLufs), "BS.1770 measures synthetic quiet sine to a finite LUFS");
+        Check(preLufs < -20.0, "synthetic quiet sine measures well below -20 LUFS");
+
+        const double targetLufs = -16.0;
+        Check(AudioNormalizer::NormalizeWav(srcPath, dstPath, targetLufs),
+              "AudioNormalizer::NormalizeWav writes the normalized WAV");
+
+        const double postLufs = AudioNormalizer::MeasureWavLufs(dstPath);
+        Check(std::isfinite(postLufs), "normalized output measures to a finite LUFS");
+        Check(std::abs(postLufs - targetLufs) < 1.0,
+              "normalized output lands within 1 LU of the -16 LUFS target");
+
+        std::filesystem::remove_all(tmpDir, ec);
     }
 
     if (g_failures == 0)

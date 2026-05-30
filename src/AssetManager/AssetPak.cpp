@@ -56,7 +56,8 @@ AssetPak::~AssetPak() {
 
 bool AssetPak::Pack(const AssetCatalog& catalog, const std::string& outPath,
                     const std::string& basePath,
-                    const std::vector<std::string>& extraFiles) {
+                    const std::vector<std::string>& extraFiles,
+                    const std::map<std::string, std::string>& pathOverrides) {
     std::ofstream out(outPath, std::ios::binary | std::ios::trunc);
     if (!out) {
         Logger::Error("AssetPak::Pack: failed to open " + outPath + " for writing");
@@ -83,9 +84,17 @@ bool AssetPak::Pack(const AssetCatalog& catalog, const std::string& outPath,
     std::vector<char> buf(kCopyChunk);
 
     for (const auto& [id, entry] : catalog.Entries()) {
-        std::ifstream in(entry.fullPath, std::ios::binary);
+        const std::string relPath = MakeRelPath(entry.fullPath, basePath);
+        // pathOverrides[relPath] swaps the source-of-bytes; the pak still stores under `relPath`,
+        // so the runtime lookup is unchanged. Audio normalize uses this to ship the normalized
+        // WAV without rewriting the asset tree.
+        std::string sourcePath = entry.fullPath;
+        if (auto it = pathOverrides.find(relPath); it != pathOverrides.end()) {
+            sourcePath = it->second;
+        }
+        std::ifstream in(sourcePath, std::ios::binary);
         if (!in) {
-            Logger::Error("AssetPak::Pack: failed to read " + entry.fullPath);
+            Logger::Error("AssetPak::Pack: failed to read " + sourcePath);
             out.close();
             std::error_code ec;
             std::filesystem::remove(outPath, ec);
@@ -101,7 +110,7 @@ bool AssetPak::Pack(const AssetCatalog& catalog, const std::string& outPath,
                 size += static_cast<std::uint64_t>(got);
             }
         }
-        staged.push_back({MakeRelPath(entry.fullPath, basePath), offset, size});
+        staged.push_back({relPath, offset, size});
     }
 
     // Append any extra (non-catalog) files in the same shape. Bake passes derived artifacts —

@@ -44,6 +44,7 @@ struct CatalogEntry
     float fontSize{0.0F};
     // Audio
     bool stream{false};
+    bool normalize{false};
 };
 
 // Directory-discovery + sidecar-parsing catalog: maps asset id -> CatalogEntry. Loads nothing;
