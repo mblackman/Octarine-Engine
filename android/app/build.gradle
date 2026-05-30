@@ -82,7 +82,11 @@ if (!projectIniFile.exists()) {
 }
 def appMinSdk  = (identityProp('octarine.minSdk', 'min_android_sdk', '28').toString()) as Integer   // floor pinned by the vcpkg triplet API level
 def appNdk     = prop('octarine.ndkVersion', '28.2.13676358')
-def abi        = prop('octarine.abi', 'arm64-v8a')
+// Local name avoids `abi` because the android { bundle { abi { ... } } } DSL closure resolves
+// receiver methods against the enclosing closure binding first; a `def abi` in scope shadows the
+// BundleOptions `abi` method and Groovy ends up calling `String.call(closure)` (fails with
+// "No signature of method: java.lang.String.call() is applicable for argument types").
+def primaryAbi = prop('octarine.abi', 'arm64-v8a')
 
 // Per-project platform knobs from project.ini. CLI > project.ini > default precedence, mirroring
 // the CMake side (cmake/OctarinePackage.cmake's identity block). Values become AndroidManifest
@@ -123,7 +127,7 @@ appPermissionList.each { p ->
 // one-flag change: -Poctarine.abi=x86_64 selects both the x86_64 ABI and the x64-android triplet.
 def tripletForAbi = ['arm64-v8a': 'arm64-android', 'x86_64': 'x64-android',
                      'armeabi-v7a': 'arm-android', 'x86': 'x86-android']
-def vcpkgTriplet = prop('octarine.triplet', tripletForAbi.getOrDefault(abi, 'arm64-android'))
+def vcpkgTriplet = prop('octarine.triplet', tripletForAbi.getOrDefault(primaryAbi, 'arm64-android'))
 
 // Multi-ABI mode for shippable AAB. -Poctarine.abis=arm64-v8a,armeabi-v7a,x86_64 turns on the
 // manual orchestration path: AGP's externalNativeBuild is bypassed (it can only run ONE vcpkg
@@ -133,7 +137,7 @@ def vcpkgTriplet = prop('octarine.triplet', tripletForAbi.getOrDefault(abi, 'arm
 def abisProp     = project.findProperty('octarine.abis')
 def multiAbi     = abisProp != null && !abisProp.toString().trim().isEmpty()
 def abiList      = multiAbi ? abisProp.toString().split(',').collect{ it.trim() }.findAll{ !it.isEmpty() }
-                            : [abi]
+                            : [primaryAbi]
 def nativeBuildRoot = "${layout.buildDirectory.get().asFile}/octarineJni"
 
 def repoRoot = "${rootDir}/.."                                  // android/ sits at <repo>/android
