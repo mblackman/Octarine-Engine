@@ -140,7 +140,12 @@ int main()
     Check(TableHasFunction(lua, "input", "is_key_down"), "input.is_key_down (InputSystem surface)");
 
     std::cout << "[manifest] generator runs\n";
-    Check(LuaApiManifest::Write(lua, preBinding, "lua_api.smoke.lua"), "manifest written");
+#ifdef LUA_API_SMOKE_OUTPUT
+    const std::string smokeOutPath = LUA_API_SMOKE_OUTPUT;
+#else
+    const std::string smokeOutPath = "lua_api.smoke.lua";
+#endif
+    Check(LuaApiManifest::Write(lua, preBinding, smokeOutPath), "manifest written");
 
     if (g_failures == 0)
     {
