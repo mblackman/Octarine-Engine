@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780181422093,
+  "lastUpdate": 1780183617433,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -5976,6 +5976,114 @@ window.BENCHMARK_DATA = {
             "value": 697998.1520727499,
             "unit": "ns/iter",
             "extra": "iterations: 1005\ncpu: 697849.7572139422 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "50160ab9c748fa94c0e1bbb300868e274fe937ff",
+          "message": "Add OCPK asset bundle (Stage 14 B4): bake-time pack + runtime open (#69)\n\nA shipped build now reads every cataloged asset out of a single\nasset_bundle.pak archive sitting next to asset_manifest.lua, instead of\nwalking the loose asset tree inside the APK/.app/.dmg. Dev builds (and\nprojects that haven't baked yet) keep loading from disk — the helper that\nopens each asset's SDL_IOStream tries the pak first and falls back to\nSDL_IOFromFile when no pak is wired in, so dev/bootstrap/shipped paths all\nshare one code path.\n\nFormat (\"OCPK\" v1, little-endian):\n  [24] header   = magic 'OCPK' | u32 version | u64 toc_off | u32 toc_count | u32 reserved\n  [data...]     raw blob bytes concatenated in TOC order\n  [TOC...]      repeated `toc_count` times:\n                  u64 offset (from file start)\n                  u64 size\n                  u16 path_len\n                  char path[path_len]   (project-relative, forward slashes, no NUL)\n\nWhole-file load via SDL_LoadFile at startup + per-asset SDL_IOFromConstMem\nslices keeps the runtime path simple — memory cost ≈ total baked asset\nbytes, fine for indie shipping budgets. A future swap to a custom\nSDL_IOStreamInterface backed by pread() leaves the lookup map unchanged.\n\nWiring:\n  - AssetPak::Pack walks AssetCatalog::Entries(), reads each fullPath +\n    appends the bytes, builds the TOC. Dedupes by source file: a font that\n    appears in the catalog at multiple sizes still gets one pak entry.\n  - Game::Bake emits asset_bundle.pak right after WriteManifest. Manifest\n    write is the gate — a failed bake never ships a partial pak.\n  - Game::Setup probes for asset_bundle.pak under the shipped/use-manifest\n    branch, stashes the opened AssetPak in the Registry, and hands a\n    non-owning pointer to AssetManager.\n  - AssetManager::OpenAssetIO is the new chokepoint for the three load\n    sites (texture/font/audio); SDL_IOFromFile is the fallback.\n\nRound-trip test in OctarineAssetPipelineTest: pack the fixture catalog,\nreopen, byte-compare every cataloged file's pak slice against its source\non disk.",
+          "timestamp": "2026-05-30T16:47:58-06:00",
+          "tree_id": "83658b7c6cd5ea1fcc714b3c11f3443302af16a4",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/50160ab9c748fa94c0e1bbb300868e274fe937ff"
+        },
+        "date": 1780183608657,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4068.251984468501,
+            "unit": "ns/iter",
+            "extra": "iterations: 169536\ncpu: 4107.797801056894 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16584.921418295875,
+            "unit": "ns/iter",
+            "extra": "iterations: 43332\ncpu: 16634.207629465192 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 110594.3615619406,
+            "unit": "ns/iter",
+            "extra": "iterations: 6288\ncpu: 110649.5120865141 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 877543.8799475501,
+            "unit": "ns/iter",
+            "extra": "iterations: 807\ncpu: 877692.8674101523 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1735285.5415372339,
+            "unit": "ns/iter",
+            "extra": "iterations: 403\ncpu: 1735464.8883375046 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2381.129241246572,
+            "unit": "ns/iter",
+            "extra": "iterations: 295231\ncpu: 2369.1028448923453 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10073.731255433435,
+            "unit": "ns/iter",
+            "extra": "iterations: 68815\ncpu: 10061.605042502404 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 70489.29730298315,
+            "unit": "ns/iter",
+            "extra": "iterations: 9897\ncpu: 70465.27715471058 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 401541.00398423005,
+            "unit": "ns/iter",
+            "extra": "iterations: 1735\ncpu: 401494.61959650874 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2163.647357600904,
+            "unit": "ns/iter",
+            "extra": "iterations: 326925\ncpu: 2129.359856237928 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6596.389722670954,
+            "unit": "ns/iter",
+            "extra": "iterations: 108823\ncpu: 6558.677862220478 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41110.290248768506,
+            "unit": "ns/iter",
+            "extra": "iterations: 16973\ncpu: 41070.19866845782 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 318943.85027538013,
+            "unit": "ns/iter",
+            "extra": "iterations: 2196\ncpu: 318822.7864298581 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 635876.5352884457,
+            "unit": "ns/iter",
+            "extra": "iterations: 1096\ncpu: 635759.1596714956 ns\nthreads: 1"
           }
         ]
       }
