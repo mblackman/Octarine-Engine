@@ -18,8 +18,13 @@
 # Behavior on missing inputs (each is a non-fatal skip, so projects mid-bootstrap still build):
 #   • icon= absent           → status message, no files emitted (platform falls back to template
 #                              defaults: SDL green robot on Android, CPack default icons on desktop).
-#   • magick/convert absent  → warning, no files emitted (same fallback path).
 #   • icon file missing      → fatal error (a typoed path is a misconfig, not a fallback).
+#
+# Resize/encode is handled by scripts/octarine-icon-tool — a vendored host-only stb-based exe.
+# It is configured + built on demand from this script, so the only host requirement is a working
+# C++17 compiler (the same one that builds the engine). The old ImageMagick PATH dep is gone.
+# macOS still shells out to `iconutil` for .icns assembly (no good cross-platform replacement);
+# this script stages the iconset via the tool, then invokes iconutil to pack it.
 #
 # Generated layout under OUT_DIR:
 #   android/
@@ -96,32 +101,67 @@ if (NOT _sc_match)
     message(FATAL_ERROR "octarine-icons: splash_color `${_splash_color}` must be #rrggbb")
 endif ()
 
-# ---- ImageMagick locate -------------------------------------------------------------------------
+# ---- icon-tool build (host helper) --------------------------------------------------------------
 
-find_program(_magick NAMES magick convert)
-if (NOT _magick)
-    message(WARNING "octarine-icons: ImageMagick (magick/convert) not on PATH — skipping icon generation. "
-                    "Install it (apt: imagemagick, brew: imagemagick, choco: imagemagick) and re-run.")
-    return()
+# Configure + build the vendored octarine-icon-tool if its exe is missing or its source has been
+# touched since the last build. Output lives under OCTARINE_ICON_OUT_DIR so callers that pass a
+# scratch dir get a clean rebuild; the configure cost is amortized across the same caller's
+# subsequent platform emissions (single -P invocation does android+desktop in one go).
+set(_tool_root "${CMAKE_CURRENT_LIST_DIR}/octarine-icon-tool")
+set(_tool_build "${OCTARINE_ICON_OUT_DIR}/_octarine_icon_tool_build")
+set(_tool_src "${_tool_root}/main.cpp")
+if (NOT EXISTS "${_tool_src}")
+    message(FATAL_ERROR "octarine-icons: icon-tool source missing at ${_tool_src}")
 endif ()
-# `magick convert in out` is the IM7 form; IM6's `convert` takes the same args without the prefix.
-get_filename_component(_magick_name "${_magick}" NAME_WE)
-if (_magick_name STREQUAL "magick")
-    set(_im_cmd "${_magick}")
+
+# Stable runtime output dir set inside the tool's CMakeLists; works for both single-config (Ninja,
+# Make) and multi-config (MSVC, Xcode) generators.
+if (CMAKE_HOST_WIN32)
+    set(_tool_exe "${_tool_build}/bin/octarine-icon-tool.exe")
 else ()
-    set(_im_cmd "${_magick}")  # IM6: convert directly
+    set(_tool_exe "${_tool_build}/bin/octarine-icon-tool")
 endif ()
 
-# Helper: resize source into a square PNG.
+set(_need_build TRUE)
+if (EXISTS "${_tool_exe}" AND NOT "${_tool_src}" IS_NEWER_THAN "${_tool_exe}")
+    set(_need_build FALSE)
+endif ()
+
+if (_need_build)
+    file(MAKE_DIRECTORY "${_tool_build}")
+    execute_process(
+            COMMAND "${CMAKE_COMMAND}" -S "${_tool_root}" -B "${_tool_build}"
+            RESULT_VARIABLE _rc
+            OUTPUT_VARIABLE _out
+            ERROR_VARIABLE _err)
+    if (NOT _rc EQUAL 0)
+        message(FATAL_ERROR "octarine-icons: icon-tool configure failed:\n${_out}${_err}")
+    endif ()
+    execute_process(
+            COMMAND "${CMAKE_COMMAND}" --build "${_tool_build}" --config Release --parallel
+            RESULT_VARIABLE _rc
+            OUTPUT_VARIABLE _out
+            ERROR_VARIABLE _err)
+    if (NOT _rc EQUAL 0)
+        message(FATAL_ERROR "octarine-icons: icon-tool build failed:\n${_out}${_err}")
+    endif ()
+endif ()
+
+if (NOT EXISTS "${_tool_exe}")
+    message(FATAL_ERROR "octarine-icons: expected icon-tool exe at ${_tool_exe} after build — generator layout mismatch")
+endif ()
+
+# Helper: resize source into a square PNG via the tool.
 function(_octarine_emit_png OUT_PATH SIZE)
     get_filename_component(_dir "${OUT_PATH}" DIRECTORY)
     file(MAKE_DIRECTORY "${_dir}")
     execute_process(
-            COMMAND "${_im_cmd}" "${_icon_src}" -resize ${SIZE}x${SIZE} -background none -gravity center -extent ${SIZE}x${SIZE} "${OUT_PATH}"
+            COMMAND "${_tool_exe}" resize "${_icon_src}" "${OUT_PATH}" "${SIZE}"
             RESULT_VARIABLE _rc
+            OUTPUT_VARIABLE _out
             ERROR_VARIABLE _err)
     if (NOT _rc EQUAL 0)
-        message(FATAL_ERROR "octarine-icons: magick failed (${SIZE}px → ${OUT_PATH}):\n${_err}")
+        message(FATAL_ERROR "octarine-icons: icon-tool resize failed (${SIZE}px → ${OUT_PATH}):\n${_out}${_err}")
     endif ()
 endfunction()
 
@@ -203,26 +243,53 @@ elseif (OCTARINE_ICON_PLATFORM STREQUAL "desktop")
     file(MAKE_DIRECTORY "${_root}")
 
     if (OCTARINE_ICON_DESKTOP_OS STREQUAL "windows")
-        # Multi-resolution .ico. Windows picks the closest match at runtime.
+        # Multi-resolution .ico (PNG entries; Vista+). Windows picks the closest match at runtime.
         execute_process(
-                COMMAND "${_im_cmd}" "${_icon_src}" -define icon:auto-resize=256,128,64,48,32,16
+                COMMAND "${_tool_exe}" ico "${_icon_src}"
                         "${_root}/octarine_icon.ico"
-                RESULT_VARIABLE _rc ERROR_VARIABLE _err)
+                        "256,128,64,48,32,16"
+                RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
         if (NOT _rc EQUAL 0)
-            message(FATAL_ERROR "octarine-icons: .ico emit failed:\n${_err}")
+            message(FATAL_ERROR "octarine-icons: .ico emit failed:\n${_out}${_err}")
         endif ()
         message(STATUS "octarine-icons: ${_root}/octarine_icon.ico")
     elseif (OCTARINE_ICON_DESKTOP_OS STREQUAL "macos")
-        # ImageMagick writes .icns directly (single-image; macOS scales for the various Finder
-        # sizes). A more polished build would use `iconutil` to pack an iconset of multiple
-        # resolutions — defer that until someone needs sharper Finder thumbnails.
-        execute_process(
-                COMMAND "${_im_cmd}" "${_icon_src}" -resize 1024x1024
-                        "${_root}/octarine_icon.icns"
-                RESULT_VARIABLE _rc ERROR_VARIABLE _err)
-        if (NOT _rc EQUAL 0)
-            message(FATAL_ERROR "octarine-icons: .icns emit failed:\n${_err}")
+        # Stage an iconset directory, then let `iconutil` pack it as an .icns. iconset names are
+        # fixed by Apple — each entry maps a (size, scale factor) pair to a square PNG. We emit
+        # the full Big Sur ladder so Finder thumbnails are crisp at every density.
+        set(_iconset "${_root}/octarine_icon.iconset")
+        file(MAKE_DIRECTORY "${_iconset}")
+        set(_pairs
+                icon_16x16.png       16
+                icon_16x16@2x.png    32
+                icon_32x32.png       32
+                icon_32x32@2x.png    64
+                icon_128x128.png     128
+                icon_128x128@2x.png  256
+                icon_256x256.png     256
+                icon_256x256@2x.png  512
+                icon_512x512.png     512
+                icon_512x512@2x.png  1024)
+        list(LENGTH _pairs _np)
+        math(EXPR _nplast "${_np} - 1")
+        foreach (_pi RANGE 0 ${_nplast} 2)
+            list(GET _pairs ${_pi} _pname)
+            math(EXPR _pi1 "${_pi} + 1")
+            list(GET _pairs ${_pi1} _psize)
+            _octarine_emit_png("${_iconset}/${_pname}" ${_psize})
+        endforeach ()
+        find_program(_iconutil iconutil)
+        if (NOT _iconutil)
+            message(FATAL_ERROR "octarine-icons: iconutil not on PATH (Xcode command-line tools needed for .icns).")
         endif ()
+        execute_process(
+                COMMAND "${_iconutil}" -c icns "${_iconset}" -o "${_root}/octarine_icon.icns"
+                RESULT_VARIABLE _rc OUTPUT_VARIABLE _out ERROR_VARIABLE _err)
+        if (NOT _rc EQUAL 0)
+            message(FATAL_ERROR "octarine-icons: iconutil failed:\n${_out}${_err}")
+        endif ()
+        # iconset/ is scratch — only the .icns is consumed downstream.
+        file(REMOVE_RECURSE "${_iconset}")
         message(STATUS "octarine-icons: ${_root}/octarine_icon.icns")
     elseif (OCTARINE_ICON_DESKTOP_OS STREQUAL "linux")
         _octarine_emit_png("${_root}/octarine_icon.png" 256)

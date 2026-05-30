@@ -159,10 +159,12 @@ metadata from that single input:
 (iOS `AppIcon.appiconset` + `LaunchScreen.storyboard` emitter lives on
 `defer/ios`.)
 
-**ImageMagick is required.** Install `magick` (or the older `convert`) on
-`PATH`. With ImageMagick missing or `icon=` unset, the script skip-warns and
-the build ships platform defaults: Android keeps the green-robot launcher,
-desktop ships no icon.
+**No external image tool is required.** Resize + `.ico` encoding is handled
+by `scripts/octarine-icon-tool`, a vendored host-only stb-based exe built
+on demand by `octarine-icons.cmake`. macOS `.icns` assembly still shells
+out to `iconutil` (ships with Xcode command-line tools). With `icon=`
+unset, the script skip-warns and the build ships platform defaults:
+Android keeps the green-robot launcher, desktop ships no icon.
 
 Adaptive icons crop the outer ~16% of the source PNG. Leave safe padding so
 the cropped circle on Android matches the legacy square on Android 7.
@@ -294,7 +296,7 @@ working NSIS install.
 | Android NDK   | `ndk;28.2.13676358` — must match `ndkVersion` in `build.gradle` |
 | CMake         | `cmake;3.22.1` (SDK-managed) or ≥ 3.15 on `PATH`            |
 | vcpkg         | `VCPKG_ROOT` env var pointing at the checkout               |
-| ImageMagick   | `magick`/`convert` on `PATH`, only if `icon=` is set        |
+| `iconutil`    | macOS only, only if `icon=` is set (ships with Xcode CLT)   |
 
 `ANDROID_NDK_HOME` is required, not optional. vcpkg's port builds use their
 own android toolchain that finds the NDK *only* through this env var; the

@@ -30,7 +30,6 @@ runs:
           autoconf-archive \
           libtool \
           libltdl-dev \
-          imagemagick \
           libx11-dev \
           libxext-dev \
           libxrandr-dev \
