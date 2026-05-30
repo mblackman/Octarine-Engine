@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780183661231,
+  "lastUpdate": 1780184957947,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -6084,6 +6084,114 @@ window.BENCHMARK_DATA = {
             "value": 635876.5352884457,
             "unit": "ns/iter",
             "extra": "iterations: 1096\ncpu: 635759.1596714956 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "33056a43b127bf4dc23052bd9e14a53e327ee472",
+          "message": "Plumb meta.stream into SDL_mixer predecode toggle (#70)\n\nAudio entries with `meta.stream = true` now decode on demand instead of\npredecoding the full PCM at load time. `MIX_LoadAudio_IO(mixer, io,\npredecode, closeio)` flips its predecode argument from the catalog's\n`stream` flag — false for short SFX (the default; predictable play\nlatency), true for long music + ambient (flat memory footprint, decode-as-played).\n\nThe flag was already discovered + serialized end-to-end (meta -> catalog ->\nmanifest); only the consumer was hardcoded to predecode=true.\n\nTest: fixture `sounds/music.wav` w/ `meta.stream = true` sidecar; catalog\nasserts `music->stream == true` while `jump` keeps the default non-streaming\nbehavior.\n\nCloses Stage 14 / track B2 (streaming half). meta.normalize loudness pass\nis deliberately deferred — requires an ffmpeg host dep + a fresh design\ndiscussion, not worth re-introducing the PATH/skip-warn anti-pattern that\njust landed for the icon pipeline (Stage 10).",
+          "timestamp": "2026-05-30T17:00:31-06:00",
+          "tree_id": "a511c9f1a4d6fdd23dd9ce705bf89337b3a46345",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/33056a43b127bf4dc23052bd9e14a53e327ee472"
+        },
+        "date": 1780184949181,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4056.163760161255,
+            "unit": "ns/iter",
+            "extra": "iterations: 169829\ncpu: 4098.768590758931 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16096.675886029569,
+            "unit": "ns/iter",
+            "extra": "iterations: 42630\ncpu: 16150.396199858329 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 109833.14355880213,
+            "unit": "ns/iter",
+            "extra": "iterations: 6431\ncpu: 109896.16436013179 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 866367.7162389911,
+            "unit": "ns/iter",
+            "extra": "iterations: 794\ncpu: 866532.8249370275 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1709389.0381424208,
+            "unit": "ns/iter",
+            "extra": "iterations: 401\ncpu: 1709579.087281788 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2378.390960007831,
+            "unit": "ns/iter",
+            "extra": "iterations: 296058\ncpu: 2366.64021238915 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10145.146941993045,
+            "unit": "ns/iter",
+            "extra": "iterations: 69744\ncpu: 10134.200303970421 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 88293.28047975981,
+            "unit": "ns/iter",
+            "extra": "iterations: 6967\ncpu: 88271.2619491907 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 397165.39521739905,
+            "unit": "ns/iter",
+            "extra": "iterations: 1752\ncpu: 397136.7448630189 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2141.232870135074,
+            "unit": "ns/iter",
+            "extra": "iterations: 326238\ncpu: 2105.9454079533307 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6618.553224683299,
+            "unit": "ns/iter",
+            "extra": "iterations: 108226\ncpu: 6574.945096377711 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41362.93098783439,
+            "unit": "ns/iter",
+            "extra": "iterations: 16877\ncpu: 41323.090952182574 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 319732.8836397558,
+            "unit": "ns/iter",
+            "extra": "iterations: 2196\ncpu: 319618.02595629444 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 633289.3423952054,
+            "unit": "ns/iter",
+            "extra": "iterations: 1104\ncpu: 633221.3632246583 ns\nthreads: 1"
           }
         ]
       }
