@@ -92,6 +92,7 @@ set(SRC_FILES
         src/Main.cpp
         src/AssetManager/AssetManager.cpp
         src/AssetManager/AssetCatalog.cpp
+        src/AssetManager/AtlasBaker.cpp
         src/AssetManager/SceneAssetScanner.cpp
         src/ECS/Registry.cpp
         src/Game/Game.cpp
@@ -195,6 +196,9 @@ target_include_directories(${PROJECT_NAME}
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/libs
+        # libs/stb is its own include root so src/AssetManager/AtlasBaker.cpp can write
+        # `#include "stb_image.h"` — matches the pattern in scripts/octarine-icon-tool/.
+        ${CMAKE_CURRENT_SOURCE_DIR}/libs/stb
         ${LUA_INCLUDE_DIR}
 )
 
@@ -434,6 +438,7 @@ if (OCTARINE_ENABLE_TESTS)
     target_include_directories(OctarineLuaApiTest PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/libs
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs/stb
             ${LUA_INCLUDE_DIR}
     )
 
@@ -490,6 +495,7 @@ if (OCTARINE_ENABLE_TESTS)
     target_include_directories(OctarineAssetPipelineTest PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/libs
+            ${CMAKE_CURRENT_SOURCE_DIR}/libs/stb
             ${LUA_INCLUDE_DIR}
     )
 

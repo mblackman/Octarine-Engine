@@ -46,6 +46,8 @@ class RenderSpriteSystem {
     if (!sprite.cachedTexture || sprite.cachedTextureGeneration != assetGen) {
       sprite.cachedTexture = assetManager_->GetTexture(sprite.assetId);
       sprite.cachedTextureGeneration = assetGen;
+      const auto slice = assetManager_->GetAtlasSlice(sprite.assetId);
+      sprite.cachedAtlasOffset = slice.has_value() ? *slice : SDL_FRect{0, 0, 0, 0};
     }
 
     const float x = sprite.isFixed ? transform.position.x : transform.position.x - camera_.x;
@@ -57,7 +59,13 @@ class RenderSpriteSystem {
     cmd.destY = y;
     cmd.destW = sprite.width * transform.scale.x;
     cmd.destH = sprite.height * transform.scale.y;
-    cmd.srcRect = sprite.srcRect;
+    // Atlas-aware src_rect compose: a loose texture leaves cachedAtlasOffset at zero (no-op add);
+    // an atlas member adds the slice origin so the sprite's logical (sx, sy) selects inside the
+    // packed atlas instead of the standalone source PNG.
+    cmd.srcRect.x = sprite.srcRect.x + sprite.cachedAtlasOffset.x;
+    cmd.srcRect.y = sprite.srcRect.y + sprite.cachedAtlasOffset.y;
+    cmd.srcRect.w = sprite.srcRect.w;
+    cmd.srcRect.h = sprite.srcRect.h;
     cmd.rotation = transform.rotation;
     cmd.pivot = {cmd.destW * 0.5f, cmd.destH * 0.5f};
     cmd.flip = sprite.flip;
