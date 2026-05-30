@@ -11,6 +11,7 @@
 #include <type_traits>
 #include <typeindex>
 #include <typeinfo>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <utility>
@@ -450,18 +451,16 @@ class Registry {
   // requires CopyConstructible.
   template <typename T>
   T& Set(T value) {
-    const auto entityComponent = Component<T>();
     auto ptr = std::make_shared<T>(std::move(value));
     T& ref = *ptr;
-    singleton_components_[entityComponent.GetId()] = std::move(ptr);
+    singleton_components_[typeid(T).name()] = std::move(ptr);
     return ref;
   }
 
   template <typename T>
   const T& Get() const {
-    const auto entityComponent = Component<T>();
     try {
-      const auto& anyVal = singleton_components_.at(entityComponent.GetId());
+      const auto& anyVal = singleton_components_.at(typeid(T).name());
       const auto& ptr = std::any_cast<const std::shared_ptr<T>&>(anyVal);
       return *ptr;
     } catch (const std::out_of_range&) {
@@ -476,13 +475,10 @@ class Registry {
     return const_cast<T&>(static_cast<const std::decay_t<decltype(*this)>&>(*this).Get<T>());
   }
 
-  // Non-throwing singleton lookup. Returns nullptr if T has never been Set, or if the type
-  // entity has not been resolved yet (i.e., Component<T>() was never called).
+  // Non-throwing singleton lookup. Returns nullptr if T has never been Set.
   template <typename T>
   [[nodiscard]] T* TryGet() {
-    const auto entityComponent = TryComponent<T>();
-    if (!entityComponent.has_value()) return nullptr;
-    const auto it = singleton_components_.find(entityComponent->GetId());
+    const auto it = singleton_components_.find(typeid(T).name());
     if (it == singleton_components_.end()) return nullptr;
     if (const auto* ptr = std::any_cast<std::shared_ptr<T>>(&it->second)) return ptr->get();
     return nullptr;
@@ -628,7 +624,13 @@ class Registry {
   std::unordered_map<ArchetypeID, std::unique_ptr<Archetype>> archetypes_;
   std::unique_ptr<Archetype> root_archetype_;  // The root of the archetype graph. Empty signature.
   std::vector<std::unique_ptr<ISystem>> systems_;
-  std::unordered_map<ComponentID, std::any> singleton_components_;
+  // Singleton storage keyed by typeid(T).name() (string_view into static storage). Was
+  // ComponentID-keyed via Component<T>(), but on Android NDK with -fvisibility=hidden, opaque-type
+  // pointers like MIX_Mixer* get TU-local typeinfo; std::type_index in type_to_entity_ produces
+  // different keys per TU and Set/TryGet mismatch silently. typeid(T).name() returns the mangled
+  // name, whose CONTENTS are identical across TUs even when the pointer addresses differ — so
+  // a string_view comparison hashes/compares by contents and matches across TUs.
+  std::unordered_map<std::string_view, std::any> singleton_components_;
   std::unordered_map<std::type_index, Entity> type_to_entity_;
   std::unordered_map<std::string, Entity> tag_to_entity_;
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
