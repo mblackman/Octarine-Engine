@@ -11,8 +11,23 @@
 
 #include "../Game/GameConfig.h"
 #include "../General/Logger.h"
+#include "AssetManager/AssetPak.h"
 
 AssetManager::~AssetManager() { ClearAssets(); }
+
+SDL_IOStream *AssetManager::OpenAssetIO(const std::string &fullPath) const {
+  if (asset_pak_ != nullptr && asset_pak_->IsOpen() && !base_path_.empty()) {
+    std::error_code ec;
+    const std::filesystem::path rel =
+        std::filesystem::relative(std::filesystem::path(fullPath), std::filesystem::path(base_path_), ec);
+    if (!ec && !rel.empty()) {
+      if (SDL_IOStream *io = asset_pak_->OpenIO(rel.generic_string()); io != nullptr) {
+        return io;
+      }
+    }
+  }
+  return SDL_IOFromFile(fullPath.c_str(), "rb");
+}
 void AssetManager::LoadGameConfig(const GameConfig &config) {
   base_path_ = config.GetAssetPath();
   if (config.GetDefaultScaleMode().has_value()) {
@@ -168,8 +183,9 @@ int AssetManager::Validate(const std::vector<AssetReference> &refs) const {
 void AssetManager::AddTexture(SDL_Renderer *renderer, const std::string &assetId, const std::string &path) {
   const std::string fullPath = GetFullPath(path);
 
-  // Route through SDL IO so the same path resolves on desktop, an APK asset root, or a .app bundle.
-  SDL_IOStream *io = SDL_IOFromFile(fullPath.c_str(), "rb");
+  // Route through OpenAssetIO so the same path resolves on desktop, an APK asset root, a .app
+  // bundle, or — for shipped builds — the OCPK asset bundle.
+  SDL_IOStream *io = OpenAssetIO(fullPath);
   if (!io) {
     Logger::Error("Failed to open texture file " + fullPath + ": " + std::string(SDL_GetError()));
     return;
@@ -209,7 +225,7 @@ SDL_Texture *AssetManager::GetTexture(const std::string &assetId) const {
 
 void AssetManager::AddFont(const std::string &assetId, const std::string &path, const float fontSize) {
   const std::string fullPath = GetFullPath(path);
-  SDL_IOStream *io = SDL_IOFromFile(fullPath.c_str(), "rb");
+  SDL_IOStream *io = OpenAssetIO(fullPath);
   if (!io) {
     Logger::Error("Failed to open font file " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;
@@ -238,7 +254,7 @@ void AssetManager::AddAudioClip(MIX_Mixer *mixer, const std::string &assetId, co
   }
 
   const std::string fullPath = GetFullPath(path);
-  SDL_IOStream *io = SDL_IOFromFile(fullPath.c_str(), "rb");
+  SDL_IOStream *io = OpenAssetIO(fullPath);
   if (!io) {
     Logger::Error("Failed to open audio file " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;

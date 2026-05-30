@@ -13,6 +13,7 @@
 #include "../Events/KeyInputEvent.h"
 #include "../General/Logger.h"
 #include "AssetManager/AssetCatalog.h"
+#include "AssetManager/AssetPak.h"
 #include "AssetManager/SceneAssetScanner.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
@@ -559,6 +560,20 @@ bool Game::RunBakeValidation(const std::string& assetPath)
             manifestPath);
     }
 
+    // Pack every cataloged asset into a single asset_bundle.pak alongside the manifest. Shipped
+    // builds (OCTARINE_SHIPPED) open this in place of the loose asset tree; dev builds ignore it
+    // and read the original files. Manifest write is the source-of-truth gate — if that failed,
+    // skip the pak so a stale archive doesn't ship.
+    if (wrote)
+    {
+        const std::string pakPath = (std::filesystem::path(assetPath) / "asset_bundle.pak").string();
+        if (!AssetPak::Pack(assetManager.GetCatalog(), pakPath, assetPath))
+        {
+            Logger::Error("Bake: AssetPak::Pack failed for " + pakPath);
+            return false;
+        }
+    }
+
     if (bake_validation_failures_ > 0)
     {
         Logger::Error("Bake: " + std::to_string(bake_validation_failures_) +
@@ -696,6 +711,21 @@ void Game::Setup()
 #endif
         assetManager.GetCatalog().Build(assetManager.GetBasePath(), lua, gameConfig, allowManifest);
         assetManager.GetCatalog().DumpToLog();
+
+        // Shipped builds (and a dev build with --use-manifest) probe for an asset_bundle.pak
+        // beside the manifest. When present, AssetManager reads every asset out of it instead of
+        // the loose tree — same code paths, different SDL_IOStream source. Absence is fine:
+        // dev/bootstrap projects haven't baked one yet.
+        if (allowManifest)
+        {
+            const std::string pakPath = (std::filesystem::path(assetManager.GetBasePath()) /
+                                         "asset_bundle.pak").string();
+            auto& pak = registry_->Set<AssetPak>(AssetPak());
+            if (pak.Open(pakPath))
+            {
+                assetManager.SetAssetPak(&pak);
+            }
+        }
 
         // Expose the global `assets` table (id -> id, raises on typo) so scripts can reference
         // ids safely before LoadGame runs the startup script.
