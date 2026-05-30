@@ -7,16 +7,22 @@
 
 #include <sol/sol.hpp>
 
+#include <cstring>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
+#include <set>
 #include <string>
+#include <vector>
 
 #include "AssetManager/AssetCatalog.h"
 #include "AssetManager/AssetManager.h"
 #include "AssetManager/AssetMetadata.h"
+#include "AssetManager/AssetPak.h"
 #include "AssetManager/AssetReference.h"
 #include "AssetManager/SceneAssetScanner.h"
+#include <SDL3/SDL.h>
 
 namespace
 {
@@ -238,6 +244,76 @@ int main()
         Check(!bad.valid(), "assets.<unknown> raises instead of returning nil");
     }
 #endif
+
+    std::cout << "[pak] round-trip pack/open via fixture catalog\n";
+    {
+        // SDL needed for SDL_LoadFile / SDL_IOFromConstMem during Open/OpenIO.
+        SDL_Init(0);
+
+        sol::state lua;
+        lua.open_libraries(sol::lib::base, sol::lib::table);
+
+        AssetCatalog catalog;
+        catalog.Build(ASSET_TEST_FIXTURE_DIR, lua, std::optional<ScaleMode>(ScaleMode::Nearest));
+        Check(catalog.Size() > 0, "pak round-trip: fixture catalog has entries");
+
+        const std::filesystem::path tmpDir =
+            std::filesystem::temp_directory_path() / "octarine_asset_pak_test";
+        std::error_code ec;
+        std::filesystem::create_directories(tmpDir, ec);
+        const std::string pakPath = (tmpDir / "asset_bundle.pak").string();
+
+        const bool packed = AssetPak::Pack(catalog, pakPath, ASSET_TEST_FIXTURE_DIR);
+        Check(packed, "AssetPak::Pack succeeds");
+
+        AssetPak pak;
+        Check(pak.Open(pakPath), "AssetPak::Open succeeds on freshly packed file");
+        // The pak dedupes by source file: a font that appears in the catalog at multiple sizes
+        // shares one underlying file + one pak entry. Compare against unique fullPath count, not
+        // raw catalog.Size().
+        std::set<std::string> uniqueFullPaths;
+        for (const auto& [id, entry] : catalog.Entries()) {
+            uniqueFullPaths.insert(entry.fullPath);
+        }
+        Check(pak.Size() == uniqueFullPaths.size(), "pak entry count matches unique source-file count");
+
+        // Byte-compare every entry: read original file off disk, fetch the pak slice via OpenIO,
+        // confirm length + contents match. Proves the offset/size TOC + memory-mapped slice
+        // serve the same bytes the loose tree would have.
+        int compared = 0;
+        int mismatch = 0;
+        for (const auto& [id, entry] : catalog.Entries())
+        {
+            const std::filesystem::path rel = std::filesystem::relative(
+                std::filesystem::path(entry.fullPath),
+                std::filesystem::path(ASSET_TEST_FIXTURE_DIR));
+            const std::string relStr = rel.generic_string();
+
+            std::ifstream src(entry.fullPath, std::ios::binary);
+            const std::vector<char> srcBytes((std::istreambuf_iterator<char>(src)),
+                                              std::istreambuf_iterator<char>());
+
+            SDL_IOStream* io = pak.OpenIO(relStr);
+            if (io == nullptr)
+            {
+                ++mismatch;
+                continue;
+            }
+            std::vector<char> pakBytes(srcBytes.size());
+            const size_t got = SDL_ReadIO(io, pakBytes.data(), pakBytes.size());
+            SDL_CloseIO(io);
+            if (got != srcBytes.size() || std::memcmp(pakBytes.data(), srcBytes.data(), got) != 0)
+            {
+                ++mismatch;
+            }
+            ++compared;
+        }
+        Check(compared == static_cast<int>(catalog.Size()), "every catalog entry resolves through the pak");
+        Check(mismatch == 0, "every pak entry's bytes match the source file exactly");
+
+        std::filesystem::remove_all(tmpDir, ec);
+        SDL_Quit();
+    }
 
     if (g_failures == 0)
     {
