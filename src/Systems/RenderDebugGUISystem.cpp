@@ -34,6 +34,7 @@
 #include "../Editor/EditorPersistence.h"
 #include "../Editor/Inspectors/ComponentInspectorRegistry.h"
 #include "../Editor/Inspectors/InspectorWidgets.h"
+#include "../Editor/PlayerLauncher.h"
 
 namespace
 {
@@ -87,6 +88,8 @@ const float deltaTime) {
   const bool projectLoaded = gameConfig.HasLoadedConfig();
 #ifdef OCTARINE_WITH_EDITOR
 auto& editorPersistence = registry->Get<EditorPersistence>();
+auto& playerLauncher = registry->Get<octarine::editor::PlayerLauncher>();
+playerLauncher.Pump();
 const bool editorSession = gameConfig.IsEditorMode() || !projectLoaded;
 const bool showEditorUI = editorSession;
 #endif
@@ -198,6 +201,7 @@ static bool openSaveLayoutModal = false;
             ImGui::MenuItem("Performance Profiler", nullptr, &editorPersistence.showProfiler);
             ImGui::MenuItem("Engine Options", nullptr, &editorPersistence.showEngineOptions);
             ImGui::MenuItem("Editor Settings", nullptr, &editorPersistence.showEditorSettings);
+            ImGui::MenuItem("Player Output", nullptr, &editorPersistence.showPlayerOutput);
             ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI);
             ImGui::Separator();
             ImGui::MenuItem("FPS Counter", nullptr, &engineOptions.showFpsCounter);
@@ -258,6 +262,32 @@ static bool openSaveLayoutModal = false;
                     editorPersistence.masterVolume = engineOptions.masterVolume;
                     editorPersistence.SaveGlobal(); // persist immediately
                 }
+
+                ImGui::SameLine();
+                // Run Player / Stop Player: spawns the standalone OctarineEngine-player process
+                // pointed at the currently-loaded project. Separate from the embedded Play button
+                // above, which only resumes the in-editor scene.
+                {
+                    const bool playerRunning =
+                        playerLauncher.Status() == octarine::editor::PlayerStatus::Running;
+                    const bool canRun = projectLoaded || !registry->Get<AssetManager>().GetBasePath().empty();
+                    ImGui::BeginDisabled(!playerRunning && !canRun);
+                    if (ImGui::Button(playerRunning ? "Stop Player" : "Run Player"))
+                    {
+                        if (playerRunning)
+                        {
+                            playerLauncher.Stop();
+                        }
+                        else
+                        {
+                            // Player Output panel auto-opens so the dev sees launch / spawn errors.
+                            editorPersistence.showPlayerOutput = true;
+                            const std::string projectDir = registry->Get<AssetManager>().GetBasePath();
+                            playerLauncher.Run(std::filesystem::path(projectDir));
+                        }
+                    }
+                    ImGui::EndDisabled();
+                }
                 ImGui::EndMenuBar();
             }
         }
@@ -305,6 +335,8 @@ static bool openSaveLayoutModal = false;
         EngineOptionsWindow(engineOptions, &editorPersistence.showEngineOptions);
     if (editorPersistence.showEditorSettings)
         EditorSettingsWindow(editorPersistence, &editorPersistence.showEditorSettings);
+    if (editorPersistence.showPlayerOutput)
+        PlayerOutputWindow(game, &editorPersistence.showPlayerOutput);
 
     if (engineOptions.showImGuiDemoWindow)
     {
@@ -884,6 +916,87 @@ void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua)
         ImGui::SetKeyboardFocusHere(-1);
         reclaimFocus = false;
     }
+
+    ImGui::End();
+}
+
+void RenderDebugGUISystem::PlayerOutputWindow(Game* game, bool* p_open)
+{
+    auto& launcher = game->GetRegistry()->Get<octarine::editor::PlayerLauncher>();
+
+    ImGui::SetNextWindowSize(ImVec2(560, 400), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Player Output", p_open, ImGuiWindowFlags_NoScrollbar))
+    {
+        ImGui::End();
+        return;
+    }
+
+    const auto status = launcher.Status();
+    const char* statusText = "Idle";
+    ImVec4 statusColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
+    switch (status)
+    {
+    case octarine::editor::PlayerStatus::Running:
+        statusText = "Running";
+        statusColor = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
+        break;
+    case octarine::editor::PlayerStatus::Exited:
+        statusText = "Exited";
+        statusColor = ImVec4(1.0F, 1.0F, 0.4F, 1.0F);
+        break;
+    case octarine::editor::PlayerStatus::FailedToLaunch:
+        statusText = "Failed to launch";
+        statusColor = ImVec4(1.0F, 0.4F, 0.4F, 1.0F);
+        break;
+    case octarine::editor::PlayerStatus::Idle:
+    default:
+        break;
+    }
+    ImGui::TextDisabled("Status:");
+    ImGui::SameLine();
+    ImGui::TextColored(statusColor, "%s", statusText);
+    if (const auto code = launcher.LastExitCode())
+    {
+        ImGui::SameLine();
+        ImGui::TextDisabled("(exit %d)", *code);
+    }
+    if (!launcher.ResolvedBinary().empty())
+    {
+        ImGui::TextDisabled("Binary: %s", launcher.ResolvedBinary().string().c_str());
+    }
+
+    if (ImGui::Button("Clear"))
+    {
+        launcher.ClearLog();
+    }
+    ImGui::SameLine();
+    static bool autoScroll = true;
+    ImGui::Checkbox("Auto-scroll", &autoScroll);
+
+    ImGui::Separator();
+
+    ImGui::BeginChild("PlayerOutputScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+    const auto snap = launcher.LogCopy();
+    if (snap.total_dropped > 0)
+    {
+        ImGui::TextDisabled("[older %zu lines dropped]", snap.total_dropped);
+    }
+    for (const auto& line : snap.lines)
+    {
+        if (line.is_stderr)
+        {
+            ImGui::TextColored(ImVec4(1.0F, 0.5F, 0.5F, 1.0F), "%s", line.text.c_str());
+        }
+        else
+        {
+            ImGui::TextUnformatted(line.text.c_str());
+        }
+    }
+    if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+    {
+        ImGui::SetScrollHereY(1.0F);
+    }
+    ImGui::EndChild();
 
     ImGui::End();
 }
