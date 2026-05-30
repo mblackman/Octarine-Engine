@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780157468727,
+  "lastUpdate": 1780159126211,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -4572,6 +4572,114 @@ window.BENCHMARK_DATA = {
             "value": 638908.0277292719,
             "unit": "ns/iter",
             "extra": "iterations: 1092\ncpu: 638769.1712454288 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b2825ba7a226bb25b0bb553aeae8f59c5f336c4d",
+          "message": "Stage emulator smoke as a script file; android-emulator-runner splits per-line (#54)\n\nreactivecircus/android-emulator-runner@v2 runs each line of its `script:`\ninput as a separate `sh -c` invocation. Variables set in one line aren't\nvisible in the next; `set -e` only scopes its own line; for/if/while\nblocks break entirely. The prior inline script reached\n  sh -c apk=\"android/app/build/outputs/apk/debug/app-debug.apk\"\n  sh -c [ -f \"$apk\" ] || { echo \"missing APK at $apk\"; exit 1; }\nand bailed with \"missing APK at \" because `$apk` evaluated to empty in\nthe second subshell.\n\nStage the script body to $RUNNER_TEMP via a prior `run:` step and invoke\nit from the action with `script: bash \"$RUNNER_TEMP/octarine-smoke.sh\"`.\nSingle shell process; variables, set -e, loops all behave normally.\n\nSurfaces only after the workflow-load fix (#43 / dc3e116) let any job\nactually start.",
+          "timestamp": "2026-05-30T10:32:14-06:00",
+          "tree_id": "e43e4c61e2f8b77234e8b3d99bd513bcc572c89d",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/b2825ba7a226bb25b0bb553aeae8f59c5f336c4d"
+        },
+        "date": 1780159117443,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4022.8948868514285,
+            "unit": "ns/iter",
+            "extra": "iterations: 171101\ncpu: 4052.6762497002883 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 15823.985064622415,
+            "unit": "ns/iter",
+            "extra": "iterations: 43201\ncpu: 15867.898057913668 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 107917.92452531696,
+            "unit": "ns/iter",
+            "extra": "iterations: 6527\ncpu: 107970.43940554876 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 856983.6618776605,
+            "unit": "ns/iter",
+            "extra": "iterations: 824\ncpu: 857147.6225728135 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1684615.5725329756,
+            "unit": "ns/iter",
+            "extra": "iterations: 415\ncpu: 1684827.3855421748 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2377.559236012436,
+            "unit": "ns/iter",
+            "extra": "iterations: 305965\ncpu: 2369.027568512845 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 9863.796880904754,
+            "unit": "ns/iter",
+            "extra": "iterations: 71058\ncpu: 9850.286048017828 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 69833.40210329472,
+            "unit": "ns/iter",
+            "extra": "iterations: 10056\ncpu: 69809.20107398016 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 399914.4625285261,
+            "unit": "ns/iter",
+            "extra": "iterations: 1748\ncpu: 399884.8495423485 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2186.487135828962,
+            "unit": "ns/iter",
+            "extra": "iterations: 324945\ncpu: 2148.050771667744 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6622.089350282021,
+            "unit": "ns/iter",
+            "extra": "iterations: 106409\ncpu: 6575.941602685749 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41303.642434579735,
+            "unit": "ns/iter",
+            "extra": "iterations: 16917\ncpu: 41259.96151802092 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 319223.24973193905,
+            "unit": "ns/iter",
+            "extra": "iterations: 2212\ncpu: 319114.50768536096 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 640370.9967062556,
+            "unit": "ns/iter",
+            "extra": "iterations: 1098\ncpu: 640255.4125683 ns\nthreads: 1"
           }
         ]
       }
