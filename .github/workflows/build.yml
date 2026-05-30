@@ -61,6 +61,25 @@ jobs:
         if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
         run: ctest --test-dir build/${{ matrix.preset }} --output-on-failure
 
+      - name: Check Lua API stub drift
+        id: lua_drift
+        if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
+        shell: bash
+        run: |
+          if ! git diff --quiet -- lua_api.smoke.lua; then
+            echo "::error::lua_api.smoke.lua drifted. Run OctarineLuaApiTest (editor preset) locally and commit the regenerated file."
+            git diff -- lua_api.smoke.lua | head -200
+            exit 1
+          fi
+
+      - name: Upload regenerated Lua API stub on drift
+        if: always() && steps.lua_drift.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: lua_api.smoke.lua-from-ci
+          path: lua_api.smoke.lua
+          if-no-files-found: error
+
       - name: Stage runtime DLLs (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh

@@ -414,6 +414,10 @@ if (OCTARINE_ENABLE_TESTS)
 
     # Mirror the main target's feature defines so the shared sources compile identically.
     target_compile_definitions(OctarineLuaApiTest PRIVATE GLM_FORCE_INTRINSICS)
+    # Smoke test writes its EmmyLua stub here so a repo-root copy stays in sync with the live bindings;
+    # CI diffs it against the tracked file to fail on drift.
+    target_compile_definitions(OctarineLuaApiTest PRIVATE
+            LUA_API_SMOKE_OUTPUT="${CMAKE_CURRENT_SOURCE_DIR}/lua_api.smoke.lua")
     if (OCTARINE_WITH_IMGUI)
         target_compile_definitions(OctarineLuaApiTest PRIVATE OCTARINE_WITH_IMGUI)
     endif ()

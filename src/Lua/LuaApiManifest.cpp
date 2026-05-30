@@ -16,6 +16,18 @@ namespace
         sol::object value;
     };
 
+    // Sol2 leaks internal metatable bookkeeping entries (the ♻ recycle marker, and class names that
+    // contain raw typeid strings like `glm::vec<2, float, glm::packed_highp>`) into the global table.
+    // Those mangled names are platform-specific (MSVC vs libstdc++ stringify templates differently)
+    // and would cause endless CI drift; they are also not real Lua surface. Skip anything that is
+    // obviously not a valid Lua identifier path.
+    bool IsSolInternalName(const std::string& name)
+    {
+        return name.find("\xe2\x99\xbb") != std::string::npos  // ♻ U+267B
+            || name.find("::") != std::string::npos
+            || name.find('<') != std::string::npos;
+    }
+
     // Collect string-keyed entries of a table, sorted by name for stable output.
     std::vector<NamedObject> SortedEntries(const sol::table& table)
     {
@@ -63,6 +75,7 @@ namespace
         for (const auto& member : SortedEntries(table))
         {
             if (member.name.rfind("__", 0) == 0) continue; // skip metamethods (__index, ...)
+            if (IsSolInternalName(member.name)) continue;
             if (member.value.get_type() == sol::type::function)
             {
                 EmitFunction(out, name + "." + member.name);
@@ -106,6 +119,7 @@ namespace LuaApiManifest
             if (key.get_type() != sol::type::string) continue;
             const std::string name = key.as<std::string>();
             if (before.contains(name)) continue;
+            if (IsSolInternalName(name)) continue;
             added.push_back({name, value});
         }
         std::sort(added.begin(), added.end(),
