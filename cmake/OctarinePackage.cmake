@@ -140,8 +140,7 @@ endfunction()
 
 # Generate per-OS icon files (.ico/.icns/.png) under ${OUT_DIR}/desktop. Sets ${ICO_VAR},
 # ${ICNS_VAR}, ${PNG_VAR} in the caller's scope to the conventional output paths (callers test
-# EXISTS before consuming, since the script skip-warns when project.ini has no `icon=` or
-# ImageMagick is absent).
+# EXISTS before consuming, since the script skip-warns when project.ini has no `icon=`).
 function(_octarine_generate_desktop_icons PROJECT_DIR OUT_DIR OS_NAME ICO_VAR ICNS_VAR PNG_VAR)
     execute_process(
             COMMAND "${CMAKE_COMMAND}"

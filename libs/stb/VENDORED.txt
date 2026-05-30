@@ -1,0 +1,12 @@
+stb single-file public-domain (MIT alt) libraries
+
+Source: https://github.com/nothings/stb
+Commit: 31c1ad37456438565541f4919958214b6e762fb4
+Files:  stb_image.h, stb_image_write.h, stb_image_resize2.h, LICENSE
+
+Used only by the host-side scripts/octarine-icon-tool — never linked into
+shipped engine binaries. License attribution rides along regardless via
+the libs/*/LICENSE* path in cmake/octarine-licenses.cmake.
+
+To bump: re-fetch each header at the new commit, update the SHA above,
+and verify the icon byte-for-byte tests in scripts/verify-icons.sh.

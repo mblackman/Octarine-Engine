@@ -146,8 +146,9 @@ def bakeExe = project.findProperty('octarine.bakeExe')
 def stagedAssetsDir = "${layout.buildDirectory.get().asFile}/octarineAssets"
 // Generated icon/splash resources (mipmap-*, values-v31, adaptive XML). Source-of-truth generator
 // is scripts/octarine-icons.cmake — same one CMake/CPack invoke on desktop + iOS. Skipped silently
-// when project.ini has no `icon=` or `magick`/`convert` aren't on PATH; existing res/mipmap-* +
-// AppTheme then ship as the fallback.
+// when project.ini has no `icon=`; existing res/mipmap-* + AppTheme then ship as the fallback.
+// The resize/.ico encoder is the vendored scripts/octarine-icon-tool (host-only, stb-based) —
+// no ImageMagick PATH dep.
 def generatedResDir = "${layout.buildDirectory.get().asFile}/generated/octarineIcons/res"
 def iconScript      = "${repoRoot}/scripts/octarine-icons.cmake"
 // Aggregated third-party license text (closes the App Store / Play Store attribution gap). The
@@ -365,10 +366,10 @@ tasks.register('generateOctarineIcons', Exec) {
             }
             logger.lifecycle("Octarine: generated icon/splash resources under ${generatedResDir}")
         } else {
-            // Script skipped (no `icon=`, no magick, or no project.ini). Leave the dir empty —
-            // AGP tolerates an empty extra res srcDir and the existing res/mipmap-* defaults win.
-            logger.lifecycle("Octarine: no generated icon resources (project.ini may lack `icon=` " +
-                    "or ImageMagick may not be installed); shipping defaults.")
+            // Script skipped (no `icon=` or no project.ini). Leave the dir empty — AGP tolerates
+            // an empty extra res srcDir and the existing res/mipmap-* defaults win.
+            logger.lifecycle("Octarine: no generated icon resources (project.ini lacks `icon=` " +
+                    "or is absent); shipping defaults.")
         }
     }
 }
