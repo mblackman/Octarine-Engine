@@ -1,8 +1,11 @@
 // Root build file. Modern layout: repositories + the AGP version live in settings.gradle
 // (pluginManagement / dependencyResolutionManagement). Plugins are declared here `apply false` and
 // applied per-module.
+// AGP is pulled in by buildSrc/build.gradle.kts (the octarine-native plugin's compile classpath
+// needs it), so declaring a version here would collide with "already on the classpath" — apply
+// without version + `apply false` and let app/build.gradle pull it in.
 plugins {
-    id 'com.android.application' version '8.7.3' apply false
+    id 'com.android.application' apply false
 }
 
 tasks.register('clean', Delete) {
