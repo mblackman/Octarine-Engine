@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780180974032,
+  "lastUpdate": 1780181379051,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -5868,6 +5868,114 @@ window.BENCHMARK_DATA = {
             "value": 648375.6409225051,
             "unit": "ns/iter",
             "extra": "iterations: 1108\ncpu: 648254.480144347 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a4e67bca3e0db043f72aafcc5f7a9e9f46f365bc",
+          "message": "Extract Android multi-ABI native fan-out into octarine-native plugin (#68)\n\nThe bespoke `octarineNative_<abi>_{configure,build,stage}` task tree + the\n`tasks.configureEach { if (task.name == 'preBuild') task.dependsOn ... }`\nshim that wired libmain.so into the AAB lived inline in app/build.gradle.\nCleaner home for the orchestration is a proper Gradle plugin under\nandroid/buildSrc/, applied via `id 'octarine-native'`.\n\nThe plugin uses AGP's `androidComponents.onVariants` API (per the Stage 12\nplan in ai/ShippingV1Plan.md): for each ABI it registers the same three\ntasks and then calls\n`variant.sources.jniLibs.addGeneratedSourceDirectory(stageTask, OctarineStageNativeTask::outputDirectory)`,\nwhich lets AGP derive the assembleX→stage dependency edge + the\nlib/<abi>/libmain.so packaging mapping automatically. Drops the static\n`jniLibs.srcDirs = multiAbi ? [...] : ['libs']` hack and the manual\npreBuild.dependsOn 'octarineNativeAll' wiring.\n\nSingle-ABI dev path (no -Poctarine.abis) keeps externalNativeBuild — plugin\nno-ops when the abis ListProperty is empty, so the IDE inner loop is\nunchanged.\n\nValidated via gradlew --dry-run:\n  bundleRelease -Poctarine.abis=arm64-v8a,x86_64 includes both\n    octarineNative_{arm64-v8a,x86_64}_{configure,build,stage} +\n    mergeReleaseJniLibFolders + packageReleaseBundle in the task graph.\n  assembleDebug (single-ABI) runs configureCMakeDebug[arm64-v8a] only;\n    no octarineNative_* tasks fire.\n\nCloses Stage 12 of ai/ShippingV1Plan.md.",
+          "timestamp": "2026-05-30T16:31:06-06:00",
+          "tree_id": "6aee81dd792dc33bcb400fa4246db9579677c202",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/a4e67bca3e0db043f72aafcc5f7a9e9f46f365bc"
+        },
+        "date": 1780181370310,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4147.6098808332,
+            "unit": "ns/iter",
+            "extra": "iterations: 167309\ncpu: 4179.9344267193355 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16639.13642629151,
+            "unit": "ns/iter",
+            "extra": "iterations: 41830\ncpu: 16675.733851303758 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 110272.56913096573,
+            "unit": "ns/iter",
+            "extra": "iterations: 6341\ncpu: 110325.219523738 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 852091.4943037946,
+            "unit": "ns/iter",
+            "extra": "iterations: 810\ncpu: 852206.0567901375 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1717577.4925677583,
+            "unit": "ns/iter",
+            "extra": "iterations: 409\ncpu: 1717687.6454767443 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2268.484696489653,
+            "unit": "ns/iter",
+            "extra": "iterations: 295267\ncpu: 2250.03712910684 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10158.349988591051,
+            "unit": "ns/iter",
+            "extra": "iterations: 69346\ncpu: 10137.619905977384 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 70319.90953317424,
+            "unit": "ns/iter",
+            "extra": "iterations: 9955\ncpu: 70265.2912104543 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 400939.8145844107,
+            "unit": "ns/iter",
+            "extra": "iterations: 1748\ncpu: 400900.0040045549 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2248.1215843025116,
+            "unit": "ns/iter",
+            "extra": "iterations: 318728\ncpu: 2198.570505259129 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 7005.705117972284,
+            "unit": "ns/iter",
+            "extra": "iterations: 99899\ncpu: 6949.9231323612075 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 45455.71846217013,
+            "unit": "ns/iter",
+            "extra": "iterations: 15530\ncpu: 45395.97623953115 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 351142.6728652396,
+            "unit": "ns/iter",
+            "extra": "iterations: 2019\ncpu: 350952.6121842881 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 697998.1520727499,
+            "unit": "ns/iter",
+            "extra": "iterations: 1005\ncpu: 697849.7572139422 ns\nthreads: 1"
           }
         ]
       }
