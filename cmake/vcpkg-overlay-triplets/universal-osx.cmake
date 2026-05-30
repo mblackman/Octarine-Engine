@@ -20,3 +20,11 @@ set(VCPKG_CRT_LINKAGE dynamic)
 set(VCPKG_LIBRARY_LINKAGE static)
 set(VCPKG_CMAKE_SYSTEM_NAME Darwin)
 set(VCPKG_OSX_ARCHITECTURES "arm64;x86_64")
+
+# Force libpng's PNG_ARM_NEON off: when the triplet builds the universal slice, the x86_64
+# half of the fat compile still picks up PNG_ARM_NEON_OPT=2 from libpng's CMakeLists ARM
+# detection (which looks at the *first* slice listed, arm64) and fails on x86_64 with
+# "NEON intrinsics not available with the soft-float ABI" because arm_neon.h doesn't apply.
+# Forcing PNG_ARM_NEON=off skips the NEON code path entirely on both slices — minor decode
+# perf cost on Apple-silicon Macs, but the universal binary then actually builds.
+set(VCPKG_CMAKE_CONFIGURE_OPTIONS "-DPNG_ARM_NEON=off")

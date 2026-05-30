@@ -45,16 +45,17 @@ jobs:
             platform: macos
             preset: ship-release
             pkg_glob: build/ship-release/*.dmg
-          # Universal macOS .dmg (arm64 + x86_64). Uses the universal-osx overlay triplet so vcpkg
-          # deps are fat too; cold build is ~2x the single-arch macos leg (every port compiled
-          # twice). x-gha cache is keyed on triplet so this is a fresh cold build the first time it
-          # runs — subsequent PRs hit the universal-osx cache and match the single-arch leg's wall
-          # time. Lives alongside the per-arch macos leg rather than replacing it: arm64-only ships
-          # smaller and is the common case for Apple-silicon users.
-          - os: macos-latest
-            platform: macos-universal
-            preset: ship-mac-universal
-            pkg_glob: build/ship-mac-universal/*.dmg
+          # macos-universal leg is intentionally dropped — the universal-osx triplet ran into a
+          # chain of vcpkg ports with hand-rolled per-arch assembly (libpng PNG_ARM_NEON_OPT,
+          # libjpeg-turbo "CMAKE_OSX_ARCHITECTURES cannot be multi-valued", almost certainly
+          # SDL3 + freetype too). Disabling each port's SIMD/NEON one by one became a yak shave
+          # of unknown depth, and per-arch macos legs (arm64-only) already ship via the `macos`
+          # entry above; Apple-silicon users get the arm64 .dmg, Intel users get x86_64 via the
+          # arch-swapped preset. Re-add macos-universal only when either (a) vcpkg upstream
+          # supports per-arch port builds + auto-lipo, or (b) we vendor a `multi_arch` overlay
+          # that builds each port per-arch + lipo'es the final outputs. Until then, the
+          # ship-mac-universal preset stays in tree for local opt-in builds; CI just doesn't
+          # exercise it. See ai/ShippingV1Plan.md note + ai/DeviceShippingPlan.md stage 5.
 
     steps:
       - name: Checkout engine
