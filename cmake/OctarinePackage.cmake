@@ -426,7 +426,14 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
     if (IS_DIRECTORY "${_project_license_drops}")
         list(APPEND _extra_dirs "${_project_license_drops}")
     endif ()
-    octarine_collect_licenses("${_licenses_out}" EXTRA_DIRS ${_extra_dirs})
+    # Editor-only assets (Roboto-Medium.ttf, Apache-2.0) are embedded into the binary when
+    # OCTARINE_WITH_EDITOR=ON. ship-release forces it off, so the shipped aggregate carries no
+    # Roboto section then — only editor-* desktop packages ship the binary that needs the notice.
+    set(_editor_fonts_arg "")
+    if (OCTARINE_WITH_EDITOR)
+        set(_editor_fonts_arg INCLUDE_EDITOR_FONTS)
+    endif ()
+    octarine_collect_licenses("${_licenses_out}" EXTRA_DIRS ${_extra_dirs} ${_editor_fonts_arg})
     install(FILES "${_licenses_out}" DESTINATION "${DATA_DEST}")
     set(_engine_license "${_OCTARINE_PACKAGE_DIR}/../LICENSE")
     if (EXISTS "${_engine_license}")

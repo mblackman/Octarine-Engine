@@ -16,7 +16,8 @@
 #       [INSTALLED_DIR <dir>]          # default: ${VCPKG_INSTALLED_DIR} or ${CMAKE_BINARY_DIR}/vcpkg_installed
 #       [ENGINE_ROOT <dir>]            # default: directory two up from this script (repo root)
 #       [REQUIRED_PORTS port1;port2]   # ports that MUST appear in the glob (FATAL_ERROR otherwise)
-#       [EXTRA_DIRS dir1;dir2])        # project-side drop-in dirs, each section keyed by filename stem
+#       [EXTRA_DIRS dir1;dir2]         # project-side drop-in dirs, each section keyed by filename stem
+#       [INCLUDE_EDITOR_FONTS])        # emit src/Editor/Fonts/LICENSE* (Apache-2.0 Roboto, editor builds)
 
 if (DEFINED _OCTARINE_LICENSES_INCLUDED)
     return()
@@ -61,7 +62,7 @@ function(_octarine_licenses_append_section OUT_FILE TITLE BODY_FILE)
 endfunction()
 
 function(octarine_collect_licenses OUT_FILE)
-    set(options "")
+    set(options INCLUDE_EDITOR_FONTS)
     set(oneValueArgs TRIPLET INSTALLED_DIR ENGINE_ROOT)
     set(multiValueArgs REQUIRED_PORTS EXTRA_DIRS)
     cmake_parse_arguments(OCL "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -169,6 +170,21 @@ function(octarine_collect_licenses OUT_FILE)
             _octarine_licenses_append_section("${OUT_FILE}" "${_vd} (vendored)" "${_lp}")
         endforeach ()
     endforeach ()
+
+    # 3b. Editor-only embedded assets. Roboto-Medium.ttf is compiled into Roboto_Medium.h and
+    # ships only when OCTARINE_WITH_EDITOR=ON (Android/iOS/ship-release force it off). Caller
+    # passes INCLUDE_EDITOR_FONTS in that case so the Apache-2.0 attribution rides along; ship
+    # paths leave it off so we don't claim an attribution for a binary that doesn't contain it.
+    if (OCL_INCLUDE_EDITOR_FONTS)
+        file(GLOB _editor_font_licenses
+                "${OCL_ENGINE_ROOT}/src/Editor/Fonts/LICENSE"
+                "${OCL_ENGINE_ROOT}/src/Editor/Fonts/LICENSE.txt"
+                "${OCL_ENGINE_ROOT}/src/Editor/Fonts/LICENSE.md")
+        list(SORT _editor_font_licenses)
+        foreach (_efl IN LISTS _editor_font_licenses)
+            _octarine_licenses_append_section("${OUT_FILE}" "Editor Fonts (embedded)" "${_efl}")
+        endforeach ()
+    endif ()
 
     # 4. Downstream extras. Each EXTRA_DIRS entry is globbed for *.txt and LICENSE*; section
     # title = filename stem so the project author controls the heading by naming the file.
