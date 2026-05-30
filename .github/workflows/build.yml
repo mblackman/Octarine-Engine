@@ -52,10 +52,14 @@ jobs:
 
       - name: Configure CMake
         shell: bash
-        run: cmake --preset ${{ matrix.preset }}
+        run: cmake --preset ${{ matrix.preset }} ${{ (matrix.platform == 'linux' && matrix.preset == 'editor-release') && '-DOCTARINE_ENABLE_TESTS=ON' || '' }}
 
       - name: Build
         run: cmake --build build/${{ matrix.preset }} --config Release --parallel
+
+      - name: Run engine tests (ctest)
+        if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
+        run: ctest --test-dir build/${{ matrix.preset }} --output-on-failure
 
       - name: Stage runtime DLLs (Windows)
         if: matrix.platform == 'windows'
