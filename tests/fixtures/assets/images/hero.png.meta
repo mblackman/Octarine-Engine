@@ -1,0 +1,4 @@
+-- Sidecar for hero.png: override the scale filter.
+return {
+  scale_mode = "linear",
+}

@@ -1,0 +1,4 @@
+-- Sidecar for logo.png: override the derived id.
+return {
+  id = "branding",
+}

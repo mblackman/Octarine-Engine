@@ -1,0 +1,5 @@
+-- Sidecar for title.ttf: custom id base + two glyph sizes.
+return {
+  id = "title",
+  sizes = { 12, 24 },
+}
