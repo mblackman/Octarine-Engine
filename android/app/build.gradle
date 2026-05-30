@@ -259,6 +259,11 @@ android {
         // Generated mipmap-*/values-v31 ride beside the committed res tree; AAPT2 merges them so
         // ic_launcher.png and the splash AppTheme override land in the APK with no manual placement.
         res.srcDir generatedResDir
+        // Permissions overlay manifest written at config time below. Pointing
+        // sourceSets.main.manifest.srcFile here replaces the committed src/main/AndroidManifest.xml
+        // for the build; the overlay generator copies the committed file + injects project.ini
+        // <uses-permission> entries, so the staged file is a strict superset.
+        manifest.srcFile "${layout.buildDirectory.get().asFile}/octarine_extras/AndroidManifest.xml"
     }
 
     // AAB per-ABI splits: Play delivers an APK carrying only the device's ABI rather than the full
@@ -275,27 +280,25 @@ android {
     }
 }
 
-// Generate the <uses-permission> overlay manifest from project.ini's `permissions=` list. AGP
-// merges this into the final AndroidManifest.xml via androidComponents.onVariants below. We write
-// the file eagerly at config time because Variant.sources.manifests.addStaticFile(File) expects
-// the file to exist when called; a stale file from a previous run is overwritten unconditionally
-// so the result always tracks the current project.ini.
+// Generate the staged AndroidManifest.xml from the committed src/main/AndroidManifest.xml plus
+// project.ini's `permissions=` list. The staged file becomes sourceSets.main.manifest.srcFile
+// (see above) so AGP sees one merged manifest source — bypasses the AGP 8.5+
+// Variant.sources.manifests.addStaticFile API whose signature has churned across point releases
+// (File / String / Provider<RegularFile> have all been rejected at different times in 8.7.x).
+// Written eagerly at config time so AGP's manifest pipeline picks it up on its first read.
 def octarinePermissionsManifest = file("${layout.buildDirectory.get().asFile}/octarine_extras/AndroidManifest.xml")
 octarinePermissionsManifest.parentFile.mkdirs()
-def _perm_sb = new StringBuilder()
-_perm_sb << '<?xml version="1.0" encoding="utf-8"?>\n'
-_perm_sb << '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n'
+def _committed_manifest = file('src/main/AndroidManifest.xml').text
+def _perm_xml = new StringBuilder()
 androidPermissions.each { p ->
-    _perm_sb << "    <uses-permission android:name=\"${p}\" />\n"
+    _perm_xml << "    <uses-permission android:name=\"${p}\" />\n"
 }
-_perm_sb << '</manifest>\n'
-octarinePermissionsManifest.text = _perm_sb.toString()
-
-androidComponents {
-    onVariants(selector().all()) { variant ->
-        variant.sources.manifests.addStaticFile(octarinePermissionsManifest)
-    }
-}
+// Inject the project-driven permissions immediately before </manifest>. The committed manifest
+// already declares VIBRATE under <manifest> root; project.ini permissions append below it.
+def _injected = _committed_manifest.replaceFirst(
+    /(?s)(\s*)<\/manifest>\s*$/,
+    "\n${_perm_xml.toString()}\$1</manifest>\n")
+octarinePermissionsManifest.text = _injected
 
 // Stage the game project into the APK assets before the asset merge runs.
 tasks.register('stageOctarineAssets', Copy) {
