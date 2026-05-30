@@ -111,8 +111,13 @@ jobs:
           printf '%s' "$OCTARINE_ANDROID_KEYSTORE" | base64 --decode > "$ks"
           echo "path=$ks" >> "$GITHUB_OUTPUT"
 
-      # Multi-ABI shipping AAB: arm64-v8a covers all modern devices, armeabi-v7a is the long-tail
-      # 32-bit floor, x86_64 lets Chromebooks + Google Play emulator deliver the right slice.
+      # Multi-ABI shipping AAB: arm64-v8a covers every modern Android device; x86_64 lets
+      # Chromebooks + Google Play emulator deliver the right slice. armeabi-v7a (32-bit ARM)
+      # is intentionally dropped — NDK r28's arm-android vcpkg triplet fails detect_compiler
+      # ("CMake was unable to find a build program corresponding to Ninja" via vcpkg's nested
+      # cmake invocation) and 32-bit ARM is <1% of Play Store install base in 2026. Re-add
+      # armeabi-v7a only if downstream telemetry justifies the bake-time cost + the toolchain
+      # gets a working arm-android path.
       # -Poctarine.abis triggers the manual orchestration path in android/app/build.gradle (per-ABI
       # cmake + vcpkg triplet); externalNativeBuild is bypassed. bundle.abi.enableSplit (also in
       # build.gradle) lets Play deliver per-ABI APKs from the same AAB.
@@ -130,7 +135,7 @@ jobs:
           export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/${OCTARINE_NDK_VERSION}"
           args=(bundleRelease
                 -Poctarine.projectDir="$GITHUB_WORKSPACE/example_repo"
-                -Poctarine.abis=arm64-v8a,armeabi-v7a,x86_64
+                -Poctarine.abis=arm64-v8a,x86_64
                 --no-daemon --console=plain)
           if [ -n "$KEYSTORE_PATH" ]; then
             args+=(-Poctarine.storeFile="$KEYSTORE_PATH"
@@ -152,7 +157,7 @@ jobs:
           [ -f "$aab" ] || { echo "no AAB at $aab"; exit 1; }
           echo "=== aab listing ==="
           unzip -l "$aab"
-          for required in arm64-v8a armeabi-v7a x86_64; do
+          for required in arm64-v8a x86_64; do
             if ! unzip -l "$aab" | grep -q "base/lib/$required/libmain.so"; then
               echo "FAIL: base/lib/$required/libmain.so missing from AAB"
               exit 1
