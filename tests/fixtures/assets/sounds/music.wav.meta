@@ -1,0 +1,4 @@
+-- Sidecar for music.wav: long-form audio, decode lazily via SDL_mixer streaming.
+return {
+  stream = true,
+}

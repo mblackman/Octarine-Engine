@@ -101,8 +101,9 @@ int main()
         const bool ok = catalog.Build(ASSET_TEST_FIXTURE_DIR, lua, std::optional<ScaleMode>(ScaleMode::Nearest));
         Check(ok, "catalog build reports no id collisions");
 
-        // 3 textures (hero, boss, branding) + 3 fonts (main-16, title-12, title-24) + 1 audio (jump).
-        Check(catalog.Size() == 7, "catalog discovered 7 entries");
+        // 3 textures (hero, boss, branding) + 3 fonts (main-16, title-12, title-24) + 2 audio
+        // (jump default-decode, music meta.stream=true).
+        Check(catalog.Size() == 8, "catalog discovered 8 entries");
 
         const CatalogEntry* hero = catalog.Find("hero");
         Check(hero != nullptr && hero->type == AssetType::Texture, "hero is a texture");
@@ -120,6 +121,10 @@ int main()
         const CatalogEntry* jump = catalog.Find("jump");
         Check(jump != nullptr && jump->type == AssetType::Audio, "jump.wav is audio");
         Check(jump != nullptr && !jump->stream, "jump defaults to non-streaming");
+
+        const CatalogEntry* music = catalog.Find("music");
+        Check(music != nullptr && music->type == AssetType::Audio, "music.wav is audio");
+        Check(music != nullptr && music->stream, "music.wav meta.stream=true propagates to catalog");
     }
 
     std::cout << "[manifest] baked manifest matches the directory scan\n";
