@@ -13,10 +13,23 @@ namespace octarine::editor
     namespace
     {
 #ifdef _WIN32
-        constexpr const char* kBuildScriptFile = "build-desktop.ps1";
+        constexpr const char* kScriptExt = ".ps1";
 #else
-        constexpr const char* kBuildScriptFile = "build-desktop.sh";
+        constexpr const char* kScriptExt = ".sh";
 #endif
+
+        const char* ScriptStem(ExportTarget target)
+        {
+            switch (target)
+            {
+            case ExportTarget::Desktop:
+                return "build-desktop";
+            case ExportTarget::AndroidDebug:
+            case ExportTarget::AndroidRelease:
+                return "build-android";
+            }
+            return "build-desktop";
+        }
 
         bool FileExists(const std::filesystem::path& p)
         {
@@ -26,9 +39,10 @@ namespace octarine::editor
     } // namespace
 
     std::optional<std::filesystem::path>
-    ExportBuilder::ResolveBuildScript(const std::filesystem::path& project_dir)
+    ExportBuilder::ResolveBuildScript(const std::filesystem::path& project_dir, ExportTarget target)
     {
-        std::filesystem::path candidate = project_dir / "scripts" / kBuildScriptFile;
+        const std::string filename = std::string(ScriptStem(target)) + kScriptExt;
+        std::filesystem::path candidate = project_dir / "scripts" / filename;
         if (FileExists(candidate))
         {
             return candidate;
@@ -36,7 +50,8 @@ namespace octarine::editor
         return std::nullopt;
     }
 
-    std::vector<std::string> ExportBuilder::Validate(const std::filesystem::path& project_dir)
+    std::vector<std::string>
+    ExportBuilder::Validate(const std::filesystem::path& project_dir, ExportTarget target)
     {
         std::vector<std::string> errors;
 
@@ -53,10 +68,11 @@ namespace octarine::editor
             }
         }
 
-        if (!ResolveBuildScript(project_dir))
+        if (!ResolveBuildScript(project_dir, target))
         {
+            const std::string filename = std::string(ScriptStem(target)) + kScriptExt;
             errors.push_back(
-                "missing scripts/" + std::string(kBuildScriptFile) +
+                "missing scripts/" + filename +
                 " — run scripts/octarine-init-build to scaffold it");
         }
 
@@ -74,7 +90,7 @@ namespace octarine::editor
         stdout_partial_.clear();
         stderr_partial_.clear();
 
-        auto errors = Validate(opts.project_dir);
+        auto errors = Validate(opts.project_dir, opts.target);
         if (!errors.empty())
         {
             for (auto& e : errors)
@@ -85,7 +101,7 @@ namespace octarine::editor
             return false;
         }
 
-        auto resolved = ResolveBuildScript(opts.project_dir);
+        auto resolved = ResolveBuildScript(opts.project_dir, opts.target);
         // ResolveBuildScript already non-null because Validate passed; double-check to silence the
         // optional unwrap and to keep behaviour explicit if Validate's policy diverges later.
         if (!resolved)
@@ -95,6 +111,21 @@ namespace octarine::editor
             return false;
         }
         resolved_script_ = *resolved;
+
+        // build-android takes a positional `release|debug` mode arg; build-desktop ignores extra
+        // positional args. Pass it for Android only so the script header stays single-purpose.
+        const char* android_mode = nullptr;
+        switch (opts.target)
+        {
+        case ExportTarget::AndroidDebug:
+            android_mode = "debug";
+            break;
+        case ExportTarget::AndroidRelease:
+            android_mode = "release";
+            break;
+        case ExportTarget::Desktop:
+            break;
+        }
 
         octarine::process::SpawnOptions po;
 #ifdef _WIN32
@@ -106,9 +137,18 @@ namespace octarine::editor
         po.argv.push_back("Bypass");
         po.argv.push_back("-File");
         po.argv.push_back(resolved_script_.string());
+        if (android_mode)
+        {
+            po.argv.emplace_back("-Mode");
+            po.argv.emplace_back(android_mode);
+        }
 #else
         po.argv.push_back("bash");
         po.argv.push_back(resolved_script_.string());
+        if (android_mode)
+        {
+            po.argv.emplace_back(android_mode);
+        }
 #endif
         po.cwd = opts.project_dir.string();
 
@@ -120,10 +160,14 @@ namespace octarine::editor
         {
             po.env.emplace_back("OCTARINE_VERSION_CODE", opts.version_code);
         }
-        if (!opts.preset.empty())
+        if (opts.target == ExportTarget::Desktop && !opts.preset.empty())
         {
             po.env.emplace_back("OCTARINE_PRESET", opts.preset);
         }
+        // AndroidRelease signing creds are inherited from the editor process's env (the user sets
+        // OCTARINE_ANDROID_KEYSTORE_PATH etc. before launching the editor). The Process wrapper's
+        // default inherit_env=true is what carries them through; PR-C adds in-editor secret storage
+        // so the dev no longer has to manage their shell env.
 
         auto p = octarine::process::Process::Spawn(po);
         if (!p)

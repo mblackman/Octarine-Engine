@@ -340,6 +340,21 @@ static bool openExportBuildModal = false;
         static char versionCodeBuf[16] = "";
         static std::string lastProjectDir;
         static std::vector<std::string> validationErrors;
+        static int targetIdx = 0; // 0=Desktop, 1=AndroidDebug, 2=AndroidRelease
+
+        constexpr const char* kTargetLabels[] = {
+            "Desktop (host OS, ship-release)",
+            "Android (debug APK)",
+            "Android (release AAB)",
+        };
+        const auto targetForIdx = [](int idx) {
+            switch (idx)
+            {
+            case 1: return octarine::editor::ExportTarget::AndroidDebug;
+            case 2: return octarine::editor::ExportTarget::AndroidRelease;
+            default: return octarine::editor::ExportTarget::Desktop;
+            }
+        };
 
         const std::string projectDir = registry->Get<AssetManager>().GetBasePath();
 
@@ -359,11 +374,17 @@ static bool openExportBuildModal = false;
                     std::snprintf(versionCodeBuf, sizeof(versionCodeBuf), "%s", ini->version_code.c_str());
                 }
             }
-            validationErrors = octarine::editor::ExportBuilder::Validate(std::filesystem::path(projectDir));
+            validationErrors = octarine::editor::ExportBuilder::Validate(
+                std::filesystem::path(projectDir), targetForIdx(targetIdx));
         }
 
-        ImGui::Text("Target: host OS (ship-release preset)");
         ImGui::TextDisabled("Project: %s", projectDir.empty() ? "(none)" : projectDir.c_str());
+        ImGui::SetNextItemWidth(260);
+        if (ImGui::Combo("Target", &targetIdx, kTargetLabels, IM_ARRAYSIZE(kTargetLabels)))
+        {
+            validationErrors = octarine::editor::ExportBuilder::Validate(
+                std::filesystem::path(projectDir), targetForIdx(targetIdx));
+        }
         ImGui::Separator();
 
         ImGui::SetNextItemWidth(180);
@@ -371,6 +392,19 @@ static bool openExportBuildModal = false;
         ImGui::SetNextItemWidth(180);
         ImGui::InputText("Version code", versionCodeBuf, sizeof(versionCodeBuf));
         ImGui::TextDisabled("Leave blank to fall through to project.ini.");
+
+        if (targetIdx == 2)
+        {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(1.0F, 0.85F, 0.4F, 1.0F),
+                               "Android-release expects signing creds in env:");
+            ImGui::BulletText("OCTARINE_ANDROID_KEYSTORE_PATH");
+            ImGui::BulletText("OCTARINE_ANDROID_STORE_PASSWORD");
+            ImGui::BulletText("OCTARINE_ANDROID_KEY_ALIAS");
+            ImGui::BulletText("OCTARINE_ANDROID_KEY_PASSWORD");
+            ImGui::TextDisabled(
+                "Unset = falls back to the Gradle debug key. In-editor secret storage lands in PR-C.");
+        }
 
         if (!validationErrors.empty())
         {
@@ -390,6 +424,7 @@ static bool openExportBuildModal = false;
         {
             octarine::editor::ExportOptions opts;
             opts.project_dir = std::filesystem::path(projectDir);
+            opts.target = targetForIdx(targetIdx);
             opts.version_name = versionNameBuf;
             opts.version_code = versionCodeBuf;
 
@@ -407,7 +442,8 @@ static bool openExportBuildModal = false;
         ImGui::SameLine();
         if (ImGui::Button("Re-validate"))
         {
-            validationErrors = octarine::editor::ExportBuilder::Validate(std::filesystem::path(projectDir));
+            validationErrors = octarine::editor::ExportBuilder::Validate(
+                std::filesystem::path(projectDir), targetForIdx(targetIdx));
         }
         ImGui::EndPopup();
     }
