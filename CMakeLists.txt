@@ -127,6 +127,17 @@ if (OCTARINE_WITH_EDITOR)
     list(APPEND SRC_FILES src/Editor/Inspectors/RegisterAllInspectors.cpp)
     list(APPEND SRC_FILES src/Editor/PlayerLauncher.cpp)
     list(APPEND SRC_FILES src/Editor/ExportBuilder.cpp)
+
+    # SecretStore: per-platform credential storage. One backend per host so the OS-native API
+    # links cleanly without cross-platform shims. Linux backend is a no-op stub the editor UI
+    # falls back to env-var-only mode on.
+    if (WIN32)
+        list(APPEND SRC_FILES src/Secrets/SecretStore_Windows.cpp)
+    elseif (APPLE)
+        list(APPEND SRC_FILES src/Secrets/SecretStore_macOS.cpp)
+    else ()
+        list(APPEND SRC_FILES src/Secrets/SecretStore_Linux.cpp)
+    endif ()
 endif ()
 
 if (UNIX AND NOT APPLE AND NOT ANDROID)
@@ -255,6 +266,18 @@ endif ()
 # native logging and platform APIs; the linker needs them named explicitly for the shared lib.
 if (ANDROID)
     target_link_libraries(${PROJECT_NAME} PRIVATE android log)
+endif ()
+
+# SecretStore backend libs. Crypt32 ships DPAPI's CryptProtectData/CryptUnprotectData on Windows;
+# Security.framework ships SecItem* on macOS. Linux backend is a stub and needs no link.
+if (OCTARINE_WITH_EDITOR)
+    if (WIN32)
+        target_link_libraries(${PROJECT_NAME} PRIVATE crypt32)
+    elseif (APPLE)
+        target_link_libraries(${PROJECT_NAME} PRIVATE
+                "-framework CoreFoundation"
+                "-framework Security")
+    endif ()
 endif ()
 
 # Install rules (optional). Skipped under packaging — octarine_package owns the deliverable layout

@@ -4,6 +4,7 @@
 
 #include "General/Logger.h"
 #include "Project/ProjectIni.h"
+#include "Secrets/SecretStore.h"
 
 #include <system_error>
 #include <utility>
@@ -164,10 +165,27 @@ namespace octarine::editor
         {
             po.env.emplace_back("OCTARINE_PRESET", opts.preset);
         }
-        // AndroidRelease signing creds are inherited from the editor process's env (the user sets
-        // OCTARINE_ANDROID_KEYSTORE_PATH etc. before launching the editor). The Process wrapper's
-        // default inherit_env=true is what carries them through; PR-C adds in-editor secret storage
-        // so the dev no longer has to manage their shell env.
+
+        // AndroidRelease signing creds: pull from SecretStore (DPAPI / Keychain) if available and
+        // override into the spawn env. SpawnOptions.env extends the inherited env, so the shell-set
+        // OCTARINE_ANDROID_* vars still apply when the store has no entry — store wins on conflict.
+        if (opts.target == ExportTarget::AndroidRelease && octarine::secrets::IsAvailable())
+        {
+            struct CredKey { const char* secret; const char* envVar; };
+            static constexpr CredKey kCreds[] = {
+                {"octarine.android.keystore_path",  "OCTARINE_ANDROID_KEYSTORE_PATH"},
+                {"octarine.android.store_password", "OCTARINE_ANDROID_STORE_PASSWORD"},
+                {"octarine.android.key_alias",      "OCTARINE_ANDROID_KEY_ALIAS"},
+                {"octarine.android.key_password",   "OCTARINE_ANDROID_KEY_PASSWORD"},
+            };
+            for (const auto& c : kCreds)
+            {
+                if (auto v = octarine::secrets::Get(c.secret))
+                {
+                    po.env.emplace_back(c.envVar, *v);
+                }
+            }
+        }
 
         auto p = octarine::process::Process::Spawn(po);
         if (!p)

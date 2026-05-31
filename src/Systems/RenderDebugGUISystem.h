@@ -116,6 +116,7 @@ class RenderDebugGUISystem {
   static void LuaConsoleWindow(sol::state& lua);
   static void PlayerOutputWindow(Game* game, bool* p_open);
   static void ExportOutputWindow(Game* game, bool* p_open);
+  static void SigningSettingsWindow(bool* p_open);
 #endif
   static void FPSWindow(float deltaTime);
   static void EntityInfoWindow(const Registry* registry);
