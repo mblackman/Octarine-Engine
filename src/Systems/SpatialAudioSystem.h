@@ -18,20 +18,34 @@
 // — register both AFTER TransformSystem so emitter/listener positions are this-frame
 // globals. Non-spatial sources are skipped entirely; their gain stays at whatever
 // AudioSystem set from `source.volume`.
+//
+// Cache pointer is hoisted to a member so the per-emitter callback does not hit
+// Registry::Get<AudioListenerCache>() (typeid-keyed map lookup) on every call. The
+// AudioListenerCache singleton is Set once during Game::Setup and never reseated, so
+// the pointer is stable for the registry's lifetime.
 class SpatialAudioSystem {
  public:
   void operator()(const ContextFacade& ctx, const GlobalTransformComponent& transform, AudioSourceComponent& source,
                   AudioSinkComponent& sink) {
     if (sink.finished || !sink.track) return;
 
-    auto* registry = ctx.GetRegistry();
-    const auto& cache = registry->Get<AudioListenerCache>();
+    if (!cache_) cache_ = &ctx.GetRegistry()->Get<AudioListenerCache>();
+    const auto& cache = *cache_;
 
     if (!source.spatial || !cache.valid) {
-      // Source isn't (or no longer is) spatial: clear any prior stereo override and let
-      // the gain reflect raw source.volume so toggling `spatial` at runtime resets cleanly.
-      MIX_SetTrackStereo(sink.track, nullptr);
-      MIX_SetTrackGain(sink.track, std::max(0.0f, source.volume));
+      // Source isn't (or no longer is) spatial: clear any prior stereo override once on
+      // the transition and let the gain reflect raw source.volume. Subsequent frames
+      // skip both calls when nothing changed.
+      if (sink.stereoApplied) {
+        MIX_SetTrackStereo(sink.track, nullptr);
+        sink.stereoApplied = false;
+        sink.lastPan = 2.0f;
+      }
+      const float gain = std::max(0.0f, source.volume);
+      if (gain != sink.lastGain) {
+        MIX_SetTrackGain(sink.track, gain);
+        sink.lastGain = gain;
+      }
       return;
     }
 
@@ -54,7 +68,10 @@ class SpatialAudioSystem {
     }
 
     const float gain = baseVolume * std::clamp(attenuation, 0.0f, 1.0f);
-    MIX_SetTrackGain(sink.track, gain);
+    if (gain != sink.lastGain) {
+      MIX_SetTrackGain(sink.track, gain);
+      sink.lastGain = gain;
+    }
 
     // Pan: project the listener→emitter vector onto the listener's right axis. Center
     // (distance ≈ 0) → equal L/R. Past `maxDist`, gain is already zero so the pan stays
@@ -66,9 +83,16 @@ class SpatialAudioSystem {
       pan = std::clamp(rightDot / distance, -1.0f, 1.0f);
     }
 
-    MIX_StereoGains gains{};
-    gains.left = std::clamp(1.0f - pan, 0.0f, 1.0f);
-    gains.right = std::clamp(1.0f + pan, 0.0f, 1.0f);
-    MIX_SetTrackStereo(sink.track, &gains);
+    if (!sink.stereoApplied || pan != sink.lastPan) {
+      MIX_StereoGains gains{};
+      gains.left = std::clamp(1.0f - pan, 0.0f, 1.0f);
+      gains.right = std::clamp(1.0f + pan, 0.0f, 1.0f);
+      MIX_SetTrackStereo(sink.track, &gains);
+      sink.stereoApplied = true;
+      sink.lastPan = pan;
+    }
   }
+
+ private:
+  const AudioListenerCache* cache_ = nullptr;
 };
