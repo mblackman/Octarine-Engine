@@ -49,7 +49,8 @@ struct FontMeta {
 
 struct AudioMeta {
   std::optional<std::string> id;  // override the derived id (filename stem)
-  bool stream{false};             // stream from disk vs full decode 
+  bool stream{false};             // stream from disk vs full decode
+  bool normalize{false};          // run BS.1770 loudness normalize at bake (Stage 14 B2 — WAV only)
 
-  void applyDefaults() {}  // `stream` already carries its default
+  void applyDefaults() {}  // `stream`/`normalize` already carry their defaults
 };

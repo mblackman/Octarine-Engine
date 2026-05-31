@@ -92,6 +92,10 @@ set(SRC_FILES
         src/Main.cpp
         src/AssetManager/AssetManager.cpp
         src/AssetManager/AssetCatalog.cpp
+        src/AssetManager/AssetPak.cpp
+        src/AssetManager/AtlasBaker.cpp
+        src/AssetManager/AudioNormalizer.cpp
+        src/AssetManager/GlyphAtlas.cpp
         src/AssetManager/TextureAtlasBaker.cpp
         src/AssetManager/SceneAssetScanner.cpp
         src/ECS/Registry.cpp
@@ -108,6 +112,7 @@ set(SRC_FILES
         src/Lua/Modules/IoModuleLuaBinding.cpp
         src/Lua/Modules/LogModuleLuaBinding.cpp
         src/Lua/Modules/SceneModuleLuaBinding.cpp
+        src/Process/Process.cpp
         src/Project/ProjectIni.cpp
         src/Renderer/Renderer.cpp
         src/Systems/AudioSystem.cpp
@@ -526,6 +531,31 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
 
     add_test(NAME AssetPipelineTest COMMAND OctarineAssetPipelineTest)
+
+    # Process-spawn smoke test: standalone — no engine sources required, just the wrapper.
+    # Validates argv quoting + spawn/wait/output capture against `cmake --version` on PATH.
+    add_executable(OctarineProcessTest
+            src/Process/Process.cpp
+            tests/ProcessTest.cpp
+    )
+
+    set_target_properties(OctarineProcessTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+    )
+
+    target_include_directories(OctarineProcessTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+
+    target_link_libraries(OctarineProcessTest PRIVATE Threads::Threads)
+
+    if (MSVC)
+        target_compile_options(OctarineProcessTest PRIVATE /W4 /permissive- /MP /EHsc)
+    endif ()
+
+    add_test(NAME ProcessTest COMMAND OctarineProcessTest)
 
     # project.ini reader smoke test: standalone — no engine sources required. Validates parse +
     # shipping-identity rules (mirrors cmake/OctarinePackage.cmake + android/app/build.gradle).

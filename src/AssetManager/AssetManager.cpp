@@ -11,8 +11,24 @@
 
 #include "../Game/GameConfig.h"
 #include "../General/Logger.h"
+#include "AssetManager/AssetPak.h"
+#include "AssetManager/GlyphAtlas.h"
 
 AssetManager::~AssetManager() { ClearAssets(); }
+
+SDL_IOStream *AssetManager::OpenAssetIO(const std::string &fullPath) const {
+  if (asset_pak_ != nullptr && asset_pak_->IsOpen() && !base_path_.empty()) {
+    std::error_code ec;
+    const std::filesystem::path rel =
+        std::filesystem::relative(std::filesystem::path(fullPath), std::filesystem::path(base_path_), ec);
+    if (!ec && !rel.empty()) {
+      if (SDL_IOStream *io = asset_pak_->OpenIO(rel.generic_string()); io != nullptr) {
+        return io;
+      }
+    }
+  }
+  return SDL_IOFromFile(fullPath.c_str(), "rb");
+}
 void AssetManager::LoadGameConfig(const GameConfig &config) {
   base_path_ = config.GetAssetPath();
   if (config.GetDefaultScaleMode().has_value()) {
@@ -100,7 +116,7 @@ bool AssetManager::LoadFromCatalog(const CatalogEntry &entry, const std::string 
         Logger::Info("AssetManager::Acquire: audio disabled, skipping clip: " + assetId);
         return false;
       }
-      AddAudioClip(mixer, assetId, entry.fullPath);
+      AddAudioClip(mixer, assetId, entry.fullPath, entry.stream);
       return audio_clips_.contains(assetId);
   }
   return false;
@@ -190,8 +206,9 @@ int AssetManager::Validate(const std::vector<AssetReference> &refs) const {
 void AssetManager::AddTexture(SDL_Renderer *renderer, const std::string &assetId, const std::string &path) {
   const std::string fullPath = GetFullPath(path);
 
-  // Route through SDL IO so the same path resolves on desktop, an APK asset root, or a .app bundle.
-  SDL_IOStream *io = SDL_IOFromFile(fullPath.c_str(), "rb");
+  // Route through OpenAssetIO so the same path resolves on desktop, an APK asset root, a .app
+  // bundle, or — for shipped builds — the OCPK asset bundle.
+  SDL_IOStream *io = OpenAssetIO(fullPath);
   if (!io) {
     Logger::Error("Failed to open texture file " + fullPath + ": " + std::string(SDL_GetError()));
     return;
@@ -244,7 +261,7 @@ std::optional<SDL_FRect> AssetManager::GetAtlasSlice(const std::string &assetId)
 
 void AssetManager::AddFont(const std::string &assetId, const std::string &path, const float fontSize) {
   const std::string fullPath = GetFullPath(path);
-  SDL_IOStream *io = SDL_IOFromFile(fullPath.c_str(), "rb");
+  SDL_IOStream *io = OpenAssetIO(fullPath);
   if (!io) {
     Logger::Error("Failed to open font file " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;
@@ -264,21 +281,46 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
   }
 
   Logger::Info("Added font: " + assetId + " from path: " + fullPath);
+
+  // Probe for a glyph-atlas sidecar pair (Stage 14 B3). The bake step writes them under
+  // <basePath>/atlases/<asset_id>.atlas.{png,lua}; presence is the opt-in. SDL_IOFromFile is used
+  // for the existence check so the probe transparently resolves through a shipped pak too.
+  if (base_path_.empty()) return;
+  const std::filesystem::path atlasPng =
+      std::filesystem::path(base_path_) / "atlases" / (assetId + ".atlas.png");
+  const std::filesystem::path atlasLua =
+      std::filesystem::path(base_path_) / "atlases" / (assetId + ".atlas.lua");
+  SDL_IOStream *probe = SDL_IOFromFile(atlasPng.string().c_str(), "rb");
+  if (probe == nullptr) return;
+  SDL_CloseIO(probe);
+  auto atlas = std::make_unique<GlyphAtlas>();
+  if (atlas->Load(atlasPng.string(), atlasLua.string())) {
+    glyph_atlases_[assetId] = std::move(atlas);
+  }
 }
 
-void AssetManager::AddAudioClip(MIX_Mixer *mixer, const std::string &assetId, const std::string &path) {
+const GlyphAtlas *AssetManager::GetGlyphAtlas(const std::string &fontAssetId) const {
+  const auto it = glyph_atlases_.find(fontAssetId);
+  return it == glyph_atlases_.end() ? nullptr : it->second.get();
+}
+
+void AssetManager::AddAudioClip(MIX_Mixer *mixer, const std::string &assetId, const std::string &path,
+                                const bool stream) {
   if (!mixer) {
     Logger::Error("AddAudioClip called with null mixer for: " + assetId);
     return;
   }
 
   const std::string fullPath = GetFullPath(path);
-  SDL_IOStream *io = SDL_IOFromFile(fullPath.c_str(), "rb");
+  SDL_IOStream *io = OpenAssetIO(fullPath);
   if (!io) {
     Logger::Error("Failed to open audio file " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;
   }
-  MIX_Audio *clip = MIX_LoadAudio_IO(mixer, io, true, true);  // predecode + closes the stream
+  // predecode=true is the default for short SFX — full PCM in RAM at load time, lowest play-call
+  // latency. predecode=false (meta.stream=true on the source) keeps the file compressed and
+  // decodes on demand; pays back as flat memory for long-form music + ambient beds.
+  MIX_Audio *clip = MIX_LoadAudio_IO(mixer, io, !stream, true);  // closes the stream regardless
   if (!clip) {
     Logger::Error("Failed to load audio clip " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;

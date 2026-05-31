@@ -13,8 +13,12 @@
 #include "../Events/KeyInputEvent.h"
 #include "../General/Logger.h"
 #include "AssetManager/AssetCatalog.h"
+#include "AssetManager/AssetPak.h"
+#include "AssetManager/AtlasBaker.h"
+#include "AssetManager/AudioNormalizer.h"
 #include "AssetManager/TextureAtlasBaker.h"
 #include "AssetManager/SceneAssetScanner.h"
+#include <SDL3_ttf/SDL_ttf.h>
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
 #include "Components/BoxColliderComponent.h"
@@ -570,6 +574,79 @@ bool Game::RunBakeValidation(const std::string& assetPath)
             manifestPath);
     }
 
+    // Glyph atlas pass (Stage 14 B3): for every Font catalog entry, rasterize ASCII printable
+    // into a packed PNG + Lua metrics sidecar under `<basePath>/atlases/<asset_id>.atlas.{png,lua}`.
+    // Runtime probes for those alongside the .ttf and renders from the atlas when present, falling
+    // back to TTF_RenderText_Blended when missing. TTF needs explicit init in bake (Bake() opens
+    // SDL_Init(0) only — no video/audio subsystems).
+    std::vector<std::string> atlasFiles;
+    if (wrote && TTF_Init())
+    {
+        const std::filesystem::path atlasDir = std::filesystem::path(assetPath) / "atlases";
+        std::error_code ec;
+        std::filesystem::create_directories(atlasDir, ec);
+        const auto codepoints = AtlasBaker::DefaultAsciiPrintable();
+        for (const auto& [id, entry] : assetManager.GetCatalog().Entries())
+        {
+            if (entry.type != AssetType::Font) continue;
+            TTF_Font* font = TTF_OpenFont(entry.fullPath.c_str(), entry.fontSize);
+            if (font == nullptr)
+            {
+                Logger::Warn("Bake: TTF_OpenFont failed for " + entry.fullPath + " @ " +
+                             std::to_string(entry.fontSize) + " — skipping atlas.");
+                continue;
+            }
+            const std::string pngPath = (atlasDir / (id + ".atlas.png")).string();
+            const std::string luaPath = (atlasDir / (id + ".atlas.lua")).string();
+            if (AtlasBaker::Bake(font, entry.fontSize, codepoints, pngPath, luaPath))
+            {
+                atlasFiles.push_back(pngPath);
+                atlasFiles.push_back(luaPath);
+            }
+            TTF_CloseFont(font);
+        }
+        TTF_Quit();
+    }
+
+    // Audio normalize pass (Stage 14 B2): for every Audio catalog entry with `meta.normalize=true`,
+    // run BS.1770 integrated loudness measurement + apply the gain to land at -16 LUFS, writing
+    // the normalized WAV to `<basePath>/normalized/<rel>.wav`. The pak override map then routes
+    // the catalog's original relPath to read bytes from the normalized variant — so shipped
+    // builds carry the loudness-aligned audio while dev tree (and dev runs) stay untouched.
+    std::map<std::string, std::string> audioOverrides;
+    if (wrote)
+    {
+        const std::filesystem::path normRoot = std::filesystem::path(assetPath) / "normalized";
+        for (const auto& [id, entry] : assetManager.GetCatalog().Entries())
+        {
+            if (entry.type != AssetType::Audio || !entry.normalize) continue;
+            const std::filesystem::path src(entry.fullPath);
+            const std::filesystem::path rel = std::filesystem::relative(src, std::filesystem::path(assetPath));
+            const std::filesystem::path dst = normRoot / rel;
+            std::error_code ec;
+            std::filesystem::create_directories(dst.parent_path(), ec);
+            if (AudioNormalizer::NormalizeWav(entry.fullPath, dst.string()))
+            {
+                audioOverrides[rel.generic_string()] = dst.string();
+            }
+        }
+    }
+
+    // Pack every cataloged asset (+ any derived atlas files, w/ optional normalized-audio
+    // overrides) into a single asset_bundle.pak alongside the manifest. Shipped builds
+    // (OCTARINE_SHIPPED) open this in place of the loose asset tree; dev builds ignore it.
+    // Manifest write is the source-of-truth gate — if that failed, skip the pak so a stale
+    // archive doesn't ship.
+    if (wrote)
+    {
+        const std::string pakPath = (std::filesystem::path(assetPath) / "asset_bundle.pak").string();
+        if (!AssetPak::Pack(assetManager.GetCatalog(), pakPath, assetPath, atlasFiles, audioOverrides))
+        {
+            Logger::Error("Bake: AssetPak::Pack failed for " + pakPath);
+            return false;
+        }
+    }
+
     if (bake_validation_failures_ > 0)
     {
         Logger::Error("Bake: " + std::to_string(bake_validation_failures_) +
@@ -707,6 +784,21 @@ void Game::Setup()
 #endif
         assetManager.GetCatalog().Build(assetManager.GetBasePath(), lua, gameConfig, allowManifest);
         assetManager.GetCatalog().DumpToLog();
+
+        // Shipped builds (and a dev build with --use-manifest) probe for an asset_bundle.pak
+        // beside the manifest. When present, AssetManager reads every asset out of it instead of
+        // the loose tree — same code paths, different SDL_IOStream source. Absence is fine:
+        // dev/bootstrap projects haven't baked one yet.
+        if (allowManifest)
+        {
+            const std::string pakPath = (std::filesystem::path(assetManager.GetBasePath()) /
+                                         "asset_bundle.pak").string();
+            auto& pak = registry_->Set<AssetPak>(AssetPak());
+            if (pak.Open(pakPath))
+            {
+                assetManager.SetAssetPak(&pak);
+            }
+        }
 
         // Expose the global `assets` table (id -> id, raises on typo) so scripts can reference
         // ids safely before LoadGame runs the startup script.

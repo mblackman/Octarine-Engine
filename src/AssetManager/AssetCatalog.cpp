@@ -122,6 +122,7 @@ namespace
         AudioMeta meta;
         if (const sol::optional<std::string> id = t["id"]; id) meta.id = *id;
         if (const sol::optional<bool> stream = t["stream"]; stream) meta.stream = *stream;
+        if (const sol::optional<bool> normalize = t["normalize"]; normalize) meta.normalize = *normalize;
         return meta;
     }
 
@@ -293,6 +294,7 @@ bool AssetCatalog::ScanFilesystem(const std::string& basePath, sol::state& lua,
                 entry.id = meta.id.value_or(stem);
                 entry.fullPath = fullPath;
                 entry.stream = meta.stream;
+                entry.normalize = meta.normalize;
                 insert(std::move(entry));
                 break;
             }
@@ -398,6 +400,7 @@ bool AssetCatalog::LoadManifest(const std::string& manifestPath, sol::state& lua
             break;
         case AssetType::Audio:
             entry.stream = e["stream"].get_or(false);
+            entry.normalize = e["normalize"].get_or(false);
             break;
         }
         entries_.emplace(std::move(id), std::move(entry));
@@ -498,6 +501,7 @@ bool AssetCatalog::WriteManifest(const std::string& outPath, const std::string& 
             break;
         case AssetType::Audio:
             out << ", stream = " << (entry.stream ? "true" : "false");
+            out << ", normalize = " << (entry.normalize ? "true" : "false");
             break;
         }
 

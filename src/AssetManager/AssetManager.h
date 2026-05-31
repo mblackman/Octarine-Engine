@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <map>
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -13,7 +14,9 @@
 #include "AssetManager/AssetCatalog.h"
 #include "AssetManager/AssetReference.h"
 
+class AssetPak;
 class GameConfig;
+class GlyphAtlas;
 
 class AssetManager {
   std::string base_path_;
@@ -31,6 +34,15 @@ class AssetManager {
   // Bumped whenever a texture is added or replaced. Sprite renderers compare against
   // their cached generation to know when to re-resolve a stale SDL_Texture* pointer.
   std::uint64_t texture_generation_{0};
+  // Optional shipped-bundle archive (Stage 14 / B4). When set, AssetManager prefers reading each
+  // asset's bytes from the pak over the loose file at `fullPath`. Non-owning — the Registry owns
+  // the AssetPak instance.
+  const AssetPak* asset_pak_{nullptr};
+  // Per-font glyph atlases (Stage 14 / B3) keyed by catalog asset id (e.g. "main-16"). Populated
+  // lazily inside AddFont when a `<basePath>/atlases/<id>.atlas.{png,lua}` sidecar pair is present;
+  // consumed by RenderTextSystem's compose path. unique_ptr to keep GlyphAtlas pinned across the
+  // map's rehashes (the surface wraps a vector<uint8_t> that must not be moved underneath SDL).
+  std::map<std::string, std::unique_ptr<GlyphAtlas>> glyph_atlases_;
 
  public:
   AssetManager() = default;
@@ -79,7 +91,11 @@ class AssetManager {
   [[nodiscard]] std::optional<SDL_FRect> GetAtlasSlice(const std::string& assetId) const;
   void AddFont(const std::string& assetId, const std::string& path, float fontSize);
   [[nodiscard]] TTF_Font* GetFont(const std::string& assetId) const;
-  void AddAudioClip(MIX_Mixer* mixer, const std::string& assetId, const std::string& path);
+  // `stream` plumbs the catalog's `meta.stream` flag into SDL_mixer's predecode toggle: false for
+  // SFX (eager decode = predictable play latency), true for long music + ambient beds (lazy decode
+  // = decode-as-played, keeps the loading footprint flat at the cost of a touch more per-play cost).
+  void AddAudioClip(MIX_Mixer* mixer, const std::string& assetId, const std::string& path,
+                    bool stream = false);
   [[nodiscard]] MIX_Audio* GetAudioClip(const std::string& assetId) const;
   [[nodiscard]] std::string GetFullPath(const std::string& relativePath) const;
   void SetDefaultScaleMode(const std::string& scaleMode);
@@ -87,6 +103,17 @@ class AssetManager {
 
   [[nodiscard]] AssetCatalog& GetCatalog() { return catalog_; }
   [[nodiscard]] const AssetCatalog& GetCatalog() const { return catalog_; }
+
+  // Wire in an opened AssetPak (typically by Game::Setup on shipped builds, after probing for an
+  // asset_bundle.pak beside the project). Asset load sites prefer the pak when set; absent it,
+  // they fall through to SDL_IOFromFile on the loose tree. Pointer is non-owning; the Registry
+  // owns the AssetPak instance.
+  void SetAssetPak(const AssetPak* pak) { asset_pak_ = pak; }
+  [[nodiscard]] const AssetPak* GetAssetPak() const { return asset_pak_; }
+
+  // Resident glyph atlas for the given font catalog id, or nullptr if none has been loaded.
+  // RenderTextSystem consults this before falling back to TTF_RenderText_Blended.
+  [[nodiscard]] const GlyphAtlas* GetGlyphAtlas(const std::string& fontAssetId) const;
 
   // Current acquire count for an id (0 if untracked). Test/diagnostic aid.
   [[nodiscard]] int RefCount(const std::string& assetId) const;
@@ -96,6 +123,11 @@ class AssetManager {
   [[nodiscard]] const std::map<std::string, MIX_Audio*>& GetAudioClips() const { return audio_clips_; }
 
  private:
+  // Open a read-only SDL_IOStream over `fullPath`. Tries the wired AssetPak first (lookup by
+  // project-relative key) and falls back to SDL_IOFromFile for dev builds + bootstrap projects
+  // where no pak has been baked yet.
+  [[nodiscard]] SDL_IOStream* OpenAssetIO(const std::string& fullPath) const;
+
   // Perform the actual SDL/MIX load for a catalog entry (no refcount bookkeeping). Returns whether
   // the handle is resident afterwards.
   bool LoadFromCatalog(const CatalogEntry& entry, const std::string& assetId, SDL_Renderer* renderer,
