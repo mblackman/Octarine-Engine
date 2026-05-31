@@ -79,6 +79,9 @@ For producing shippable artifacts (Windows ZIP/NSIS, Linux TGZ, macOS DMG, Andro
 see [`docs/device-builds.md`](docs/device-builds.md). Shipping config is the `ship-release`
 preset (and `ship-mac-universal` for universal macOS).
 
+Contributing? See [`CONTRIBUTING.md`](CONTRIBUTING.md) for workflow, coding
+standards, commit style, and the `SRC_FILES` rule.
+
 ### Running the Engine
 
 Octarine Engine accepts the game directory as a positional argument:

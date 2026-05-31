@@ -176,3 +176,59 @@ The engine looks for specific functions in your scripts:
 - `on_update(self, entity, delta_time)`: Called every frame.
 - `on_debug_gui(self, entity)`: Called during the ImGui rendering pass.
 - `on_click(self, entity)`: Called if the entity has a `ui_button` component and is clicked.
+
+---
+
+## 8. Adding component methods
+
+When you add a Lua binding for a component (`src/Lua/Bindings/<X>ComponentLuaBinding.h`),
+the `bindUsertype` call exposes both fields and **member functions** to scripts:
+
+```cpp
+lua.new_usertype<HealthComponent>(kUsertypeName,
+    "max_health", &HealthComponent::maxHealth,
+    "damage",     &HealthComponent::damage,   // member function
+    "heal",       &HealthComponent::heal,
+    "is_dead",    sol::property(&HealthComponent::isDead),   // derived read-only
+    "fraction",   sol::property(&HealthComponent::fraction));
+```
+
+### Hard rule
+
+A component method may **read and write the component's own fields only**.
+
+No:
+
+- `Registry&` access (no looking up sibling components, no other entities).
+- `EventBus*` access (no `EmitEvent`).
+- Cross-entity reads or writes.
+- Archetype mutation (`AddComponent` / `RemoveComponent` / `DestroyEntity`).
+- Allocation, file I/O, or any other side effect.
+
+Anything that needs to cross those lines belongs in a **system**, not a method.
+The moment a method wants to touch a sibling entity or fire an event, move the
+logic out and call it from the relevant system's update.
+
+### Why this matters
+
+Component methods run from Lua at unpredictable points in the frame — inside an
+`on_update`, inside an `on_debug_gui`, inside a callback chain. Systems run in
+known order with known invariants (input → simulation → render). Touching the
+registry from a method during, say, a render-pass debug-gui call can mutate
+state mid-frame and cause iterator invalidation, stale archetype caches, or
+visible single-frame glitches. Keeping methods data-only means you can call
+them anywhere safely.
+
+### Patterns
+
+- **Mutators with invariants** — bind the field with `sol::property` and a
+  clamping setter so Lua can't bypass the invariant by direct field assignment.
+  `HealthComponent::currentHealth` is the canonical example: writes clamp to
+  `[0, maxHealth]`.
+- **Derived read-only state** — bind with `sol::property(&T::accessor)` so
+  scripts get field-style access (`health.is_dead`) without exposing a setter.
+- **Plain getters/setters** — bind the member function directly.
+
+For the canonical reference, read the comment block in
+[`src/Lua/Bindings/LuaBinding.h`](../src/Lua/Bindings/LuaBinding.h) and
+[`HealthComponentLuaBinding.h`](../src/Lua/Bindings/HealthComponentLuaBinding.h).
