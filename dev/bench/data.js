@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780196126171,
+  "lastUpdate": 1780245504891,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -6516,6 +6516,114 @@ window.BENCHMARK_DATA = {
             "value": 636199.5953574111,
             "unit": "ns/iter",
             "extra": "iterations: 1097\ncpu: 636114.3928896718 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "afa8fcec950dca4289243377a2956312fb50591e",
+          "message": "Drop ai/ plan references and fix doc accuracy bugs (#80)\n\nTracked docs no longer reference the local-only ai/ design-plan directory.\nReplace the LicenseShippingPlan pointer with the actual cmake aggregator;\ndrop the four other ai/*Plan.md references in docs/device-builds.md\n(iOSDeferralPlan, ShippingV1Plan, DeviceShippingPlan,\nAssetPipelineAndDeviceBuildsPlan). Inline what mattered, drop the rest.\n\nAlso fix three correctness bugs in docs/lua-scripting.md:\n- Example dir name: Octarine-Engine-Example-main -> Octarine-Engine-Example.\n- ImGui example placed inside a top-level function then narrated as a\n  script-component callback; move it into a script = { on_debug_gui = ... }\n  block so the example matches the surrounding text.\n- on_click callback documented against a 'button' component; real component\n  is ui_button.\n\nREADME.md picks up a shipping pointer to docs/device-builds.md and a\nmention of the ship-release / ship-mac-universal presets so the dev-only\nbuild instructions are not misread as shipping guidance.",
+          "timestamp": "2026-05-31T10:18:36-06:00",
+          "tree_id": "b20ddeb0f72419109467195a774bdf0b42dd9357",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/afa8fcec950dca4289243377a2956312fb50591e"
+        },
+        "date": 1780245496143,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4069.6336461891547,
+            "unit": "ns/iter",
+            "extra": "iterations: 170069\ncpu: 4119.545455080031 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16092.439316067377,
+            "unit": "ns/iter",
+            "extra": "iterations: 41712\ncpu: 16150.537375335904 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 107602.44278341687,
+            "unit": "ns/iter",
+            "extra": "iterations: 6526\ncpu: 107668.66135458204 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 856204.3560736806,
+            "unit": "ns/iter",
+            "extra": "iterations: 822\ncpu: 856299.9781022073 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1710882.7396397442,
+            "unit": "ns/iter",
+            "extra": "iterations: 413\ncpu: 1710960.5326876733 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2289.615070412467,
+            "unit": "ns/iter",
+            "extra": "iterations: 309971\ncpu: 2271.7617357743625 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 9949.958642481542,
+            "unit": "ns/iter",
+            "extra": "iterations: 70287\ncpu: 9936.643063434985 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 93508.2563805865,
+            "unit": "ns/iter",
+            "extra": "iterations: 8201\ncpu: 93488.26021217134 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 395340.8107922396,
+            "unit": "ns/iter",
+            "extra": "iterations: 1743\ncpu: 395337.60183588834 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2186.6025083143577,
+            "unit": "ns/iter",
+            "extra": "iterations: 325592\ncpu: 2150.671223496132 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6532.996867029029,
+            "unit": "ns/iter",
+            "extra": "iterations: 107875\ncpu: 6491.414488989622 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41318.7743883402,
+            "unit": "ns/iter",
+            "extra": "iterations: 16977\ncpu: 41275.95252400514 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 319031.80355770746,
+            "unit": "ns/iter",
+            "extra": "iterations: 2207\ncpu: 318848.1010421824 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 632493.0516994527,
+            "unit": "ns/iter",
+            "extra": "iterations: 1107\ncpu: 632373.06504067 ns\nthreads: 1"
           }
         ]
       }
