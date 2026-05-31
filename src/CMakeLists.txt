@@ -200,6 +200,7 @@ endif ()
 # final exe link without forcing the engine TU to know about editor concretely.
 # -----------------------------------------------------------------------------
 octarine_library(octarine_engine
+        Engine/EngineBootstrap.cpp
         Game/Game.cpp
 )
 target_link_libraries(octarine_engine PUBLIC

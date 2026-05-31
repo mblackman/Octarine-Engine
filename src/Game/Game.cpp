@@ -41,18 +41,19 @@
 #include "ECS/Iterable.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
+#include "Engine/EngineBootstrap.h"
 #include "Events/MouseInputEvent.h"
 #include "Events/MouseWheelEvent.h"
 #include "GameConfig.h"
 #include "General/PerfUtils.h"
 #include "General/Rect.h"
+// InputSystemLuaBinding specializes LuaSystemBinding<InputSystem> — needed below where
+// LuaSystemRegistry::registerSystem(inputSystem) instantiates the lookup. Don't drop.
 #include "Lua/Bindings/InputSystemLuaBinding.h"
 #include "Lua/Bindings/LuaSystemRegistry.h"
-#include "Lua/Bindings/RegisterAllBindings.h"
 #include "Lua/HotReload/ScriptHotReload.h"
 #include "Lua/LuaApiManifest.h"
 #include "Lua/LuaEntityLoader.h"
-#include "Lua/Modules/RegisterAllModules.h"
 #include "Components/AudioActiveTag.h"
 #include "Components/AudioListenerComponent.h"
 #include "Systems/AnimationSystem.h"
@@ -63,11 +64,9 @@
 #include "Systems/DamageSystem.h"
 #include "Systems/DopplerSystem.h"
 #include "Systems/DrawColliderSystem.h"
-#include "Systems/EntityPoolSystem.h"
 #include "Systems/InputSystem.h"
 #include "Systems/ObstacleBounceSystem.h"
 #include "Systems/OffScreenDespawnSystem.h"
-#include "Systems/ProjectileEmitSystem.h"
 #include "Systems/ProjectileLifecycleSystem.h"
 #include "Systems/RenderPrimitiveSystem.h"
 #include "Systems/RenderSpriteSystem.h"
@@ -91,7 +90,6 @@
 #include "../Editor/EditorPersistence.h"
 #include "../Editor/ExportBuilder.h"
 #include "../Editor/PlayerLauncher.h"
-#include "../Editor/Inspectors/RegisterAllInspectors.h"
 #endif
 
 constexpr Uint8 GREY_COLOR = 24;
@@ -101,7 +99,8 @@ namespace
 {
     // Read a file's bytes through SDL_IO so the same path resolves on desktop, inside an APK asset
     // root, or inside a .app bundle. Lua's stock fopen-based loader only sees a real filesystem and
-    // misses AAssetManager-backed entries on Android.
+    // misses AAssetManager-backed entries on Android. Used by LoadGame + LoadScene; the dofile
+    // override that exposes this to scripts lives in engine_bootstrap::InstallLuaLibraries.
     std::optional<std::string> ReadFileViaSDL(const std::string& path)
     {
         SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
@@ -120,47 +119,6 @@ namespace
         std::string out(static_cast<const char*>(data), size);
         SDL_free(data);
         return out;
-    }
-
-    // Raw Lua C function backing the engine's `dofile` override. Registered via lua_pushcfunction so
-    // sol2 doesn't post-process the return: we report (top_after - top_before) which Lua interprets
-    // as the number of return values from the chunk, preserving multi-return correctly.
-    int LuaDofileViaSDL(lua_State* L)
-    {
-        std::size_t plen = 0;
-        const char* p = luaL_checklstring(L, 1, &plen);
-        const std::string path(p, plen);
-
-        auto bytes = ReadFileViaSDL(path);
-        if (!bytes)
-        {
-            return luaL_error(L, "dofile: cannot open '%s'", path.c_str());
-        }
-
-        // Drop the path arg so chunk return values are the only ones above topBefore.
-        lua_settop(L, 0);
-        const int topBefore = lua_gettop(L);
-        const std::string chunkname = "@" + path;
-        if (luaL_loadbuffer(L, bytes->data(), bytes->size(), chunkname.c_str()) != 0)
-        {
-            return luaL_error(L, "dofile load '%s': %s", path.c_str(), lua_tostring(L, -1));
-        }
-        if (lua_pcall(L, 0, LUA_MULTRET, 0) != 0)
-        {
-            return luaL_error(L, "dofile run '%s': %s", path.c_str(), lua_tostring(L, -1));
-        }
-        return lua_gettop(L) - topBefore;
-    }
-
-    // Override Lua's `dofile` so chunks load through SDL_IO too. The example calls
-    // dofile(get_asset_path("scripts/lib/foo.lua")); on desktop that's an absolute path SDL_IO opens
-    // directly, on Android it's a relative path SDL_IO resolves against the APK asset root. The stock
-    // Lua loader would fall back to fopen and miss the APK on Android.
-    void InstallLuaFileLoaders(sol::state& lua)
-    {
-        lua_State* L = lua.lua_state();
-        lua_pushcfunction(L, &LuaDofileViaSDL);
-        lua_setglobal(L, "dofile");
     }
 } // namespace
 
@@ -518,51 +476,30 @@ bool Game::RunBakeValidation(const std::string& assetPath)
         return false;
     }
 
-    // Singletons the startup script + its module globals touch at load time. This mirrors the
-    // pre-LoadGame prefix of Game::Setup but omits everything tied to a window/renderer/mixer
-    // (per-frame systems, audio, render queue producers) since the bake runs no frames.
-    const octarine::Rect camera{0, 0, static_cast<float>(gameConfig.windowWidth),
-                                static_cast<float>(gameConfig.windowHeight)};
-    registry_->Set<RenderQueue>(RenderQueue());
-    registry_->Set<CameraComponent>(CameraComponent{camera});
-    registry_->Set<AssetManager>(AssetManager());
-    registry_->Set<ViewportInfo>(ViewportInfo{
-        0, 0, static_cast<float>(gameConfig.windowWidth),
-        static_cast<float>(gameConfig.windowHeight)
-    });
-    // Bake mode: no window/renderer/mixer exist. Context still gets Set so module/system code
-    // that reads it can branch on null fields instead of TryGet'ing each slot separately.
-    EngineContext ctx;
-    ctx.eventBus = event_bus_.get();
-    ctx.config = &gameConfig;
-    ctx.assets = &registry_->Get<AssetManager>();
-    registry_->Set<EngineContext>(ctx);
+    // Bake mode: no window/renderer/mixer. Set the engine context first with the bits that do
+    // exist; InstallCoreSingletons plumbs ctx.assets once it Sets the AssetManager.
+    EngineContext bakeCtx;
+    bakeCtx.eventBus = event_bus_.get();
+    bakeCtx.config = &gameConfig;
+    registry_->Set<EngineContext>(bakeCtx);
 
-    // EntityPoolManager before ProjectileEmitSystem::Init (Init calls RegisterPool against it),
-    // matching Setup's ordering so fire_projectile binds correctly during module install.
-    registry_->Set<EntityPoolManager>(EntityPoolManager());
-    auto& projectileEmitSystem = registry_->Set<ProjectileEmitSystem>(ProjectileEmitSystem());
-    projectileEmitSystem.Init(*registry_);
-
-    // InputSystem owns the `input.*` Lua surface the scene libs bind against (input_map.install,
-    // spawn.install_click_spawn). Set + subscribe before bindings install.
-    auto& inputSystem = registry_->Set<InputSystem>(InputSystem());
-    inputSystem.SubscribeToEvents(event_bus_, registry_.get());
-
-    RegisterAllLuaBindings();
-
+    // Shared bootstrap spine. withSpriteRenderCache=false — bake runs no frames so the render
+    // cache slot is unused.
+    engine_bootstrap::InstallCoreSingletons(*registry_, registry_->Get<EngineContext>(), gameConfig.windowWidth,
+                                            gameConfig.windowHeight, /*withSpriteRenderCache=*/false);
+    engine_bootstrap::InstallPoolAndProjectile(*registry_);
+    auto& inputSystem = engine_bootstrap::InstallInputSystem(*registry_, event_bus_);
+    engine_bootstrap::RegisterAllComponentBindings();
     LuaSystemRegistry::clear();
     LuaSystemRegistry::registerSystem(inputSystem);
-
-    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
-    InstallLuaFileLoaders(lua);
+    engine_bootstrap::InstallLuaLibraries(lua);
+    // Bake doesn't register ScriptSystem as a per-frame system (no frames). A stack instance
+    // is enough to install the primitive + component usertypes Lua scripts reference.
     ScriptSystem scriptSystem;
     scriptSystem.CreateLuaBindings(lua);
-    RegisterAllLuaModules(lua, *this);
+    engine_bootstrap::InstallLuaModules(lua, *this);
     LuaSystemRegistry::bindAll(lua);
-    lua["game_window_width"] = gameConfig.windowWidth;
-    lua["game_window_height"] = gameConfig.windowHeight;
-    lua["oct_startup_mode"] = startup_mode_;
+    engine_bootstrap::SetCommonLuaGlobals(lua, gameConfig, startup_mode_);
 
     auto& assetManager = registry_->Get<AssetManager>();
     assetManager.LoadGameConfig(gameConfig);
@@ -700,73 +637,29 @@ void Game::Run()
 void Game::Setup()
 {
     auto& gameConfig = registry_->Get<GameConfig>();
-    const octarine::Rect camera{0, 0, static_cast<float>(gameConfig.windowWidth),
-                                static_cast<float>(gameConfig.windowHeight)};
 
-    registry_->Set<RenderQueue>(RenderQueue());
-    registry_->Set<CameraComponent>(CameraComponent{camera});
-    registry_->Set<AssetManager>(AssetManager());
-    // Render-side cache mapping Entity → cached SDL_Texture*. Replaces the mutable cachedTexture
-    // member that used to live on SpriteComponent; keeps SpriteComponent POD-no-SDL.
-    registry_->Set<SpriteRenderCache>(SpriteRenderCache());
-    registry_->Set<ViewportInfo>(ViewportInfo{
-        0, 0, static_cast<float>(gameConfig.windowWidth),
-        static_cast<float>(gameConfig.windowHeight)
-    });
+    // Shared bootstrap spine (see engine_bootstrap/EngineBootstrap.h). withSpriteRenderCache=true
+    // — the live game loop reads the cache from the parallel sprite-render pass.
+    engine_bootstrap::InstallCoreSingletons(*registry_, registry_->Get<EngineContext>(), gameConfig.windowWidth,
+                                            gameConfig.windowHeight, /*withSpriteRenderCache=*/true);
 
-    // Finish populating the engine context: AssetManager is now live, so plumb its pointer in
-    // alongside the SDL handles Initialize() already set. Mixer is filled in below after
-    // AudioSystem::Init succeeds.
-    registry_->Get<EngineContext>().assets = &registry_->Get<AssetManager>();
-
-    // Gameplay
+    // ScriptSystem is registered as a per-frame system (vs. Bake's stack instance) so its
+    // operator() runs each tick. CreateLuaBindings still happens below in the bootstrap spine.
     auto& scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
-    // InputSystem owned by the Registry so Lua bindings + event subscriptions outlive any single
-    // scene script reload. Must be Set before CreateLuaBindings so the `input` table is installed
-    // alongside ScriptSystem's globals.
-    auto& inputSystem = registry_->Set<InputSystem>(InputSystem());
-    inputSystem.SubscribeToEvents(event_bus_, registry_.get());
 
-    // Component bindings (LuaBinding<T> specializations) must be registered BEFORE
-    // ScriptSystem's CreateLuaBindings runs — usertypes + registry.has_/get_ are
-    // populated from LuaComponentRegistry at that point.
-    RegisterAllLuaBindings();
-
-#ifdef OCTARINE_WITH_EDITOR
-    // Editor inspector surface — declarative parallel to the Lua bindings.
-    RegisterAllComponentInspectors();
-#endif
-
-    // Systems that expose a Lua surface register here; bindAll installs them all once
-    // the sol::state has its libraries open.
+    auto& inputSystem = engine_bootstrap::InstallInputSystem(*registry_, event_bus_);
+    engine_bootstrap::RegisterAllComponentBindings();
     LuaSystemRegistry::clear();
     LuaSystemRegistry::registerSystem(inputSystem);
-
-    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
-    // Re-route Lua file-loading through SDL_IO so dofile() reaches inside read-only bundles
-    // (APK/.app). Must run after open_libraries (which installs the stock dofile).
-    InstallLuaFileLoaders(lua);
+    engine_bootstrap::InstallLuaLibraries(lua);
     // Snapshot stdlib globals before binding so the API manifest can diff out everything the
     // engine adds. Cheap; the actual dump only fires when OCTARINE_DUMP_LUA_API is set.
     const auto preBindingGlobals = LuaApiManifest::SnapshotGlobals(lua);
-
-    // EntityPoolManager Set before ProjectileEmitSystem::Init — Init calls
-    // Get<EntityPoolManager>().RegisterPool<...>. Was Set later (after audio); moved up to
-    // satisfy the new init order.
-    registry_->Set<EntityPoolManager>(EntityPoolManager());
-
-    // ProjectileEmitSystem set + Init early so GameModule's fire_projectile can capture it from
-    // the Registry during RegisterAllLuaModules. Init only does RegisterPool<...> calls — safe
-    // to run before scene/system registration.
-    auto& projectileEmitSystem = registry_->Set<ProjectileEmitSystem>(ProjectileEmitSystem());
-    projectileEmitSystem.Init(*registry_);
-
+    engine_bootstrap::InstallPoolAndProjectile(*registry_);
     scriptSystem.CreateLuaBindings(lua);
-    RegisterAllLuaModules(lua, *this);
+    engine_bootstrap::InstallLuaModules(lua, *this);
     LuaSystemRegistry::bindAll(lua);
-    lua["game_window_width"] = gameConfig.windowWidth;
-    lua["game_window_height"] = gameConfig.windowHeight;
-    lua["oct_startup_mode"] = startup_mode_;
+    engine_bootstrap::SetCommonLuaGlobals(lua, gameConfig, startup_mode_);
 
     // Emit the EmmyLua API stub when requested (no-op otherwise). Runs once per Setup, after the
     // full surface — globals, modules, system tables — is installed.
