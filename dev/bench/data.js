@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780192824898,
+  "lastUpdate": 1780196078647,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -6408,6 +6408,114 @@ window.BENCHMARK_DATA = {
             "value": 633718.6716470288,
             "unit": "ns/iter",
             "extra": "iterations: 1118\ncpu: 633631.2307691885 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "987583141e68d090e2e28243b9999bea48c41736",
+          "message": "Add Run Player toolbar action backed by PlayerLauncher (#72)\n\nStage 3 of ai/EditorBuildAndDeployPlan.md. Wires the editor's playback\ntoolbar to spawn the standalone OctarineEngine-player subprocess at the\ncurrently-loaded project. Player stdout/stderr stream into a new Player\nOutput ImGui window with auto-scroll, status indicator, and per-line\nstdout/stderr coloring.\n\nDev player presets (player-debug / player-profile / player-release) now\nemit `OctarineEngine-player` so the editor and player coexist in the\nsame dev tree; ship-release and the packaging path keep the canonical\n`OctarineEngine` name so downstream packaging owns the shipped binary\nfilename.\n\nPlayerLauncher is a Registry singleton constructed in Game::Setup right\nafter EditorPersistence. The launcher resolves the player binary by\nprobing same-dir first, then sibling `player-*` preset bin dirs;\nmissing binary emits a hint pointing at `cmake --build --preset\nplayer-debug`. Pump() runs every frame from RenderDebugGUISystem to\ndrain captured output and update Running -> Exited transitions.",
+          "timestamp": "2026-05-30T20:47:24-06:00",
+          "tree_id": "62b73d2139fbe34f5134476e8a474451e71e8ded",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/987583141e68d090e2e28243b9999bea48c41736"
+        },
+        "date": 1780196069449,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4052.708875961556,
+            "unit": "ns/iter",
+            "extra": "iterations: 170111\ncpu: 4090.637954041531 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16227.952077874035,
+            "unit": "ns/iter",
+            "extra": "iterations: 42911\ncpu: 16277.293351354761 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 109991.44210751062,
+            "unit": "ns/iter",
+            "extra": "iterations: 6408\ncpu: 110038.09378901392 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 865637.529271634,
+            "unit": "ns/iter",
+            "extra": "iterations: 806\ncpu: 865818.3858560815 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1715463.8132474986,
+            "unit": "ns/iter",
+            "extra": "iterations: 406\ncpu: 1715461.2364531893 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2310.444881077998,
+            "unit": "ns/iter",
+            "extra": "iterations: 300063\ncpu: 2303.6957805524767 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 11961.64691536418,
+            "unit": "ns/iter",
+            "extra": "iterations: 56019\ncpu: 11954.088755601015 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 69544.47849353106,
+            "unit": "ns/iter",
+            "extra": "iterations: 8165\ncpu: 69498.54072260812 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 397686.05154878827,
+            "unit": "ns/iter",
+            "extra": "iterations: 1749\ncpu: 397661.3624928707 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2178.1530037644,
+            "unit": "ns/iter",
+            "extra": "iterations: 323280\ncpu: 2151.3446362282043 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6607.190911217442,
+            "unit": "ns/iter",
+            "extra": "iterations: 106826\ncpu: 6574.554321977641 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41312.601158368365,
+            "unit": "ns/iter",
+            "extra": "iterations: 16804\ncpu: 41276.773744335835 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 317776.9600131393,
+            "unit": "ns/iter",
+            "extra": "iterations: 2210\ncpu: 317694.6837103634 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 636199.5953574111,
+            "unit": "ns/iter",
+            "extra": "iterations: 1097\ncpu: 636114.3928896718 ns\nthreads: 1"
           }
         ]
       }
