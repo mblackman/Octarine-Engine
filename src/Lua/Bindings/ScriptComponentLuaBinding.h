@@ -75,12 +75,12 @@ struct LuaBinding<ScriptComponent>
         sol::protected_function_result result = dofile(absPath);
         if (!result.valid())
         {
-            const sol::error err = result;
+            const auto err = result.get<sol::error>();
             Logger::ErrorLua("ScriptComponent dofile '" + absPath + "': " + err.what());
             return ScriptComponent(spec, sol::lua_nil, sol::lua_nil, absPath);
         }
 
-        const sol::object returned = result;
+        const auto returned = result.get<sol::object>();
         if (!returned.is<sol::table>())
         {
             Logger::Error("ScriptComponent: '" + absPath + "' did not return a table");

@@ -88,12 +88,12 @@ void ScriptHotReload::ReloadFile(const std::string& canonicalPath, Registry& reg
 
   sol::protected_function_result result = dofile(canonicalPath);
   if (!result.valid()) {
-    const sol::error err = result;
+    const auto err = result.get<sol::error>();
     RecordFailure(canonicalPath, err.what());
     return;
   }
 
-  const sol::object returned = result;
+  const auto returned = result.get<sol::object>();
   if (!returned.is<sol::table>()) {
     RecordFailure(canonicalPath, "script did not return a table");
     return;
@@ -117,7 +117,7 @@ bool ScriptHotReload::SwapComponent(ScriptComponent& sc, const sol::table& newTa
   using namespace LuaComponentHelpers;
   // Preserve per-entity state (`data` sub-table) across the swap. Authors mutate this at
   // runtime; clobbering it would defeat the point of hot reload.
-  const sol::object preservedData = sc.scriptTable["data"];
+  const auto preservedData = sc.scriptTable.get<sol::object>("data");
 
   // Resolve new callbacks first so we never end up with a half-swapped state if Lua throws.
   sol::protected_function newUpdate = SafeGetProtectedFunction(newTable, "on_update");
