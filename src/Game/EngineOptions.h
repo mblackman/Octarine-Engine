@@ -17,4 +17,8 @@ struct EngineOptions {
   // When true, a scene whose asset references fail validation aborts the load (dev gate). Off by
   // default so players never hard-fail; the bake step is the CI enforcement point.
   bool assetValidationFatal = false;
+  // Lua script hot reload. Compiled out under OCTARINE_SHIPPED; in dev/editor builds this is the
+  // runtime toggle. Poll cadence is mtime-based, single-threaded, on the main loop.
+  bool hotReloadEnabled = true;
+  float hotReloadPollSeconds = 0.25F;
 };

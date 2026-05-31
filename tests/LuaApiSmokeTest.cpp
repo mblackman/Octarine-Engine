@@ -10,13 +10,18 @@
 
 #include <sol/sol.hpp>
 
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <set>
 #include <string>
 #include <vector>
 
+#include "Components/ScriptComponent.h"
 #include "ECS/Registry.h"
 #include "Game/Game.h"
+#include "General/Logger.h"
+#include "Lua/HotReload/ScriptHotReload.h"
 #ifdef OCTARINE_WITH_EDITOR
 #include "Editor/Inspectors/ComponentInspectorRegistry.h"
 #include "Editor/Inspectors/RegisterAllInspectors.h"
@@ -65,6 +70,11 @@ namespace
 
 int main()
 {
+    // Logger::Init brings up the dual main/lua spdlog sinks. ScriptHotReload calls
+    // Logger::ErrorLua on failed reloads; without Init the lua sink shared_ptr is null and the
+    // call AVs. Real binary calls this from Main; tests must do it explicitly.
+    Logger::Init();
+
     Game game; // SDL-free constructor — allocates Registry/EventBus/Renderer, opens no window.
     sol::state& lua = game.GetLua();
     lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
@@ -165,6 +175,85 @@ int main()
 #endif
 #ifdef LUA_API_MODULES_OUTPUT
     Check(LuaApiManifest::WriteModulesJson(LUA_API_MODULES_OUTPUT), "modules.json written");
+#endif
+
+#ifndef OCTARINE_SHIPPED
+    std::cout << "[hot-reload] ScriptHotReload swap + state preservation + error containment\n";
+    {
+        auto* reg = game.GetRegistry();
+        reg->Set<ScriptHotReload>(ScriptHotReload());
+        auto& hotReload = reg->Get<ScriptHotReload>();
+
+        const auto tempDir = std::filesystem::temp_directory_path() / "octarine-hotreload-test";
+        std::error_code ec;
+        std::filesystem::create_directories(tempDir, ec);
+        const auto scriptPath = (tempDir / "fixture.lua").string();
+
+        const auto WriteScript = [&](const std::string& body) {
+            std::ofstream f(scriptPath, std::ios::trunc);
+            f << body;
+            f.close();
+        };
+
+        // v1: on_update writes 'kind = "v1"' into self.data.
+        WriteScript(
+            "return {\n"
+            "  data = { kind = 'initial', persisted = 42 },\n"
+            "  on_update = function(self, e, dt) self.data.kind = 'v1' end,\n"
+            "}\n");
+
+        // Load v1 manually via dofile (mirrors what FromSource does in the binding).
+        sol::protected_function_result loadV1 = lua["dofile"](scriptPath);
+        Check(loadV1.valid(), "fixture v1 loads");
+        sol::table v1Table = loadV1;
+        const sol::protected_function v1Update = v1Table["on_update"];
+
+        // Author-side mutation before reload: bump a value that must survive the swap.
+        v1Table["data"]["persisted"] = 99;
+
+        ScriptComponent sc(v1Table, v1Update, sol::protected_function(sol::lua_nil), scriptPath);
+        const Entity ent = reg->CreateEntity();
+        reg->AddComponent(ent, std::move(sc));
+
+        // Drive v1 once so 'kind' is set to "v1".
+        {
+            auto& live = reg->GetComponent<ScriptComponent>(ent);
+            live.updateFunction(live.scriptTable, ent, 0.016F);
+            sol::optional<std::string> kindOpt = live.scriptTable["data"]["kind"];
+            Check(kindOpt.value_or("<missing>") == "v1", "v1 on_update fires (kind == 'v1')");
+        }
+
+        // v2: same file, different behavior. Save *should* be picked up by ForceReloadAll.
+        WriteScript(
+            "return {\n"
+            "  data = { kind = 'shadow', persisted = 0 },\n"
+            "  on_update = function(self, e, dt) self.data.kind = 'v2' end,\n"
+            "}\n");
+        hotReload.ForceReloadAll(*reg, lua);
+        {
+            auto& live = reg->GetComponent<ScriptComponent>(ent);
+            live.updateFunction(live.scriptTable, ent, 0.016F);
+            sol::optional<sol::table> dataOpt = live.scriptTable["data"];
+            sol::optional<std::string> kindOpt = dataOpt ? dataOpt->get<sol::optional<std::string>>("kind") : sol::nullopt;
+            Check(kindOpt.value_or("<missing>") == "v2", "v2 on_update fires after reload (kind == 'v2')");
+            sol::optional<int> persistedOpt = dataOpt ? dataOpt->get<sol::optional<int>>("persisted") : sol::nullopt;
+            Check(persistedOpt.value_or(-1) == 99, "scriptTable.data preserved across reload (persisted == 99)");
+            Check(hotReload.LastReload().error.empty(), "successful reload leaves no last-error");
+        }
+
+        // Syntax error: reload must log + leave prior callbacks intact.
+        WriteScript("return { on_update = function(self, e, dt) self.data.kind = 'v3' end,\n");  // missing closing }
+        hotReload.ForceReloadAll(*reg, lua);
+        {
+            auto& live = reg->GetComponent<ScriptComponent>(ent);
+            live.updateFunction(live.scriptTable, ent, 0.016F);
+            sol::optional<std::string> kindOpt = live.scriptTable["data"]["kind"];
+            Check(kindOpt.value_or("<missing>") == "v2", "syntax-error reload preserves prior callback (kind still 'v2')");
+            Check(!hotReload.LastReload().error.empty(), "failed reload records error");
+        }
+
+        std::filesystem::remove_all(tempDir, ec);
+    }
 #endif
 
     if (g_failures == 0)

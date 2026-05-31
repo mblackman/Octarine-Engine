@@ -91,12 +91,29 @@ class GameConfig {
     return SetValue<int>(config, key, setter, [](const std::string& s) { return std::stoi(s); }, required);
   }
 
+  bool SetValue(const std::unordered_map<std::string, std::string>& config, const std::string& key,
+                void (GameConfig::*setter)(bool), const bool required = false) {
+    return SetValue<bool>(
+        config, key, setter,
+        [](const std::string& s) {
+          return s == "true" || s == "1" || s == "yes" || s == "on";
+        },
+        required);
+  }
+
+  bool SetValue(const std::unordered_map<std::string, std::string>& config, const std::string& key,
+                void (GameConfig::*setter)(float), const bool required = false) {
+    return SetValue<float>(config, key, setter, [](const std::string& s) { return std::stof(s); }, required);
+  }
+
   void SetAssetPath(const std::string& assetPath);
   void SetGameTitle(const std::string& gameTitle);
   void SetStartupScript(const std::string& startupScript);
   void SetDefaultScaleMode(const std::string& defaultScaleMode);
   void SetDefaultWidth(int defaultWidth);
   void SetDefaultHeight(int defaultHeight);
+  void SetHotReloadEnabled(bool enabled);
+  void SetHotReloadPollSeconds(float seconds);
   // Runtime override of the compile-time default log level. Invoked from LoadConfig; pushes the
   // value straight into spdlog via Logger::SetLevel, so subsequent Logger calls honor it.
   void SetLogLevel(const std::string& logLevel);
