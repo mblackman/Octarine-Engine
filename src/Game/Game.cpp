@@ -417,8 +417,15 @@ bool Game::Initialize(const std::string& assetPath)
 
     SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
 
-    registry_->Set<SDL_Renderer*>(sdl_renderer_);
-    registry_->Set<EventBus*>(event_bus_.get());
+    // Populate the engine-level resource bundle now that SDL is up. AssetManager + mixer are
+    // filled in by Setup once those exist; consumers read the same instance via
+    // Registry::Get<EngineContext>().
+    EngineContext ctx;
+    ctx.sdlWindow = window_;
+    ctx.sdlRenderer = sdl_renderer_;
+    ctx.eventBus = event_bus_.get();
+    ctx.config = &gameConfig;
+    registry_->Set<EngineContext>(ctx);
 
     s_is_running_ = true;
     return true;
@@ -523,8 +530,13 @@ bool Game::RunBakeValidation(const std::string& assetPath)
         0, 0, static_cast<float>(gameConfig.windowWidth),
         static_cast<float>(gameConfig.windowHeight)
     });
-    registry_->Set<SDL_Renderer*>(nullptr); // no GPU in bake; bake-mode asset globals skip it
-    registry_->Set<EventBus*>(event_bus_.get());
+    // Bake mode: no window/renderer/mixer exist. Context still gets Set so module/system code
+    // that reads it can branch on null fields instead of TryGet'ing each slot separately.
+    EngineContext ctx;
+    ctx.eventBus = event_bus_.get();
+    ctx.config = &gameConfig;
+    ctx.assets = &registry_->Get<AssetManager>();
+    registry_->Set<EngineContext>(ctx);
 
     // EntityPoolManager before ProjectileEmitSystem::Init (Init calls RegisterPool against it),
     // matching Setup's ordering so fire_projectile binds correctly during module install.
@@ -702,6 +714,11 @@ void Game::Setup()
         static_cast<float>(gameConfig.windowHeight)
     });
 
+    // Finish populating the engine context: AssetManager is now live, so plumb its pointer in
+    // alongside the SDL handles Initialize() already set. Mixer is filled in below after
+    // AudioSystem::Init succeeds.
+    registry_->Get<EngineContext>().assets = &registry_->Get<AssetManager>();
+
     // Gameplay
     auto& scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
     // InputSystem owned by the Registry so Lua bindings + event subscriptions outlive any single
@@ -830,6 +847,9 @@ void Game::Setup()
     {
         Logger::Error("AudioSystem failed to initialize; audio disabled this session.");
     }
+    // Mixer is owned by AudioSystem; publish it on the context so asset loads + the master-
+    // volume sync (in Game::Update) can reach it without going through the Registry's typed slot.
+    registry_->Get<EngineContext>().mixer = audioSystem.Mixer();
 
     if (gameConfig.HasLoadedConfig())
     {
@@ -972,10 +992,10 @@ void Game::Update(const float deltaTime)
     // Master volume + mute live at the mixer level so they apply to every track (including loops
     // already playing). Synced every frame — and outside the pause gate — so toggling mute reacts
     // immediately even while execution is paused.
-    if (auto* mixer = registry_->TryGet<MIX_Mixer*>())
+    if (auto* mixer = registry_->Get<EngineContext>().mixer)
     {
         const float masterGain = options.audioEnabled ? std::max(0.0F, options.masterVolume) : 0.0F;
-        MIX_SetMixerGain(*mixer, masterGain);
+        MIX_SetMixerGain(mixer, masterGain);
     }
 
     auto* inputSystem = registry_->TryGet<InputSystem>();
@@ -1208,7 +1228,7 @@ void Game::LoadScene(const std::string& scenePath)
             if (assets && assets->valid())
             {
                 auto& am = registry_->Get<AssetManager>();
-                auto* mixer = registry_->TryGet<MIX_Mixer*>();
+                auto* mixer = registry_->Get<EngineContext>().mixer;
                 int assetCount = 0;
                 for (auto& [key, value] : *assets)
                 {
@@ -1229,7 +1249,7 @@ void Game::LoadScene(const std::string& scenePath)
                         }
                         else if (type == "audio_clip")
                         {
-                            if (mixer) am.AddAudioClip(*mixer, id, file);
+                            if (mixer) am.AddAudioClip(mixer, id, file);
                         }
                         assetCount++;
                     }
@@ -1242,8 +1262,7 @@ void Game::LoadScene(const std::string& scenePath)
             // front before entities load.
             {
                 auto& am = registry_->Get<AssetManager>();
-                auto* mixerPtr = registry_->TryGet<MIX_Mixer*>();
-                MIX_Mixer* mixer = mixerPtr ? *mixerPtr : nullptr;
+                MIX_Mixer* mixer = registry_->Get<EngineContext>().mixer;
                 const std::vector<AssetReference> refs = SceneAssetScanner::CollectRefs(sceneTable);
 
                 if (const int failures = am.Validate(refs); failures > 0)

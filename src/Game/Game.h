@@ -10,6 +10,7 @@
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/GlobalTransformComponent.h"
 #include "../ECS/Query.h"
+#include "../Engine/EngineContext.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
 #include "../Renderer/Renderer.h"
@@ -67,6 +68,13 @@ public:
 
     [[nodiscard]] Registry* GetRegistry() const { return registry_.get(); }
     [[nodiscard]] sol::state& GetLua() { return lua; }
+
+    // Engine-level resource bundle (SDL handles, EventBus, AssetManager, GameConfig).
+    // Lives as a Registry singleton — systems read it the same way via
+    // `Registry::Get<EngineContext>()`. Game just forwards to the registry copy so
+    // fields stay coherent across Initialize → Setup → AudioSystem::Init mutations.
+    [[nodiscard]] EngineContext& GetContext() { return registry_->Get<EngineContext>(); }
+    [[nodiscard]] const EngineContext& GetContext() const { return registry_->Get<EngineContext>(); }
 
     void LoadScene(const std::string& scenePath);
     void ReloadScene();

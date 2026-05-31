@@ -13,6 +13,7 @@
 #include "../ECS/Entity.h"
 #include "../ECS/Iterable.h"
 #include "../ECS/Registry.h"
+#include "../Engine/EngineContext.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
 #include "General/PerfUtils.h"
@@ -91,7 +92,7 @@ class CollisionSystem {
     PROFILE_NAMED_SCOPE("Collision System Update");
 
     auto* registry = ctx.GetRegistry();
-    auto* eventBus = registry->Get<EventBus*>();
+    auto* eventBus = registry->Get<EngineContext>().eventBus;
 
     if (collisionResult_.valid() &&
         collisionResult_.wait_for(std::chrono::milliseconds(0)) != std::future_status::ready) {

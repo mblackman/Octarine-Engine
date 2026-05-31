@@ -16,6 +16,7 @@
 #include "../AssetManager/GlyphAtlas.h"
 #include "../Components/GlobalTransformComponent.h"
 #include "../Components/TextLabelComponent.h"
+#include "../Engine/EngineContext.h"
 #include "../General/Logger.h"
 #include "../General/PerfUtils.h"
 #include "../General/Rect.h"
@@ -49,7 +50,7 @@ class RenderTextSystem {
 
     Registry* registry = ctx.GetRegistry();
     const auto& assetManager = registry->Get<AssetManager>();
-    auto* sdlRenderer = registry->Get<SDL_Renderer*>();
+    auto* sdlRenderer = registry->Get<EngineContext>().sdlRenderer;
     auto& renderQueue = registry->Get<RenderQueue>();
     const octarine::Rect camera = registry->Get<CameraComponent>().viewport;
 
