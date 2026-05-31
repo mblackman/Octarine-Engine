@@ -21,6 +21,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
+#include "../Renderer/SpriteRenderCache.h"
 #include "Components/BoxColliderComponent.h"
 #include "Components/CameraComponents.h"
 #include "Components/EntityMaskComponent.h"
@@ -44,6 +45,7 @@
 #include "Events/MouseWheelEvent.h"
 #include "GameConfig.h"
 #include "General/PerfUtils.h"
+#include "General/Rect.h"
 #include "Lua/Bindings/InputSystemLuaBinding.h"
 #include "Lua/Bindings/LuaSystemRegistry.h"
 #include "Lua/Bindings/RegisterAllBindings.h"
@@ -512,8 +514,8 @@ bool Game::RunBakeValidation(const std::string& assetPath)
     // Singletons the startup script + its module globals touch at load time. This mirrors the
     // pre-LoadGame prefix of Game::Setup but omits everything tied to a window/renderer/mixer
     // (per-frame systems, audio, render queue producers) since the bake runs no frames.
-    const SDL_FRect camera(0, 0, static_cast<float>(gameConfig.windowWidth),
-                           static_cast<float>(gameConfig.windowHeight));
+    const octarine::Rect camera{0, 0, static_cast<float>(gameConfig.windowWidth),
+                                static_cast<float>(gameConfig.windowHeight)};
     registry_->Set<RenderQueue>(RenderQueue());
     registry_->Set<CameraComponent>(CameraComponent{camera});
     registry_->Set<AssetManager>(AssetManager());
@@ -686,12 +688,15 @@ void Game::Run()
 void Game::Setup()
 {
     auto& gameConfig = registry_->Get<GameConfig>();
-    const SDL_FRect camera(0, 0, static_cast<float>(gameConfig.windowWidth),
-                           static_cast<float>(gameConfig.windowHeight));
+    const octarine::Rect camera{0, 0, static_cast<float>(gameConfig.windowWidth),
+                                static_cast<float>(gameConfig.windowHeight)};
 
     registry_->Set<RenderQueue>(RenderQueue());
     registry_->Set<CameraComponent>(CameraComponent{camera});
     registry_->Set<AssetManager>(AssetManager());
+    // Render-side cache mapping Entity → cached SDL_Texture*. Replaces the mutable cachedTexture
+    // member that used to live on SpriteComponent; keeps SpriteComponent POD-no-SDL.
+    registry_->Set<SpriteRenderCache>(SpriteRenderCache());
     registry_->Set<ViewportInfo>(ViewportInfo{
         0, 0, static_cast<float>(gameConfig.windowWidth),
         static_cast<float>(gameConfig.windowHeight)
@@ -1349,6 +1354,12 @@ void Game::clearSceneEntities()
     if (auto* inputSystem = registry_->TryGet<InputSystem>())
     {
         inputSystem->ResetLuaState();
+    }
+    // Drop cached SDL_Texture* lookups for entities that just got blammed; the next sprite-emit
+    // pass repopulates as those entities are recreated by the new scene's load.
+    if (auto* spriteCache = registry_->TryGet<SpriteRenderCache>())
+    {
+        spriteCache->Clear();
     }
 }
 

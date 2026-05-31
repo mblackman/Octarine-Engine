@@ -18,6 +18,7 @@
 #include "../Components/TextLabelComponent.h"
 #include "../General/Logger.h"
 #include "../General/PerfUtils.h"
+#include "../General/Rect.h"
 #include "../Renderer/RenderCommands.h"
 #include "../Renderer/RenderCulling.h"
 #include "../Renderer/RenderQueue.h"
@@ -50,7 +51,7 @@ class RenderTextSystem {
     const auto& assetManager = registry->Get<AssetManager>();
     auto* sdlRenderer = registry->Get<SDL_Renderer*>();
     auto& renderQueue = registry->Get<RenderQueue>();
-    const SDL_FRect camera = registry->Get<CameraComponent>().viewport;
+    const octarine::Rect camera = registry->Get<CameraComponent>().viewport;
 
     TTF_Font* font = assetManager.GetFont(text.fontId);
     if (!font) return;
@@ -61,17 +62,20 @@ class RenderTextSystem {
 
     auto it = text_cache_.find(cacheKey);
     if (it == text_cache_.end()) {
-      // Atlas fast path (Stage 14 B3): when every codepoint in the string is resident in the
-      // font's GlyphAtlas, compose the destination surface by blitting from the atlas. Falls back
-      // to TTF_RenderText_Blended if the font has no baked atlas or the string hits a glyph the
-      // bake step didn't cover (extended Latin, emoji, etc.).
+      // text.color is now octarine::Color (Stage 2 POD-no-SDL). Convert to SDL_Color once at the
+      // render seam — both the atlas fast path and the TTF fallback take it.
+      const SDL_Color sdlColor{text.color.r, text.color.g, text.color.b, text.color.a};
+      // Atlas fast path: when every codepoint in the string is resident in the font's GlyphAtlas,
+      // compose the destination surface by blitting from the atlas. Falls back to
+      // TTF_RenderText_Blended when no atlas is baked or the string hits an uncovered glyph
+      // (extended Latin, emoji, etc.).
       SDL_Surface* surface = nullptr;
       const GlyphAtlas* atlas = assetManager.GetGlyphAtlas(text.fontId);
       if (atlas != nullptr && atlas->IsLoaded()) {
-        surface = ComposeFromAtlas(*atlas, text.text, text.color);
+        surface = ComposeFromAtlas(*atlas, text.text, sdlColor);
       }
       if (surface == nullptr) {
-        surface = TTF_RenderText_Blended(font, text.text.c_str(), 0, text.color);
+        surface = TTF_RenderText_Blended(font, text.text.c_str(), 0, sdlColor);
       }
       if (!surface) {
         Logger::Error("RenderText: surface compose failed: " + std::string(SDL_GetError()));

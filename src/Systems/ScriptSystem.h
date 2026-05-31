@@ -1,11 +1,11 @@
 #pragma once
 
-#include <SDL3/SDL.h>
-
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <sol/sol.hpp>
 
 #include "../Components/ScriptComponent.h"
+#include "../General/Color.h"
 #include "../General/Logger.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
 
@@ -51,9 +51,10 @@ private:
                                     &glm::vec2::x,
                                     "y", &glm::vec2::y);
 
-        lua.new_usertype<SDL_Color>("color",
-                                    sol::constructors<SDL_Color(), SDL_Color(Uint8, Uint8, Uint8, Uint8)>(),
-                                    "r", &SDL_Color::r, "g", &SDL_Color::g, "b", &SDL_Color::b, "a", &SDL_Color::a);
+        lua.new_usertype<octarine::Color>(
+            "color",
+            sol::constructors<octarine::Color(), octarine::Color(std::uint8_t, std::uint8_t, std::uint8_t, std::uint8_t)>(),
+            "r", &octarine::Color::r, "g", &octarine::Color::g, "b", &octarine::Color::b, "a", &octarine::Color::a);
 
         // Component usertypes — driven by LuaComponentRegistry. Add a new component by
         // dropping a LuaBinding<T> header + one line in RegisterAllBindings.cpp.

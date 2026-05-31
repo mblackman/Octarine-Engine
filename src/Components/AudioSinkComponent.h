@@ -4,6 +4,11 @@
 
 #include <cstdint>
 
+// Carries the MIX_Track* AudioSystem assigned this emitter, plus a generation guard so a track
+// reassigned to a different emitter after our clip stopped isn't mistakenly treated as ours.
+// Still SDL-typed — Stage 2's POD goal punts on this one because SpatialAudioSystem +
+// DopplerSystem read sink.track directly each frame and decoupling them via a resolve
+// indirection is a separate refactor. See ArchitectureImprovementsPlan follow-ups.
 struct AudioSinkComponent {
   MIX_Track* track = nullptr;
   std::uint32_t generation = 0;

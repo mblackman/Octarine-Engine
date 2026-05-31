@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL3/SDL.h>
+#include <cmath>
 
 #include "../Components/AnimationComponent.h"
 #include "../Components/SpriteComponent.h"

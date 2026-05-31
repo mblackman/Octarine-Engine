@@ -8,6 +8,7 @@
 #include "../ECS/Registry.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/CollisionEvent.h"
+#include "../General/SpriteFlip.h"
 
 class ObstacleBounceSystem {
  public:
@@ -37,7 +38,8 @@ class ObstacleBounceSystem {
 
     if (registry_->HasComponent<SpriteComponent>(enemy)) {
       auto& sprite = registry_->GetComponent<SpriteComponent>(enemy);
-      sprite.flip = sprite.flip == SDL_FLIP_NONE ? SDL_FLIP_HORIZONTAL : SDL_FLIP_NONE;
+      sprite.flip =
+          sprite.flip == octarine::SpriteFlip::None ? octarine::SpriteFlip::Horizontal : octarine::SpriteFlip::None;
     }
   }
 

@@ -1,7 +1,7 @@
 #pragma once
 
-#include <SDL3/SDL_rect.h>
+#include "General/Rect.h"
 
 struct CameraComponent {
-  SDL_FRect viewport;
+  octarine::Rect viewport;
 };
