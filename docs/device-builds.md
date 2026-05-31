@@ -57,8 +57,9 @@ The two pieces that make this work end to end:
    execute), so the **project commits its `asset_manifest.lua`** or passes a
    host-native binary via `-Poctarine.bakeExe=`.
 
-Read `CLAUDE.md` for the broader engine architecture; this doc is strictly
-about how the build system reaches a shippable artifact.
+For the broader engine architecture see [`docs/ecs-architecture.md`](ecs-architecture.md)
+and [`docs/lua-scripting.md`](lua-scripting.md); this doc is strictly about how the build
+system reaches a shippable artifact.
 
 ---
 

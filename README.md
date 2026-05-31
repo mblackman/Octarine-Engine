@@ -64,7 +64,7 @@ cmake --list-presets
 cmake --preset editor-debug
 cmake --build --preset editor-debug
 
-# Build the Player (Shipping build)
+# Build the Player (optimized dev runtime, live-scan catalog)
 cmake --preset player-release
 cmake --build --preset player-release
 
@@ -99,8 +99,8 @@ Octarine Engine accepts the game directory as a positional argument:
 
 The engine runs automated performance benchmarks via GitHub Actions on every push to `main` and Pull Request.
 
-You can view the interactive historical performance dashboard here:
-👉 **[Octarine Engine Performance Dashboard](https://mblackman.github.io/Octarine-Engine/dev/bench/)**
+Interactive historical performance dashboard:
+**[Octarine Engine Performance Dashboard](https://mblackman.github.io/Octarine-Engine/dev/bench/)**
 
 ### Local Profiling
 

@@ -30,8 +30,8 @@ archetype.
 
 ### Chunks and SoA
 
-Within an Archetype, data is stored in fixed-size **Chunks** (default 16KB). Each chunk uses a **Structure of Arrays (
-SoA)** layout:
+Within an Archetype, data is stored in fixed-size **Chunks** (default 16KB). Each chunk uses a
+**Structure of Arrays (SoA)** layout:
 
 ```text
 Chunk (16KB)
@@ -74,8 +74,8 @@ The `Registry` is the central manager for the entire ECS. It handles:
 
 ### Component Queries
 
-Systems interact with data via `ComponentQuery<TComponents...>`. A query identifies all archetypes that are a **superset
-** of the requested components.
+Systems interact with data via `ComponentQuery<TComponents...>`. A query identifies all archetypes
+that are a **superset** of the requested components.
 
 Queries are cached; they only re-evaluate the archetype graph when the registry's `archetype_generation` increases.
 
@@ -109,8 +109,8 @@ Octarine supports three primary ways to process entities:
 The ECS supports **Pairs** to model relationships between entities:
 
 - **Pairs:** Represented as `(Relationship, Target)`.
-- **Hierarchy:** Built using the `ChildOf` relationship. The `TransformSystem` optimizedly handles nested transforms
-  using this mechanism.
+- **Hierarchy:** Built using the `ChildOf` relationship. The `TransformSystem` handles nested
+  transforms efficiently via this mechanism.
 
 ### Command Buffers
 
