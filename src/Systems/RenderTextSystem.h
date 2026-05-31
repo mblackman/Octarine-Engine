@@ -138,8 +138,9 @@ class RenderTextSystem {
   // ascent-aware baseline alignment is a follow-up.
   static SDL_Surface* ComposeFromAtlas(const GlyphAtlas& atlas, const std::string& text, SDL_Color color) {
     float totalW = 0.0F;
-    for (const unsigned char c : text) {
-      const auto* g = atlas.Find(static_cast<std::uint32_t>(c));
+    for (const char c : text) {
+      const auto cp = static_cast<std::uint32_t>(static_cast<unsigned char>(c));
+      const auto* g = atlas.Find(cp);
       if (g == nullptr) return nullptr;
       totalW += g->advance;
     }

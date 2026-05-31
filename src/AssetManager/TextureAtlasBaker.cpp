@@ -1,7 +1,9 @@
 #include "AssetManager/TextureAtlasBaker.h"
 
-#define STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
+// STB_IMAGE_IMPLEMENTATION lives in src/AssetManager/GlyphAtlas.cpp; STB_IMAGE_WRITE_IMPLEMENTATION
+// lives in src/AssetManager/AtlasBaker.cpp (the glyph-atlas baker). Each implementation symbol set
+// is defined in exactly one TU repo-wide to keep the linker happy. We only own
+// STB_RECT_PACK_IMPLEMENTATION here.
 #define STB_RECT_PACK_IMPLEMENTATION
 #include "stb_image.h"
 #include "stb_image_write.h"
