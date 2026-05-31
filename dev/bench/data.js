@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780261983055,
+  "lastUpdate": 1780262392272,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -7164,6 +7164,114 @@ window.BENCHMARK_DATA = {
             "value": 642446.0798488248,
             "unit": "ns/iter",
             "extra": "iterations: 1086\ncpu: 642367.3204419676 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1d4f12b4c9ca67fdf2ca167efa6edd2527f06820",
+          "message": "Add Android targets to Export Build modal (#87)\n\nStage 5 PR-B of EditorBuildAndDeployPlan. Extends ExportBuilder with an\nExportTarget enum (Desktop / AndroidDebug / AndroidRelease) and routes Android\nbuilds through the scaffolded scripts/build-android.{sh,ps1} from Stage 4\n(positional mode arg on POSIX, -Mode parameter on the PS1 flavor). Desktop\nremains the default and unchanged.\n\nModal gains a Target combo. AndroidRelease surfaces the signing-creds env\ncontract inline (OCTARINE_ANDROID_KEYSTORE_PATH / _STORE_PASSWORD /\n_KEY_ALIAS / _KEY_PASSWORD) and notes the Gradle debug-key fallback. The\neditor process's env is inherited into the subprocess (Process default\ninherit_env=true), so a dev who exports the keystore vars before launching\nthe editor gets signed AABs without further wiring.\n\nOut of scope this PR (deferred to PR-C per plan): in-editor signing-credential\nstorage backed by DPAPI (Windows) / Keychain (macOS), SHA256 of artifact,\nReveal-in-Explorer, install-command clipboard hint.",
+          "timestamp": "2026-05-31T15:05:46-06:00",
+          "tree_id": "5f1088e7f101eb526ac25821ef99c1d2d37904d0",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/1d4f12b4c9ca67fdf2ca167efa6edd2527f06820"
+        },
+        "date": 1780262383488,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4143.5292436789005,
+            "unit": "ns/iter",
+            "extra": "iterations: 164592\ncpu: 4176.993189219636 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16427.690420097086,
+            "unit": "ns/iter",
+            "extra": "iterations: 43266\ncpu: 16470.497873618373 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 108809.26686953603,
+            "unit": "ns/iter",
+            "extra": "iterations: 6444\ncpu: 108859.4410304138 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 870419.4142748937,
+            "unit": "ns/iter",
+            "extra": "iterations: 806\ncpu: 870552.497518617 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1745248.7150704176,
+            "unit": "ns/iter",
+            "extra": "iterations: 401\ncpu: 1745380.0997506147 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2349.3138028613866,
+            "unit": "ns/iter",
+            "extra": "iterations: 293904\ncpu: 2339.1796777184554 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10269.414159822918,
+            "unit": "ns/iter",
+            "extra": "iterations: 68617\ncpu: 10257.821720567184 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 69967.26196349229,
+            "unit": "ns/iter",
+            "extra": "iterations: 9772\ncpu: 69942.22984036397 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 406917.8383028971,
+            "unit": "ns/iter",
+            "extra": "iterations: 1721\ncpu: 406842.59965139313 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2188.381421532847,
+            "unit": "ns/iter",
+            "extra": "iterations: 325679\ncpu: 2154.012481615116 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6516.448656262712,
+            "unit": "ns/iter",
+            "extra": "iterations: 108021\ncpu: 6479.1260310512625 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41102.770114590196,
+            "unit": "ns/iter",
+            "extra": "iterations: 17017\ncpu: 41074.559440554316 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 315877.46421379043,
+            "unit": "ns/iter",
+            "extra": "iterations: 2207\ncpu: 315789.2383325893 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 634597.9203533264,
+            "unit": "ns/iter",
+            "extra": "iterations: 1105\ncpu: 634465.9981901097 ns\nthreads: 1"
           }
         ]
       }
