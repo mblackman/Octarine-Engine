@@ -2,16 +2,16 @@
 
 #ifdef OCTARINE_WITH_EDITOR
 
-// ExportBuilder — Stage 5 of ai/EditorBuildAndDeployPlan.md.
+// ExportBuilder.
 //
 // Wraps the spawn of a project's scaffolded build script (`scripts/build-desktop.{sh,ps1}` for the
 // host-OS desktop target, `scripts/build-android.{sh,ps1}` for Android). Mirrors PlayerLauncher: a
 // Registry singleton with a state machine (Idle -> Building -> Succeeded/Failed), a ring-capped log
 // of subprocess stdout/stderr, and a per-frame Pump() drained on the main thread.
 //
-// Out of scope (deferred per plan): in-editor signing-credential storage (PR-C: DPAPI/keychain),
-// SHA256 of artifact, "Reveal in Explorer" / clipboard install hint. AndroidRelease signing creds
-// flow via the editor process's existing env vars (OCTARINE_ANDROID_KEYSTORE_PATH, etc.).
+// Deferred follow-ups: in-editor signing-credential storage (DPAPI/keychain), SHA256 of artifact,
+// "Reveal in Explorer" / clipboard install hint. AndroidRelease signing creds flow via the editor
+// process's existing env vars (OCTARINE_ANDROID_KEYSTORE_PATH, etc.).
 
 #include "Process/Process.h"
 

@@ -146,6 +146,12 @@ struct Health {
 };
 ```
 
+If the component is exposed to Lua via a `LuaBinding<T>` specialization, any
+methods bound through `bindUsertype` may read or write the component's own
+fields only — no `Registry&`, no `EventBus*`, no cross-entity touches, no
+allocation. Anything beyond that belongs in a system. See [Lua scripting:
+adding component methods](lua-scripting.md#8-adding-component-methods).
+
 ### Creating a System
 
 Implement your logic in `src/Systems/` and register it in `Game::Setup()`.
