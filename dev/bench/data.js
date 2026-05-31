@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780250054433,
+  "lastUpdate": 1780250458413,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -6948,6 +6948,114 @@ window.BENCHMARK_DATA = {
             "value": 633508.6234042473,
             "unit": "ns/iter",
             "extra": "iterations: 1101\ncpu: 633404.8019981903 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "834e5fbec0a21065534c718a8a8d08cf02e3f900",
+          "message": "Polish docs: drop CLAUDE.md/emoji refs, fix formatting + accuracy bugs (#85)\n\nFinal review pass over tracked docs:\n\n- docs/device-builds.md, .github/workflows/android-emulator.yml: drop\n  pointers to CLAUDE.md (gitignored local-only agent scratchpad — must\n  not appear in tracked files). Device-builds replaces the pointer with\n  docs/ecs-architecture.md + docs/lua-scripting.md; android-emulator\n  workflow comment just drops the trailing 'see CLAUDE.md'.\n- README.md: 'Build the Player (Shipping build)' comment was wrong —\n  player-release is the optimized dev runtime with a live-scan catalog,\n  not a shipping artifact. Shipping config is ship-release (already\n  pointed at docs/device-builds.md from the line above). Also drop two\n  stray 👉 pointer emojis from README + lua-scripting.\n- docs/QUICKSTART.md: 'OCTARINE_PROFILING' (the compile define) was\n  shown as if it were the CMake option name; corrected to\n  OCTARINE_ENABLE_PROFILING so -D<name>=ON copy-paste actually works.\n- docs/ecs-architecture.md: two mid-bold line breaks ('Structure of\n  Arrays (\\nSoA)' and '**superset\\n**') were rendering as literal\n  newlines inside the bold span; reflow. Replace 'optimizedly' with\n  'efficiently' (not a word).\n\nDoc-only changes; no behavior change.",
+          "timestamp": "2026-05-31T11:31:49-06:00",
+          "tree_id": "879da3f07fc5e59ae38f280270fdb27331a032fa",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/834e5fbec0a21065534c718a8a8d08cf02e3f900"
+        },
+        "date": 1780250449640,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4020.2850501526887,
+            "unit": "ns/iter",
+            "extra": "iterations: 169982\ncpu: 4058.8391888555852 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16359.722142395574,
+            "unit": "ns/iter",
+            "extra": "iterations: 42759\ncpu: 16402.472953062654 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 108137.62738103271,
+            "unit": "ns/iter",
+            "extra": "iterations: 6446\ncpu: 108193.33229909798 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 863359.52129261,
+            "unit": "ns/iter",
+            "extra": "iterations: 810\ncpu: 863481.1382715885 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1707494.1447479469,
+            "unit": "ns/iter",
+            "extra": "iterations: 408\ncpu: 1707711.5686274266 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2344.25066341981,
+            "unit": "ns/iter",
+            "extra": "iterations: 296183\ncpu: 2336.716884494225 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10175.093979795782,
+            "unit": "ns/iter",
+            "extra": "iterations: 70215\ncpu: 10162.93519903175 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 101562.1270269103,
+            "unit": "ns/iter",
+            "extra": "iterations: 6812\ncpu: 101548.52847916097 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 400135.2463195954,
+            "unit": "ns/iter",
+            "extra": "iterations: 1753\ncpu: 400080.0262407265 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2180.8757811846403,
+            "unit": "ns/iter",
+            "extra": "iterations: 323351\ncpu: 2144.663551373624 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6546.6884574001415,
+            "unit": "ns/iter",
+            "extra": "iterations: 107459\ncpu: 6509.806670455426 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41311.80664667177,
+            "unit": "ns/iter",
+            "extra": "iterations: 17016\ncpu: 41270.51604372435 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 321112.338164322,
+            "unit": "ns/iter",
+            "extra": "iterations: 2164\ncpu: 320999.8114602482 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 644328.8744736569,
+            "unit": "ns/iter",
+            "extra": "iterations: 1093\ncpu: 644212.3833486475 ns\nthreads: 1"
           }
         ]
       }
