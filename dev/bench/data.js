@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780264241341,
+  "lastUpdate": 1780267039601,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -7380,6 +7380,114 @@ window.BENCHMARK_DATA = {
             "value": 694282.4268531476,
             "unit": "ns/iter",
             "extra": "iterations: 1033\ncpu: 694153.6437560697 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a2e4847b16526f77d06defbfd0dda2ca4ff9a3ff",
+          "message": "Add CONTRIBUTING.md and document component-methods rule (#90)\n\nTwo doc gaps closed:\n\n1. Component-methods rule. LuaBinding<T>::bindUsertype methods may read or\n   write the component's own fields only — no Registry, no EventBus, no\n   cross-entity touches, no allocation. The rule already lived as a comment\n   block in src/Lua/Bindings/LuaBinding.h but tracked docs never stated it,\n   so new contributors discovered it through code review. Added a § 8\n   'Adding component methods' section to docs/lua-scripting.md with the\n   rule, the rationale (component methods run from Lua at unpredictable\n   frame points, registry mutation there breaks invariants), and patterns\n   (sol::property setter for clamped fields, sol::property getter for\n   derived state). docs/ecs-architecture.md § Adding a New Component now\n   links to it.\n\n2. CONTRIBUTING.md at repo root. Covers branch workflow, build + test\n   commands, clang-format/.clang-tidy thresholds, naming conventions,\n   SRC_FILES rule, file-organization quick reference, commit message style\n   (plain capitalized, no conventional-commit prefixes, no AI co-author\n   trailer), the no-ai/-refs and no-CLAUDE.md-refs rules from PRs #80/81/85.\n   README.md now links to it from the build section.\n\nDrive-by: src/Editor/ExportBuilder.h (merged in #87) carried a 'Stage 5 of\nai/EditorBuildAndDeployPlan.md' comment header that slipped past the #81\nscrub. Strip it the same way the others were handled; inline the rationale\nfor the deferred follow-ups instead of pointing at the plan.",
+          "timestamp": "2026-05-31T15:36:02-06:00",
+          "tree_id": "09acab9683a7dfe0028c09dc1353b62b0c1d3c65",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/a2e4847b16526f77d06defbfd0dda2ca4ff9a3ff"
+        },
+        "date": 1780267030795,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4031.7103952981242,
+            "unit": "ns/iter",
+            "extra": "iterations: 170776\ncpu: 4070.6631845227575 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16235.234531983879,
+            "unit": "ns/iter",
+            "extra": "iterations: 43012\ncpu: 16282.101088068319 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 108381.93676715838,
+            "unit": "ns/iter",
+            "extra": "iterations: 6431\ncpu: 108437.40662416418 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 867104.4913274057,
+            "unit": "ns/iter",
+            "extra": "iterations: 807\ncpu: 867234.1189591063 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1694775.1249981392,
+            "unit": "ns/iter",
+            "extra": "iterations: 409\ncpu: 1694914.5965770078 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2388.7892687196495,
+            "unit": "ns/iter",
+            "extra": "iterations: 309990\ncpu: 2384.028449304406 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 11768.815088414593,
+            "unit": "ns/iter",
+            "extra": "iterations: 59815\ncpu: 11758.739162416203 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 76898.1213525558,
+            "unit": "ns/iter",
+            "extra": "iterations: 9992\ncpu: 76856.42684147661 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 398513.1184810065,
+            "unit": "ns/iter",
+            "extra": "iterations: 1761\ncpu: 398486.5229982831 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2182.4946105887966,
+            "unit": "ns/iter",
+            "extra": "iterations: 325962\ncpu: 2153.310106697297 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6543.14334823686,
+            "unit": "ns/iter",
+            "extra": "iterations: 107453\ncpu: 6509.832968834516 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41037.7512988633,
+            "unit": "ns/iter",
+            "extra": "iterations: 17037\ncpu: 41001.23073310279 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 317214.82719231513,
+            "unit": "ns/iter",
+            "extra": "iterations: 2210\ncpu: 317121.0832578813 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 633269.5173160157,
+            "unit": "ns/iter",
+            "extra": "iterations: 1108\ncpu: 633206.045126355 ns\nthreads: 1"
           }
         ]
       }
