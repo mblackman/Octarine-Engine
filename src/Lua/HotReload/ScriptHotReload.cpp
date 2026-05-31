@@ -78,8 +78,9 @@ void ScriptHotReload::RefreshTracking(Registry& registry) {
 
 void ScriptHotReload::ReloadFile(const std::string& canonicalPath, Registry& registry, sol::state& lua) {
   // protected_function (not plain sol::function) so Lua errors return invalid results instead of
-  // propagating as C++ exceptions — engine + tests compile without /EHsc.
-  sol::protected_function dofile = lua["dofile"];
+  // propagating as C++ exceptions — engine + tests compile without /EHsc. Explicit .get<>()
+  // dodges GCC -Wconversion ambiguity between operator T() and the ctor overload.
+  auto dofile = lua["dofile"].get<sol::protected_function>();
   if (!dofile.valid()) {
     RecordFailure(canonicalPath, "dofile not installed");
     return;

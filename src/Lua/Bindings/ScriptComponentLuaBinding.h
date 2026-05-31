@@ -43,7 +43,9 @@ struct LuaBinding<ScriptComponent>
     static ScriptComponent FromSource(const sol::table& spec, const std::string& relPath)
     {
         sol::state_view lua(spec.lua_state());
-        sol::protected_function getAssetPath = lua["get_asset_path"];
+        // Explicit .get<>() — implicit conversion from sol::table_proxy to protected_function is
+        // ambiguous under GCC's -Wconversion (two viable overloads; ours is the operator T()).
+        auto getAssetPath = lua["get_asset_path"].get<sol::protected_function>();
         if (!getAssetPath.valid())
         {
             Logger::Error("ScriptComponent: get_asset_path not installed; cannot resolve '" + relPath + "'");
@@ -63,7 +65,7 @@ struct LuaBinding<ScriptComponent>
 
         // protected_function so a syntax error in the file returns an invalid result instead of
         // propagating as a C++ exception (engine compiles without /EHsc).
-        sol::protected_function dofile = lua["dofile"];
+        auto dofile = lua["dofile"].get<sol::protected_function>();
         if (!dofile.valid())
         {
             Logger::Error("ScriptComponent: dofile not installed (Lua setup ordering bug)");
