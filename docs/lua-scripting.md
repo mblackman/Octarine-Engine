@@ -2,7 +2,7 @@
 
 Octarine Engine is designed to be driven by Lua scripts. This guide explains how to structure your game project and use the engine's Lua API.
 
-For a complete working example, refer to the `Octarine-Engine-Example-main/` directory in the repository.
+For a complete working example, refer to the sibling `Octarine-Engine-Example/` directory.
 
 ---
 
@@ -151,20 +151,21 @@ Polling, action map, and callbacks. Action bindings + callbacks are cleared on `
 
 ## 6. ImGui Integration
 
-The engine exposes ImGui to Lua, allowing you to create debug tools and UI directly in script:
+The engine exposes ImGui to Lua, allowing you to create debug tools and UI directly in script.
+Wire it via the `script` component's `on_debug_gui` callback:
 
 ```lua
-function on_debug_gui(self, entity)
-    if ImGui.Begin("Tools") then
-        if ImGui.Button("Spawn Enemy") then
-            -- Logic to spawn an enemy
+script = {
+    on_debug_gui = function(self, entity)
+        if ImGui.Begin("Tools") then
+            if ImGui.Button("Spawn Enemy") then
+                -- Logic to spawn an enemy
+            end
         end
+        ImGui.End()
     end
-    ImGui.End()
-end
+}
 ```
-
-To use this, add the `on_debug_gui` function to a `script` component.
 
 ---
 
@@ -174,4 +175,4 @@ The engine looks for specific functions in your scripts:
 
 - `on_update(self, entity, delta_time)`: Called every frame.
 - `on_debug_gui(self, entity)`: Called during the ImGui rendering pass.
-- `on_click(self, entity)`: Called if the entity has a `button` component and is clicked.
+- `on_click(self, entity)`: Called if the entity has a `ui_button` component and is clicked.
