@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780185593392,
+  "lastUpdate": 1780192778834,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -6300,6 +6300,114 @@ window.BENCHMARK_DATA = {
             "value": 653825.6434950887,
             "unit": "ns/iter",
             "extra": "iterations: 1066\ncpu: 653643.0544090441 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b80b6cb4116c2cfa6b56a42e93cd21c0ba7a5d7d",
+          "message": "Pack textures into bake-time atlases (Stage 11) (#67)\n\n* Pack textures into bake-time atlases via stb_rect_pack\n\nImplements Stage 11 of ShippingV1Plan. Sprite-heavy projects can now opt\ninto texture-atlas packing through a single `meta.atlas = <group-name>`\nsidecar key; the bake step collects every member, packs them into one\nPNG per group, and rewrites the manifest so the runtime resolves member\nids onto the atlas texture + offsets src_rect into the packed slice.\n\nEngine additions:\n\n  - libs/stb/stb_rect_pack.h vendored at the same upstream pin\n    (31c1ad37) as the other stb headers.\n\n  - src/AssetManager/AtlasBaker.{h,cpp}. Walks AssetCatalog::Entries(),\n    groups texture entries by their `atlas` field (skipping any with\n    `no_atlas = true`), loads each member's source PNG via stb_image,\n    packs the group with stb_rect_pack into the smallest power-of-two\n    square that fits (doubling up to a 4096px ceiling on pack failure),\n    writes `<project>/_atlases/<group>.png`, and mutates the catalog to\n    record (a) a new atlas CatalogEntry id `__atlas_<group>` pointing at\n    the packed PNG and (b) atlasId/atlasSlice fields on every member.\n\n  - CatalogEntry gains optional `atlasId`/`atlasSlice` + a `noAtlas`\n    flag. ScanFilesystem sets `noAtlas` from `meta.no_atlas`.\n    WriteManifest serializes all four atlas fields; LoadManifest parses\n    them back so shipped builds reconstruct the packed catalog without\n    re-running the bake.\n\n  - AssetManager:\n      * Acquire(member) recursively acquires the backing atlas — one\n        SDL_Texture* per atlas, refcounted across N member ids.\n      * GetTexture(member) walks the catalog redirect to the atlas's\n        SDL handle. Members never appear in textures_, so ClearAssets'\n        SDL_DestroyTexture loop runs exactly once per atlas (no\n        use-after-free from sharing a pointer across N alias entries).\n      * GetAtlasSlice exposes the per-member rect for the render path.\n      * UnloadAsset short-circuits on atlas members — releases the\n        atlas's refcount instead of destroying a borrowed texture.\n\n  - SpriteComponent caches `cachedAtlasOffset` alongside cachedTexture\n    (same generation gate). RenderSpriteSystem composes the final\n    cmd.srcRect as `sprite.srcRect + cachedAtlasOffset` — loose\n    textures leave the cached offset at zero, so the add is a no-op for\n    non-atlas sprites.\n\nBake step (Game::RunBakeValidation) runs AtlasBaker::Run after scene\nload completes and before WriteManifest, so the validation pass (which\nchecks member ids exist in the catalog) still sees the un-atlassed\ncatalog and the manifest carries the fully resolved atlas layout.\n\nBuild wiring: AtlasBaker.cpp added to SRC_FILES; libs/stb added as an\ninclude root on the main target + the OctarineLuaApiTest /\nOctarineAssetPipelineTest test targets so the stb implementation TU\nlinks cleanly.\n\nLua surface unchanged — `load_asset(\"hero\")` and acquire_scene_assets\nbehave the same; the atlas indirection is transparent. Existing\nprojects without `meta.atlas` produce no `_atlases/` directory and\nship loose textures exactly as before.\n\n* Silence stb header warnings in AtlasBaker.cpp under -Werror\n\nThe vendored stb_image / stb_image_write / stb_rect_pack headers emit\n-Wconversion warnings (int -> short, int -> size_t, signed/unsigned\nmixes) the engine's -Wall -Wextra -Wpedantic -Wshadow -Wconversion\nbaseline + per-target -Werror treats as fatal. set_source_files_properties\non AtlasBaker.cpp adds -w / /w after the project's flags so the stb\nimplementation TU compiles silently while the rest of the engine keeps\nthe strict baseline.\n\n* Make verify-icons.sh tolerate the deleted stock mipmap PNGs\n\nWhen d3546ff dropped the committed android/app/src/main/res/mipmap-*/\nic_launcher.png template PNGs (icon pipeline became generator-only), the\ndefault `--stock` path in verify-icons.sh started pointing at a file that\nno longer existed, so the android.yml `Verify AAB ships project icon`\ngate failed on every PR.\n\nWith no stock reference on disk, the \"differs from SDL template\" gate is\nmoot: every shipped ic_launcher.png is generator-emitted by construction.\nFall back to asserting the AAB carries non-empty mipmap-*/ic_launcher.png\nentries (still catches a Gradle res-merge break or a zero-byte emit).\n\nTag-pushed builds with a checked-in stock binary keep the original\nhash-divergence path.\n\n* Re-trigger CI (PR webhooks missed prior push)\n\n* Rename AtlasBaker -> TextureAtlasBaker to free the name for the glyph atlas\n\nmain's Stage 14 B3 added a glyph-atlas AtlasBaker. Rename the texture-atlas\npacker (this PR's class) so they can coexist.\n\n* Silence stb-header + BS.1770 warnings on the other -Werror-tripping TUs\n\nmain's AtlasBaker.cpp (glyph atlas, stb_image_write), GlyphAtlas.cpp\n(stb_image), and AudioNormalizer.cpp (size_t -> double narrowing) hit the\nsame -Wconversion / -Wsign-conversion / -Werror baseline this PR\nalready paper-overs for TextureAtlasBaker.cpp. Extend the same per-source\nwarning silencing to all four so the strict baseline keeps protecting\nthe rest of the engine without taking down every CI leg on main.\n\n* Fix stb impl symbol clash + macOS RenderTextSystem sign-conv error\n\nTextureAtlasBaker.cpp was defining STB_IMAGE_IMPLEMENTATION and\nSTB_IMAGE_WRITE_IMPLEMENTATION alongside main's GlyphAtlas.cpp / AtlasBaker.cpp,\nwhich each already define one of those — the linker rejected the\nduplicate stbi_write_jpg + friends. This TU only needs to own\nSTB_RECT_PACK_IMPLEMENTATION; drop the other two and just include the\nheaders for declarations.\n\nRenderTextSystem.h's atlas compose iterated 'const unsigned char c : text'\nwhere text is std::string. Apple clang's -Wsign-conversion flags the\nimplicit char -> unsigned char conversion. Iterate as char and route the\ncast through static_cast<unsigned char> + static_cast<uint32_t> so the\nnarrowing is explicit (which silences the diagnostic).\n\n* Fix second const-char sign-conv at RenderTextSystem.h:158",
+          "timestamp": "2026-05-30T19:50:48-06:00",
+          "tree_id": "6dce5a836077f238173195c8a6c7683800cc3ab2",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/b80b6cb4116c2cfa6b56a42e93cd21c0ba7a5d7d"
+        },
+        "date": 1780192770038,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4088.7796008370683,
+            "unit": "ns/iter",
+            "extra": "iterations: 169386\ncpu: 4123.170220679327 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16522.37428643985,
+            "unit": "ns/iter",
+            "extra": "iterations: 42648\ncpu: 16554.21016225682 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 107896.07775757044,
+            "unit": "ns/iter",
+            "extra": "iterations: 6335\ncpu: 107943.48871350104 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 865861.0451783013,
+            "unit": "ns/iter",
+            "extra": "iterations: 812\ncpu: 865923.1403940778 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1724807.3643247776,
+            "unit": "ns/iter",
+            "extra": "iterations: 406\ncpu: 1724961.9334975535 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2304.8613820470996,
+            "unit": "ns/iter",
+            "extra": "iterations: 304906\ncpu: 2295.9883964240344 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10021.895146796414,
+            "unit": "ns/iter",
+            "extra": "iterations: 69684\ncpu: 10011.882010219579 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 103121.16716192801,
+            "unit": "ns/iter",
+            "extra": "iterations: 6916\ncpu: 103089.45141701664 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 400450.7393341761,
+            "unit": "ns/iter",
+            "extra": "iterations: 1732\ncpu: 400407.44110852253 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2176.474748402677,
+            "unit": "ns/iter",
+            "extra": "iterations: 327605\ncpu: 2139.3952534317796 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6561.661030818142,
+            "unit": "ns/iter",
+            "extra": "iterations: 107567\ncpu: 6519.119479018217 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41676.15140518151,
+            "unit": "ns/iter",
+            "extra": "iterations: 16871\ncpu: 41627.738604704624 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 317957.68733442266,
+            "unit": "ns/iter",
+            "extra": "iterations: 2192\ncpu: 317868.2919708422 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 633718.6716470288,
+            "unit": "ns/iter",
+            "extra": "iterations: 1118\ncpu: 633631.2307691885 ns\nthreads: 1"
           }
         ]
       }
