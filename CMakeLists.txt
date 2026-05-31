@@ -111,6 +111,8 @@ set(SRC_FILES
         src/Lua/Modules/IoModuleLuaBinding.cpp
         src/Lua/Modules/LogModuleLuaBinding.cpp
         src/Lua/Modules/SceneModuleLuaBinding.cpp
+        src/Lua/HotReload/ScriptWatcher.cpp
+        src/Lua/HotReload/ScriptHotReload.cpp
         src/Process/Process.cpp
         src/Project/ProjectIni.cpp
         src/Renderer/Renderer.cpp

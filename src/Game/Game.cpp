@@ -47,6 +47,7 @@
 #include "Lua/Bindings/InputSystemLuaBinding.h"
 #include "Lua/Bindings/LuaSystemRegistry.h"
 #include "Lua/Bindings/RegisterAllBindings.h"
+#include "Lua/HotReload/ScriptHotReload.h"
 #include "Lua/LuaApiManifest.h"
 #include "Lua/LuaEntityLoader.h"
 #include "Lua/Modules/RegisterAllModules.h"
@@ -875,6 +876,10 @@ void Game::Setup()
 
     // Pre-build the debug-collider query once so we don't allocate per render frame.
     collider_query_ = registry_->CreateQuery<GlobalTransformComponent, BoxColliderComponent>();
+
+    // Hot reload owns its own ScriptWatcher + (path -> entities) discovery loop. Compiled out
+    // under OCTARINE_SHIPPED; in dev/editor builds the runtime gate lives on EngineOptions.
+    registry_->Set<ScriptHotReload>(ScriptHotReload());
 }
 
 void Game::ProcessInput() const
@@ -959,6 +964,18 @@ void Game::Update(const float deltaTime)
     {
         inputSystem->BeginFrame();
     }
+
+#ifndef OCTARINE_SHIPPED
+    // Run hot reload even when paused — authors iterate code with the editor paused all the time,
+    // and the swap is cheap. Uses real deltaTime (not time-scaled) so the poll cadence is stable.
+    if (options.hotReloadEnabled)
+    {
+        if (auto* hotReload = registry_->TryGet<ScriptHotReload>())
+        {
+            hotReload->Tick(*registry_, lua, deltaTime, options.hotReloadPollSeconds);
+        }
+    }
+#endif
 
     if (!options.isPaused || options.stepFrame)
     {

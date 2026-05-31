@@ -173,6 +173,8 @@ bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string> &
   success &= SetValue(settings, "DefaultScalingMode", &GameConfig::SetDefaultScaleMode, false);
   success &= SetValue(settings, "DefaultWindowWidth", &GameConfig::SetDefaultWidth, false);
   success &= SetValue(settings, "DefaultWindowHeight", &GameConfig::SetDefaultHeight, false);
+  success &= SetValue(settings, "HotReload", &GameConfig::SetHotReloadEnabled, false);
+  success &= SetValue(settings, "HotReloadPollSeconds", &GameConfig::SetHotReloadPollSeconds, false);
 
   return success;
 }
@@ -248,6 +250,19 @@ void GameConfig::SetDefaultScaleMode(const std::string &defaultScaleMode) {
 }
 void GameConfig::SetDefaultWidth(const int defaultWidth) { default_width_ = defaultWidth; }
 void GameConfig::SetDefaultHeight(const int defaultHeight) { default_height_ = defaultHeight; }
+
+void GameConfig::SetHotReloadEnabled(const bool enabled) {
+  engine_options_.hotReloadEnabled = enabled;
+  Logger::Info(std::string("Hot reload ") + (enabled ? "enabled" : "disabled"));
+}
+
+void GameConfig::SetHotReloadPollSeconds(const float seconds) {
+  if (seconds <= 0.0F) {
+    Logger::Warn("HotReloadPollSeconds must be > 0; keeping current value.");
+    return;
+  }
+  engine_options_.hotReloadPollSeconds = seconds;
+}
 
 void GameConfig::SetLogLevel(const std::string &logLevel) {
   if (logLevel.empty()) return;
