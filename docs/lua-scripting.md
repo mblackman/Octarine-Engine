@@ -41,7 +41,11 @@ DefaultScalingMode=nearest # 'nearest' or 'linear'
 
 ## 3. Loading Assets
 
-Assets must be loaded before they can be used by entities.
+Assets must be loaded before they can be used by entities. The recommended
+flow is `acquire_scene_assets(scene)` — the scene table's references drive
+the load. The full asset model (catalog, `.meta` sidecars, bake, atlases,
+audio normalize) lives in [`docs/asset-pipeline.md`](asset-pipeline.md).
+The explicit `load_asset` form below is the legacy path.
 
 ```lua
 -- Load a texture

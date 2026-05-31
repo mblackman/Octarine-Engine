@@ -111,6 +111,11 @@ mirror block at the top of `app/build.gradle`.
 
 ## 3. The bake step — `asset_manifest.lua`
 
+> Full asset-pipeline reference (`.meta` sidecars, atlas packing, glyph
+> rasterization, audio loudness normalize) lives in
+> [`docs/asset-pipeline.md`](asset-pipeline.md). This section covers the
+> bake-as-shipping-gate angle only.
+
 ```
 OctarineEngine <project-dir> -m bake
 ```
