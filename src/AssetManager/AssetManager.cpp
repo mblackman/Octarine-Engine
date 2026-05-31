@@ -72,6 +72,20 @@ bool AssetManager::Acquire(const std::string &assetId, SDL_Renderer *renderer, M
     return false;
   }
 
+  // Atlas member: piggy-back on the backing atlas's SDL_Texture* rather than loading the
+  // member's source bytes. The atlas gains one refcount per acquired member; releasing the
+  // member drops that refcount back. The member id never appears in textures_, so GetTexture
+  // walks the catalog atlas_id -> textures_[atlas_id] on lookup.
+  if (entry->type == AssetType::Texture && entry->atlasId.has_value()) {
+    if (!Acquire(*entry->atlasId, renderer, mixer)) {
+      Logger::Error("AssetManager::Acquire: failed to acquire atlas '" + *entry->atlasId +
+                    "' for member '" + assetId + "'");
+      return false;
+    }
+    refcounts_[assetId] = 1;
+    return true;
+  }
+
   const bool loaded = LoadFromCatalog(*entry, assetId, renderer, mixer);
   if (loaded) refcounts_[assetId] = 1;
   return loaded;
@@ -126,6 +140,14 @@ int AssetManager::RefCount(const std::string &assetId) const {
 }
 
 void AssetManager::UnloadAsset(const std::string &assetId) {
+  // Atlas-member alias: shares the atlas's SDL_Texture* via catalog redirect, not via a
+  // textures_ entry. Drop the member's stake in the atlas's refcount and we're done — the
+  // SDL handle stays alive until the last member (or the atlas itself) releases.
+  if (const CatalogEntry *e = catalog_.Find(assetId); e != nullptr && e->atlasId.has_value()) {
+    Release(*e->atlasId);
+    Logger::Info("Unloaded atlas member: " + assetId);
+    return;
+  }
   if (const auto it = textures_.find(assetId); it != textures_.end()) {
     SDL_DestroyTexture(it->second);
     textures_.erase(it);
@@ -215,13 +237,26 @@ void AssetManager::AddTexture(SDL_Renderer *renderer, const std::string &assetId
 }
 
 SDL_Texture *AssetManager::GetTexture(const std::string &assetId) const {
-  const auto it = textures_.find(assetId);
-  if (it == textures_.end()) {
-    // No per-frame warning: scene-load validation (AssetManager::Validate) is the authoritative
-    // miss check. Renderers tolerate a null texture.
-    return nullptr;
+  if (const auto it = textures_.find(assetId); it != textures_.end()) {
+    return it->second;
   }
-  return it->second;
+  // Atlas members are never inserted into textures_ directly — resolve the catalog redirect
+  // to the backing atlas's SDL_Texture*. One-hop only (atlases do not nest).
+  if (const CatalogEntry *e = catalog_.Find(assetId); e != nullptr && e->atlasId.has_value()) {
+    if (const auto ait = textures_.find(*e->atlasId); ait != textures_.end()) {
+      return ait->second;
+    }
+  }
+  // No per-frame warning: scene-load validation (AssetManager::Validate) is the authoritative
+  // miss check. Renderers tolerate a null texture.
+  return nullptr;
+}
+
+std::optional<SDL_FRect> AssetManager::GetAtlasSlice(const std::string &assetId) const {
+  if (const CatalogEntry *e = catalog_.Find(assetId); e != nullptr) {
+    return e->atlasSlice;
+  }
+  return std::nullopt;
 }
 
 void AssetManager::AddFont(const std::string &assetId, const std::string &path, const float fontSize) {

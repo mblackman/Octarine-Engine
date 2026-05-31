@@ -60,10 +60,6 @@ if [ ! -f "$aab" ]; then
     echo "verify-icons: AAB not found at $aab" >&2
     exit 1
 fi
-if [ ! -f "$stock" ]; then
-    echo "verify-icons: stock reference icon not found at $stock" >&2
-    exit 1
-fi
 
 # Pull every shipped mipmap-*/ic_launcher.png entry from the AAB. The base path varies between
 # debug APK (res/mipmap-*) and release AAB (base/res/mipmap-*-v4/...); list+grep covers both.
@@ -72,6 +68,27 @@ if [ -z "$shipped" ]; then
     echo "verify-icons: AAB carries no ic_launcher.png entries — Gradle res merge broke" >&2
     unzip -l "$aab" | grep -i mipmap || true
     exit 1
+fi
+
+# The committed stock mipmap PNGs were dropped once the generator became the only source of
+# truth (no more committed res/mipmap-*/ic_launcher.png). When no stock reference is available
+# the divergence check is moot: every shipped ic_launcher.png is generator-emitted by
+# construction. Just confirm the AAB carries non-empty entries.
+if [ ! -f "$stock" ]; then
+    tmp=$(mktemp -d)
+    trap 'rm -rf "$tmp"' EXIT
+    total=0
+    for entry in $shipped; do
+        total=$((total + 1))
+        unzip -p "$aab" "$entry" > "$tmp/shipped.png"
+        if [ ! -s "$tmp/shipped.png" ]; then
+            echo "FAIL: $entry is empty — generator emitted a zero-byte PNG." >&2
+            exit 1
+        fi
+        echo "ok:   $entry ($(stat -c%s "$tmp/shipped.png" 2>/dev/null || wc -c < "$tmp/shipped.png") bytes)"
+    done
+    echo "PASS: $total shipped mipmap/ic_launcher.png entries are non-empty (stock-template comparison skipped — no stock on disk)."
+    exit 0
 fi
 
 stock_hash=$(sha256sum "$stock" | awk '{print $1}')

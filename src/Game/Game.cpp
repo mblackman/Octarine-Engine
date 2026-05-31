@@ -16,6 +16,7 @@
 #include "AssetManager/AssetPak.h"
 #include "AssetManager/AtlasBaker.h"
 #include "AssetManager/AudioNormalizer.h"
+#include "AssetManager/TextureAtlasBaker.h"
 #include "AssetManager/SceneAssetScanner.h"
 #include <SDL3_ttf/SDL_ttf.h>
 #include "../Renderer/RenderQueue.h"
@@ -554,6 +555,16 @@ bool Game::RunBakeValidation(const std::string& assetPath)
     // mode validate every referenced id against the catalog and tally failures on this Game instead
     // of uploading to a GPU. This is the CI gate: a typo'd or missing asset reference fails the bake.
     LoadGame(lua, assetManager, gameConfig);
+
+    // Pack atlases declared by `meta.atlas = <group>` sidecars into <project>/_atlases/<group>.png
+    // and mutate member entries to record their slice within each. Runs after scene load so a
+    // future `meta.atlas` injection from scene scripts could also be honored. Members tagged
+    // `meta.no_atlas = true` skip the pack and ship as loose textures.
+    if (!TextureAtlasBaker{}.Run(assetManager.GetCatalog(), assetPath))
+    {
+        Logger::Error("Bake: atlas packing failed. Aborting.");
+        return false;
+    }
 
     const std::string manifestPath = (std::filesystem::path(assetPath) / "asset_manifest.lua").string();
     const bool wrote = assetManager.GetCatalog().WriteManifest(manifestPath, assetPath);

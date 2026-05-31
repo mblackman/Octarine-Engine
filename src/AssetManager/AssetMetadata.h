@@ -23,6 +23,9 @@ struct TextureMeta {
   std::optional<std::string> id;       // override the derived id (filename stem)
   std::optional<ScaleMode> scaleMode;  // nearest/linear; falls back to the project default
   std::optional<std::string> atlas;    // atlas group name ; nullopt = loose texture
+  bool noAtlas{false};                 // meta.no_atlas = true ; never folded into an atlas even if
+                                       // a sibling pulls the group via atlas=. For pixel-art that
+                                       // hates packing bleed at sub-pixel src_rect math.
 
   // `defaultScaleMode` is the GameConfig DefaultScalingMode (nullopt -> nearest). An explicit
   // sidecar value always wins.

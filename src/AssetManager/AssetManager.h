@@ -81,7 +81,14 @@ class AssetManager {
   [[nodiscard]] int Validate(const std::vector<AssetReference>& refs) const;
 
   void AddTexture(SDL_Renderer* renderer, const std::string& assetId, const std::string& path);
+  // Resolves to the SDL_Texture under `assetId`. For atlas-member ids this walks the catalog to
+  // the backing atlas (whose SDL_Texture* lives in textures_) — members themselves never appear
+  // in textures_, which is what lets one atlas keep one SDL handle even with N member ids.
   [[nodiscard]] SDL_Texture* GetTexture(const std::string& assetId) const;
+  // Pixel-rect of `assetId` within its atlas, when `assetId` is an atlas member. Nullopt for
+  // loose textures and non-textures. Sprite render adds slice.x/y to the sprite's logical
+  // src_rect to compose the final source rect into the atlas.
+  [[nodiscard]] std::optional<SDL_FRect> GetAtlasSlice(const std::string& assetId) const;
   void AddFont(const std::string& assetId, const std::string& path, float fontSize);
   [[nodiscard]] TTF_Font* GetFont(const std::string& assetId) const;
   // `stream` plumbs the catalog's `meta.stream` flag into SDL_mixer's predecode toggle: false for

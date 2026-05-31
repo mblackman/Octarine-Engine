@@ -95,6 +95,7 @@ namespace
         if (const sol::optional<std::string> id = t["id"]; id) meta.id = *id;
         if (const sol::optional<std::string> mode = t["scale_mode"]; mode) meta.scaleMode = ParseScaleMode(*mode);
         if (const sol::optional<std::string> atlas = t["atlas"]; atlas) meta.atlas = *atlas;
+        if (const sol::optional<bool> noAtlas = t["no_atlas"]; noAtlas) meta.noAtlas = *noAtlas;
         return meta;
     }
 
@@ -264,6 +265,7 @@ bool AssetCatalog::ScanFilesystem(const std::string& basePath, sol::state& lua,
                 entry.fullPath = fullPath;
                 entry.scaleMode = meta.scaleMode;
                 entry.atlas = meta.atlas;
+                entry.noAtlas = meta.noAtlas;
                 insert(std::move(entry));
                 break;
             }
@@ -381,6 +383,17 @@ bool AssetCatalog::LoadManifest(const std::string& manifestPath, sol::state& lua
         case AssetType::Texture:
             if (const sol::optional<std::string> mode = e["scale_mode"]; mode) entry.scaleMode = ParseScaleMode(*mode);
             if (const sol::optional<std::string> atlas = e["atlas"]; atlas) entry.atlas = *atlas;
+            if (const sol::optional<bool> noAtlas = e["no_atlas"]; noAtlas) entry.noAtlas = *noAtlas;
+            if (const sol::optional<std::string> atlasId = e["atlas_id"]; atlasId) entry.atlasId = *atlasId;
+            if (const sol::optional<sol::table> slice = e["atlas_slice"]; slice)
+            {
+                SDL_FRect r{};
+                r.x = (*slice)["x"].get_or(0.0F);
+                r.y = (*slice)["y"].get_or(0.0F);
+                r.w = (*slice)["w"].get_or(0.0F);
+                r.h = (*slice)["h"].get_or(0.0F);
+                entry.atlasSlice = r;
+            }
             break;
         case AssetType::Font:
             entry.fontSize = e["font_size"].get_or(0.0F);
@@ -408,6 +421,20 @@ const CatalogEntry* AssetCatalog::Find(const std::string& id) const
 {
     const auto it = entries_.find(id);
     return it == entries_.end() ? nullptr : &it->second;
+}
+
+void AssetCatalog::InsertOrReplace(CatalogEntry entry)
+{
+    const std::string id = entry.id;
+    entries_.insert_or_assign(id, std::move(entry));
+}
+
+void AssetCatalog::SetAtlasMembership(const std::string& memberId, std::string atlasId, SDL_FRect atlasSlice)
+{
+    const auto it = entries_.find(memberId);
+    if (it == entries_.end()) return;
+    it->second.atlasId = std::move(atlasId);
+    it->second.atlasSlice = atlasSlice;
 }
 
 void AssetCatalog::DumpToLog() const
@@ -453,6 +480,20 @@ bool AssetCatalog::WriteManifest(const std::string& outPath, const std::string& 
             if (entry.atlas.has_value())
             {
                 out << ", atlas = \"" << EscapeLua(*entry.atlas) << "\"";
+            }
+            if (entry.noAtlas)
+            {
+                out << ", no_atlas = true";
+            }
+            if (entry.atlasId.has_value())
+            {
+                out << ", atlas_id = \"" << EscapeLua(*entry.atlasId) << "\"";
+            }
+            if (entry.atlasSlice.has_value())
+            {
+                const auto& s = *entry.atlasSlice;
+                out << ", atlas_slice = { x = " << static_cast<int>(s.x) << ", y = " << static_cast<int>(s.y)
+                    << ", w = " << static_cast<int>(s.w) << ", h = " << static_cast<int>(s.h) << " }";
             }
             break;
         case AssetType::Font:
