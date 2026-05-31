@@ -126,6 +126,7 @@ if (OCTARINE_WITH_EDITOR)
     list(APPEND SRC_FILES src/Editor/EditorPersistence.cpp)
     list(APPEND SRC_FILES src/Editor/EditorLayoutPresets.cpp)
     list(APPEND SRC_FILES src/Editor/Inspectors/RegisterAllInspectors.cpp)
+    list(APPEND SRC_FILES src/Editor/PlayerLauncher.cpp)
 endif ()
 
 if (UNIX AND NOT APPLE AND NOT ANDROID)
@@ -151,12 +152,21 @@ endif ()
 
 # Create the engine target. On Android, SDLActivity dlopens libmain.so and jumps to SDL_main, so the
 # engine must be that shared lib (OUTPUT_NAME main → libmain.so). Everywhere else it is a plain
-# executable.
+# executable. The desktop non-editor build renames its OUTPUT to `OctarineEngine-player` so the
+# editor (also `OctarineEngine`) and the player can coexist in the same dev tree — the editor
+# resolves the player binary by that fixed name when handling the Run Player toolbar action.
 if (ANDROID)
     add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
     set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME main)
 else ()
     add_executable(${PROJECT_NAME} ${SRC_FILES})
+    # Dev player presets (player-debug / player-profile / player-release): rename the binary so
+    # `OctarineEngine` (editor) and `OctarineEngine-player` coexist in the same tree. Shipping
+    # configs (ship-release / packaging) keep the canonical `OctarineEngine` name — downstream
+    # packaging owns the shipped artifact's filename.
+    if (NOT OCTARINE_WITH_EDITOR AND NOT OCTARINE_SHIPPED)
+        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME OctarineEngine-player)
+    endif ()
 endif ()
 
 # Set target properties
