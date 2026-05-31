@@ -24,34 +24,40 @@
 // SDL3_mixer's MIX_Track exposes a built-in per-track frequency ratio (added in the
 // MIX_Track API revision). The original plan called for a Mix_RegisterEffect / postmix
 // resampler or an SDL_AudioStream rewrite — both unnecessary against this surface.
+//
+// Cache pointer is hoisted to a member (mirrors SpatialAudioSystem) so the per-emitter
+// callback avoids a Registry::Get<AudioListenerCache>() hashmap lookup per call.
+// MIX_SetTrackFrequencyRatio fires only when the computed ratio differs from
+// sink.lastRatio so an unchanged ratio (the steady-state case) costs zero mixer calls.
 class DopplerSystem {
  public:
   void operator()(const ContextFacade& ctx, const GlobalTransformComponent& transform,
                   const RigidBodyComponent& rigidBody, AudioSourceComponent& source, AudioSinkComponent& sink) {
     if (sink.finished || !sink.track) return;
 
-    auto* registry = ctx.GetRegistry();
-    const auto& cache = registry->Get<AudioListenerCache>();
+    if (!cache_) cache_ = &ctx.GetRegistry()->Get<AudioListenerCache>();
+    const auto& cache = *cache_;
 
-    if (!source.doppler || !cache.valid) {
-      MIX_SetTrackFrequencyRatio(sink.track, 1.0f);
-      return;
+    const float ratio = ComputeRatio(transform, rigidBody, source, cache);
+    if (ratio != sink.lastRatio) {
+      MIX_SetTrackFrequencyRatio(sink.track, ratio);
+      sink.lastRatio = ratio;
     }
+  }
+
+ private:
+  static float ComputeRatio(const GlobalTransformComponent& transform, const RigidBodyComponent& rigidBody,
+                            const AudioSourceComponent& source, const AudioListenerCache& cache) {
+    if (!source.doppler || !cache.valid) return 1.0f;
 
     const float c = std::max(1.0f, cache.speedOfSound);
     const float factor = std::max(0.0f, cache.dopplerFactor);
-    if (factor <= 0.0f) {
-      MIX_SetTrackFrequencyRatio(sink.track, 1.0f);
-      return;
-    }
+    if (factor <= 0.0f) return 1.0f;
 
     const glm::vec2 rel = transform.position - cache.position;
     constexpr float kEpsilon = 1e-4f;
     const float distance = glm::length(rel);
-    if (distance <= kEpsilon) {
-      MIX_SetTrackFrequencyRatio(sink.track, 1.0f);
-      return;
-    }
+    if (distance <= kEpsilon) return 1.0f;
     const glm::vec2 dir = rel / distance;
 
     // Radial components: positive = receding from listener, negative = approaching.
@@ -63,8 +69,8 @@ class DopplerSystem {
     // exaggerated dopplerFactor doesn't yank a track into ultrasonic / DC territory.
     const float denom = std::max(c - vsRadial * factor, c * 0.01f);
     const float numer = c + vlRadial * factor;
-    const float ratio = std::clamp(numer / denom, 0.25f, 4.0f);
-
-    MIX_SetTrackFrequencyRatio(sink.track, ratio);
+    return std::clamp(numer / denom, 0.25f, 4.0f);
   }
+
+  const AudioListenerCache* cache_ = nullptr;
 };
