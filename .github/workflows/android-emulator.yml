@@ -104,7 +104,7 @@ jobs:
           #!/usr/bin/env bash
           # Boot emulator → install APK → launch activity → poll logcat for the manifest-load line.
           # Mirrors ios.yml's launch+assert step. Tag is `Octarine` (set by Logger::Init's
-          # spdlog::android_logger_mt — see CLAUDE.md). The catalog logs
+          # spdlog::android_logger_mt). The catalog logs
           # "AssetCatalog: loaded N entries from manifest" once the bake is consumed; absence
           # within the budget means the APK never reached scene load.
           set -e

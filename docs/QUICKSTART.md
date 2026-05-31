@@ -17,7 +17,7 @@ CMake presets live in `CMakePresets.json`. The common ones:
 | `editor-debug`    | Day-to-day dev with editor + ImGui debug overlays |
 | `editor-release`  | Optimized editor build                            |
 | `player-release`  | Optimized runtime, no editor (live-scan catalog)  |
-| `player-profile`  | RelWithDebInfo + `OCTARINE_PROFILING` for timing  |
+| `player-profile`  | RelWithDebInfo + `OCTARINE_ENABLE_PROFILING` for timing |
 | `ship-release`    | Canonical shipping config (manifest-load catalog) |
 
 ## 2. Run

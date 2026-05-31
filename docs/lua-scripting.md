@@ -66,8 +66,8 @@ load_asset({
 
 Entities are created by passing a table to `load_entity`. They are composed of a `tag` (optional) and several `components`.
 
-For a full list of available components and their fields, see:
-👉 **[ECS Component Reference](ecs-components.md)**
+For a full list of available components and their fields, see
+**[ECS Component Reference](ecs-components.md)**.
 
 ```lua
 local player = {
