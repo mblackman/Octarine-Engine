@@ -1,11 +1,13 @@
 name: Benchmark
 
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
+  schedule:
+    - cron: '0 9 * * *'
   workflow_dispatch:
+
+concurrency:
+  group: benchmark-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
@@ -82,7 +84,7 @@ jobs:
           output-file-path: macro_bench.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           skip-fetch-gh-pages: true
-          auto-push: ${{ github.event_name == 'push' }}
+          auto-push: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           alert-threshold: '200%'
           comment-on-alert: false
           fail-on-alert: false
