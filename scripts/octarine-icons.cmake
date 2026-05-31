@@ -35,7 +35,7 @@
 #     values-v31/octarine_splash.xml           (overrides AppTheme w/ splash attrs on API 31+)
 #   desktop/
 #     (iOS Assets.xcassets/AppIcon.appiconset + LaunchScreen.storyboard emitter is parked on
-#     defer/ios pending an Apple Developer account; see ai/iOSDeferralPlan.md.)
+#     defer/ios pending an Apple Developer account.)
 #     octarine_icon.ico                        (Windows; multi-resolution embed)
 #     octarine_icon.icns                       (macOS; magick writes the .icns directly)
 #     octarine_icon.png                        (Linux; 256×256 PNG for .desktop)

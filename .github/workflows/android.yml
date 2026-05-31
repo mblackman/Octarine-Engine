@@ -99,8 +99,7 @@ jobs:
 
       # Decode the release keystore on demand. Secrets are not available to fork PRs (so HAS_KEYSTORE
       # stays empty there), in which case bundleRelease falls back to the debug key — still a useful
-      # build-passes signal. Pinned secret names mirror the Stage 1 contract in
-      # ai/DeviceShippingPlan.md.
+      # build-passes signal.
       - name: Decode release keystore
         id: keystore
         if: env.OCTARINE_ANDROID_KEYSTORE != ''
