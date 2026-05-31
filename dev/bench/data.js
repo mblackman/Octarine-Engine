@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780262440488,
+  "lastUpdate": 1780264194699,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -7272,6 +7272,114 @@ window.BENCHMARK_DATA = {
             "value": 634597.9203533264,
             "unit": "ns/iter",
             "extra": "iterations: 1105\ncpu: 634465.9981901097 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9cb3ca2dabcc9a3f582a6ffb8e7673e541c3ace8",
+          "message": "Add Doppler shift for spatial audio (Sound plan Phase 4) (#88)\n\n* Add Doppler shift for spatial audio (Sound plan Phase 4)\n\nAdds DopplerSystem (registered on GlobalTransform + RigidBody + AudioSource\n+ AudioSink). Listener picks up doppler_factor / speed_of_sound; emitter\npicks up a doppler bool. Per-frame radial-velocity projection drives\nMIX_SetTrackFrequencyRatio with clamped denominator (Mach-1 guard) and a\nmusical 0.25x..4x ratio cap so an exaggerated dopplerFactor cannot drive a\ntrack into DC or ultrasonic territory.\n\nUpdateListenerTransformSystem now also snapshots the listener's\nRigidBodyComponent.velocity (zero if absent) and the listener's\ndopplerFactor/speedOfSound into AudioListenerCache so the per-emitter math\nis one struct load.\n\nThe plan called out a Mix_RegisterEffect postmix resampler or an\nSDL_AudioStream rewrite to get per-track pitch. SDL3_mixer's MIX_Track\nexposes MIX_SetTrackFrequencyRatio directly, so neither workaround is\nneeded; the plan note about that constraint is now obsolete.\n\nSource.doppler defaults to false; sources without RigidBodyComponent are\nsilently ignored (no velocity, no shift). Toggling doppler off at runtime\nresets the ratio to 1.0 on the next frame.\n\n* Skip redundant MIX_SetTrackFrequencyRatio + hoist listener cache pointer\n\nMirrors the SpatialAudioSystem cleanup: cache the AudioListenerCache pointer\nin a system member (registered once, stable for the registry's lifetime) so\nthe per-emitter callback skips a Registry::Get hashmap lookup per call.\nThe frequency-ratio compute is split into a static ComputeRatio helper so\nthe hot path is a single value-vs-lastRatio compare plus one mixer call on\nchange.\n\nNet effect at steady state (constant relative velocity): zero MIX_Set*\ncalls per emitter per frame instead of one. The bigger win shows up under\nPhase 5 culling where active sink counts climb.",
+          "timestamp": "2026-05-31T15:28:37-06:00",
+          "tree_id": "564d42cf61d9294d8fe4ed6d296d2ada4ede1e5e",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/9cb3ca2dabcc9a3f582a6ffb8e7673e541c3ace8"
+        },
+        "date": 1780264185924,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4380.184093821083,
+            "unit": "ns/iter",
+            "extra": "iterations: 157895\ncpu: 4425.181291364436 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16585.552485374545,
+            "unit": "ns/iter",
+            "extra": "iterations: 41809\ncpu: 16636.181252840037 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 109601.05468722103,
+            "unit": "ns/iter",
+            "extra": "iterations: 6384\ncpu: 109666.23104636575 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 869712.0216270682,
+            "unit": "ns/iter",
+            "extra": "iterations: 806\ncpu: 869817.0856079394 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1726006.2177815745,
+            "unit": "ns/iter",
+            "extra": "iterations: 403\ncpu: 1726162.5384615324 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2385.650597397063,
+            "unit": "ns/iter",
+            "extra": "iterations: 294457\ncpu: 2373.9312972700523 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10039.553606158664,
+            "unit": "ns/iter",
+            "extra": "iterations: 69525\ncpu: 10028.026537215104 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 70084.37341717994,
+            "unit": "ns/iter",
+            "extra": "iterations: 9936\ncpu: 70043.4661835671 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 399293.2224198664,
+            "unit": "ns/iter",
+            "extra": "iterations: 1748\ncpu: 399280.9107551454 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2237.9523135014388,
+            "unit": "ns/iter",
+            "extra": "iterations: 318513\ncpu: 2196.823241126712 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6793.962856071539,
+            "unit": "ns/iter",
+            "extra": "iterations: 103109\ncpu: 6748.7973503779085 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 44102.43088876962,
+            "unit": "ns/iter",
+            "extra": "iterations: 15977\ncpu: 44039.57507668228 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 338212.6435587542,
+            "unit": "ns/iter",
+            "extra": "iterations: 2089\ncpu: 338098.91096216376 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 694282.4268531476,
+            "unit": "ns/iter",
+            "extra": "iterations: 1033\ncpu: 694153.6437560697 ns\nthreads: 1"
           }
         ]
       }
