@@ -592,6 +592,10 @@ function acquire_scene_assets(...) end
 animation_component = {}
 
 
+---@class audio_listener_component
+audio_listener_component = {}
+
+
 ---@class audio_source_component
 audio_source_component = {}
 
@@ -715,6 +719,8 @@ registry = {}
 
 function registry.get_animation(...) end
 
+function registry.get_audio_listener(...) end
+
 function registry.get_audio_source(...) end
 
 function registry.get_box_collider(...) end
@@ -748,6 +754,8 @@ function registry.get_text_label(...) end
 function registry.get_ui_button(...) end
 
 function registry.has_animation(...) end
+
+function registry.has_audio_listener(...) end
 
 function registry.has_audio_source(...) end
 

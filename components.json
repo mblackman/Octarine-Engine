@@ -8,6 +8,12 @@
       "get_accessor": "registry.get_animation"
     },
     {
+      "lua_key": "audio_listener",
+      "usertype": "audio_listener_component",
+      "has_accessor": "registry.has_audio_listener",
+      "get_accessor": "registry.get_audio_listener"
+    },
+    {
       "lua_key": "audio_source",
       "usertype": "audio_source_component",
       "has_accessor": "registry.has_audio_source",
