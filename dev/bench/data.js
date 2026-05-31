@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780246439888,
+  "lastUpdate": 1780246843503,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -6732,6 +6732,114 @@ window.BENCHMARK_DATA = {
             "value": 633618.9714520897,
             "unit": "ns/iter",
             "extra": "iterations: 1094\ncpu: 633486.1672759997 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c11e6d623267e4afc5d7855d287d96f379b45a76",
+          "message": "Drop ai/ plan references from tracked sources (#81)\n\nTracked code/config/workflows should not point at the local-only ai/\ndesign-plan directory (gitignored). Strip the 'see ai/X.md' tails from\n9 comment blocks across:\n- CMakeLists.txt, cmake/OctarinePackage.cmake, scripts/octarine-icons.cmake\n- .github/workflows/android.yml, .github/workflows/package.yml\n- src/AssetManager/AtlasBaker.h, src/Editor/PlayerLauncher.h, src/General/Logger.cpp\n\nComment-only changes; no behavior change.",
+          "timestamp": "2026-05-31T10:47:03-06:00",
+          "tree_id": "9457335c9b0cc4e79b9e98ad814f9c390c01d86f",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/c11e6d623267e4afc5d7855d287d96f379b45a76"
+        },
+        "date": 1780246834730,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4065.3776449318843,
+            "unit": "ns/iter",
+            "extra": "iterations: 168956\ncpu: 4105.224940221051 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16569.853596604084,
+            "unit": "ns/iter",
+            "extra": "iterations: 41105\ncpu: 16615.756501642547 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 109984.75606298014,
+            "unit": "ns/iter",
+            "extra": "iterations: 6389\ncpu: 110030.70198779063 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 886114.9283998375,
+            "unit": "ns/iter",
+            "extra": "iterations: 790\ncpu: 885501.8860759583 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1723593.8650079796,
+            "unit": "ns/iter",
+            "extra": "iterations: 401\ncpu: 1723665.7231920057 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2355.6268105174267,
+            "unit": "ns/iter",
+            "extra": "iterations: 309171\ncpu: 2344.01136911317 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10229.628416242334,
+            "unit": "ns/iter",
+            "extra": "iterations: 70756\ncpu: 10216.041876307358 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 69862.23235281988,
+            "unit": "ns/iter",
+            "extra": "iterations: 10060\ncpu: 69833.02574552895 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 396090.7227743817,
+            "unit": "ns/iter",
+            "extra": "iterations: 1770\ncpu: 396072.4644067799 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2168.5109907060105,
+            "unit": "ns/iter",
+            "extra": "iterations: 326880\ncpu: 2131.5478463012123 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6542.49683821932,
+            "unit": "ns/iter",
+            "extra": "iterations: 108837\ncpu: 6485.269366119658 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41337.99116206313,
+            "unit": "ns/iter",
+            "extra": "iterations: 16856\ncpu: 41293.57172520519 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 319370.54191872367,
+            "unit": "ns/iter",
+            "extra": "iterations: 2192\ncpu: 319233.3978102696 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 635731.8924246754,
+            "unit": "ns/iter",
+            "extra": "iterations: 1099\ncpu: 635556.5550500813 ns\nthreads: 1"
           }
         ]
       }
