@@ -13,7 +13,9 @@ namespace octarine::secrets
 {
     namespace
     {
-        constexpr CFStringRef kService = CFSTR("com.octarine.engine.secrets");
+        // CFSTR expands to a __builtin reinterpret_cast that Clang rejects in constexpr context.
+        // The macro itself produces a process-lifetime constant CFString, so a static const is fine.
+        static const CFStringRef kService = CFSTR("com.octarine.engine.secrets");
 
         CFStringRef MakeAccount(std::string_view key)
         {
