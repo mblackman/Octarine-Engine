@@ -1,5 +1,7 @@
 #pragma once
 
+#include <SDL3/SDL_stdinc.h>
+
 #include <string>
 
 struct AudioSourceComponent {
@@ -21,6 +23,12 @@ struct AudioSourceComponent {
   // DopplerSystem applies a per-frame frequency ratio via MIX_SetTrackFrequencyRatio.
   // Independent of `spatial` — a non-spatial doppler source is allowed but unusual.
   bool doppler = false;
+
+  // Phase 5 culling resume: -1 = no pending resume. AudioCullingSystem stashes
+  // MIX_GetTrackPlaybackPosition here when it culls a playing emitter, and AudioSystem
+  // seeks the new track to this offset (then resets to -1) when the emitter comes back
+  // in range and a fresh sink spawns. Looping sources resume mid-loop seamlessly.
+  Sint64 playbackOffsetFrames = -1;
 
   explicit AudioSourceComponent(std::string t_clipId = "", float t_volume = 1.0f, float t_pitch = 1.0f,
                                 bool t_loop = false, bool t_playOnSpawn = true, bool t_despawnOnFinish = false,

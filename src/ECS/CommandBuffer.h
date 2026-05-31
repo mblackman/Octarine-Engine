@@ -67,6 +67,21 @@ class CommandBuffer {
         [entity, c = std::move(component)](Registry* r) mutable { r->AddComponent(entity, std::move(c)); });
   }
 
+  template <typename T>
+  void RemoveComponent(Entity entity) const {
+    state_->deferred.Emplace([entity](Registry* r) { r->RemoveComponent<T>(entity); });
+  }
+
+  template <typename T>
+  void AddTag(Entity entity) const {
+    state_->deferred.Emplace([entity](Registry* r) { r->AddTag<T>(entity); });
+  }
+
+  template <typename T>
+  void RemoveTag(Entity entity) const {
+    state_->deferred.Emplace([entity](Registry* r) { r->RemoveTag<T>(entity); });
+  }
+
   void Playback(Registry* registry) const;
 
  private:
