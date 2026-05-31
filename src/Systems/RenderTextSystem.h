@@ -155,8 +155,9 @@ class RenderTextSystem {
     SDL_SetSurfaceBlendMode(src, SDL_BLENDMODE_BLEND);
 
     float pen = 0.0F;
-    for (const unsigned char c : text) {
-      const auto* g = atlas.Find(static_cast<std::uint32_t>(c));
+    for (const char c : text) {
+      const auto cp = static_cast<std::uint32_t>(static_cast<unsigned char>(c));
+      const auto* g = atlas.Find(cp);
       SDL_Rect srcR{static_cast<int>(g->x), static_cast<int>(g->y), static_cast<int>(g->w),
                     static_cast<int>(g->h)};
       SDL_Rect dstR{static_cast<int>(pen), 0, static_cast<int>(g->w), static_cast<int>(g->h)};
