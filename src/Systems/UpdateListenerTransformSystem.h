@@ -4,6 +4,7 @@
 
 #include "../Components/AudioListenerComponent.h"
 #include "../Components/GlobalTransformComponent.h"
+#include "../Components/RigidBodyComponent.h"
 #include "../ECS/Iterable.h"
 #include "../ECS/Query.h"
 #include "../ECS/Registry.h"
@@ -34,6 +35,9 @@ class UpdateListenerTransformSystem {
       if (found) return;
       cache.entity = entity;
       cache.position = transform.position;
+      cache.velocity = registry->HasComponent<RigidBodyComponent>(entity)
+                           ? registry->GetComponent<RigidBodyComponent>(entity).velocity
+                           : glm::vec2(0.0f, 0.0f);
       // 2D top-down basis. When camera rotation lands later, derive forward/right from
       // the camera's world rotation here so the spatial math stays decoupled from any
       // listener-entity rotation (the "Listener Dilemma" decoupling).
@@ -41,6 +45,8 @@ class UpdateListenerTransformSystem {
       cache.right = glm::vec2(1.0f, 0.0f);
       cache.maxDistance = listener.maxDistance;
       cache.rolloff = listener.rolloff;
+      cache.dopplerFactor = listener.dopplerFactor;
+      cache.speedOfSound = listener.speedOfSound;
       cache.valid = true;
       found = true;
     });

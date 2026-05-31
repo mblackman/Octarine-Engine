@@ -24,8 +24,9 @@ struct LuaBinding<AudioSourceComponent>
         const bool spatial = SafeGetOptionalValue<bool>(t, "spatial", false);
         const float minDistance = SafeGetOptionalValue<float>(t, "min_distance", 50.0f);
         const float maxDistance = SafeGetOptionalValue<float>(t, "max_distance", 1000.0f);
+        const bool doppler = SafeGetOptionalValue<bool>(t, "doppler", false);
         return AudioSourceComponent(clipId, volume, pitch, loop, playOnSpawn, despawnOnFinish, spatial, minDistance,
-                                    maxDistance);
+                                    maxDistance, doppler);
     }
 
     static void bindUsertype(sol::state& lua)
@@ -39,6 +40,7 @@ struct LuaBinding<AudioSourceComponent>
                                                "despawn_on_finish", &AudioSourceComponent::despawnOnFinish,
                                                "spatial", &AudioSourceComponent::spatial,
                                                "min_distance", &AudioSourceComponent::minDistance,
-                                               "max_distance", &AudioSourceComponent::maxDistance);
+                                               "max_distance", &AudioSourceComponent::maxDistance,
+                                               "doppler", &AudioSourceComponent::doppler);
     }
 };

@@ -56,6 +56,7 @@
 #include "Systems/CameraFollowSystem.h"
 #include "Systems/CollisionSystem.h"
 #include "Systems/DamageSystem.h"
+#include "Systems/DopplerSystem.h"
 #include "Systems/DrawColliderSystem.h"
 #include "Systems/EntityPoolSystem.h"
 #include "Systems/InputSystem.h"
@@ -853,6 +854,11 @@ void Game::Setup()
     registry_->Set<AudioListenerCache>(AudioListenerCache{});
     registry_->RegisterBulkSystem<GlobalTransformComponent>(UpdateListenerTransformSystem());
     registry_->RegisterSystem<GlobalTransformComponent, AudioSourceComponent, AudioSinkComponent>(SpatialAudioSystem());
+    // Doppler is independent of spatial: governs frequency ratio via MIX_SetTrackFrequencyRatio.
+    // Requires RigidBodyComponent on the emitter (no body → no velocity → no shift).
+    registry_
+        ->RegisterSystem<GlobalTransformComponent, RigidBodyComponent, AudioSourceComponent, AudioSinkComponent>(
+            DopplerSystem());
 
     // Camera follows after gameplay-driven transform updates
     registry_->RegisterSystem<PositionComponent, CameraFollowComponent>(CameraFollowSystem());
