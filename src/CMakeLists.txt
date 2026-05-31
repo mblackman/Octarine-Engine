@@ -105,6 +105,7 @@ target_link_libraries(octarine_renderer PUBLIC
 # -----------------------------------------------------------------------------
 octarine_library(octarine_lua
         Lua/LuaApiManifest.cpp
+        Lua/Bindings/InputSystemLuaBinding.cpp
         Lua/Bindings/RegisterAllBindings.cpp
         Lua/HotReload/ScriptHotReload.cpp
         Lua/HotReload/ScriptWatcher.cpp
@@ -129,6 +130,7 @@ target_link_libraries(octarine_lua PUBLIC
 # -----------------------------------------------------------------------------
 octarine_library(octarine_systems
         Systems/AudioSystem.cpp
+        Systems/InputSystem.cpp
 )
 target_link_libraries(octarine_systems PUBLIC
         octarine_core
