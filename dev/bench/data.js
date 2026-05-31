@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780246893681,
+  "lastUpdate": 1780250009003,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -6840,6 +6840,114 @@ window.BENCHMARK_DATA = {
             "value": 635731.8924246754,
             "unit": "ns/iter",
             "extra": "iterations: 1099\ncpu: 635556.5550500813 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4dd72d713295df1896629af5c3946cc0ded018ff",
+          "message": "Add Export Build toolbar action backed by ExportBuilder (#84)\n\nStage 5 PR-A of EditorBuildAndDeployPlan. Editor-side runner that spawns the\nproject's scripts/build-desktop.{sh,ps1} scaffolded by Stage 4 and surfaces a\ntoolbar action + modal + output window to drive it.\n\nExportBuilder mirrors PlayerLauncher: Registry singleton, state machine\n(Idle / Building / Succeeded / Failed), ring-capped log of subprocess\nstdout/stderr, per-frame Pump() drained on the main thread. Validates\nproject.ini via ProjectIni::ValidateForShipping and confirms the scaffolded\nbuild-desktop script is present before spawning; pre-build errors surface in\nthe modal instead of producing a broken subprocess. Windows path spawns\npowershell -ExecutionPolicy Bypass -File so freshly scaffolded unsigned .ps1\nfiles run without machine-wide policy changes; POSIX path spawns bash.\nOCTARINE_VERSION_NAME / _VERSION_CODE / OCTARINE_PRESET flow into the script\nvia env vars when set in the modal.\n\nUI surface: a new \"Export Build...\" button in the playback toolbar next to\nRun Player toggles to \"Stop Export\" while a build is in flight; an \"Export\nOutput\" ImGui window (toggle persisted in EditorPersistence) mirrors the\nPlayer Output panel for streaming stdout/stderr with status / exit-code chip.\n\nOut of scope this PR (deferred per plan): Android targets, OS-secret signing\ncredential storage, SHA256 of artifact, Reveal-in-Explorer / install-command\nclipboard hint. Those follow as PR-B / PR-C.",
+          "timestamp": "2026-05-31T11:22:42-06:00",
+          "tree_id": "1c7499270b4dc6c85ac724691146a903761d2749",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/4dd72d713295df1896629af5c3946cc0ded018ff"
+        },
+        "date": 1780250000236,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4062.3314167975263,
+            "unit": "ns/iter",
+            "extra": "iterations: 166535\ncpu: 4101.800210165703 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16275.574046602349,
+            "unit": "ns/iter",
+            "extra": "iterations: 42950\ncpu: 16328.564423749227 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 109044.50896528992,
+            "unit": "ns/iter",
+            "extra": "iterations: 6462\ncpu: 109112.66604766637 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 858077.6637059327,
+            "unit": "ns/iter",
+            "extra": "iterations: 821\ncpu: 858260.5724725977 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1695773.083960173,
+            "unit": "ns/iter",
+            "extra": "iterations: 413\ncpu: 1695785.7118643988 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2234.7344516407798,
+            "unit": "ns/iter",
+            "extra": "iterations: 304619\ncpu: 2225.1234427262257 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 9920.952581252544,
+            "unit": "ns/iter",
+            "extra": "iterations: 69774\ncpu: 9912.922492622221 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 102620.36755556718,
+            "unit": "ns/iter",
+            "extra": "iterations: 6952\ncpu: 102605.80854429457 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 395813.1632498617,
+            "unit": "ns/iter",
+            "extra": "iterations: 1738\ncpu: 395765.89930953534 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2169.7327334158854,
+            "unit": "ns/iter",
+            "extra": "iterations: 329481\ncpu: 2134.932369392022 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6510.912011458429,
+            "unit": "ns/iter",
+            "extra": "iterations: 108617\ncpu: 6471.201791612584 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41080.330117688834,
+            "unit": "ns/iter",
+            "extra": "iterations: 17148\ncpu: 41039.99072777098 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 316353.61374090426,
+            "unit": "ns/iter",
+            "extra": "iterations: 2193\ncpu: 316248.33834932145 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 633508.6234042473,
+            "unit": "ns/iter",
+            "extra": "iterations: 1101\ncpu: 633404.8019981903 ns\nthreads: 1"
           }
         ]
       }
