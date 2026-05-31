@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780192778834,
+  "lastUpdate": 1780192824898,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -46217,6 +46217,660 @@ window.BENCHMARK_DATA = {
           {
             "name": "Registry::Update (pending blam/despawn) [max]",
             "value": 0.004,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 5"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b80b6cb4116c2cfa6b56a42e93cd21c0ba7a5d7d",
+          "message": "Pack textures into bake-time atlases (Stage 11) (#67)\n\n* Pack textures into bake-time atlases via stb_rect_pack\n\nImplements Stage 11 of ShippingV1Plan. Sprite-heavy projects can now opt\ninto texture-atlas packing through a single `meta.atlas = <group-name>`\nsidecar key; the bake step collects every member, packs them into one\nPNG per group, and rewrites the manifest so the runtime resolves member\nids onto the atlas texture + offsets src_rect into the packed slice.\n\nEngine additions:\n\n  - libs/stb/stb_rect_pack.h vendored at the same upstream pin\n    (31c1ad37) as the other stb headers.\n\n  - src/AssetManager/AtlasBaker.{h,cpp}. Walks AssetCatalog::Entries(),\n    groups texture entries by their `atlas` field (skipping any with\n    `no_atlas = true`), loads each member's source PNG via stb_image,\n    packs the group with stb_rect_pack into the smallest power-of-two\n    square that fits (doubling up to a 4096px ceiling on pack failure),\n    writes `<project>/_atlases/<group>.png`, and mutates the catalog to\n    record (a) a new atlas CatalogEntry id `__atlas_<group>` pointing at\n    the packed PNG and (b) atlasId/atlasSlice fields on every member.\n\n  - CatalogEntry gains optional `atlasId`/`atlasSlice` + a `noAtlas`\n    flag. ScanFilesystem sets `noAtlas` from `meta.no_atlas`.\n    WriteManifest serializes all four atlas fields; LoadManifest parses\n    them back so shipped builds reconstruct the packed catalog without\n    re-running the bake.\n\n  - AssetManager:\n      * Acquire(member) recursively acquires the backing atlas — one\n        SDL_Texture* per atlas, refcounted across N member ids.\n      * GetTexture(member) walks the catalog redirect to the atlas's\n        SDL handle. Members never appear in textures_, so ClearAssets'\n        SDL_DestroyTexture loop runs exactly once per atlas (no\n        use-after-free from sharing a pointer across N alias entries).\n      * GetAtlasSlice exposes the per-member rect for the render path.\n      * UnloadAsset short-circuits on atlas members — releases the\n        atlas's refcount instead of destroying a borrowed texture.\n\n  - SpriteComponent caches `cachedAtlasOffset` alongside cachedTexture\n    (same generation gate). RenderSpriteSystem composes the final\n    cmd.srcRect as `sprite.srcRect + cachedAtlasOffset` — loose\n    textures leave the cached offset at zero, so the add is a no-op for\n    non-atlas sprites.\n\nBake step (Game::RunBakeValidation) runs AtlasBaker::Run after scene\nload completes and before WriteManifest, so the validation pass (which\nchecks member ids exist in the catalog) still sees the un-atlassed\ncatalog and the manifest carries the fully resolved atlas layout.\n\nBuild wiring: AtlasBaker.cpp added to SRC_FILES; libs/stb added as an\ninclude root on the main target + the OctarineLuaApiTest /\nOctarineAssetPipelineTest test targets so the stb implementation TU\nlinks cleanly.\n\nLua surface unchanged — `load_asset(\"hero\")` and acquire_scene_assets\nbehave the same; the atlas indirection is transparent. Existing\nprojects without `meta.atlas` produce no `_atlases/` directory and\nship loose textures exactly as before.\n\n* Silence stb header warnings in AtlasBaker.cpp under -Werror\n\nThe vendored stb_image / stb_image_write / stb_rect_pack headers emit\n-Wconversion warnings (int -> short, int -> size_t, signed/unsigned\nmixes) the engine's -Wall -Wextra -Wpedantic -Wshadow -Wconversion\nbaseline + per-target -Werror treats as fatal. set_source_files_properties\non AtlasBaker.cpp adds -w / /w after the project's flags so the stb\nimplementation TU compiles silently while the rest of the engine keeps\nthe strict baseline.\n\n* Make verify-icons.sh tolerate the deleted stock mipmap PNGs\n\nWhen d3546ff dropped the committed android/app/src/main/res/mipmap-*/\nic_launcher.png template PNGs (icon pipeline became generator-only), the\ndefault `--stock` path in verify-icons.sh started pointing at a file that\nno longer existed, so the android.yml `Verify AAB ships project icon`\ngate failed on every PR.\n\nWith no stock reference on disk, the \"differs from SDL template\" gate is\nmoot: every shipped ic_launcher.png is generator-emitted by construction.\nFall back to asserting the AAB carries non-empty mipmap-*/ic_launcher.png\nentries (still catches a Gradle res-merge break or a zero-byte emit).\n\nTag-pushed builds with a checked-in stock binary keep the original\nhash-divergence path.\n\n* Re-trigger CI (PR webhooks missed prior push)\n\n* Rename AtlasBaker -> TextureAtlasBaker to free the name for the glyph atlas\n\nmain's Stage 14 B3 added a glyph-atlas AtlasBaker. Rename the texture-atlas\npacker (this PR's class) so they can coexist.\n\n* Silence stb-header + BS.1770 warnings on the other -Werror-tripping TUs\n\nmain's AtlasBaker.cpp (glyph atlas, stb_image_write), GlyphAtlas.cpp\n(stb_image), and AudioNormalizer.cpp (size_t -> double narrowing) hit the\nsame -Wconversion / -Wsign-conversion / -Werror baseline this PR\nalready paper-overs for TextureAtlasBaker.cpp. Extend the same per-source\nwarning silencing to all four so the strict baseline keeps protecting\nthe rest of the engine without taking down every CI leg on main.\n\n* Fix stb impl symbol clash + macOS RenderTextSystem sign-conv error\n\nTextureAtlasBaker.cpp was defining STB_IMAGE_IMPLEMENTATION and\nSTB_IMAGE_WRITE_IMPLEMENTATION alongside main's GlyphAtlas.cpp / AtlasBaker.cpp,\nwhich each already define one of those — the linker rejected the\nduplicate stbi_write_jpg + friends. This TU only needs to own\nSTB_RECT_PACK_IMPLEMENTATION; drop the other two and just include the\nheaders for declarations.\n\nRenderTextSystem.h's atlas compose iterated 'const unsigned char c : text'\nwhere text is std::string. Apple clang's -Wsign-conversion flags the\nimplicit char -> unsigned char conversion. Iterate as char and route the\ncast through static_cast<unsigned char> + static_cast<uint32_t> so the\nnarrowing is explicit (which silences the diagnostic).\n\n* Fix second const-char sign-conv at RenderTextSystem.h:158",
+          "timestamp": "2026-05-30T19:50:48-06:00",
+          "tree_id": "6dce5a836077f238173195c8a6c7683800cc3ab2",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/b80b6cb4116c2cfa6b56a42e93cd21c0ba7a5d7d"
+        },
+        "date": 1780192824825,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "ScriptSystem [p95]",
+            "value": 0.126,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ScriptSystem [p99]",
+            "value": 0.568,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ScriptSystem [max]",
+            "value": 0.637,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "CommandBuffer::Playback [p95]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 1116"
+          },
+          {
+            "name": "CommandBuffer::Playback [p99]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 1116"
+          },
+          {
+            "name": "CommandBuffer::Playback [max]",
+            "value": 0.001,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 1116"
+          },
+          {
+            "name": "AudioSystem [p95]",
+            "value": 0.007,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AudioSystem [p99]",
+            "value": 0.011,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AudioSystem [max]",
+            "value": 0.017,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AnimationSystem [p95]",
+            "value": 0.002,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AnimationSystem [p99]",
+            "value": 0.003,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "AnimationSystem [max]",
+            "value": 0.004,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ProjectileLifecycleSystem [p95]",
+            "value": 0.006,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ProjectileLifecycleSystem [p99]",
+            "value": 0.012,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "ProjectileLifecycleSystem [max]",
+            "value": 0.037,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "VelocityIntegrationSystem [p95]",
+            "value": 0.073,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "VelocityIntegrationSystem [p99]",
+            "value": 0.235,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "VelocityIntegrationSystem [max]",
+            "value": 0.312,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "OffScreenDespawnSystem [p95]",
+            "value": 0.133,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "OffScreenDespawnSystem [p99]",
+            "value": 0.168,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "OffScreenDespawnSystem [max]",
+            "value": 0.852,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (roots rebuild + walk start) [p95]",
+            "value": 0.044,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (roots rebuild + walk start) [p99]",
+            "value": 0.053,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (roots rebuild + walk start) [max]",
+            "value": 0.101,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (descendants walk) [p95]",
+            "value": 0.001,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (descendants walk) [p99]",
+            "value": 0.002,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow (descendants walk) [max]",
+            "value": 0.003,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow [p95]",
+            "value": 0.058,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow [p99]",
+            "value": 0.066,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem: Slow [max]",
+            "value": 0.14,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem [p95]",
+            "value": 0.062,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem [p99]",
+            "value": 0.076,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "TransformSystem [max]",
+            "value": 0.144,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Emit Events [p95]",
+            "value": 0.007,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Emit Events [p99]",
+            "value": 0.013,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Emit Events [max]",
+            "value": 0.015,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Gather Boxes [p95]",
+            "value": 0.054,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Gather Boxes [p99]",
+            "value": 0.097,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Gather Boxes [max]",
+            "value": 0.116,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Collision System Update [p95]",
+            "value": 0.112,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Collision System Update [p99]",
+            "value": 0.154,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Collision System Update [max]",
+            "value": 0.17,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "CollisionSystem [p95]",
+            "value": 0.118,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 385"
+          },
+          {
+            "name": "CollisionSystem [p99]",
+            "value": 0.161,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 385"
+          },
+          {
+            "name": "CollisionSystem [max]",
+            "value": 0.175,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 385"
+          },
+          {
+            "name": "CameraFollowSystem [p95]",
+            "value": 0.023,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 400"
+          },
+          {
+            "name": "CameraFollowSystem [p99]",
+            "value": 0.036,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 400"
+          },
+          {
+            "name": "CameraFollowSystem [max]",
+            "value": 0.063,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 400"
+          },
+          {
+            "name": "Brute Force Intersection [p95]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Brute Force Intersection [p99]",
+            "value": 0.001,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Brute Force Intersection [max]",
+            "value": 0.001,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderSpriteSystem [p95]",
+            "value": 0.088,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderSpriteSystem [p99]",
+            "value": 0.119,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderSpriteSystem [max]",
+            "value": 0.127,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderTextSystem [p95]",
+            "value": 0.017,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderTextSystem [p99]",
+            "value": 0.022,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderTextSystem [max]",
+            "value": 0.027,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderPrimitiveSystem [p95]",
+            "value": 0.036,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderPrimitiveSystem [p99]",
+            "value": 0.046,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "RenderPrimitiveSystem [max]",
+            "value": 0.09,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Registry::Update (total) [p95]",
+            "value": 0.713,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Registry::Update (total) [p99]",
+            "value": 0.972,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Registry::Update (total) [max]",
+            "value": 1.39,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::Update (total) [p95]",
+            "value": 0.717,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::Update (total) [p99]",
+            "value": 0.976,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::Update (total) [max]",
+            "value": 1.398,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Sort [p95]",
+            "value": 0.021,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Sort [p99]",
+            "value": 0.027,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Sort [max]",
+            "value": 0.035,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Draw [p95]",
+            "value": 0.069,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Draw [p99]",
+            "value": 0.081,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Draw [max]",
+            "value": 0.098,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Present [p95]",
+            "value": 0.341,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Present [p99]",
+            "value": 0.385,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Render: Present [max]",
+            "value": 0.435,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::Render (total) [p95]",
+            "value": 7.92,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::Render (total) [p99]",
+            "value": 8.38,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::Render (total) [max]",
+            "value": 9.731,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 372"
+          },
+          {
+            "name": "Game::ProcessInput [p95]",
+            "value": 0.011,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 371"
+          },
+          {
+            "name": "Game::ProcessInput [p99]",
+            "value": 0.014,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 371"
+          },
+          {
+            "name": "Game::ProcessInput [max]",
+            "value": 0.015,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 371"
+          },
+          {
+            "name": "Game::WaitTime [p95]",
+            "value": 9.069,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 371"
+          },
+          {
+            "name": "Game::WaitTime [p99]",
+            "value": 9.077,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 371"
+          },
+          {
+            "name": "Game::WaitTime [max]",
+            "value": 9.359,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 371"
+          },
+          {
+            "name": "Query::Update [p95]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 26"
+          },
+          {
+            "name": "Query::Update [p99]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 26"
+          },
+          {
+            "name": "Query::Update [max]",
+            "value": 0,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 26"
+          },
+          {
+            "name": "Registry::Update (pending blam/despawn) [p95]",
+            "value": 0.06,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 5"
+          },
+          {
+            "name": "Registry::Update (pending blam/despawn) [p99]",
+            "value": 0.06,
+            "range": "0",
+            "unit": "ms",
+            "extra": "Samples: 5"
+          },
+          {
+            "name": "Registry::Update (pending blam/despawn) [max]",
+            "value": 0.06,
             "range": "0",
             "unit": "ms",
             "extra": "Samples: 5"
