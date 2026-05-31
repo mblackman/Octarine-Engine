@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780245550480,
+  "lastUpdate": 1780246394936,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -6624,6 +6624,114 @@ window.BENCHMARK_DATA = {
             "value": 632493.0516994527,
             "unit": "ns/iter",
             "extra": "iterations: 1107\ncpu: 632373.06504067 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dcc5672bc82e55d4d871aa1302ba0baa0b68f5e2",
+          "message": "Add octarine-init-build scaffolder for per-project build scripts (#79)\n\nStage 4 of EditorBuildAndDeployPlan. Bash + PowerShell scaffolder that emits\nper-project build-android, build-desktop, and play scripts (both shell flavors)\nplus a scripts/README.md. Same scripts CI runs: build-android wraps gradlew with\n-Poctarine.projectDir (mirrors .github/workflows/android.yml); build-desktop\nwraps cmake --preset ship-release + cpack (mirrors package.yml); play resolves\nthe engine binary from OCTARINE_ENGINE_BIN or auto-detects under editor-debug /\nplayer-debug. Identity (version_name, version_code, signing creds) flows from\nenv vars, never project.ini. Existing files are skipped by default; --force\noverwrites so hand-edits survive re-runs.",
+          "timestamp": "2026-05-31T10:30:20-06:00",
+          "tree_id": "edea1a2c8f59d84b3c0041b49959ba4637bfd8e6",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/dcc5672bc82e55d4d871aa1302ba0baa0b68f5e2"
+        },
+        "date": 1780246386175,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4004.152999179664,
+            "unit": "ns/iter",
+            "extra": "iterations: 170948\ncpu: 4040.284852703553 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16605.222136901633,
+            "unit": "ns/iter",
+            "extra": "iterations: 43157\ncpu: 16647.595268436562 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 109321.02229665307,
+            "unit": "ns/iter",
+            "extra": "iterations: 6375\ncpu: 109376.75231372566 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 866975.5444574503,
+            "unit": "ns/iter",
+            "extra": "iterations: 810\ncpu: 867088.7814814921 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1730112.0300903732,
+            "unit": "ns/iter",
+            "extra": "iterations: 405\ncpu: 1730075.5827160585 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2334.8258353792016,
+            "unit": "ns/iter",
+            "extra": "iterations: 304228\ncpu: 2326.806227566703 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 9940.28851427355,
+            "unit": "ns/iter",
+            "extra": "iterations: 69992\ncpu: 9933.906703620763 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 70546.31910016658,
+            "unit": "ns/iter",
+            "extra": "iterations: 9686\ncpu: 70509.59622136288 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 395756.60476234317,
+            "unit": "ns/iter",
+            "extra": "iterations: 1758\ncpu: 395749.8623436071 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2163.6166501957537,
+            "unit": "ns/iter",
+            "extra": "iterations: 330693\ncpu: 2132.4858584849067 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6543.556352724107,
+            "unit": "ns/iter",
+            "extra": "iterations: 107618\ncpu: 6507.234356706784 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41182.557059884886,
+            "unit": "ns/iter",
+            "extra": "iterations: 16968\ncpu: 41148.58374586381 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 321116.24357839156,
+            "unit": "ns/iter",
+            "extra": "iterations: 2190\ncpu: 320979.77077624464 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 633618.9714520897,
+            "unit": "ns/iter",
+            "extra": "iterations: 1094\ncpu: 633486.1672759997 ns\nthreads: 1"
           }
         ]
       }
