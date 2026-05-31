@@ -2,7 +2,7 @@
 
 #ifdef OCTARINE_WITH_EDITOR
 
-// PlayerLauncher — Stage 3 of ai/EditorBuildAndDeployPlan.md.
+// PlayerLauncher.
 //
 // Owns the editor's spawned player subprocess. The Run Player toolbar action goes through here,
 // the per-frame Pump() call drains captured stdout/stderr into a ring-capped log buffer that the

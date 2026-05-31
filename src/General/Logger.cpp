@@ -11,8 +11,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #endif
 
-// iOS os_log sink is parked on the defer/ios branch pending an Apple Developer account; see
-// ai/iOSDeferralPlan.md.
+// iOS os_log sink is parked on the defer/ios branch pending an Apple Developer account.
 
 std::shared_ptr<spdlog::logger> Logger::lua_logger_;
 std::vector<std::string> Logger::history_;

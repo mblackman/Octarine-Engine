@@ -61,8 +61,7 @@ if (ANDROID)
     set(OCTARINE_SHIPPED ON CACHE BOOL "Forced ON on Android (manifest-load, no FS scan)" FORCE)
 endif ()
 
-# iOS build target is parked on the defer/ios branch pending an Apple Developer account; see
-# ai/iOSDeferralPlan.md.
+# iOS build target is parked on the defer/ios branch pending an Apple Developer account.
 
 if (OCTARINE_WITH_EDITOR)
     set(OCTARINE_WITH_IMGUI ON CACHE BOOL "Forced ON by Editor" FORCE)

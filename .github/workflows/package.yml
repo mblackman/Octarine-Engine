@@ -55,7 +55,7 @@ jobs:
           # supports per-arch port builds + auto-lipo, or (b) we vendor a `multi_arch` overlay
           # that builds each port per-arch + lipo'es the final outputs. Until then, the
           # ship-mac-universal preset stays in tree for local opt-in builds; CI just doesn't
-          # exercise it. See ai/ShippingV1Plan.md note + ai/DeviceShippingPlan.md stage 5.
+          # exercise it.
 
     steps:
       - name: Checkout engine
@@ -129,7 +129,7 @@ jobs:
       # pre-account state skip cleanly). Bootstrap an ephemeral keychain, import the Developer
       # ID Application cert, then hand off to scripts/octarine-macos-notarize.sh which mounts
       # the cpack-produced .dmg, signs the .app, submits to notarytool, staples, and rebuilds
-      # the .dmg as the shipping artifact. See ai/ShippingV1Plan.md Stage 4.
+      # the .dmg as the shipping artifact.
       - name: Bootstrap macOS signing keychain
         if: |
           startsWith(matrix.platform, 'macos')

@@ -136,7 +136,7 @@ function(_octarine_validate_identity PROJECT_DIR PKG_NAME PKG_ID PKG_VER SHIPPED
 endfunction()
 
 # iOS bundle helper, orientation/permission Info.plist mappers, and Settings.bundle wiring are
-# parked on the defer/ios branch pending an Apple Developer account; see ai/iOSDeferralPlan.md.
+# parked on the defer/ios branch pending an Apple Developer account.
 
 # Generate per-OS icon files (.ico/.icns/.png) under ${OUT_DIR}/desktop. Sets ${ICO_VAR},
 # ${ICNS_VAR}, ${PNG_VAR} in the caller's scope to the conventional output paths (callers test

@@ -23,6 +23,6 @@ class AtlasBaker {
 
   // Default ASCII printable set (codepoints 32..126). Suitable for most western UIs; projects with
   // accented Latin or non-Latin scripts will eventually want an explicit list via meta.glyphs (not
-  // yet plumbed — see Stage 14 B3 in ai/ShippingV1Plan.md).
+  // yet plumbed).
   static std::vector<std::uint32_t> DefaultAsciiPrintable();
 };
