@@ -137,7 +137,7 @@ load_entity(player)
 
 ### `input` table
 
-Polling, action map, and callbacks. Action bindings + callbacks are cleared on `load_scene`/`reload_scene` — re-install in the new scene's `setup` (use a guard for idempotency).
+Polling, action map, and callbacks. Action bindings + callbacks are cleared on `load_scene`/`reload_scene` — re-install in the new scene's `setup` (use a guard for idempotency). Full scene lifecycle in [`docs/scenes.md`](scenes.md).
 
 | Function | Description |
 | --- | --- |

@@ -84,6 +84,7 @@ CI (`.github/workflows/build.yml`) runs both on the Linux editor-release leg on 
 - [`docs/ecs-architecture.md`](ecs-architecture.md) — archetype graph, chunk storage, query model
 - [`docs/ecs-components.md`](ecs-components.md) — every component's Lua shape
 - [`docs/lua-scripting.md`](lua-scripting.md) — how Lua scripts wire into the engine
+- [`docs/scenes.md`](scenes.md) — scene file shape, lifecycle, `load_scene` / `reload_scene`
 - [`docs/asset-pipeline.md`](asset-pipeline.md) — `.meta` sidecars, bake step, atlases, audio normalize
 - [`docs/device-builds.md`](device-builds.md) — shipping artifacts for desktop and Android
 - `lua_api.smoke.lua` — generated, exhaustive reference for the live Lua surface
