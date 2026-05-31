@@ -45,6 +45,7 @@
 #include "Lua/LuaApiManifest.h"
 #include "Lua/LuaEntityLoader.h"
 #include "Lua/Modules/RegisterAllModules.h"
+#include "Components/AudioListenerComponent.h"
 #include "Systems/AnimationSystem.h"
 #include "Systems/AudioSystem.h"
 #include "Systems/CameraFollowSystem.h"
@@ -61,8 +62,10 @@
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/RenderTextSystem.h"
 #include "Systems/ScriptSystem.h"
+#include "Systems/SpatialAudioSystem.h"
 #include "Systems/TransformSystem.h"
 #include "Systems/UIButtonSystem.h"
+#include "Systems/UpdateListenerTransformSystem.h"
 #include "Systems/VelocityIntegrationSystem.h"
 
 #ifdef OCTARINE_WITH_IMGUI
@@ -735,6 +738,14 @@ void Game::Setup()
 
     // Collision reads transform.globalPosition / globalScale — must run after TransformSystem.
     registry_->RegisterBulkSystem(CollisionSystem());
+
+    // Spatial audio: snapshot the listener entity (UpdateListenerTransformSystem) then mutate
+    // gain + stereo pan on live spatial tracks (SpatialAudioSystem). Both must run AFTER
+    // TransformSystem so emitter + listener globals are this-frame values; AudioSystem (above)
+    // is the one that creates the AudioSinkComponent's MIX_Track that these mutate.
+    registry_->Set<AudioListenerCache>(AudioListenerCache{});
+    registry_->RegisterBulkSystem<GlobalTransformComponent>(UpdateListenerTransformSystem());
+    registry_->RegisterSystem<GlobalTransformComponent, AudioSourceComponent, AudioSinkComponent>(SpatialAudioSystem());
 
     // Camera follows after gameplay-driven transform updates
     registry_->RegisterSystem<PositionComponent, CameraFollowComponent>(CameraFollowSystem());

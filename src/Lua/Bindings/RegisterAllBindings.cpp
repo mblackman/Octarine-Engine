@@ -1,6 +1,7 @@
 #include "Lua/Bindings/RegisterAllBindings.h"
 
 #include "Lua/Bindings/AnimationComponentLuaBinding.h"
+#include "Lua/Bindings/AudioListenerComponentLuaBinding.h"
 #include "Lua/Bindings/AudioSourceComponentLuaBinding.h"
 #include "Lua/Bindings/BoxColliderComponentLuaBinding.h"
 #include "Lua/Bindings/CameraFollowComponentLuaBinding.h"
@@ -33,6 +34,7 @@ void RegisterAllLuaBindings()
     LuaComponentRegistry::registerComponent<UIButtonComponent>();
     LuaComponentRegistry::registerComponent<TextLabelComponent>();
     LuaComponentRegistry::registerComponent<AudioSourceComponent>();
+    LuaComponentRegistry::registerComponent<AudioListenerComponent>();
     LuaComponentRegistry::registerComponent<NameComponent>();
     LuaComponentRegistry::registerComponent<ScaleComponent>();
     LuaComponentRegistry::registerComponent<PositionComponent>();
