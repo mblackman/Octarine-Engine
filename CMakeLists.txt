@@ -126,6 +126,7 @@ if (OCTARINE_WITH_EDITOR)
     list(APPEND SRC_FILES src/Editor/EditorLayoutPresets.cpp)
     list(APPEND SRC_FILES src/Editor/Inspectors/RegisterAllInspectors.cpp)
     list(APPEND SRC_FILES src/Editor/PlayerLauncher.cpp)
+    list(APPEND SRC_FILES src/Editor/ExportBuilder.cpp)
 endif ()
 
 if (UNIX AND NOT APPLE AND NOT ANDROID)

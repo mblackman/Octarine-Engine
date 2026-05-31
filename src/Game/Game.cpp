@@ -80,6 +80,7 @@
 #ifdef OCTARINE_WITH_EDITOR
 #include "../Editor/EditorLayoutPresets.h"
 #include "../Editor/EditorPersistence.h"
+#include "../Editor/ExportBuilder.h"
 #include "../Editor/PlayerLauncher.h"
 #include "../Editor/Inspectors/RegisterAllInspectors.h"
 #endif
@@ -222,6 +223,7 @@ bool Game::Initialize(const std::string& assetPath)
     auto& editorPersistence = registry_->Get<EditorPersistence>();
     editorPersistence.LoadGlobal();
     registry_->Set<octarine::editor::PlayerLauncher>(octarine::editor::PlayerLauncher());
+    registry_->Set<octarine::editor::ExportBuilder>(octarine::editor::ExportBuilder());
     if (effectivePath.empty())
     {
         effectivePath = editorPersistence.lastProjectPath;
