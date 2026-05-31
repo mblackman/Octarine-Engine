@@ -2,14 +2,16 @@
 
 #ifdef OCTARINE_WITH_EDITOR
 
-// ExportBuilder — Stage 5 of ai/EditorBuildAndDeployPlan.md (PR-A: runner + UI for host-OS desktop).
+// ExportBuilder — Stage 5 of ai/EditorBuildAndDeployPlan.md.
 //
-// Wraps the spawn of the project's `scripts/build-desktop.{sh,ps1}` scaffolded by Stage 4. Mirrors
-// PlayerLauncher: a Registry singleton with a state machine (Idle -> Building -> Succeeded/Failed),
-// a ring-capped log of subprocess stdout/stderr, and a per-frame Pump() drained on the main thread.
+// Wraps the spawn of a project's scaffolded build script (`scripts/build-desktop.{sh,ps1}` for the
+// host-OS desktop target, `scripts/build-android.{sh,ps1}` for Android). Mirrors PlayerLauncher: a
+// Registry singleton with a state machine (Idle -> Building -> Succeeded/Failed), a ring-capped log
+// of subprocess stdout/stderr, and a per-frame Pump() drained on the main thread.
 //
-// Out of scope this PR (deferred per plan): Android targets, signing-credentials prompt, SHA256
-// of artifact, "Reveal in Explorer" / clipboard install hint.
+// Out of scope (deferred per plan): in-editor signing-credential storage (PR-C: DPAPI/keychain),
+// SHA256 of artifact, "Reveal in Explorer" / clipboard install hint. AndroidRelease signing creds
+// flow via the editor process's existing env vars (OCTARINE_ANDROID_KEYSTORE_PATH, etc.).
 
 #include "Process/Process.h"
 
@@ -31,6 +33,13 @@ namespace octarine::editor
         Failed,
     };
 
+    enum class ExportTarget
+    {
+        Desktop,        // host-OS via scripts/build-desktop.{sh,ps1}
+        AndroidDebug,   // assembleDebug via scripts/build-android.{sh,ps1} debug
+        AndroidRelease, // bundleRelease via scripts/build-android.{sh,ps1} release
+    };
+
     struct ExportLogLine
     {
         bool is_stderr = false;
@@ -40,9 +49,10 @@ namespace octarine::editor
     struct ExportOptions
     {
         std::filesystem::path project_dir;
+        ExportTarget target = ExportTarget::Desktop;
         std::string version_name; // optional; empty -> falls through to project.ini
         std::string version_code; // optional; empty -> falls through to project.ini
-        std::string preset;       // optional; empty -> emitted script default (ship-release)
+        std::string preset;       // Desktop only; empty -> emitted script default (ship-release)
     };
 
     class ExportBuilder
@@ -52,14 +62,14 @@ namespace octarine::editor
         // ready to build. Mirrors the policy enforced by the scaffolded script + Gradle/CMake
         // identity validators so the UI can surface failures inline.
         //   - project_dir contains project.ini, and ProjectIni::ValidateForShipping passes
-        //   - scripts/build-desktop.sh (POSIX) or scripts/build-desktop.ps1 (Windows) exists
-        //   - cmake is on PATH
-        static std::vector<std::string> Validate(const std::filesystem::path& project_dir);
+        //   - the scaffolded build script for the target exists under <project>/scripts/
+        static std::vector<std::string>
+        Validate(const std::filesystem::path& project_dir, ExportTarget target = ExportTarget::Desktop);
 
-        // Spawns the scaffolded build-desktop script with env vars set per the ExportOptions.
-        // Returns false when Validate() fails (errors are pushed into the log as stderr lines and
-        // status flips to Failed) or when spawning the script fails. A no-op (returning true) when
-        // a build is already Building.
+        // Spawns the scaffolded build script for `opts.target` with env vars set per the
+        // ExportOptions. Returns false when Validate() fails (errors are pushed into the log as
+        // stderr lines and status flips to Failed) or when spawning the script fails. A no-op
+        // (returning true) when a build is already Building.
         bool Run(const ExportOptions& opts);
 
         // Terminates the running script subprocess if any. No-op when not Building.
@@ -81,9 +91,11 @@ namespace octarine::editor
         LogSnapshot LogCopy() const;
         void ClearLog();
 
-        // Picks scripts/build-desktop.ps1 on Windows, scripts/build-desktop.sh elsewhere. Returns
-        // nullopt if neither flavor exists. Public for unit testing.
-        static std::optional<std::filesystem::path> ResolveBuildScript(const std::filesystem::path& project_dir);
+        // Picks the script flavor (.ps1 on Windows, .sh elsewhere) for the requested target. Returns
+        // nullopt if the script is missing. Public for unit testing.
+        static std::optional<std::filesystem::path>
+        ResolveBuildScript(const std::filesystem::path& project_dir,
+                           ExportTarget target = ExportTarget::Desktop);
 
     private:
         static constexpr std::size_t kLogCap = 4096;
