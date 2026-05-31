@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780250503913,
+  "lastUpdate": 1780261934024,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -7056,6 +7056,114 @@ window.BENCHMARK_DATA = {
             "value": 644328.8744736569,
             "unit": "ns/iter",
             "extra": "iterations: 1093\ncpu: 644212.3833486475 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "mblackman@users.noreply.github.com",
+            "name": "mblackman",
+            "username": "mblackman"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0ab3c73ec4d0787387ef1e189f8a9c64a4a4cdd9",
+          "message": "Add 2D spatial audio (Sound plan Phase 3) (#82)\n\n* Add 2D spatial audio (Sound plan Phase 3)\n\nIntroduces AudioListenerComponent + AudioListenerCache singleton,\nUpdateListenerTransformSystem (snapshots listener entity each frame after\nTransformSystem), and SpatialAudioSystem (per-emitter distance attenuation\nand stereo pan via MIX_SetTrackGain + MIX_SetTrackStereo). AudioSourceComponent\ngains spatial / minDistance / maxDistance fields plumbed through the Lua factory.\n\nListener basis is fixed to world axes for now (2D top-down). Camera-rotation\ndecoupling lands when scenes gain rotated cameras; the cache layout already\nsplits position from forward/right to keep that change additive.\n\nNon-spatial sources are skipped entirely; their gain remains source.volume so\nthe existing event-driven play_sound path and looping music sources are\nunchanged. Toggling spatial off at runtime clears the stereo override on the\nnext frame.\n\n* Skip redundant MIX_Set* calls + hoist listener cache pointer\n\nSpatialAudioSystem was calling MIX_SetTrackGain + MIX_SetTrackStereo every\nframe for every active sink, including non-spatial ones (which only needed\nthe stereo override cleared once). It was also re-fetching the\nAudioListenerCache singleton via Registry::Get (typeid-name string_view map\nlookup) on every per-entity call.\n\nNow: cache pointer is lazy-initialized into a system member once, and\nAudioSinkComponent carries lastGain / lastPan / stereoApplied so each\nMIX_Set* call only fires when the value transitions. lastRatio is added\nin the same struct for DopplerSystem to consume in the Phase 4 commit.\n\nAt small emitter counts (the current track-pool cap) this is mostly\nhygiene; at Phase 5's higher counts it removes a per-frame hashmap lookup\n+ ~2 mixer-internal locks per sink.\n\n* Regenerate Lua API stubs for audio_listener binding\n\nMechanical regeneration after AudioListenerComponent's LuaBinding registration\nin this branch. components.json gains the audio_listener entry with its\nregistry.has_/get_ accessors, and lua_api.smoke.lua gains the matching\nEmmyLua class + registry function stubs. modules.json is unchanged\n(audio_listener is a component, not a module).\n\nCloses the linux (editor-release) CI drift gate.",
+          "timestamp": "2026-05-31T15:05:39-06:00",
+          "tree_id": "b3e8d2b5e39d4318617660b7e68e954e7089d46b",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/0ab3c73ec4d0787387ef1e189f8a9c64a4a4cdd9"
+        },
+        "date": 1780261925203,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4049.8157295130245,
+            "unit": "ns/iter",
+            "extra": "iterations: 169731\ncpu: 4087.286223494787 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16512.35780756227,
+            "unit": "ns/iter",
+            "extra": "iterations: 42760\ncpu: 16556.87951356425 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 111987.27751848963,
+            "unit": "ns/iter",
+            "extra": "iterations: 6357\ncpu: 112055.70583609008 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 882204.8291208306,
+            "unit": "ns/iter",
+            "extra": "iterations: 796\ncpu: 882323.8404522793 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1732423.235000369,
+            "unit": "ns/iter",
+            "extra": "iterations: 401\ncpu: 1732483.2618453964 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2303.717217831491,
+            "unit": "ns/iter",
+            "extra": "iterations: 306324\ncpu: 2294.8884481790988 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10186.788983410157,
+            "unit": "ns/iter",
+            "extra": "iterations: 68972\ncpu: 10172.027619907192 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 69808.90220147441,
+            "unit": "ns/iter",
+            "extra": "iterations: 10026\ncpu: 69778.76760423745 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 397785.3765512492,
+            "unit": "ns/iter",
+            "extra": "iterations: 1753\ncpu: 397763.56360525475 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2191.2272656078635,
+            "unit": "ns/iter",
+            "extra": "iterations: 323227\ncpu: 2154.957484986149 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6589.598925177622,
+            "unit": "ns/iter",
+            "extra": "iterations: 108315\ncpu: 6550.318903198745 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 41892.12408545684,
+            "unit": "ns/iter",
+            "extra": "iterations: 16959\ncpu: 41847.44908306812 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 324213.11502023425,
+            "unit": "ns/iter",
+            "extra": "iterations: 2193\ncpu: 324033.6023711476 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 642446.0798488248,
+            "unit": "ns/iter",
+            "extra": "iterations: 1086\ncpu: 642367.3204419676 ns\nthreads: 1"
           }
         ]
       }
