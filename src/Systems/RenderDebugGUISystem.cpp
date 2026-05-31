@@ -34,7 +34,9 @@
 #include "../Editor/EditorPersistence.h"
 #include "../Editor/Inspectors/ComponentInspectorRegistry.h"
 #include "../Editor/Inspectors/InspectorWidgets.h"
+#include "../Editor/ExportBuilder.h"
 #include "../Editor/PlayerLauncher.h"
+#include "../Project/ProjectIni.h"
 
 namespace
 {
@@ -90,6 +92,8 @@ const float deltaTime) {
 auto& editorPersistence = registry->Get<EditorPersistence>();
 auto& playerLauncher = registry->Get<octarine::editor::PlayerLauncher>();
 playerLauncher.Pump();
+auto& exportBuilder = registry->Get<octarine::editor::ExportBuilder>();
+exportBuilder.Pump();
 const bool editorSession = gameConfig.IsEditorMode() || !projectLoaded;
 const bool showEditorUI = editorSession;
 #endif
@@ -125,6 +129,7 @@ ImGui::NewFrame();
 #ifdef OCTARINE_WITH_EDITOR
 static bool showProjectSelector = false;
 static bool openSaveLayoutModal = false;
+static bool openExportBuildModal = false;
 
   if (showEditorUI)
 {
@@ -202,6 +207,7 @@ static bool openSaveLayoutModal = false;
             ImGui::MenuItem("Engine Options", nullptr, &editorPersistence.showEngineOptions);
             ImGui::MenuItem("Editor Settings", nullptr, &editorPersistence.showEditorSettings);
             ImGui::MenuItem("Player Output", nullptr, &editorPersistence.showPlayerOutput);
+            ImGui::MenuItem("Export Output", nullptr, &editorPersistence.showExportOutput);
             ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI);
             ImGui::Separator();
             ImGui::MenuItem("FPS Counter", nullptr, &engineOptions.showFpsCounter);
@@ -288,6 +294,29 @@ static bool openSaveLayoutModal = false;
                     }
                     ImGui::EndDisabled();
                 }
+
+                ImGui::SameLine();
+                // Export Build: opens a modal to spawn the project's scaffolded
+                // scripts/build-desktop.{sh,ps1}. Disabled while a build is in flight; reads as
+                // "Stop Export" so the dev can cancel.
+                {
+                    const bool exportRunning =
+                        exportBuilder.Status() == octarine::editor::ExportStatus::Building;
+                    const bool canExport = projectLoaded || !registry->Get<AssetManager>().GetBasePath().empty();
+                    ImGui::BeginDisabled(!exportRunning && !canExport);
+                    if (ImGui::Button(exportRunning ? "Stop Export" : "Export Build..."))
+                    {
+                        if (exportRunning)
+                        {
+                            exportBuilder.Stop();
+                        }
+                        else
+                        {
+                            openExportBuildModal = true;
+                        }
+                    }
+                    ImGui::EndDisabled();
+                }
                 ImGui::EndMenuBar();
             }
         }
@@ -298,6 +327,89 @@ static bool openSaveLayoutModal = false;
     {
         ImGui::OpenPopup("Save Layout Preset");
         openSaveLayoutModal = false;
+    }
+
+    if (openExportBuildModal)
+    {
+        ImGui::OpenPopup("Export Build");
+        openExportBuildModal = false;
+    }
+    if (ImGui::BeginPopupModal("Export Build", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+    {
+        static char versionNameBuf[32] = "";
+        static char versionCodeBuf[16] = "";
+        static std::string lastProjectDir;
+        static std::vector<std::string> validationErrors;
+
+        const std::string projectDir = registry->Get<AssetManager>().GetBasePath();
+
+        // Refresh the version-field defaults and validation when the project switches under the
+        // modal. The buffers themselves are static so a dev can edit and have the override stick
+        // across reopens within the same project.
+        if (projectDir != lastProjectDir)
+        {
+            lastProjectDir = projectDir;
+            versionNameBuf[0] = '\0';
+            versionCodeBuf[0] = '\0';
+            if (!projectDir.empty())
+            {
+                if (auto ini = octarine::project::ProjectIni::Load(std::filesystem::path(projectDir)))
+                {
+                    std::snprintf(versionNameBuf, sizeof(versionNameBuf), "%s", ini->version_name.c_str());
+                    std::snprintf(versionCodeBuf, sizeof(versionCodeBuf), "%s", ini->version_code.c_str());
+                }
+            }
+            validationErrors = octarine::editor::ExportBuilder::Validate(std::filesystem::path(projectDir));
+        }
+
+        ImGui::Text("Target: host OS (ship-release preset)");
+        ImGui::TextDisabled("Project: %s", projectDir.empty() ? "(none)" : projectDir.c_str());
+        ImGui::Separator();
+
+        ImGui::SetNextItemWidth(180);
+        ImGui::InputText("Version name", versionNameBuf, sizeof(versionNameBuf));
+        ImGui::SetNextItemWidth(180);
+        ImGui::InputText("Version code", versionCodeBuf, sizeof(versionCodeBuf));
+        ImGui::TextDisabled("Leave blank to fall through to project.ini.");
+
+        if (!validationErrors.empty())
+        {
+            ImGui::Separator();
+            ImGui::TextColored(ImVec4(1.0F, 0.5F, 0.5F, 1.0F), "Validation errors:");
+            for (const auto& e : validationErrors)
+            {
+                ImGui::BulletText("%s", e.c_str());
+            }
+        }
+
+        ImGui::Separator();
+
+        const bool canBuild = validationErrors.empty() && !projectDir.empty();
+        ImGui::BeginDisabled(!canBuild);
+        if (ImGui::Button("Build"))
+        {
+            octarine::editor::ExportOptions opts;
+            opts.project_dir = std::filesystem::path(projectDir);
+            opts.version_name = versionNameBuf;
+            opts.version_code = versionCodeBuf;
+
+            editorPersistence.showExportOutput = true;
+            exportBuilder.ClearLog();
+            exportBuilder.Run(opts);
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel"))
+        {
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Re-validate"))
+        {
+            validationErrors = octarine::editor::ExportBuilder::Validate(std::filesystem::path(projectDir));
+        }
+        ImGui::EndPopup();
     }
     if (ImGui::BeginPopupModal("Save Layout Preset", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
     {
@@ -337,6 +449,8 @@ static bool openSaveLayoutModal = false;
         EditorSettingsWindow(editorPersistence, &editorPersistence.showEditorSettings);
     if (editorPersistence.showPlayerOutput)
         PlayerOutputWindow(game, &editorPersistence.showPlayerOutput);
+    if (editorPersistence.showExportOutput)
+        ExportOutputWindow(game, &editorPersistence.showExportOutput);
 
     if (engineOptions.showImGuiDemoWindow)
     {
@@ -977,6 +1091,87 @@ void RenderDebugGUISystem::PlayerOutputWindow(Game* game, bool* p_open)
 
     ImGui::BeginChild("PlayerOutputScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
     const auto snap = launcher.LogCopy();
+    if (snap.total_dropped > 0)
+    {
+        ImGui::TextDisabled("[older %zu lines dropped]", snap.total_dropped);
+    }
+    for (const auto& line : snap.lines)
+    {
+        if (line.is_stderr)
+        {
+            ImGui::TextColored(ImVec4(1.0F, 0.5F, 0.5F, 1.0F), "%s", line.text.c_str());
+        }
+        else
+        {
+            ImGui::TextUnformatted(line.text.c_str());
+        }
+    }
+    if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
+    {
+        ImGui::SetScrollHereY(1.0F);
+    }
+    ImGui::EndChild();
+
+    ImGui::End();
+}
+
+void RenderDebugGUISystem::ExportOutputWindow(Game* game, bool* p_open)
+{
+    auto& builder = game->GetRegistry()->Get<octarine::editor::ExportBuilder>();
+
+    ImGui::SetNextWindowSize(ImVec2(620, 420), ImGuiCond_FirstUseEver);
+    if (!ImGui::Begin("Export Output", p_open, ImGuiWindowFlags_NoScrollbar))
+    {
+        ImGui::End();
+        return;
+    }
+
+    const auto status = builder.Status();
+    const char* statusText = "Idle";
+    ImVec4 statusColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
+    switch (status)
+    {
+    case octarine::editor::ExportStatus::Building:
+        statusText = "Building";
+        statusColor = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
+        break;
+    case octarine::editor::ExportStatus::Succeeded:
+        statusText = "Succeeded";
+        statusColor = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
+        break;
+    case octarine::editor::ExportStatus::Failed:
+        statusText = "Failed";
+        statusColor = ImVec4(1.0F, 0.4F, 0.4F, 1.0F);
+        break;
+    case octarine::editor::ExportStatus::Idle:
+    default:
+        break;
+    }
+    ImGui::TextDisabled("Status:");
+    ImGui::SameLine();
+    ImGui::TextColored(statusColor, "%s", statusText);
+    if (const auto code = builder.LastExitCode())
+    {
+        ImGui::SameLine();
+        ImGui::TextDisabled("(exit %d)", *code);
+    }
+    if (!builder.ResolvedScript().empty())
+    {
+        ImGui::TextDisabled("Script: %s", builder.ResolvedScript().string().c_str());
+    }
+
+    if (ImGui::Button("Clear"))
+    {
+        builder.ClearLog();
+    }
+    ImGui::SameLine();
+    static bool autoScroll = true;
+    ImGui::Checkbox("Auto-scroll", &autoScroll);
+
+    ImGui::Separator();
+
+    ImGui::BeginChild("ExportOutputScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+    const auto snap = builder.LogCopy();
     if (snap.total_dropped > 0)
     {
         ImGui::TextDisabled("[older %zu lines dropped]", snap.total_dropped);
