@@ -2,7 +2,7 @@
 
 End-to-end reference for producing shippable artifacts on every platform Octarine
 targets: Windows, Linux, macOS (per-arch and universal), and Android (APK + AAB).
-(iOS work is parked on `defer/ios` — see `ai/iOSDeferralPlan.md`.)
+(iOS work is parked on the `defer/ios` branch.)
 
 This document covers:
 
@@ -264,9 +264,9 @@ so non-tag pushes, PRs, and pre-account state skip without failing the leg.
 Both `macos` and `macos-universal` legs notarize.
 
 Migrating to **App Store Connect API key** auth (`AuthKey_*.p8` — no
-annual rotation) is queued as Stage 9 of `ai/ShippingV1Plan.md`. Notarytool
-accepts either `--apple-id`/`--password` or `--key`/`--key-id`/`--issuer`,
-so the swap is one script edit when the key is generated.
+annual rotation) is a queued follow-up. Notarytool accepts either
+`--apple-id`/`--password` or `--key`/`--key-id`/`--issuer`, so the swap is
+one script edit when the key is generated.
 
 ### NSIS installer (Windows, opt-in)
 
@@ -492,9 +492,8 @@ traits from `__cpp_noexcept_function_type` and breaks differently.
 iOS build target (`ship-ios-*` presets, `_octarine_setup_ios_bundle`,
 `scripts/build-ios-ipa.sh`, `os_log` sink, `.github/workflows/ios*.yml`,
 the `Settings.bundle` license pointer) is parked on the `defer/ios` branch
-pending an Apple Developer account. Reattachment recipe in
-`ai/iOSDeferralPlan.md`; snapshot tag `ios-snapshot-2026-05-29` points at
-the last known-good commit.
+pending an Apple Developer account. Snapshot tag `ios-snapshot-2026-05-29`
+points at the last known-good commit.
 
 ---
 
@@ -705,7 +704,7 @@ Tag push fires two workflows:
   when the keystore secrets aren't wired).
 
 Drop the shipping artifacts into Steam / Play Store once distribution
-automation lands (see `ai/DeviceShippingPlan.md` § Stage 6).
+automation lands.
 
 ---
 
@@ -722,8 +721,3 @@ automation lands (see `ai/DeviceShippingPlan.md` § Stage 6).
 | Manifest load gate               | `AssetCatalog::Build` (`allowManifest` parameter)     |
 | `project.ini` parsers            | `OctarinePackage.cmake` `octarine_read_project_ini`, `build.gradle` `identityProp` |
 | Logger sink selection            | `src/General/Logger.cpp` (`android_logger` / stdout)  |
-
-For the historical plan and the rationale behind each stage, see
-`ai/AssetPipelineAndDeviceBuildsPlan.md` (closed) and
-`ai/DeviceShippingPlan.md` (active — distribution work picking up where
-the asset pipeline left off).

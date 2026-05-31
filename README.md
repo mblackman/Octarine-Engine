@@ -24,8 +24,8 @@ New here? Start with [`docs/QUICKSTART.md`](docs/QUICKSTART.md) — the shortest
 
 Octarine Engine itself is MIT-licensed (see [`LICENSE`](LICENSE)). Every shipped package
 (desktop ZIP/TGZ/DMG, Android AAB) ships a build-time-aggregated
-`THIRD_PARTY_LICENSES.txt` covering every linked dependency. The aggregator and shipping
-contract live in [`ai/LicenseShippingPlan.md`](ai/LicenseShippingPlan.md).
+`THIRD_PARTY_LICENSES.txt` covering every linked dependency. Aggregation lives in
+[`cmake/octarine-licenses.cmake`](cmake/octarine-licenses.cmake).
 
 Portions of this software are copyright © The FreeType Project (www.freetype.org). All rights
 reserved. FreeType is used under the terms of the FreeType License (FTL); see the bundled
@@ -74,6 +74,10 @@ cmake --build --preset player-profile
 ```
 
 The compiled binaries will be located in `build/[preset-name]/bin/`.
+
+For producing shippable artifacts (Windows ZIP/NSIS, Linux TGZ, macOS DMG, Android APK/AAB)
+see [`docs/device-builds.md`](docs/device-builds.md). Shipping config is the `ship-release`
+preset (and `ship-mac-universal` for universal macOS).
 
 ### Running the Engine
 
