@@ -92,7 +92,7 @@ set(SRC_FILES
         src/Main.cpp
         src/AssetManager/AssetManager.cpp
         src/AssetManager/AssetCatalog.cpp
-        src/AssetManager/AtlasBaker.cpp
+        src/AssetManager/TextureAtlasBaker.cpp
         src/AssetManager/SceneAssetScanner.cpp
         src/ECS/Registry.cpp
         src/Game/Game.cpp
@@ -127,11 +127,11 @@ if (UNIX AND NOT APPLE AND NOT ANDROID)
     list(APPEND SRC_FILES src/General/SDL3_Linux_Stubs.cpp)
 endif ()
 
-# AtlasBaker.cpp is the single TU that emits the stb_image / stb_image_write / stb_rect_pack
+# TextureAtlasBaker.cpp is the single TU that emits the stb_image / stb_image_write / stb_rect_pack
 # implementations. The vendored headers don't satisfy the engine's `-Wconversion -Werror`
 # baseline (int -> short_int, int -> size_t, etc.), so disable warnings just for this file. The
 # user-authored code at the bottom of the .cpp is small enough to eyeball without -Wall help.
-set_source_files_properties(src/AssetManager/AtlasBaker.cpp PROPERTIES
+set_source_files_properties(src/AssetManager/TextureAtlasBaker.cpp PROPERTIES
         COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/w,-w>")
 
 # Add packaged libs
@@ -203,7 +203,7 @@ target_include_directories(${PROJECT_NAME}
         PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/libs
-        # libs/stb is its own include root so src/AssetManager/AtlasBaker.cpp can write
+        # libs/stb is its own include root so src/AssetManager/TextureAtlasBaker.cpp can write
         # `#include "stb_image.h"` — matches the pattern in scripts/octarine-icon-tool/.
         ${CMAKE_CURRENT_SOURCE_DIR}/libs/stb
         ${LUA_INCLUDE_DIR}

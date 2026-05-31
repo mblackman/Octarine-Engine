@@ -13,7 +13,7 @@
 #include "../Events/KeyInputEvent.h"
 #include "../General/Logger.h"
 #include "AssetManager/AssetCatalog.h"
-#include "AssetManager/AtlasBaker.h"
+#include "AssetManager/TextureAtlasBaker.h"
 #include "AssetManager/SceneAssetScanner.h"
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
@@ -556,7 +556,7 @@ bool Game::RunBakeValidation(const std::string& assetPath)
     // and mutate member entries to record their slice within each. Runs after scene load so a
     // future `meta.atlas` injection from scene scripts could also be honored. Members tagged
     // `meta.no_atlas = true` skip the pack and ship as loose textures.
-    if (!AtlasBaker{}.Run(assetManager.GetCatalog(), assetPath))
+    if (!TextureAtlasBaker{}.Run(assetManager.GetCatalog(), assetPath))
     {
         Logger::Error("Bake: atlas packing failed. Aborting.");
         return false;

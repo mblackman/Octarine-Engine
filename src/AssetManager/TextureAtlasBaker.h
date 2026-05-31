@@ -14,7 +14,7 @@ class AssetCatalog;
 // Pure bake-time helper: never invoked in a running game, only from Game::RunBakeValidation. The
 // stb_image + stb_image_write + stb_rect_pack implementation is compiled into the engine binary
 // behind this single translation unit so the runtime cost is one extra .o on the link line.
-class AtlasBaker
+class TextureAtlasBaker
 {
 public:
     // Default padding (transparent gutter) between packed sprites, in pixels. Avoids bilinear
@@ -28,7 +28,7 @@ public:
     // their art instead of silently producing 5x the textures).
     static constexpr int kDefaultMaxAtlasDim = 4096;
 
-    AtlasBaker() = default;
+    TextureAtlasBaker() = default;
 
     // Pack every atlas group declared by `catalog`. Writes `<basePath>/_atlases/<group>.png` for
     // each, mutates member entries to point at the atlas, and inserts the new atlas entries.

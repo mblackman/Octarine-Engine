@@ -1,4 +1,4 @@
-#include "AssetManager/AtlasBaker.h"
+#include "AssetManager/TextureAtlasBaker.h"
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -56,7 +56,7 @@ namespace
     }
 } // namespace
 
-bool AtlasBaker::Run(AssetCatalog& catalog, const std::string& basePath) const
+bool TextureAtlasBaker::Run(AssetCatalog& catalog, const std::string& basePath) const
 {
     // Group eligible textures by atlas name. Iteration order over std::map is id-sorted, so the
     // resulting groups (and the packing rect order inside each) are deterministic across runs.
@@ -75,7 +75,7 @@ bool AtlasBaker::Run(AssetCatalog& catalog, const std::string& basePath) const
     fs::create_directories(atlasOutDir, ec);
     if (ec)
     {
-        Logger::Error("AtlasBaker: failed to create " + atlasOutDir.string() + ": " + ec.message());
+        Logger::Error("TextureAtlasBaker: failed to create " + atlasOutDir.string() + ": " + ec.message());
         return false;
     }
 
@@ -97,7 +97,7 @@ bool AtlasBaker::Run(AssetCatalog& catalog, const std::string& basePath) const
             unsigned char* data = stbi_load(member->fullPath.c_str(), &w, &h, &comp, 4);
             if (data == nullptr)
             {
-                Logger::Error("AtlasBaker: failed to load source for atlas member '" + mid + "' (" +
+                Logger::Error("TextureAtlasBaker: failed to load source for atlas member '" + mid + "' (" +
                               member->fullPath + "): " + std::string(stbi_failure_reason() != nullptr ? stbi_failure_reason() : ""));
                 return false;
             }
@@ -140,7 +140,7 @@ bool AtlasBaker::Run(AssetCatalog& catalog, const std::string& basePath) const
         }
         if (!packed)
         {
-            Logger::Error("AtlasBaker: atlas '" + groupName + "' (" + std::to_string(sources.size()) +
+            Logger::Error("TextureAtlasBaker: atlas '" + groupName + "' (" + std::to_string(sources.size()) +
                           " members) cannot fit inside " + std::to_string(kDefaultMaxAtlasDim) +
                           "px square. Split the group or shrink the source art.");
             return false;
@@ -165,7 +165,7 @@ bool AtlasBaker::Run(AssetCatalog& catalog, const std::string& basePath) const
         const fs::path atlasOut = atlasOutDir / (groupName + ".png");
         if (stbi_write_png(atlasOut.string().c_str(), dim, dim, 4, canvas.data(), dim * 4) == 0)
         {
-            Logger::Error("AtlasBaker: failed to write atlas PNG " + atlasOut.string());
+            Logger::Error("TextureAtlasBaker: failed to write atlas PNG " + atlasOut.string());
             return false;
         }
 
@@ -193,7 +193,7 @@ bool AtlasBaker::Run(AssetCatalog& catalog, const std::string& basePath) const
         atlasEntry.fullPath = atlasFullPath;
         catalog.InsertOrReplace(std::move(atlasEntry));
 
-        Logger::Info("AtlasBaker: packed atlas '" + groupName + "' (" + std::to_string(sources.size()) + " members, " +
+        Logger::Info("TextureAtlasBaker: packed atlas '" + groupName + "' (" + std::to_string(sources.size()) + " members, " +
                      std::to_string(dim) + "x" + std::to_string(dim) + ") -> " + atlasOut.string());
     }
 

@@ -6,7 +6,7 @@ Files:  stb_image.h, stb_image_write.h, stb_image_resize2.h, stb_rect_pack.h, LI
 
 Used by:
   - scripts/octarine-icon-tool  (host-only resize + .ico encoder)
-  - src/AssetManager/AtlasBaker (bake-time texture atlas packing —
+  - src/AssetManager/TextureAtlasBaker (bake-time texture atlas packing —
     stb_image + stb_image_write + stb_rect_pack; only compiled into the
     engine binary so the bake step has them, never invoked at runtime
     outside `-m bake`).

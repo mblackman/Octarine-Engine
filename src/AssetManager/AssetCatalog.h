@@ -43,7 +43,7 @@ struct CatalogEntry
     std::optional<ScaleMode> scaleMode;
     std::optional<std::string> atlas; // sidecar `meta.atlas = <group>` (raw group name)
     bool noAtlas{false};              // sidecar `meta.no_atlas = true` (escape hatch, see AssetMetadata.h)
-    // Resolved atlas membership — populated by AtlasBaker after the scan. When set, this entry
+    // Resolved atlas membership — populated by TextureAtlasBaker after the scan. When set, this entry
     // is rendered as a slice of `atlasId`'s texture instead of its own. Both fields move
     // through asset_manifest.lua so shipped builds skip the bake.
     std::optional<std::string> atlasId; // catalog id of the packed atlas texture (e.g. "__atlas_main")
@@ -98,7 +98,7 @@ public:
     [[nodiscard]] std::size_t Size() const { return entries_.size(); }
     void Clear() { entries_.clear(); }
 
-    // Bake-time mutation surface. AtlasBaker uses these to record packed-atlas membership and to
+    // Bake-time mutation surface. TextureAtlasBaker uses these to record packed-atlas membership and to
     // splice in the new atlas entries themselves. Not for runtime use.
     void InsertOrReplace(CatalogEntry entry);
     void SetAtlasMembership(const std::string& memberId, std::string atlasId, SDL_FRect atlasSlice);
