@@ -162,14 +162,20 @@ jobs:
   lint:
     name: lint (clang-format)
     runs-on: ubuntu-latest
+    env:
+      # Pinned for reproducibility. clang-format output differs between major versions, so a floating
+      # `apt install clang-format` (Ubuntu runner default) drifts from contributors' local versions and
+      # churns formatting. The pip wheel is the same binary on every platform. Bump here AND re-run the
+      # `format` target tree-wide when upgrading. Match locally: pipx install clang-format==<this version>
+      CLANG_FORMAT_VERSION: 18.1.8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install clang-format
-        run: sudo apt-get update && sudo apt-get install -y clang-format
+      - name: Install pinned clang-format
+        run: pipx install "clang-format==${CLANG_FORMAT_VERSION}"
 
       - name: clang-format changed files
         shell: bash
@@ -184,6 +190,6 @@ jobs:
           fi
           printf 'checking:\n%s\n' "$(printf '  %s\n' "${files[@]}")"
           if ! clang-format --dry-run --Werror -style=file "${files[@]}"; then
-            echo "::error::clang-format violations. Fix locally with: cmake --build build/editor-release --target format"
+            echo "::error::clang-format violations. Fix with pinned clang-format ${CLANG_FORMAT_VERSION}: cmake --build build/editor-release --target format"
             exit 1
           fi
