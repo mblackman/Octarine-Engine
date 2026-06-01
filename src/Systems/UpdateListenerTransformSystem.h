@@ -29,27 +29,27 @@ class UpdateListenerTransformSystem {
 
     bool found = false;
     int listenerCount = 0;
-    query_->ForEach([&](const Entity entity, const GlobalTransformComponent& transform,
-                        const AudioListenerComponent& listener) {
-      ++listenerCount;
-      if (found) return;
-      cache.entity = entity;
-      cache.position = transform.position;
-      cache.velocity = registry->HasComponent<RigidBodyComponent>(entity)
-                           ? registry->GetComponent<RigidBodyComponent>(entity).velocity
-                           : glm::vec2(0.0f, 0.0f);
-      // 2D top-down basis. When camera rotation lands later, derive forward/right from
-      // the camera's world rotation here so the spatial math stays decoupled from any
-      // listener-entity rotation (the "Listener Dilemma" decoupling).
-      cache.forward = glm::vec2(0.0f, 1.0f);
-      cache.right = glm::vec2(1.0f, 0.0f);
-      cache.maxDistance = listener.maxDistance;
-      cache.rolloff = listener.rolloff;
-      cache.dopplerFactor = listener.dopplerFactor;
-      cache.speedOfSound = listener.speedOfSound;
-      cache.valid = true;
-      found = true;
-    });
+    query_->ForEach(
+        [&](const Entity entity, const GlobalTransformComponent& transform, const AudioListenerComponent& listener) {
+          ++listenerCount;
+          if (found) return;
+          cache.entity = entity;
+          cache.position = transform.position;
+          cache.velocity = registry->HasComponent<RigidBodyComponent>(entity)
+                               ? registry->GetComponent<RigidBodyComponent>(entity).velocity
+                               : glm::vec2(0.0f, 0.0f);
+          // 2D top-down basis. When camera rotation lands later, derive forward/right from
+          // the camera's world rotation here so the spatial math stays decoupled from any
+          // listener-entity rotation (the "Listener Dilemma" decoupling).
+          cache.forward = glm::vec2(0.0f, 1.0f);
+          cache.right = glm::vec2(1.0f, 0.0f);
+          cache.maxDistance = listener.maxDistance;
+          cache.rolloff = listener.rolloff;
+          cache.dopplerFactor = listener.dopplerFactor;
+          cache.speedOfSound = listener.speedOfSound;
+          cache.valid = true;
+          found = true;
+        });
 
     if (listenerCount > 1 && !warnedMultipleListeners_) {
       Logger::Warn("UpdateListenerTransformSystem: " + std::to_string(listenerCount) +

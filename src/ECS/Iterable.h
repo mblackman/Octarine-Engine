@@ -76,9 +76,7 @@ template <typename... TComponents>
 class ContextImpl final : public AnyContext {
  public:
   ContextImpl(Registry* registry, const float dt)
-      : registry_(registry),
-        dt_(dt),
-        ids_{registry->Component<Internal::unwrap_opt_t<TComponents>>().GetId()...} {}
+      : registry_(registry), dt_(dt), ids_{registry->Component<Internal::unwrap_opt_t<TComponents>>().GetId()...} {}
 
   void Update(const Entity entity, std::tuple<Internal::resolve_yield_t<TComponents>...> components) {
     entity_ = entity;

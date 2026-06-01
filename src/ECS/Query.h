@@ -150,12 +150,13 @@ class ComponentQuery final : public Query {
   void RebuildSorted() {
     sorted_type_.clear();
     // Only components NOT wrapped in Opt<T> drive matching.
-    ([&] {
-      if constexpr (!Internal::is_optional_v<TComponents>) {
-        sorted_type_.push_back(registry_->Component<Internal::unwrap_opt_t<TComponents>>().GetId());
-      }
-    }(),
-     ...);
+    (
+        [&] {
+          if constexpr (!Internal::is_optional_v<TComponents>) {
+            sorted_type_.push_back(registry_->Component<Internal::unwrap_opt_t<TComponents>>().GetId());
+          }
+        }(),
+        ...);
 
     for (const ComponentID id : extra_required_) {
       if (std::ranges::find(sorted_type_, id) == sorted_type_.end()) {
@@ -170,8 +171,8 @@ class ComponentQuery final : public Query {
     // yet optional-aware.
     return Iterable(
         [&] {
-          return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.begin(),
-                                                                                      registry_, registry_->DeltaTime()));
+          return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(
+              archetype_query_.begin(), registry_, registry_->DeltaTime()));
         },
         [&] {
           return AnyIterator(std::make_unique<Internal::IteratorImpl<TComponents...>>(archetype_query_.end(), registry_,

@@ -6,24 +6,21 @@
 #include "Lua/Bindings/LuaBinding.h"
 
 template <>
-struct LuaBinding<UIButtonComponent>
-{
-    static constexpr const char* kLuaKey = "ui_button";
-    static constexpr const char* kUsertypeName = "ui_button_component";
+struct LuaBinding<UIButtonComponent> {
+  static constexpr const char* kLuaKey = "ui_button";
+  static constexpr const char* kUsertypeName = "ui_button_component";
 
-    static UIButtonComponent fromLua(const sol::object& data)
-    {
-        const auto t = data.as<sol::table>();
-        using namespace LuaComponentHelpers;
-        const bool isActive = SafeGetOptionalValue<bool>(t, "is_active", true);
-        const bool isFixed = SafeGetOptionalValue<bool>(t, "is_fixed", true);
-        const sol::protected_function clickFn = SafeGetProtectedFunction(t, "on_click");
-        return UIButtonComponent(isActive, isFixed, t, clickFn);
-    }
+  static UIButtonComponent fromLua(const sol::object& data) {
+    const auto t = data.as<sol::table>();
+    using namespace LuaComponentHelpers;
+    const bool isActive = SafeGetOptionalValue<bool>(t, "is_active", true);
+    const bool isFixed = SafeGetOptionalValue<bool>(t, "is_fixed", true);
+    const sol::protected_function clickFn = SafeGetProtectedFunction(t, "on_click");
+    return UIButtonComponent(isActive, isFixed, t, clickFn);
+  }
 
-    static void bindUsertype(sol::state& lua)
-    {
-        lua.new_usertype<UIButtonComponent>(kUsertypeName, "is_active", &UIButtonComponent::isActive, "is_fixed",
-                                            &UIButtonComponent::isFixed);
-    }
+  static void bindUsertype(sol::state& lua) {
+    lua.new_usertype<UIButtonComponent>(kUsertypeName, "is_active", &UIButtonComponent::isActive, "is_fixed",
+                                        &UIButtonComponent::isFixed);
+  }
 };

@@ -19,24 +19,23 @@
 #include "Lua/Bindings/TextLabelComponentLuaBinding.h"
 #include "Lua/Bindings/UIButtonComponentLuaBinding.h"
 
-void RegisterAllLuaBindings()
-{
-    LuaComponentRegistry::clear();
-    LuaComponentRegistry::registerComponent<RigidBodyComponent>();
-    LuaComponentRegistry::registerComponent<SpriteComponent>();
-    LuaComponentRegistry::registerComponent<SquarePrimitiveComponent>();
-    LuaComponentRegistry::registerComponent<AnimationComponent>();
-    LuaComponentRegistry::registerComponent<BoxColliderComponent>();
-    LuaComponentRegistry::registerComponent<HealthComponent>();
-    LuaComponentRegistry::registerComponent<ProjectileEmitterComponent>();
-    LuaComponentRegistry::registerComponent<CameraFollowComponent>();
-    LuaComponentRegistry::registerComponent<ScriptComponent>();
-    LuaComponentRegistry::registerComponent<UIButtonComponent>();
-    LuaComponentRegistry::registerComponent<TextLabelComponent>();
-    LuaComponentRegistry::registerComponent<AudioSourceComponent>();
-    LuaComponentRegistry::registerComponent<AudioListenerComponent>();
-    LuaComponentRegistry::registerComponent<NameComponent>();
-    LuaComponentRegistry::registerComponent<ScaleComponent>();
-    LuaComponentRegistry::registerComponent<PositionComponent>();
-    LuaComponentRegistry::registerComponent<RotationComponent>();
+void RegisterAllLuaBindings() {
+  LuaComponentRegistry::clear();
+  LuaComponentRegistry::registerComponent<RigidBodyComponent>();
+  LuaComponentRegistry::registerComponent<SpriteComponent>();
+  LuaComponentRegistry::registerComponent<SquarePrimitiveComponent>();
+  LuaComponentRegistry::registerComponent<AnimationComponent>();
+  LuaComponentRegistry::registerComponent<BoxColliderComponent>();
+  LuaComponentRegistry::registerComponent<HealthComponent>();
+  LuaComponentRegistry::registerComponent<ProjectileEmitterComponent>();
+  LuaComponentRegistry::registerComponent<CameraFollowComponent>();
+  LuaComponentRegistry::registerComponent<ScriptComponent>();
+  LuaComponentRegistry::registerComponent<UIButtonComponent>();
+  LuaComponentRegistry::registerComponent<TextLabelComponent>();
+  LuaComponentRegistry::registerComponent<AudioSourceComponent>();
+  LuaComponentRegistry::registerComponent<AudioListenerComponent>();
+  LuaComponentRegistry::registerComponent<NameComponent>();
+  LuaComponentRegistry::registerComponent<ScaleComponent>();
+  LuaComponentRegistry::registerComponent<PositionComponent>();
+  LuaComponentRegistry::registerComponent<RotationComponent>();
 }

@@ -94,10 +94,7 @@ class GameConfig {
   bool SetValue(const std::unordered_map<std::string, std::string>& config, const std::string& key,
                 void (GameConfig::*setter)(bool), const bool required = false) {
     return SetValue<bool>(
-        config, key, setter,
-        [](const std::string& s) {
-          return s == "true" || s == "1" || s == "yes" || s == "on";
-        },
+        config, key, setter, [](const std::string& s) { return s == "true" || s == "1" || s == "yes" || s == "on"; },
         required);
   }
 

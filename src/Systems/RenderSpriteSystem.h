@@ -56,8 +56,8 @@ class RenderSpriteSystem {
 
   void operator()(Entity entity, const GlobalTransformComponent& transform, const SpriteComponent& sprite) const {
     const bool isOutsideCamera = IsRenderableOutsideViewport(
-        transform.position.x, transform.position.y, sprite.width * transform.scale.x,
-        sprite.height * transform.scale.y, sprite.isFixed, camera_, windowWidth_, windowHeight_);
+        transform.position.x, transform.position.y, sprite.width * transform.scale.x, sprite.height * transform.scale.y,
+        sprite.isFixed, camera_, windowWidth_, windowHeight_);
 
     if (isOutsideCamera) {
       PROFILE_COUNTER_INC(culledCounter_);

@@ -15,8 +15,7 @@ struct ScriptComponent {
 
   explicit ScriptComponent(sol::table t_scriptTable = sol::lua_nil,
                            sol::protected_function t_updateFunction = sol::lua_nil,
-                           sol::protected_function t_onDebugGUIFunction = sol::lua_nil,
-                           std::string t_sourcePath = {})
+                           sol::protected_function t_onDebugGUIFunction = sol::lua_nil, std::string t_sourcePath = {})
       : scriptTable(std::move(t_scriptTable)),
         updateFunction(std::move(t_updateFunction)),
         onDebugGUIFunction(std::move(t_onDebugGUIFunction)),

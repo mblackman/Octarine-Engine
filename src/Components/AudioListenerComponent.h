@@ -17,10 +17,7 @@ struct AudioListenerComponent {
   AudioListenerComponent() = default;
   explicit AudioListenerComponent(float t_maxDistance, float t_rolloff = 1.0f, float t_dopplerFactor = 1.0f,
                                   float t_speedOfSound = 343.0f)
-      : maxDistance(t_maxDistance),
-        rolloff(t_rolloff),
-        dopplerFactor(t_dopplerFactor),
-        speedOfSound(t_speedOfSound) {}
+      : maxDistance(t_maxDistance), rolloff(t_rolloff), dopplerFactor(t_dopplerFactor), speedOfSound(t_speedOfSound) {}
 };
 
 // Singleton cache populated each frame by UpdateListenerTransformSystem and read by

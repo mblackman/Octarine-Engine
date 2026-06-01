@@ -1,7 +1,6 @@
 #pragma once
 
 #include <sol/sol.hpp>
-
 #include <string>
 #include <unordered_set>
 #include <vector>

@@ -3,9 +3,9 @@
 #include <spdlog/logger.h>
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
-#include <mutex>
 
 class Logger {
   static std::shared_ptr<spdlog::logger> lua_logger_;

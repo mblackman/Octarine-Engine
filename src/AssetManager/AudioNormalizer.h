@@ -16,14 +16,14 @@
 // doesn't yet vendor. A future PR can add stb_vorbis + minimp3 to widen the matrix.
 class AudioNormalizer {
  public:
-    // Read `srcPath`, measure integrated loudness, apply the gain needed to land at
-    // `targetLufs`, write the result to `dstPath`. Returns false on unsupported format, I/O error,
-    // or a signal too quiet to measure (everything below -70 LUFS absolute gate). On false the
-    // caller should fall through to shipping the original.
-    static bool NormalizeWav(const std::string& srcPath, const std::string& dstPath, double targetLufs = -16.0);
+  // Read `srcPath`, measure integrated loudness, apply the gain needed to land at
+  // `targetLufs`, write the result to `dstPath`. Returns false on unsupported format, I/O error,
+  // or a signal too quiet to measure (everything below -70 LUFS absolute gate). On false the
+  // caller should fall through to shipping the original.
+  static bool NormalizeWav(const std::string& srcPath, const std::string& dstPath, double targetLufs = -16.0);
 
-    // Pure measurement — no file write. Returns the integrated loudness in LUFS, or NaN when the
-    // signal is entirely below the -70 LUFS absolute gate. Exposed so the test can verify the
-    // post-normalize loudness lands at the target without re-implementing the analyzer.
-    static double MeasureWavLufs(const std::string& wavPath);
+  // Pure measurement — no file write. Returns the integrated loudness in LUFS, or NaN when the
+  // signal is entirely below the -70 LUFS absolute gate. Exposed so the test can verify the
+  // post-normalize loudness lands at the target without re-implementing the analyzer.
+  static double MeasureWavLufs(const std::string& wavPath);
 };

@@ -86,9 +86,7 @@ class RenderDebugGUISystem {
 
     ImFont* font = io.Fonts->AddFontFromMemoryTTF(
         const_cast<unsigned char*>(octarine::editor::fonts::kRobotoMediumData),
-        static_cast<int>(octarine::editor::fonts::kRobotoMediumSize),
-        fontConfig.SizePixels,
-        &fontConfig);
+        static_cast<int>(octarine::editor::fonts::kRobotoMediumSize), fontConfig.SizePixels, &fontConfig);
     if (font == nullptr) {
       // Fallback so the editor still boots if the embedded load fails for any reason.
       io.FontDefault = io.Fonts->AddFontDefault();

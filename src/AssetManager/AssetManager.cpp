@@ -78,8 +78,8 @@ bool AssetManager::Acquire(const std::string &assetId, SDL_Renderer *renderer, M
   // walks the catalog atlas_id -> textures_[atlas_id] on lookup.
   if (entry->type == AssetType::Texture && entry->atlasId.has_value()) {
     if (!Acquire(*entry->atlasId, renderer, mixer)) {
-      Logger::Error("AssetManager::Acquire: failed to acquire atlas '" + *entry->atlasId +
-                    "' for member '" + assetId + "'");
+      Logger::Error("AssetManager::Acquire: failed to acquire atlas '" + *entry->atlasId + "' for member '" + assetId +
+                    "'");
       return false;
     }
     refcounts_[assetId] = 1;
@@ -99,8 +99,8 @@ bool AssetManager::LoadFromCatalog(const CatalogEntry &entry, const std::string 
       // Per-asset scale mode from the catalog overrides the project default applied in AddTexture.
       if (entry.scaleMode.has_value()) {
         if (SDL_Texture *texture = textures_.contains(assetId) ? textures_.at(assetId) : nullptr) {
-          SDL_SetTextureScaleMode(
-              texture, *entry.scaleMode == ScaleMode::Linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
+          SDL_SetTextureScaleMode(texture,
+                                  *entry.scaleMode == ScaleMode::Linear ? SDL_SCALEMODE_LINEAR : SDL_SCALEMODE_NEAREST);
         }
       }
       return textures_.contains(assetId);
@@ -286,10 +286,8 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
   // <basePath>/atlases/<asset_id>.atlas.{png,lua}; presence is the opt-in. SDL_IOFromFile is used
   // for the existence check so the probe transparently resolves through a shipped pak too.
   if (base_path_.empty()) return;
-  const std::filesystem::path atlasPng =
-      std::filesystem::path(base_path_) / "atlases" / (assetId + ".atlas.png");
-  const std::filesystem::path atlasLua =
-      std::filesystem::path(base_path_) / "atlases" / (assetId + ".atlas.lua");
+  const std::filesystem::path atlasPng = std::filesystem::path(base_path_) / "atlases" / (assetId + ".atlas.png");
+  const std::filesystem::path atlasLua = std::filesystem::path(base_path_) / "atlases" / (assetId + ".atlas.lua");
   SDL_IOStream *probe = SDL_IOFromFile(atlasPng.string().c_str(), "rb");
   if (probe == nullptr) return;
   SDL_CloseIO(probe);

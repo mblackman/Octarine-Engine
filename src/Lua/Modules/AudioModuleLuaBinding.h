@@ -2,12 +2,9 @@
 
 #include "Lua/Modules/LuaModule.h"
 
-struct AudioModule
-{
-};
+struct AudioModule {};
 
 template <>
-struct LuaModuleBinding<AudioModule>
-{
-    static void install(sol::state& lua, Game& game);
+struct LuaModuleBinding<AudioModule> {
+  static void install(sol::state& lua, Game& game);
 };
