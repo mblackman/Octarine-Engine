@@ -17,6 +17,19 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Compiler cache: dramatically speeds the edit -> rebuild -> verify loop agents run constantly.
+# Honors an already-set CMAKE_CXX_COMPILER_LAUNCHER. Prefers ccache; falls back to sccache (better
+# MSVC support). Opt out with -DOCTARINE_USE_CCACHE=OFF.
+option(OCTARINE_USE_CCACHE "Use ccache/sccache as the compiler launcher when available" ON)
+if (OCTARINE_USE_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
+    find_program(OCTARINE_COMPILER_CACHE NAMES ccache sccache)
+    if (OCTARINE_COMPILER_CACHE)
+        set(CMAKE_CXX_COMPILER_LAUNCHER "${OCTARINE_COMPILER_CACHE}")
+        set(CMAKE_C_COMPILER_LAUNCHER "${OCTARINE_COMPILER_CACHE}")
+        message(STATUS "Octarine: compiler cache ENABLED (${OCTARINE_COMPILER_CACHE})")
+    endif ()
+endif ()
+
 # LTO for non-Debug builds. Combines with --gc-sections to drop unreferenced
 # code/data from statically linked third-party libs (SDL3, Lua, etc).
 include(CheckIPOSupported)
@@ -388,6 +401,48 @@ if (OCTARINE_ENABLE_TESTS)
         target_compile_options(OctarineProjectIniTest PRIVATE /W4 /permissive- /MP /EHsc)
     endif ()
     add_test(NAME ProjectIniTest COMMAND OctarineProjectIniTest)
+
+    # Headless ECS / system tests. These link only the ECS core (Registry + Logger) — no SDL,
+    # window, or Lua — exactly like the benchmark target, so they build and run fast. One helper
+    # per target keeps the registrations DRY.
+    function(octarine_add_core_test exe_name ctest_name source)
+        add_executable(${exe_name} ${source}
+                src/ECS/Registry.cpp
+                src/General/Logger.cpp)
+        set_target_properties(${exe_name} PROPERTIES
+                CXX_STANDARD 20
+                CXX_STANDARD_REQUIRED ON
+                CXX_EXTENSIONS OFF)
+        target_compile_definitions(${exe_name} PRIVATE GLM_FORCE_INTRINSICS)
+        target_include_directories(${exe_name} PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/src
+                ${CMAKE_CURRENT_SOURCE_DIR}/libs)
+        target_link_libraries(${exe_name} PRIVATE glm::glm spdlog::spdlog Threads::Threads)
+        if (MSVC)
+            target_compile_options(${exe_name} PRIVATE /W4 /permissive- /MP /EHsc /bigobj)
+        endif ()
+        add_test(NAME ${ctest_name} COMMAND ${exe_name})
+    endfunction()
+
+    octarine_add_core_test(OctarineEcsTest EcsRegistryTest tests/EcsRegistryTest.cpp)
+    octarine_add_core_test(OctarineEcsHierarchyTest EcsHierarchyTest tests/EcsHierarchyTest.cpp)
+    octarine_add_core_test(OctarineSystemLogicTest SystemLogicTest tests/SystemLogicTest.cpp)
+
+    # EventBus is header-only; it needs Logger for its construction log lines, nothing else.
+    add_executable(OctarineEventBusTest
+            src/General/Logger.cpp
+            tests/EventBusTest.cpp)
+    set_target_properties(OctarineEventBusTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF)
+    target_include_directories(OctarineEventBusTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    target_link_libraries(OctarineEventBusTest PRIVATE spdlog::spdlog)
+    if (MSVC)
+        target_compile_options(OctarineEventBusTest PRIVATE /W4 /permissive- /MP /EHsc)
+    endif ()
+    add_test(NAME EventBusTest COMMAND OctarineEventBusTest)
 
     message(STATUS "Octarine: Tests ENABLED")
 endif ()

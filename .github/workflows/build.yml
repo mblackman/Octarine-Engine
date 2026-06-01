@@ -121,3 +121,36 @@ jobs:
           name: OctarineEngine-${{ matrix.platform }}-${{ matrix.preset }}
           path: build/${{ matrix.preset }}/bin/release
           if-no-files-found: error
+
+  # Style gate. Lightweight (no vcpkg/SDL): formats only the files a PR actually changed, so the
+  # large pre-existing tree never blocks on legacy style. Auto-fixable via the CMake `format` target.
+  # clang-tidy is enforced locally by scripts/octarine-verify.sh --full for now; CI tidy lands in a
+  # later staged tightening once a cached configured build is wired up.
+  lint:
+    name: lint (clang-format)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install clang-format
+        run: sudo apt-get update && sudo apt-get install -y clang-format
+
+      - name: clang-format changed files
+        shell: bash
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          if [ -z "$base" ]; then base="$(git rev-parse HEAD~1 2>/dev/null || git rev-parse HEAD)"; fi
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- 'src/*' 'tests/*' \
+            | grep -E '\.(cpp|h|hpp)$' || true)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No changed C/C++ sources to format-check."
+            exit 0
+          fi
+          printf 'checking:\n%s\n' "$(printf '  %s\n' "${files[@]}")"
+          if ! clang-format --dry-run --Werror -style=file "${files[@]}"; then
+            echo "::error::clang-format violations. Fix locally with: cmake --build build/editor-release --target format"
+            exit 1
+          fi
