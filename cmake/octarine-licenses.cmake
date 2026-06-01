@@ -68,6 +68,25 @@ function(_octarine_licenses_required_from_vcpkg OUT_VAR ENGINE_ROOT)
         math(EXPR _last "${_dep_count} - 1")
         foreach (_i RANGE 0 ${_last})
             string(JSON _name GET "${_manifest_json}" dependencies ${_i} name)
+            # Honor an optional `platform` qualifier: a dep gated to another OS (e.g. the
+            # linux-only `dbus`, pulled in for SDL3's IBus backend) isn't installed in this
+            # triplet, so requiring its license here would falsely fail packaging on macOS /
+            # Windows. Only the qualifiers this manifest actually uses are evaluated; an
+            # unrecognized expression falls through as "required" (the safe default).
+            string(JSON _plat ERROR_VARIABLE _plat_err GET "${_manifest_json}" dependencies ${_i} platform)
+            if (NOT _plat_err AND _plat)
+                set(_plat_matches TRUE)
+                if (_plat STREQUAL "linux" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Linux")
+                    set(_plat_matches FALSE)
+                elseif (_plat STREQUAL "windows" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
+                    set(_plat_matches FALSE)
+                elseif (_plat STREQUAL "osx" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+                    set(_plat_matches FALSE)
+                endif ()
+                if (NOT _plat_matches)
+                    continue()
+                endif ()
+            endif ()
             string(TOLOWER "${_name}" _name_lc)
             list(APPEND _required "${_name_lc}")
         endforeach ()
