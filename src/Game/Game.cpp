@@ -51,8 +51,10 @@
 #include "Lua/LuaApiManifest.h"
 #include "Lua/LuaEntityLoader.h"
 #include "Lua/Modules/RegisterAllModules.h"
+#include "Components/AudioActiveTag.h"
 #include "Components/AudioListenerComponent.h"
 #include "Systems/AnimationSystem.h"
+#include "Systems/AudioCullingSystem.h"
 #include "Systems/AudioSystem.h"
 #include "Systems/CameraFollowSystem.h"
 #include "Systems/CollisionSystem.h"
@@ -854,6 +856,12 @@ void Game::Setup()
     // is the one that creates the AudioSinkComponent's MIX_Track that these mutate.
     registry_->Set<AudioListenerCache>(AudioListenerCache{});
     registry_->RegisterBulkSystem<GlobalTransformComponent>(UpdateListenerTransformSystem());
+    // Phase 5 culling: pre-register the AudioActiveTag so its component entity exists
+    // before any HasTag query fires (Tag<T>() is lazy otherwise). CullingSystem then gates
+    // SpatialAudioSystem / DopplerSystem implicitly — culled emitters lose their sink, and
+    // both downstream systems short-circuit on the missing sink.
+    registry_->Tag<AudioActiveTag>();
+    registry_->RegisterSystem<GlobalTransformComponent, AudioSourceComponent>(AudioCullingSystem());
     registry_->RegisterSystem<GlobalTransformComponent, AudioSourceComponent, AudioSinkComponent>(SpatialAudioSystem());
     // Doppler is independent of spatial: governs frequency ratio via MIX_SetTrackFrequencyRatio.
     // Requires RigidBodyComponent on the emitter (no body → no velocity → no shift).

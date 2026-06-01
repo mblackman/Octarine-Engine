@@ -6,6 +6,7 @@
 #include <string>
 
 #include "../AssetManager/AssetManager.h"
+#include "../Components/AudioActiveTag.h"
 #include "../Game/GameConfig.h"
 #include "../General/Logger.h"
 
@@ -160,7 +161,18 @@ void AudioSystem::operator()(Entity entity, AudioSourceComponent& source)
 
     if (!registry_->HasComponent<AudioSinkComponent>(entity))
     {
-        if (!source.playOnSpawn) return;
+        // Spatial sources are gated by AudioCullingSystem's AudioActiveTag: an out-of-range
+        // emitter has no tag, so even a resume-pending source waits here until it comes back
+        // into the listener radius. Without this gate the resume + cull pair would oscillate
+        // (AudioSystem re-spawns the sink, CullingSystem culls it again next frame).
+        if (source.spatial && !registry_->HasTag<AudioActiveTag>(entity)) return;
+
+        // Resume-from-cull is a second valid play trigger alongside playOnSpawn: when
+        // AudioCullingSystem halts a culled emitter it stashes the frame offset on the
+        // source and removes the sink, so the entity arrives here with a >=0 offset
+        // waiting to be consumed.
+        const bool resumingFromCull = source.playbackOffsetFrames >= 0;
+        if (!source.playOnSpawn && !resumingFromCull) return;
 
         auto& assetManager = registry_->Get<AssetManager>();
         MIX_Audio* clip = assetManager.GetAudioClip(source.clipId);
@@ -199,6 +211,14 @@ void AudioSystem::operator()(Entity entity, AudioSourceComponent& source)
         {
             Logger::Warn("MIX_PlayTrack failed for " + source.clipId + ": " + std::string(SDL_GetError()));
             return;
+        }
+
+        // Seek AFTER play: SDL_mixer accepts position changes on a playing track and the
+        // seek-then-play path skips an extra paused-state transition.
+        if (resumingFromCull)
+        {
+            MIX_SetTrackPlaybackPosition(acquired.track, source.playbackOffsetFrames);
+            source.playbackOffsetFrames = -1;
         }
         cmd_buffer_.AddComponent<AudioSinkComponent>(entity, AudioSinkComponent(acquired.track, acquired.generation));
         return;
