@@ -32,6 +32,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          # Full history so the advisory clang-tidy step can diff against the PR base.
+          fetch-depth: 0
 
       - name: Checkout example project (bake smoke)
         if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
@@ -57,6 +59,17 @@ jobs:
         uses: ilammy/msvc-dev-cmd@v1
         with:
           arch: x64
+
+      # Compiler cache for the engine build (vcpkg deps are already binary-cached separately).
+      # ccache integrates cleanly with GCC/Clang on Linux/macOS; the CMakeLists auto-detects it on
+      # PATH and wires CMAKE_CXX_COMPILER_LAUNCHER. Skipped on Windows/MSVC where ccache support is
+      # weaker. Cache is keyed per platform+preset.
+      - name: Setup ccache
+        if: matrix.platform != 'windows'
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: ${{ matrix.platform }}-${{ matrix.preset }}
+          max-size: 500M
 
       - name: Configure CMake
         shell: bash
@@ -103,6 +116,26 @@ jobs:
             modules.json
           if-no-files-found: error
 
+      # Advisory clang-tidy over the PR's changed .cpp files, using the compile_commands.json the
+      # editor-release build just emitted. Non-blocking (continue-on-error) for now: the 81-check
+      # ruleset against a codebase with no tidy history surfaces pre-existing debt, so gating hard
+      # would block unrelated PRs. Staged to changed-lines-as-errors later once the set is clean.
+      - name: clang-tidy (advisory)
+        if: matrix.platform == 'linux' && matrix.preset == 'editor-release' && github.event_name == 'pull_request'
+        continue-on-error: true
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang-tidy
+          base="${{ github.event.pull_request.base.sha }}"
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- 'src/*' 'tests/*' \
+            | grep -E '\.cpp$' || true)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No changed .cpp files to lint."
+            exit 0
+          fi
+          printf 'tidying:\n%s\n' "$(printf '  %s\n' "${files[@]}")"
+          clang-tidy -p build/${{ matrix.preset }} "${files[@]}"
+
       - name: Stage runtime DLLs (Windows)
         if: matrix.platform == 'windows'
         shell: pwsh
@@ -124,8 +157,8 @@ jobs:
 
   # Style gate. Lightweight (no vcpkg/SDL): formats only the files a PR actually changed, so the
   # large pre-existing tree never blocks on legacy style. Auto-fixable via the CMake `format` target.
-  # clang-tidy is enforced locally by scripts/octarine-verify.sh --full for now; CI tidy lands in a
-  # later staged tightening once a cached configured build is wired up.
+  # clang-tidy runs as an advisory (non-blocking) step in the editor-release build leg above, which
+  # has the compile_commands.json it needs; it will be tightened to blocking on changed lines later.
   lint:
     name: lint (clang-format)
     runs-on: ubuntu-latest
