@@ -73,22 +73,28 @@ add a one-line comment justifying it.
 
 ### Naming
 
-The configured rules:
+Match the surrounding code:
 
 | Surface | Convention |
 |---------|-----------|
 | Class / struct / enum | `PascalCase` (`HealthComponent`) |
-| Member variable | `camelCase` (`currentHealth`) — trailing underscore for class members where it improves readability |
+| Function / method | `PascalCase` (`CreateEntity`, `Update`) |
+| Member variable | `snake_case_` (trailing underscore, e.g. `delta_time_`) |
+| Local / parameter | `camelCase` (`deltaTime`, `entityLocation`) |
 | Constant / `constexpr` | `kPascalCase` (`kDefaultWindowWidth`) |
 
-Match the surrounding code if you find a stylistic disagreement; raise it in
-a separate PR rather than reformatting on the side of a feature.
+(`.clang-tidy` configures `FunctionCase: camelBack`, but the codebase uses `PascalCase` for functions
+and nothing enforces that key — follow the code.) If you find a genuine stylistic disagreement, raise
+it in a separate PR rather than reformatting on the side of a feature.
 
-### `SRC_FILES` rule
+### Registering a new `.cpp`
 
-Every new `.cpp` under `src/` must be appended to `SRC_FILES` in
-`CMakeLists.txt`. Header-only additions don't need this. Forgetting it means
-your file compiles locally but fails CI on the editor-debug leg.
+The engine is split into per-layer static libraries, so every new `.cpp` under
+`src/` must be added to the matching layer's source list in `src/CMakeLists.txt`
+(`octarine_core`, `_assets`, `_renderer`, `_lua`, `_systems`, `_editor`, or
+`_engine`) — not the root `CMakeLists.txt`. Header-only additions don't need
+this. Forgetting it means your file compiles locally but fails CI on the
+editor-release leg.
 
 ### File organization
 
@@ -99,7 +105,7 @@ your file compiles locally but fails CI on the editor-debug leg.
 - New Lua component bindings: `src/Lua/Bindings/<X>ComponentLuaBinding.h` +
   one line in `RegisterAllBindings.cpp`.
 - New Lua module (free-function globals): `src/Lua/Modules/<X>ModuleLuaBinding.{h,cpp}` +
-  one line in `RegisterAllModules.cpp` + append `.cpp` to `SRC_FILES`.
+  one line in `RegisterAllModules.cpp` + add the `.cpp` to the `octarine_lua` list in `src/CMakeLists.txt`.
 - New events: `src/Events/<X>Event.h`. Emit via `EmitEvent<X>`; subscribe in
   the consuming system's `Init`.
 
