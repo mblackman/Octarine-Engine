@@ -1,10 +1,11 @@
 #pragma once
 
-#include <SDL3/SDL.h>
-
+#include <cstdint>
 #include <glm/glm.hpp>
 #include <sol/sol.hpp>
 #include <string>
+
+#include "General/Color.h"
 
 namespace LuaComponentHelpers
 {
@@ -21,10 +22,11 @@ namespace LuaComponentHelpers
         return result;
     }
 
-    inline SDL_Color SafeGetColor(const sol::table& parentTable, const std::string& key, Uint8 defaultR = 0,
-                                  Uint8 defaultG = 0, Uint8 defaultB = 0, Uint8 defaultA = 0)
+    inline octarine::Color SafeGetColor(const sol::table& parentTable, const std::string& key,
+                                        std::uint8_t defaultR = 0, std::uint8_t defaultG = 0,
+                                        std::uint8_t defaultB = 0, std::uint8_t defaultA = 0)
     {
-        SDL_Color result = {defaultR, defaultG, defaultB, defaultA};
+        octarine::Color result{defaultR, defaultG, defaultB, defaultA};
         if (sol::optional<sol::table> vecTableOpt = parentTable[key]; vecTableOpt && vecTableOpt.value().valid())
         {
             sol::table& vecTable = vecTableOpt.value();

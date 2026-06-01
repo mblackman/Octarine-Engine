@@ -86,129 +86,6 @@ if (OCTARINE_WITH_IMGUI)
 endif ()
 find_package(Threads REQUIRED)
 
-# Source files
-set(SRC_FILES
-        src/Main.cpp
-        src/AssetManager/AssetManager.cpp
-        src/AssetManager/AssetCatalog.cpp
-        src/AssetManager/AssetPak.cpp
-        src/AssetManager/AtlasBaker.cpp
-        src/AssetManager/AudioNormalizer.cpp
-        src/AssetManager/GlyphAtlas.cpp
-        src/AssetManager/TextureAtlasBaker.cpp
-        src/AssetManager/SceneAssetScanner.cpp
-        src/ECS/Registry.cpp
-        src/Game/Game.cpp
-        src/Game/GameConfig.cpp
-        src/General/Logger.cpp
-        src/Lua/Bindings/RegisterAllBindings.cpp
-        src/Lua/LuaApiManifest.cpp
-        src/Lua/Modules/RegisterAllModules.cpp
-        src/Lua/Modules/AssetsModuleLuaBinding.cpp
-        src/Lua/Modules/AudioModuleLuaBinding.cpp
-        src/Lua/Modules/EntityModuleLuaBinding.cpp
-        src/Lua/Modules/GameModuleLuaBinding.cpp
-        src/Lua/Modules/IoModuleLuaBinding.cpp
-        src/Lua/Modules/LogModuleLuaBinding.cpp
-        src/Lua/Modules/SceneModuleLuaBinding.cpp
-        src/Lua/HotReload/ScriptWatcher.cpp
-        src/Lua/HotReload/ScriptHotReload.cpp
-        src/Process/Process.cpp
-        src/Project/ProjectIni.cpp
-        src/Renderer/Renderer.cpp
-        src/Systems/AudioSystem.cpp
-)
-
-if (OCTARINE_WITH_IMGUI)
-    list(APPEND SRC_FILES src/Systems/RenderDebugGUISystem.cpp)
-endif ()
-
-if (OCTARINE_WITH_EDITOR)
-    list(APPEND SRC_FILES src/Editor/EditorPersistence.cpp)
-    list(APPEND SRC_FILES src/Editor/EditorLayoutPresets.cpp)
-    list(APPEND SRC_FILES src/Editor/Inspectors/RegisterAllInspectors.cpp)
-    list(APPEND SRC_FILES src/Editor/PlayerLauncher.cpp)
-    list(APPEND SRC_FILES src/Editor/ExportBuilder.cpp)
-
-    # SecretStore: per-platform credential storage. One backend per host so the OS-native API
-    # links cleanly without cross-platform shims. Linux backend is a no-op stub the editor UI
-    # falls back to env-var-only mode on.
-    if (WIN32)
-        list(APPEND SRC_FILES src/Secrets/SecretStore_Windows.cpp)
-    elseif (APPLE)
-        list(APPEND SRC_FILES src/Secrets/SecretStore_macOS.cpp)
-    else ()
-        list(APPEND SRC_FILES src/Secrets/SecretStore_Linux.cpp)
-    endif ()
-endif ()
-
-if (UNIX AND NOT APPLE AND NOT ANDROID)
-    list(APPEND SRC_FILES src/General/SDL3_Linux_Stubs.cpp)
-endif ()
-
-# Every TU that pulls in a vendored stb single-header (texture atlas bake, glyph atlas bake,
-# JPEG-style image read) trips the engine's `-Wconversion -Wsign-conversion -Werror` baseline at
-# stb's int -> short_int / int -> size_t casts. AudioNormalizer's BS.1770 math hits the same kind
-# of size_t -> double narrowing the project wants flagged elsewhere but cannot here. Disable
-# warnings just for these files so the strict baseline keeps protecting the rest of the engine.
-set_source_files_properties(
-        src/AssetManager/TextureAtlasBaker.cpp
-        src/AssetManager/AtlasBaker.cpp
-        src/AssetManager/GlyphAtlas.cpp
-        src/AssetManager/AudioNormalizer.cpp
-        PROPERTIES COMPILE_OPTIONS "$<IF:$<CXX_COMPILER_ID:MSVC>,/w,-w>")
-
-# Add packaged libs
-if (OCTARINE_WITH_IMGUI)
-    add_subdirectory(libs/sol2_ImGui_Bindings)
-endif ()
-
-# Create the engine target. On Android, SDLActivity dlopens libmain.so and jumps to SDL_main, so the
-# engine must be that shared lib (OUTPUT_NAME main → libmain.so). Everywhere else it is a plain
-# executable. The desktop non-editor build renames its OUTPUT to `OctarineEngine-player` so the
-# editor (also `OctarineEngine`) and the player can coexist in the same dev tree — the editor
-# resolves the player binary by that fixed name when handling the Run Player toolbar action.
-if (ANDROID)
-    add_library(${PROJECT_NAME} SHARED ${SRC_FILES})
-    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME main)
-else ()
-    add_executable(${PROJECT_NAME} ${SRC_FILES})
-    # Dev player presets (player-debug / player-profile / player-release): rename the binary so
-    # `OctarineEngine` (editor) and `OctarineEngine-player` coexist in the same tree. Shipping
-    # configs (ship-release / packaging) keep the canonical `OctarineEngine` name — downstream
-    # packaging owns the shipped artifact's filename.
-    if (NOT OCTARINE_WITH_EDITOR AND NOT OCTARINE_SHIPPED)
-        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME OctarineEngine-player)
-    endif ()
-endif ()
-
-# Set target properties
-set_target_properties(${PROJECT_NAME} PROPERTIES
-        CXX_STANDARD 20
-        CXX_STANDARD_REQUIRED ON
-        CXX_EXTENSIONS OFF
-)
-
-if (OCTARINE_ENABLE_PROFILING)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_PROFILING)
-    message(STATUS "Octarine: Profiling ENABLED")
-endif ()
-
-if (OCTARINE_WITH_IMGUI)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_WITH_IMGUI)
-    message(STATUS "Octarine: ImGui Debug UI ENABLED")
-endif ()
-
-if (OCTARINE_WITH_EDITOR)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_WITH_EDITOR)
-    message(STATUS "Octarine: Editor ENABLED")
-endif ()
-
-if (OCTARINE_SHIPPED)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_SHIPPED)
-    message(STATUS "Octarine: SHIPPED build — asset catalog loads baked manifest (no scan)")
-endif ()
-
 # Engine log level (compile-time default baked into the binary). Policy when OCTARINE_LOG_LEVEL is
 # empty (the default):
 #   SHIPPED build  → warn   (production: errors + warnings only)
@@ -228,57 +105,105 @@ if (NOT OCTARINE_LOG_LEVEL)
 else ()
     set(_octarine_default_log_level "${OCTARINE_LOG_LEVEL}")
 endif ()
-target_compile_definitions(${PROJECT_NAME} PRIVATE OCTARINE_LOG_LEVEL_NAME="${_octarine_default_log_level}")
 message(STATUS "Octarine: default log level = ${_octarine_default_log_level}")
 
-# Include directories
-target_include_directories(${PROJECT_NAME}
-        PRIVATE
-        ${CMAKE_CURRENT_SOURCE_DIR}/src
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs
-        # libs/stb is its own include root so src/AssetManager/TextureAtlasBaker.cpp can write
-        # `#include "stb_image.h"` — matches the pattern in scripts/octarine-icon-tool/.
-        ${CMAKE_CURRENT_SOURCE_DIR}/libs/stb
-        ${LUA_INCLUDE_DIR}
-)
-
-# Link libraries
-target_link_libraries(${PROJECT_NAME}
-        PRIVATE
-        glm::glm
-        SDL3::SDL3
-        SDL3_ttf::SDL3_ttf
-        $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
-        $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
-        ${LUA_LIBRARIES}
-        spdlog::spdlog
-        sol2::sol2
-        Threads::Threads
-)
-
+if (OCTARINE_ENABLE_PROFILING)
+    message(STATUS "Octarine: Profiling ENABLED")
+endif ()
 if (OCTARINE_WITH_IMGUI)
-    target_link_libraries(${PROJECT_NAME}
-            PRIVATE
-            imgui::imgui
-            sol2_ImGui_Bindings
-    )
+    message(STATUS "Octarine: ImGui Debug UI ENABLED")
+endif ()
+if (OCTARINE_WITH_EDITOR)
+    message(STATUS "Octarine: Editor ENABLED")
+endif ()
+if (OCTARINE_SHIPPED)
+    message(STATUS "Octarine: SHIPPED build — asset catalog loads baked manifest (no scan)")
 endif ()
 
-# Android NDK system libs. SDL3 (statically linked from the arm64-android vcpkg triplet) pulls in the
-# native logging and platform APIs; the linker needs them named explicitly for the shared lib.
+# Vendored ImGui binding lib lives outside src/ so it stays untouched by the layer split. Only
+# meaningful when ImGui is on; pulled in PUBLIC by octarine_editor.
+if (OCTARINE_WITH_IMGUI)
+    add_subdirectory(libs/sol2_ImGui_Bindings)
+endif ()
+
+# Standard compile flags + warnings, packaged as one helper so every static lib + the exe pick up
+# the same set. Replaces the per-target blocks that used to live in this file.
+include(cmake/octarine_library.cmake)
+
+# Per-layer STATIC libraries: octarine_{core,assets,renderer,lua,systems,editor,engine}.
+# octarine_engine is the top-level coordinator that depends on every other lib transitively.
+add_subdirectory(src)
+
+# Final OctarineEngine artifact. On Android, SDLActivity dlopens libmain.so and jumps to SDL_main,
+# so the entry point must live in a shared lib (OUTPUT_NAME main → libmain.so). Everywhere else
+# it is a plain executable.
+#
+# Desktop player presets (player-debug / player-profile / player-release) rename the binary to
+# `OctarineEngine-player` so it can coexist with the editor (also `OctarineEngine`) in the same
+# dev tree — the editor's Run Player toolbar action resolves the player by that fixed name.
+# Shipping configs (ship-release / packaging) keep the canonical `OctarineEngine` name —
+# downstream packaging owns the shipped artifact's filename.
+if (ANDROID)
+    add_library(${PROJECT_NAME} SHARED src/Main.cpp)
+    set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME main)
+else ()
+    add_executable(${PROJECT_NAME} src/Main.cpp)
+    if (NOT OCTARINE_WITH_EDITOR AND NOT OCTARINE_SHIPPED)
+        set_target_properties(${PROJECT_NAME} PROPERTIES OUTPUT_NAME OctarineEngine-player)
+    endif ()
+endif ()
+
+set_target_properties(${PROJECT_NAME} PROPERTIES
+        CXX_STANDARD 20
+        CXX_STANDARD_REQUIRED ON
+        CXX_EXTENSIONS OFF
+)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE octarine_engine)
+
+# Android NDK system libs — linker needs them named explicitly when SDL3 is statically linked from
+# the arm64-android vcpkg triplet.
 if (ANDROID)
     target_link_libraries(${PROJECT_NAME} PRIVATE android log)
 endif ()
 
-# SecretStore backend libs. Crypt32 ships DPAPI's CryptProtectData/CryptUnprotectData on Windows;
-# Security.framework ships SecItem* on macOS. Linux backend is a stub and needs no link.
-if (OCTARINE_WITH_EDITOR)
-    if (WIN32)
-        target_link_libraries(${PROJECT_NAME} PRIVATE crypt32)
-    elseif (APPLE)
-        target_link_libraries(${PROJECT_NAME} PRIVATE
-                "-framework CoreFoundation"
-                "-framework Security")
+# Compile flags for the final exe match the per-lib helper's settings (the exe TU is just
+# Main.cpp but consistency makes the link-line warnings predictable).
+if (MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+            /W4 /permissive- /MP /bigobj
+            /w14242 /w14244 /w14254 /w44456 /w44457 /w44458 /w44459 /wd4201 /wd5321
+    )
+    target_compile_options(${PROJECT_NAME} PRIVATE
+            $<IF:$<CONFIG:Debug>,,-WX /arch:AVX2>
+    )
+else ()
+    target_compile_options(${PROJECT_NAME} PRIVATE
+            -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Wfatal-errors
+    )
+    if (ANDROID)
+        target_compile_options(${PROJECT_NAME} PRIVATE
+                $<IF:$<CONFIG:Debug>,,-ffast-math>
+        )
+    else ()
+        target_compile_options(${PROJECT_NAME} PRIVATE
+                $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
+        )
+    endif ()
+    target_compile_options(${PROJECT_NAME} PRIVATE
+            $<$<NOT:$<CONFIG:Debug>>:-ffunction-sections>
+            $<$<NOT:$<CONFIG:Debug>>:-fdata-sections>
+    )
+    if (APPLE)
+        target_link_options(${PROJECT_NAME} PRIVATE
+                $<$<NOT:$<CONFIG:Debug>>:-Wl,-dead_strip>
+                $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-Wl,-x>
+        )
+    else ()
+        target_link_options(${PROJECT_NAME} PRIVATE
+                $<$<NOT:$<CONFIG:Debug>>:-Wl,--gc-sections>
+                $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-s>
+        )
     endif ()
 endif ()
 
@@ -299,68 +224,6 @@ if (OCTARINE_PACKAGE_PROJECT AND NOT ANDROID)
     octarine_package(${PROJECT_NAME} PROJECT "${OCTARINE_PACKAGE_PROJECT}" NAME "${PROJECT_NAME}")
 endif ()
 
-# Compiler-specific flags - Treat warnings as errors in prod builds
-if (MSVC)
-    target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_INTRINSICS)
-    target_compile_options(${PROJECT_NAME} PRIVATE
-            /W4
-            /permissive-
-            /MP
-            /bigobj
-            /w14242 # Conversion: possible loss of data
-            /w14244 # Conversion: possible loss of data (float/double/int)
-            /w14254 # Conversion: possible loss of data (larger to smaller type)
-            /w44456 # Shadowing: declaration hides previous local declaration
-            /w44457 # Shadowing: declaration hides function parameter
-            /w44458 # Shadowing: declaration hides class member
-            /w44459 # Shadowing: declaration hides global declaration
-            /wd4201 # nonstandard extension used: nameless struct/union (common in GLM)
-            /wd5321 # nonstandard extension used: encoding UTF-8 character (common in sol2 headers)
-    )
-    target_compile_options(${PROJECT_NAME} PRIVATE
-            $<IF:$<CONFIG:Debug>,,-WX /arch:AVX2>
-    )
-else ()
-    target_compile_definitions(${PROJECT_NAME} PRIVATE GLM_FORCE_INTRINSICS)
-    target_compile_options(${PROJECT_NAME} PRIVATE
-            -Wall
-            -Wextra
-            -Wpedantic
-            -Wshadow
-            -Wconversion
-            -Wfatal-errors
-    )
-    if (ANDROID)
-        # Cross-compile: -march=native would target the build host, not the device. -Werror is dropped
-        # because device-arch-specific warnings can't be observed/cleared from a desktop checkout.
-        target_compile_options(${PROJECT_NAME} PRIVATE
-                $<IF:$<CONFIG:Debug>,,-ffast-math>
-        )
-    else ()
-        target_compile_options(${PROJECT_NAME} PRIVATE
-                $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
-        )
-    endif ()
-    # Size reduction for non-Debug builds:
-    # - function/data sections + --gc-sections drops unreferenced symbols from static libs
-    # - -s strips the linked binary
-    target_compile_options(${PROJECT_NAME} PRIVATE
-            $<$<NOT:$<CONFIG:Debug>>:-ffunction-sections>
-            $<$<NOT:$<CONFIG:Debug>>:-fdata-sections>
-    )
-    if (APPLE)
-        target_link_options(${PROJECT_NAME} PRIVATE
-                $<$<NOT:$<CONFIG:Debug>>:-Wl,-dead_strip>
-                $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-Wl,-x>
-        )
-    else ()
-        target_link_options(${PROJECT_NAME} PRIVATE
-                $<$<NOT:$<CONFIG:Debug>>:-Wl,--gc-sections>
-                $<$<OR:$<CONFIG:Release>,$<CONFIG:MinSizeRel>>:-s>
-        )
-    endif ()
-endif ()
-
 # -----------------------------------------------------------------------------
 # Linting & Formatting Integration
 # -----------------------------------------------------------------------------
@@ -370,9 +233,13 @@ option(OCTARINE_ENABLE_LINTING "Run clang-tidy during compilation" OFF)
 if (OCTARINE_ENABLE_LINTING)
     find_program(CLANG_TIDY_EXE NAMES "clang-tidy")
     if (CLANG_TIDY_EXE)
-        set_target_properties(${PROJECT_NAME} PROPERTIES
-                CXX_CLANG_TIDY "${CLANG_TIDY_EXE}"
-        )
+        # Apply to every internal lib + the exe so the whole engine TU set gets linted.
+        foreach (_tgt octarine_core octarine_assets octarine_renderer octarine_lua octarine_systems
+                octarine_editor octarine_engine ${PROJECT_NAME})
+            if (TARGET ${_tgt})
+                set_target_properties(${_tgt} PROPERTIES CXX_CLANG_TIDY "${CLANG_TIDY_EXE}")
+            endif ()
+        endforeach ()
         message(STATUS "Octarine: clang-tidy ENABLED (reading from .clang-tidy)")
     else ()
         message(WARNING "Octarine: Linting enabled but clang-tidy executable not found!")
@@ -406,37 +273,28 @@ option(OCTARINE_ENABLE_BENCHMARKS "Build benchmarks" OFF)
 if (OCTARINE_ENABLE_BENCHMARKS)
     find_package(benchmark CONFIG REQUIRED)
 
-    set(BENCHMARK_SRC_FILES
-            tests/benchmarks/EntityPoolBenchmark.cpp
-            src/ECS/Registry.cpp
-            src/General/Logger.cpp
-    )
-
-    add_executable(OctarineBenchmarks ${BENCHMARK_SRC_FILES})
-
-    # Always compile in Release mode flags for the benchmark where possible,
-    # though it will inherit CMake build type
-    target_include_directories(OctarineBenchmarks PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${CMAKE_CURRENT_SOURCE_DIR}/libs
+    # ECS + Logger are the only engine TUs the benchmark exercises; link octarine_core to pull
+    # their .obj plus the standard compile flags. Skips the rest of the engine — bench runs are
+    # microbenchmarks, not full-engine timings.
+    add_executable(OctarineBenchmarks tests/benchmarks/EntityPoolBenchmark.cpp)
+    set_target_properties(OctarineBenchmarks PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
     )
 
     target_link_libraries(OctarineBenchmarks PRIVATE
+            octarine_core
             benchmark::benchmark
             benchmark::benchmark_main
-            glm::glm
-            spdlog::spdlog
-            Threads::Threads
     )
 
     if (MSVC)
-        target_compile_definitions(OctarineBenchmarks PRIVATE GLM_FORCE_INTRINSICS)
         target_compile_options(OctarineBenchmarks PRIVATE /W4 /permissive- /MP /bigobj)
         target_compile_options(OctarineBenchmarks PRIVATE
                 $<IF:$<CONFIG:Debug>,,-WX /arch:AVX2>
         )
     else ()
-        target_compile_definitions(OctarineBenchmarks PRIVATE GLM_FORCE_INTRINSICS)
         target_compile_options(OctarineBenchmarks PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(OctarineBenchmarks PRIVATE
                 $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
@@ -455,121 +313,41 @@ option(OCTARINE_ENABLE_TESTS "Build engine tests" OFF)
 if (OCTARINE_ENABLE_TESTS)
     enable_testing()
 
-    # The Lua API smoke test links the whole engine (it constructs a Game) minus the real
-    # entry point, then replays Game::Setup's binding sequence headless.
-    set(TEST_SRC_FILES ${SRC_FILES})
-    list(REMOVE_ITEM TEST_SRC_FILES src/Main.cpp)
-    list(APPEND TEST_SRC_FILES tests/LuaApiSmokeTest.cpp)
-
-    add_executable(OctarineLuaApiTest ${TEST_SRC_FILES})
-
+    # Both engine-spanning tests link octarine_engine — same surface the real exe sees, minus
+    # Main.cpp. The test .cpp constructs a Game directly and replays its Setup sequence headless.
+    add_executable(OctarineLuaApiTest tests/LuaApiSmokeTest.cpp)
     set_target_properties(OctarineLuaApiTest PROPERTIES
             CXX_STANDARD 20
             CXX_STANDARD_REQUIRED ON
             CXX_EXTENSIONS OFF
     )
-
-    # Mirror the main target's feature defines so the shared sources compile identically.
-    target_compile_definitions(OctarineLuaApiTest PRIVATE GLM_FORCE_INTRINSICS)
     # Smoke test writes its EmmyLua stub + JSON indexes here so repo-root copies stay in sync with
     # the live bindings; CI diffs all three against tracked files to fail on drift.
     target_compile_definitions(OctarineLuaApiTest PRIVATE
             LUA_API_SMOKE_OUTPUT="${CMAKE_CURRENT_SOURCE_DIR}/lua_api.smoke.lua"
             LUA_API_COMPONENTS_OUTPUT="${CMAKE_CURRENT_SOURCE_DIR}/components.json"
             LUA_API_MODULES_OUTPUT="${CMAKE_CURRENT_SOURCE_DIR}/modules.json")
-    if (OCTARINE_WITH_IMGUI)
-        target_compile_definitions(OctarineLuaApiTest PRIVATE OCTARINE_WITH_IMGUI)
-    endif ()
-    if (OCTARINE_WITH_EDITOR)
-        target_compile_definitions(OctarineLuaApiTest PRIVATE OCTARINE_WITH_EDITOR)
-    endif ()
-    if (OCTARINE_ENABLE_PROFILING)
-        target_compile_definitions(OctarineLuaApiTest PRIVATE OCTARINE_PROFILING)
-    endif ()
-
-    target_include_directories(OctarineLuaApiTest PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${CMAKE_CURRENT_SOURCE_DIR}/libs
-            ${CMAKE_CURRENT_SOURCE_DIR}/libs/stb
-            ${LUA_INCLUDE_DIR}
-    )
-
-    target_link_libraries(OctarineLuaApiTest PRIVATE
-            glm::glm
-            SDL3::SDL3
-            SDL3_ttf::SDL3_ttf
-            $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
-            $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
-            ${LUA_LIBRARIES}
-            spdlog::spdlog
-            sol2::sol2
-            Threads::Threads
-    )
-    if (OCTARINE_WITH_IMGUI)
-        target_link_libraries(OctarineLuaApiTest PRIVATE imgui::imgui sol2_ImGui_Bindings)
-    endif ()
-
-    # /bigobj: sol2 + the aggregated engine TU exceed MSVC's default section limit.
+    target_link_libraries(OctarineLuaApiTest PRIVATE octarine_engine)
     if (MSVC)
         target_compile_options(OctarineLuaApiTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
     endif ()
-
     add_test(NAME LuaApiSmokeTest COMMAND OctarineLuaApiTest)
 
-    # Asset pipeline checks (metadata defaults + catalog build). Links the full engine minus the
-    # real entry point, matching the smoke test, so the tests can exercise AssetCatalog::Build
-    # (which needs GameConfig / sol2) without re-plumbing the target.
-    set(ASSET_TEST_SRC_FILES ${SRC_FILES})
-    list(REMOVE_ITEM ASSET_TEST_SRC_FILES src/Main.cpp)
-    list(APPEND ASSET_TEST_SRC_FILES tests/AssetPipelineTest.cpp)
-
-    add_executable(OctarineAssetPipelineTest ${ASSET_TEST_SRC_FILES})
-
+    # Asset pipeline checks (metadata defaults + catalog build). Same target shape — links the
+    # full engine via octarine_engine so AssetCatalog::Build (which needs GameConfig / sol2) is
+    # reachable without re-plumbing sources.
+    add_executable(OctarineAssetPipelineTest tests/AssetPipelineTest.cpp)
     set_target_properties(OctarineAssetPipelineTest PROPERTIES
             CXX_STANDARD 20
             CXX_STANDARD_REQUIRED ON
             CXX_EXTENSIONS OFF
     )
-
-    target_compile_definitions(OctarineAssetPipelineTest PRIVATE GLM_FORCE_INTRINSICS)
     target_compile_definitions(OctarineAssetPipelineTest PRIVATE
             ASSET_TEST_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/assets")
-    if (OCTARINE_WITH_IMGUI)
-        target_compile_definitions(OctarineAssetPipelineTest PRIVATE OCTARINE_WITH_IMGUI)
-    endif ()
-    if (OCTARINE_WITH_EDITOR)
-        target_compile_definitions(OctarineAssetPipelineTest PRIVATE OCTARINE_WITH_EDITOR)
-    endif ()
-    if (OCTARINE_ENABLE_PROFILING)
-        target_compile_definitions(OctarineAssetPipelineTest PRIVATE OCTARINE_PROFILING)
-    endif ()
-
-    target_include_directories(OctarineAssetPipelineTest PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src
-            ${CMAKE_CURRENT_SOURCE_DIR}/libs
-            ${CMAKE_CURRENT_SOURCE_DIR}/libs/stb
-            ${LUA_INCLUDE_DIR}
-    )
-
-    target_link_libraries(OctarineAssetPipelineTest PRIVATE
-            glm::glm
-            SDL3::SDL3
-            SDL3_ttf::SDL3_ttf
-            $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
-            $<IF:$<TARGET_EXISTS:SDL3_image::SDL3_image-shared>,SDL3_image::SDL3_image-shared,SDL3_image::SDL3_image-static>
-            ${LUA_LIBRARIES}
-            spdlog::spdlog
-            sol2::sol2
-            Threads::Threads
-    )
-    if (OCTARINE_WITH_IMGUI)
-        target_link_libraries(OctarineAssetPipelineTest PRIVATE imgui::imgui sol2_ImGui_Bindings)
-    endif ()
-
+    target_link_libraries(OctarineAssetPipelineTest PRIVATE octarine_engine)
     if (MSVC)
         target_compile_options(OctarineAssetPipelineTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
     endif ()
-
     add_test(NAME AssetPipelineTest COMMAND OctarineAssetPipelineTest)
 
     # Process-spawn smoke test: standalone — no engine sources required, just the wrapper.
@@ -578,23 +356,18 @@ if (OCTARINE_ENABLE_TESTS)
             src/Process/Process.cpp
             tests/ProcessTest.cpp
     )
-
     set_target_properties(OctarineProcessTest PROPERTIES
             CXX_STANDARD 20
             CXX_STANDARD_REQUIRED ON
             CXX_EXTENSIONS OFF
     )
-
     target_include_directories(OctarineProcessTest PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
-
     target_link_libraries(OctarineProcessTest PRIVATE Threads::Threads)
-
     if (MSVC)
         target_compile_options(OctarineProcessTest PRIVATE /W4 /permissive- /MP /EHsc)
     endif ()
-
     add_test(NAME ProcessTest COMMAND OctarineProcessTest)
 
     # project.ini reader smoke test: standalone — no engine sources required. Validates parse +
@@ -603,21 +376,17 @@ if (OCTARINE_ENABLE_TESTS)
             src/Project/ProjectIni.cpp
             tests/ProjectIniTest.cpp
     )
-
     set_target_properties(OctarineProjectIniTest PROPERTIES
             CXX_STANDARD 20
             CXX_STANDARD_REQUIRED ON
             CXX_EXTENSIONS OFF
     )
-
     target_include_directories(OctarineProjectIniTest PRIVATE
             ${CMAKE_CURRENT_SOURCE_DIR}/src
     )
-
     if (MSVC)
         target_compile_options(OctarineProjectIniTest PRIVATE /W4 /permissive- /MP /EHsc)
     endif ()
-
     add_test(NAME ProjectIniTest COMMAND OctarineProjectIniTest)
 
     message(STATUS "Octarine: Tests ENABLED")

@@ -31,8 +31,14 @@
       "name": "sdl3",
       "features": [
         "x11",
-        "wayland"
+        "wayland",
+        "dbus"
       ],
+      "platform": "linux"
+    },
+    {
+      "name": "dbus",
+      "default-features": false,
       "platform": "linux"
     },
     {

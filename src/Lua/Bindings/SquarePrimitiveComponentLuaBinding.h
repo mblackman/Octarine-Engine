@@ -19,7 +19,7 @@ struct LuaBinding<SquarePrimitiveComponent>
         const auto layer = SafeGetOptionalValue<int>(t, "layer", 1);
         const auto width = SafeGetOptionalValue<float>(t, "width", 0.0f);
         const auto height = SafeGetOptionalValue<float>(t, "height", 0.0f);
-        const SDL_Color color = SafeGetColor(t, "color");
+        const octarine::Color color = SafeGetColor(t, "color");
         const auto fixed = SafeGetOptionalValue<bool>(t, "fixed", false);
         return SquarePrimitiveComponent(position, layer, width, height, color, fixed);
     }

@@ -1,12 +1,11 @@
 #pragma once
 
-#include <SDL3/SDL.h>
-
 #include <atomic>
 
 #include "../Components/GlobalTransformComponent.h"
 #include "../Components/SquarePrimitiveComponent.h"
 #include "../General/PerfUtils.h"
+#include "../General/Rect.h"
 #include "../Renderer/RenderCulling.h"
 #include "../Renderer/RenderQueue.h"
 #include "Components/CameraComponents.h"
@@ -45,7 +44,7 @@ class RenderPrimitiveSystem {
 
     auto& cmd = renderQueue_->EmplaceSquare(static_cast<unsigned int>(square.layer), square.position.y);
     cmd.destRect = {x, y, square.width, square.height};
-    cmd.color = square.color;
+    cmd.color = SDL_Color{square.color.r, square.color.g, square.color.b, square.color.a};
     cmd.rotation = transform.rotation;
   }
 
@@ -53,7 +52,7 @@ class RenderPrimitiveSystem {
   RenderQueue* renderQueue_ = nullptr;
   float windowWidth_ = 0;
   float windowHeight_ = 0;
-  SDL_FRect camera_{};
+  octarine::Rect camera_{};
 #ifdef OCTARINE_PROFILING
   std::atomic<long long>* culledCounter_ = nullptr;
   std::atomic<long long>* emplacedCounter_ = nullptr;

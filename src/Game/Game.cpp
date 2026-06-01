@@ -21,6 +21,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 #include "../Renderer/RenderQueue.h"
 #include "../Renderer/Renderer.h"
+#include "../Renderer/SpriteRenderCache.h"
 #include "Components/BoxColliderComponent.h"
 #include "Components/CameraComponents.h"
 #include "Components/EntityMaskComponent.h"
@@ -40,17 +41,19 @@
 #include "ECS/Iterable.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
+#include "Engine/EngineBootstrap.h"
 #include "Events/MouseInputEvent.h"
 #include "Events/MouseWheelEvent.h"
 #include "GameConfig.h"
 #include "General/PerfUtils.h"
+#include "General/Rect.h"
+// InputSystemLuaBinding specializes LuaSystemBinding<InputSystem> — needed below where
+// LuaSystemRegistry::registerSystem(inputSystem) instantiates the lookup. Don't drop.
 #include "Lua/Bindings/InputSystemLuaBinding.h"
 #include "Lua/Bindings/LuaSystemRegistry.h"
-#include "Lua/Bindings/RegisterAllBindings.h"
 #include "Lua/HotReload/ScriptHotReload.h"
 #include "Lua/LuaApiManifest.h"
 #include "Lua/LuaEntityLoader.h"
-#include "Lua/Modules/RegisterAllModules.h"
 #include "Components/AudioActiveTag.h"
 #include "Components/AudioListenerComponent.h"
 #include "Systems/AnimationSystem.h"
@@ -61,11 +64,9 @@
 #include "Systems/DamageSystem.h"
 #include "Systems/DopplerSystem.h"
 #include "Systems/DrawColliderSystem.h"
-#include "Systems/EntityPoolSystem.h"
 #include "Systems/InputSystem.h"
 #include "Systems/ObstacleBounceSystem.h"
 #include "Systems/OffScreenDespawnSystem.h"
-#include "Systems/ProjectileEmitSystem.h"
 #include "Systems/ProjectileLifecycleSystem.h"
 #include "Systems/RenderPrimitiveSystem.h"
 #include "Systems/RenderSpriteSystem.h"
@@ -89,17 +90,14 @@
 #include "../Editor/EditorPersistence.h"
 #include "../Editor/ExportBuilder.h"
 #include "../Editor/PlayerLauncher.h"
-#include "../Editor/Inspectors/RegisterAllInspectors.h"
 #endif
-
-constexpr Uint8 GREY_COLOR = 24;
-constexpr Uint8 BLACK_COLOR = 0;
 
 namespace
 {
     // Read a file's bytes through SDL_IO so the same path resolves on desktop, inside an APK asset
     // root, or inside a .app bundle. Lua's stock fopen-based loader only sees a real filesystem and
-    // misses AAssetManager-backed entries on Android.
+    // misses AAssetManager-backed entries on Android. Used by LoadGame + LoadScene; the dofile
+    // override that exposes this to scripts lives in engine_bootstrap::InstallLuaLibraries.
     std::optional<std::string> ReadFileViaSDL(const std::string& path)
     {
         SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
@@ -118,47 +116,6 @@ namespace
         std::string out(static_cast<const char*>(data), size);
         SDL_free(data);
         return out;
-    }
-
-    // Raw Lua C function backing the engine's `dofile` override. Registered via lua_pushcfunction so
-    // sol2 doesn't post-process the return: we report (top_after - top_before) which Lua interprets
-    // as the number of return values from the chunk, preserving multi-return correctly.
-    int LuaDofileViaSDL(lua_State* L)
-    {
-        std::size_t plen = 0;
-        const char* p = luaL_checklstring(L, 1, &plen);
-        const std::string path(p, plen);
-
-        auto bytes = ReadFileViaSDL(path);
-        if (!bytes)
-        {
-            return luaL_error(L, "dofile: cannot open '%s'", path.c_str());
-        }
-
-        // Drop the path arg so chunk return values are the only ones above topBefore.
-        lua_settop(L, 0);
-        const int topBefore = lua_gettop(L);
-        const std::string chunkname = "@" + path;
-        if (luaL_loadbuffer(L, bytes->data(), bytes->size(), chunkname.c_str()) != 0)
-        {
-            return luaL_error(L, "dofile load '%s': %s", path.c_str(), lua_tostring(L, -1));
-        }
-        if (lua_pcall(L, 0, LUA_MULTRET, 0) != 0)
-        {
-            return luaL_error(L, "dofile run '%s': %s", path.c_str(), lua_tostring(L, -1));
-        }
-        return lua_gettop(L) - topBefore;
-    }
-
-    // Override Lua's `dofile` so chunks load through SDL_IO too. The example calls
-    // dofile(get_asset_path("scripts/lib/foo.lua")); on desktop that's an absolute path SDL_IO opens
-    // directly, on Android it's a relative path SDL_IO resolves against the APK asset root. The stock
-    // Lua loader would fall back to fopen and miss the APK on Android.
-    void InstallLuaFileLoaders(sol::state& lua)
-    {
-        lua_State* L = lua.lua_state();
-        lua_pushcfunction(L, &LuaDofileViaSDL);
-        lua_setglobal(L, "dofile");
     }
 } // namespace
 
@@ -336,12 +293,8 @@ bool Game::Initialize(const std::string& assetPath)
         return false;
     }
 
-    game_render_texture_ = SDL_CreateTexture(sdl_renderer_, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
-                                             gameConfig.windowWidth, gameConfig.windowHeight);
-
-    if (!game_render_texture_)
+    if (!renderer_->CreateScene(sdl_renderer_, gameConfig.windowWidth, gameConfig.windowHeight))
     {
-        Logger::Error("SDL_CreateTexture Error: " + std::string(SDL_GetError()));
         return false;
     }
 
@@ -413,10 +366,15 @@ bool Game::Initialize(const std::string& assetPath)
 #endif
 #endif
 
-    SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
-
-    registry_->Set<SDL_Renderer*>(sdl_renderer_);
-    registry_->Set<EventBus*>(event_bus_.get());
+    // Populate the engine-level resource bundle now that SDL is up. AssetManager + mixer are
+    // filled in by Setup once those exist; consumers read the same instance via
+    // Registry::Get<EngineContext>().
+    EngineContext ctx;
+    ctx.sdlWindow = window_;
+    ctx.sdlRenderer = sdl_renderer_;
+    ctx.eventBus = event_bus_.get();
+    ctx.config = &gameConfig;
+    registry_->Set<EngineContext>(ctx);
 
     s_is_running_ = true;
     return true;
@@ -450,10 +408,7 @@ void Game::Destroy()
 
     if (sdl_renderer_)
     {
-        if (game_render_texture_)
-        {
-            SDL_DestroyTexture(game_render_texture_);
-        }
+        renderer_->DestroyScene();
 #ifdef OCTARINE_WITH_IMGUI
         ImGui_ImplSDLRenderer3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
@@ -509,46 +464,30 @@ bool Game::RunBakeValidation(const std::string& assetPath)
         return false;
     }
 
-    // Singletons the startup script + its module globals touch at load time. This mirrors the
-    // pre-LoadGame prefix of Game::Setup but omits everything tied to a window/renderer/mixer
-    // (per-frame systems, audio, render queue producers) since the bake runs no frames.
-    const SDL_FRect camera(0, 0, static_cast<float>(gameConfig.windowWidth),
-                           static_cast<float>(gameConfig.windowHeight));
-    registry_->Set<RenderQueue>(RenderQueue());
-    registry_->Set<CameraComponent>(CameraComponent{camera});
-    registry_->Set<AssetManager>(AssetManager());
-    registry_->Set<ViewportInfo>(ViewportInfo{
-        0, 0, static_cast<float>(gameConfig.windowWidth),
-        static_cast<float>(gameConfig.windowHeight)
-    });
-    registry_->Set<SDL_Renderer*>(nullptr); // no GPU in bake; bake-mode asset globals skip it
-    registry_->Set<EventBus*>(event_bus_.get());
+    // Bake mode: no window/renderer/mixer. Set the engine context first with the bits that do
+    // exist; InstallCoreSingletons plumbs ctx.assets once it Sets the AssetManager.
+    EngineContext bakeCtx;
+    bakeCtx.eventBus = event_bus_.get();
+    bakeCtx.config = &gameConfig;
+    registry_->Set<EngineContext>(bakeCtx);
 
-    // EntityPoolManager before ProjectileEmitSystem::Init (Init calls RegisterPool against it),
-    // matching Setup's ordering so fire_projectile binds correctly during module install.
-    registry_->Set<EntityPoolManager>(EntityPoolManager());
-    auto& projectileEmitSystem = registry_->Set<ProjectileEmitSystem>(ProjectileEmitSystem());
-    projectileEmitSystem.Init(*registry_);
-
-    // InputSystem owns the `input.*` Lua surface the scene libs bind against (input_map.install,
-    // spawn.install_click_spawn). Set + subscribe before bindings install.
-    auto& inputSystem = registry_->Set<InputSystem>(InputSystem());
-    inputSystem.SubscribeToEvents(event_bus_, registry_.get());
-
-    RegisterAllLuaBindings();
-
+    // Shared bootstrap spine. withSpriteRenderCache=false — bake runs no frames so the render
+    // cache slot is unused.
+    engine_bootstrap::InstallCoreSingletons(*registry_, registry_->Get<EngineContext>(), gameConfig.windowWidth,
+                                            gameConfig.windowHeight, /*withSpriteRenderCache=*/false);
+    engine_bootstrap::InstallPoolAndProjectile(*registry_);
+    auto& inputSystem = engine_bootstrap::InstallInputSystem(*registry_, event_bus_);
+    engine_bootstrap::RegisterAllComponentBindings();
     LuaSystemRegistry::clear();
     LuaSystemRegistry::registerSystem(inputSystem);
-
-    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
-    InstallLuaFileLoaders(lua);
+    engine_bootstrap::InstallLuaLibraries(lua);
+    // Bake doesn't register ScriptSystem as a per-frame system (no frames). A stack instance
+    // is enough to install the primitive + component usertypes Lua scripts reference.
     ScriptSystem scriptSystem;
     scriptSystem.CreateLuaBindings(lua);
-    RegisterAllLuaModules(lua, *this);
+    engine_bootstrap::InstallLuaModules(lua, *this);
     LuaSystemRegistry::bindAll(lua);
-    lua["game_window_width"] = gameConfig.windowWidth;
-    lua["game_window_height"] = gameConfig.windowHeight;
-    lua["oct_startup_mode"] = startup_mode_;
+    engine_bootstrap::SetCommonLuaGlobals(lua, gameConfig, startup_mode_);
 
     auto& assetManager = registry_->Get<AssetManager>();
     assetManager.LoadGameConfig(gameConfig);
@@ -686,65 +625,29 @@ void Game::Run()
 void Game::Setup()
 {
     auto& gameConfig = registry_->Get<GameConfig>();
-    const SDL_FRect camera(0, 0, static_cast<float>(gameConfig.windowWidth),
-                           static_cast<float>(gameConfig.windowHeight));
 
-    registry_->Set<RenderQueue>(RenderQueue());
-    registry_->Set<CameraComponent>(CameraComponent{camera});
-    registry_->Set<AssetManager>(AssetManager());
-    registry_->Set<ViewportInfo>(ViewportInfo{
-        0, 0, static_cast<float>(gameConfig.windowWidth),
-        static_cast<float>(gameConfig.windowHeight)
-    });
+    // Shared bootstrap spine (see engine_bootstrap/EngineBootstrap.h). withSpriteRenderCache=true
+    // — the live game loop reads the cache from the parallel sprite-render pass.
+    engine_bootstrap::InstallCoreSingletons(*registry_, registry_->Get<EngineContext>(), gameConfig.windowWidth,
+                                            gameConfig.windowHeight, /*withSpriteRenderCache=*/true);
 
-    // Gameplay
+    // ScriptSystem is registered as a per-frame system (vs. Bake's stack instance) so its
+    // operator() runs each tick. CreateLuaBindings still happens below in the bootstrap spine.
     auto& scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
-    // InputSystem owned by the Registry so Lua bindings + event subscriptions outlive any single
-    // scene script reload. Must be Set before CreateLuaBindings so the `input` table is installed
-    // alongside ScriptSystem's globals.
-    auto& inputSystem = registry_->Set<InputSystem>(InputSystem());
-    inputSystem.SubscribeToEvents(event_bus_, registry_.get());
 
-    // Component bindings (LuaBinding<T> specializations) must be registered BEFORE
-    // ScriptSystem's CreateLuaBindings runs — usertypes + registry.has_/get_ are
-    // populated from LuaComponentRegistry at that point.
-    RegisterAllLuaBindings();
-
-#ifdef OCTARINE_WITH_EDITOR
-    // Editor inspector surface — declarative parallel to the Lua bindings.
-    RegisterAllComponentInspectors();
-#endif
-
-    // Systems that expose a Lua surface register here; bindAll installs them all once
-    // the sol::state has its libraries open.
+    auto& inputSystem = engine_bootstrap::InstallInputSystem(*registry_, event_bus_);
+    engine_bootstrap::RegisterAllComponentBindings();
     LuaSystemRegistry::clear();
     LuaSystemRegistry::registerSystem(inputSystem);
-
-    lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
-    // Re-route Lua file-loading through SDL_IO so dofile() reaches inside read-only bundles
-    // (APK/.app). Must run after open_libraries (which installs the stock dofile).
-    InstallLuaFileLoaders(lua);
+    engine_bootstrap::InstallLuaLibraries(lua);
     // Snapshot stdlib globals before binding so the API manifest can diff out everything the
     // engine adds. Cheap; the actual dump only fires when OCTARINE_DUMP_LUA_API is set.
     const auto preBindingGlobals = LuaApiManifest::SnapshotGlobals(lua);
-
-    // EntityPoolManager Set before ProjectileEmitSystem::Init — Init calls
-    // Get<EntityPoolManager>().RegisterPool<...>. Was Set later (after audio); moved up to
-    // satisfy the new init order.
-    registry_->Set<EntityPoolManager>(EntityPoolManager());
-
-    // ProjectileEmitSystem set + Init early so GameModule's fire_projectile can capture it from
-    // the Registry during RegisterAllLuaModules. Init only does RegisterPool<...> calls — safe
-    // to run before scene/system registration.
-    auto& projectileEmitSystem = registry_->Set<ProjectileEmitSystem>(ProjectileEmitSystem());
-    projectileEmitSystem.Init(*registry_);
-
+    engine_bootstrap::InstallPoolAndProjectile(*registry_);
     scriptSystem.CreateLuaBindings(lua);
-    RegisterAllLuaModules(lua, *this);
+    engine_bootstrap::InstallLuaModules(lua, *this);
     LuaSystemRegistry::bindAll(lua);
-    lua["game_window_width"] = gameConfig.windowWidth;
-    lua["game_window_height"] = gameConfig.windowHeight;
-    lua["oct_startup_mode"] = startup_mode_;
+    engine_bootstrap::SetCommonLuaGlobals(lua, gameConfig, startup_mode_);
 
     // Emit the EmmyLua API stub when requested (no-op otherwise). Runs once per Setup, after the
     // full surface — globals, modules, system tables — is installed.
@@ -825,6 +728,9 @@ void Game::Setup()
     {
         Logger::Error("AudioSystem failed to initialize; audio disabled this session.");
     }
+    // Mixer is owned by AudioSystem; publish it on the context so asset loads + the master-
+    // volume sync (in Game::Update) can reach it without going through the Registry's typed slot.
+    registry_->Get<EngineContext>().mixer = audioSystem.Mixer();
 
     if (gameConfig.HasLoadedConfig())
     {
@@ -967,10 +873,10 @@ void Game::Update(const float deltaTime)
     // Master volume + mute live at the mixer level so they apply to every track (including loops
     // already playing). Synced every frame — and outside the pause gate — so toggling mute reacts
     // immediately even while execution is paused.
-    if (auto* mixer = registry_->TryGet<MIX_Mixer*>())
+    if (auto* mixer = registry_->Get<EngineContext>().mixer)
     {
         const float masterGain = options.audioEnabled ? std::max(0.0F, options.masterVolume) : 0.0F;
-        MIX_SetMixerGain(*mixer, masterGain);
+        MIX_SetMixerGain(mixer, masterGain);
     }
 
     auto* inputSystem = registry_->TryGet<InputSystem>();
@@ -1018,9 +924,7 @@ void Game::Render([[maybe_unused]] const float deltaTime)
     PROFILE_COUNTER_SET("RenderQueue: Size", static_cast<long long>(renderQueue.Size()));
     PROFILE_COUNTER_SET("Entities: User", static_cast<long long>(registry_->GetUserEntityCount()));
 
-    SDL_SetRenderTarget(sdl_renderer_, game_render_texture_);
-    SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
-    SDL_RenderClear(sdl_renderer_);
+    renderer_->BeginScene(sdl_renderer_);
 
 #ifdef OCTARINE_PROFILING
     {
@@ -1029,11 +933,11 @@ void Game::Render([[maybe_unused]] const float deltaTime)
     }
     {
         PerfUtils::ScopedTimer drawTimer("Render: Draw");
-        renderer_->Render(renderQueue, sdl_renderer_);
+        renderer_->DrawQueue(renderQueue, sdl_renderer_);
     }
 #else
     renderQueue.Sort();
-    renderer_->Render(renderQueue, sdl_renderer_);
+    renderer_->DrawQueue(renderQueue, sdl_renderer_);
 #endif
 
     if (gameConfig.GetEngineOptions().drawColliders && collider_query_)
@@ -1043,9 +947,7 @@ void Game::Render([[maybe_unused]] const float deltaTime)
         collider_query_->ForEach(drawColliderSystem);
     }
 
-    SDL_SetRenderTarget(sdl_renderer_, nullptr);
-    SDL_SetRenderDrawColor(sdl_renderer_, BLACK_COLOR, BLACK_COLOR, BLACK_COLOR, Constants::kUint8Max);
-    SDL_RenderClear(sdl_renderer_);
+    renderer_->EndScene(sdl_renderer_);
 
     auto& options = gameConfig.GetEngineOptions();
     const bool editorSession = gameConfig.IsEditorMode() || !gameConfig.HasLoadedConfig();
@@ -1075,20 +977,20 @@ void Game::Render([[maybe_unused]] const float deltaTime)
         // and NOT showing debug overlays. In editor mode, the Scene window handles drawing this texture.
         if (!editorSession && !options.showDebugGUI)
         {
-            SDL_RenderTexture(sdl_renderer_, game_render_texture_, nullptr, nullptr);
+            renderer_->CompositeSceneToWindow(sdl_renderer_);
         }
 #ifdef OCTARINE_WITH_IMGUI
-        RenderDebugGUISystem::Render(this, sdl_renderer_, game_render_texture_, deltaTime);
+        RenderDebugGUISystem::Render(this, sdl_renderer_, renderer_->GetSceneTexture(), deltaTime);
 #endif
     }
 
 #ifdef OCTARINE_PROFILING
     {
         PerfUtils::ScopedTimer presentTimer("Render: Present");
-        SDL_RenderPresent(sdl_renderer_);
+        renderer_->Present(sdl_renderer_);
     }
 #else
-    SDL_RenderPresent(sdl_renderer_);
+    renderer_->Present(sdl_renderer_);
 #endif
     // Emit per-frame counters as COUNTER lines so headless bench runs can capture them
     // alongside TIMER lines. All systems for this frame have already written their values.
@@ -1203,7 +1105,7 @@ void Game::LoadScene(const std::string& scenePath)
             if (assets && assets->valid())
             {
                 auto& am = registry_->Get<AssetManager>();
-                auto* mixer = registry_->TryGet<MIX_Mixer*>();
+                auto* mixer = registry_->Get<EngineContext>().mixer;
                 int assetCount = 0;
                 for (auto& [key, value] : *assets)
                 {
@@ -1224,7 +1126,7 @@ void Game::LoadScene(const std::string& scenePath)
                         }
                         else if (type == "audio_clip")
                         {
-                            if (mixer) am.AddAudioClip(*mixer, id, file);
+                            if (mixer) am.AddAudioClip(mixer, id, file);
                         }
                         assetCount++;
                     }
@@ -1237,8 +1139,7 @@ void Game::LoadScene(const std::string& scenePath)
             // front before entities load.
             {
                 auto& am = registry_->Get<AssetManager>();
-                auto* mixerPtr = registry_->TryGet<MIX_Mixer*>();
-                MIX_Mixer* mixer = mixerPtr ? *mixerPtr : nullptr;
+                MIX_Mixer* mixer = registry_->Get<EngineContext>().mixer;
                 const std::vector<AssetReference> refs = SceneAssetScanner::CollectRefs(sceneTable);
 
                 if (const int failures = am.Validate(refs); failures > 0)
@@ -1349,6 +1250,12 @@ void Game::clearSceneEntities()
     if (auto* inputSystem = registry_->TryGet<InputSystem>())
     {
         inputSystem->ResetLuaState();
+    }
+    // Drop cached SDL_Texture* lookups for entities that just got blammed; the next sprite-emit
+    // pass repopulates as those entities are recreated by the new scene's load.
+    if (auto* spriteCache = registry_->TryGet<SpriteRenderCache>())
+    {
+        spriteCache->Clear();
     }
 }
 

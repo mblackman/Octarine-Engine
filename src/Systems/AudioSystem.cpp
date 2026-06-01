@@ -70,8 +70,8 @@ bool AudioSystem::Init(Registry* registry, const std::unique_ptr<EventBus>& even
         }
     }
 
-    registry_->Set<MIX_Mixer*>(mixer);
-
+    // Mixer is published onto EngineContext by Game::Setup once Init returns; AudioSystem owns
+    // the pointer and exposes it via Mixer() so callers don't need a Registry round-trip.
     eventBus->SubscribeEvent<AudioSystem, AudioPlayEvent>(this, &AudioSystem::OnAudioPlay);
 
     Logger::Info("AudioSystem initialized; track pool size = " + std::to_string(state_->track_pool.size()) +

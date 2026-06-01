@@ -2,10 +2,12 @@
 
 #ifdef OCTARINE_WITH_EDITOR
 
-#include <SDL3/SDL.h>
 #include <imgui.h>
 
+#include <cstdint>
 #include <string>
+
+#include "General/Color.h"
 
 // Shared ImGui helpers for component inspectors. Keeps the per-component
 // EditorInspector<T>::draw bodies free of repeated boilerplate.
@@ -35,13 +37,13 @@ inline bool InputTextString(const char* label, std::string& str, ImGuiInputTextF
   return ImGui::InputText(label, str.data(), str.capacity() + 1, flags, detail::InputTextStringResize, &userData);
 }
 
-/// ColorEdit4 bound to an SDL_Color (0-255). Handles the float[4] <-> Uint8
+/// ColorEdit4 bound to an octarine::Color (0-255). Handles the float[4] <-> Uint8
 /// conversion both ways.
-inline void DrawColorEdit(const char* label, SDL_Color& color) {
+inline void DrawColorEdit(const char* label, octarine::Color& color) {
   float col[4] = {color.r / 255.0F, color.g / 255.0F, color.b / 255.0F, color.a / 255.0F};
   if (ImGui::ColorEdit4(label, col)) {
-    color = {static_cast<Uint8>(col[0] * 255), static_cast<Uint8>(col[1] * 255), static_cast<Uint8>(col[2] * 255),
-             static_cast<Uint8>(col[3] * 255)};
+    color = {static_cast<std::uint8_t>(col[0] * 255), static_cast<std::uint8_t>(col[1] * 255),
+             static_cast<std::uint8_t>(col[2] * 255), static_cast<std::uint8_t>(col[3] * 255)};
   }
 }
 

@@ -19,7 +19,7 @@ struct LuaBinding<TextLabelComponent>
         const int layer = SafeGetOptionalValue<int>(t, "layer", 1);
         const std::string text = t["text"].get<std::string>();
         const std::string fontId = t["font_id"].get<std::string>();
-        const SDL_Color color = SafeGetColor(t, "color");
+        const octarine::Color color = SafeGetColor(t, "color");
         const bool isFixed = SafeGetOptionalValue<bool>(t, "is_fixed", true);
         return TextLabelComponent(offsetPosition, layer, text, fontId, color, isFixed);
     }

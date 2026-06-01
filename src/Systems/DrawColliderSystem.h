@@ -6,6 +6,7 @@
 
 #include "../Components/BoxColliderComponent.h"
 #include "../Components/GlobalTransformComponent.h"
+#include "../Engine/EngineContext.h"
 #include "../General/Constants.h"
 #include "Components/CameraComponents.h"
 #include "ECS/Iterable.h"
@@ -15,7 +16,7 @@ class DrawColliderSystem {
  public:
   void operator()(const ContextFacade& context, const GlobalTransformComponent& transform,
                   const BoxColliderComponent& collider) const {
-    auto* renderer = context.GetRegistry()->Get<SDL_Renderer*>();
+    auto* renderer = context.GetRegistry()->Get<EngineContext>().sdlRenderer;
     const auto& camera = context.GetRegistry()->Get<CameraComponent>().viewport;
 
     const float w = static_cast<float>(collider.width) * transform.scale.x;

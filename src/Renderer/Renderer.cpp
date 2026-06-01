@@ -1,10 +1,56 @@
 #include "./Renderer.h"
 
 #include <cmath>
+#include <string>
 
+#include "General/Constants.h"
 #include "General/Logger.h"
 
-void Renderer::Render(const RenderQueue& renderQueue, SDL_Renderer* renderer) const {
+namespace
+{
+constexpr Uint8 kSceneClearGrey = 24;
+constexpr Uint8 kWindowClearBlack = 0;
+}  // namespace
+
+bool Renderer::CreateScene(SDL_Renderer* sdlRenderer, const int width, const int height) {
+  if (sdlRenderer == nullptr) return false;
+  scene_texture_ =
+      SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height);
+  if (scene_texture_ == nullptr) {
+    Logger::Error("Renderer::CreateScene SDL_CreateTexture failed: " + std::string(SDL_GetError()));
+    return false;
+  }
+  return true;
+}
+
+void Renderer::DestroyScene() {
+  if (scene_texture_ != nullptr) {
+    SDL_DestroyTexture(scene_texture_);
+    scene_texture_ = nullptr;
+  }
+}
+
+void Renderer::BeginScene(SDL_Renderer* sdlRenderer) const {
+  SDL_SetRenderTarget(sdlRenderer, scene_texture_);
+  SDL_SetRenderDrawColor(sdlRenderer, kSceneClearGrey, kSceneClearGrey, kSceneClearGrey, Constants::kUint8Max);
+  SDL_RenderClear(sdlRenderer);
+}
+
+void Renderer::EndScene(SDL_Renderer* sdlRenderer) const {
+  SDL_SetRenderTarget(sdlRenderer, nullptr);
+  SDL_SetRenderDrawColor(sdlRenderer, kWindowClearBlack, kWindowClearBlack, kWindowClearBlack, Constants::kUint8Max);
+  SDL_RenderClear(sdlRenderer);
+}
+
+void Renderer::CompositeSceneToWindow(SDL_Renderer* sdlRenderer) const {
+  if (scene_texture_ != nullptr) {
+    SDL_RenderTexture(sdlRenderer, scene_texture_, nullptr, nullptr);
+  }
+}
+
+void Renderer::Present(SDL_Renderer* sdlRenderer) const { SDL_RenderPresent(sdlRenderer); }
+
+void Renderer::DrawQueue(const RenderQueue& renderQueue, SDL_Renderer* renderer) const {
   for (const RenderKey& key : renderQueue) {
     switch (key.type) {
       case SPRITE: {

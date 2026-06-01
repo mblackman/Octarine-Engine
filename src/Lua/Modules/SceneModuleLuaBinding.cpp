@@ -14,6 +14,7 @@
 #include "AssetManager/AssetManager.h"
 #include "AssetManager/SceneAssetScanner.h"
 #include "ECS/Registry.h"
+#include "Engine/EngineContext.h"
 #include "Game/Game.h"
 #include "Game/GameConfig.h"
 #include "General/Logger.h"
@@ -68,7 +69,7 @@ void LuaModuleBinding<SceneModule>::install(sol::state& lua, Game& game)
             return;
         }
 
-        LoadAsset(std::move(assetTable), assetManager, game.GetRenderer(), registry->Get<MIX_Mixer*>());
+        LoadAsset(std::move(assetTable), assetManager, game.GetRenderer(), game.GetContext().mixer);
     });
     // Scan a scene table for its required asset ids (sprite/font/audio + tilemap + preload),
     // validate them against the catalog, then acquire each. The data-driven replacement for a
@@ -79,8 +80,7 @@ void LuaModuleBinding<SceneModule>::install(sol::state& lua, Game& game)
     {
         auto* registry = game.GetRegistry();
         auto& assetManager = registry->Get<AssetManager>();
-        auto* mixerPtr = registry->TryGet<MIX_Mixer*>();
-        MIX_Mixer* mixer = mixerPtr ? *mixerPtr : nullptr;
+        MIX_Mixer* mixer = game.GetContext().mixer;
 
         const std::vector<AssetReference> refs = SceneAssetScanner::CollectRefs(scene);
         const int failures = assetManager.Validate(refs);
