@@ -92,9 +92,6 @@
 #include "../Editor/PlayerLauncher.h"
 #endif
 
-constexpr Uint8 GREY_COLOR = 24;
-constexpr Uint8 BLACK_COLOR = 0;
-
 namespace
 {
     // Read a file's bytes through SDL_IO so the same path resolves on desktop, inside an APK asset
@@ -296,12 +293,8 @@ bool Game::Initialize(const std::string& assetPath)
         return false;
     }
 
-    game_render_texture_ = SDL_CreateTexture(sdl_renderer_, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET,
-                                             gameConfig.windowWidth, gameConfig.windowHeight);
-
-    if (!game_render_texture_)
+    if (!renderer_->CreateScene(sdl_renderer_, gameConfig.windowWidth, gameConfig.windowHeight))
     {
-        Logger::Error("SDL_CreateTexture Error: " + std::string(SDL_GetError()));
         return false;
     }
 
@@ -373,8 +366,6 @@ bool Game::Initialize(const std::string& assetPath)
 #endif
 #endif
 
-    SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
-
     // Populate the engine-level resource bundle now that SDL is up. AssetManager + mixer are
     // filled in by Setup once those exist; consumers read the same instance via
     // Registry::Get<EngineContext>().
@@ -417,10 +408,7 @@ void Game::Destroy()
 
     if (sdl_renderer_)
     {
-        if (game_render_texture_)
-        {
-            SDL_DestroyTexture(game_render_texture_);
-        }
+        renderer_->DestroyScene();
 #ifdef OCTARINE_WITH_IMGUI
         ImGui_ImplSDLRenderer3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
@@ -936,9 +924,7 @@ void Game::Render([[maybe_unused]] const float deltaTime)
     PROFILE_COUNTER_SET("RenderQueue: Size", static_cast<long long>(renderQueue.Size()));
     PROFILE_COUNTER_SET("Entities: User", static_cast<long long>(registry_->GetUserEntityCount()));
 
-    SDL_SetRenderTarget(sdl_renderer_, game_render_texture_);
-    SDL_SetRenderDrawColor(sdl_renderer_, GREY_COLOR, GREY_COLOR, GREY_COLOR, Constants::kUint8Max);
-    SDL_RenderClear(sdl_renderer_);
+    renderer_->BeginScene(sdl_renderer_);
 
 #ifdef OCTARINE_PROFILING
     {
@@ -947,11 +933,11 @@ void Game::Render([[maybe_unused]] const float deltaTime)
     }
     {
         PerfUtils::ScopedTimer drawTimer("Render: Draw");
-        renderer_->Render(renderQueue, sdl_renderer_);
+        renderer_->DrawQueue(renderQueue, sdl_renderer_);
     }
 #else
     renderQueue.Sort();
-    renderer_->Render(renderQueue, sdl_renderer_);
+    renderer_->DrawQueue(renderQueue, sdl_renderer_);
 #endif
 
     if (gameConfig.GetEngineOptions().drawColliders && collider_query_)
@@ -961,9 +947,7 @@ void Game::Render([[maybe_unused]] const float deltaTime)
         collider_query_->ForEach(drawColliderSystem);
     }
 
-    SDL_SetRenderTarget(sdl_renderer_, nullptr);
-    SDL_SetRenderDrawColor(sdl_renderer_, BLACK_COLOR, BLACK_COLOR, BLACK_COLOR, Constants::kUint8Max);
-    SDL_RenderClear(sdl_renderer_);
+    renderer_->EndScene(sdl_renderer_);
 
     auto& options = gameConfig.GetEngineOptions();
     const bool editorSession = gameConfig.IsEditorMode() || !gameConfig.HasLoadedConfig();
@@ -993,20 +977,20 @@ void Game::Render([[maybe_unused]] const float deltaTime)
         // and NOT showing debug overlays. In editor mode, the Scene window handles drawing this texture.
         if (!editorSession && !options.showDebugGUI)
         {
-            SDL_RenderTexture(sdl_renderer_, game_render_texture_, nullptr, nullptr);
+            renderer_->CompositeSceneToWindow(sdl_renderer_);
         }
 #ifdef OCTARINE_WITH_IMGUI
-        RenderDebugGUISystem::Render(this, sdl_renderer_, game_render_texture_, deltaTime);
+        RenderDebugGUISystem::Render(this, sdl_renderer_, renderer_->GetSceneTexture(), deltaTime);
 #endif
     }
 
 #ifdef OCTARINE_PROFILING
     {
         PerfUtils::ScopedTimer presentTimer("Render: Present");
-        SDL_RenderPresent(sdl_renderer_);
+        renderer_->Present(sdl_renderer_);
     }
 #else
-    SDL_RenderPresent(sdl_renderer_);
+    renderer_->Present(sdl_renderer_);
 #endif
     // Emit per-frame counters as COUNTER lines so headless bench runs can capture them
     // alongside TIMER lines. All systems for this frame have already written their values.

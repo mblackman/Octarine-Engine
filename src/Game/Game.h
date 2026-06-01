@@ -110,7 +110,6 @@ private:
 
     SDL_Window* window_;
     SDL_Renderer* sdl_renderer_;
-    SDL_Texture* game_render_texture_{nullptr};
     static inline bool s_is_running_{false};
     bool scene_running_ = false;
     bool bake_mode_ = false;
