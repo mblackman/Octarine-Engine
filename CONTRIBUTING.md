@@ -123,7 +123,9 @@ Avoid:
 
 - `feat: add atlas packing` — no conventional-commit prefix.
 - `Implement atlas packing logic for textures` — verbose subject, no body.
-- `Co-Authored-By: <AI tool>` trailers — do not add these.
+- `Co-Authored-By: <AI tool>` trailers — **never** add these. No `Co-Authored-By` /
+  `Co-authored-by` line crediting Claude or any AI tool, and no AI listed as commit author.
+  This holds even if a tool's default behavior is to append one.
 
 ## Documentation
 
