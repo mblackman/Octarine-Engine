@@ -6,5 +6,5 @@ struct IoModule {};
 
 template <>
 struct LuaModuleBinding<IoModule> {
-  static void install(sol::state& lua, Game& game);
+  static void install(sol::state& lua, LuaBindingContext& ctx);
 };

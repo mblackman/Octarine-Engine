@@ -6,5 +6,5 @@ struct AssetsModule {};
 
 template <>
 struct LuaModuleBinding<AssetsModule> {
-  static void install(sol::state& lua, Game& game);
+  static void install(sol::state& lua, LuaBindingContext& ctx);
 };

@@ -13,11 +13,12 @@
 #include "../Engine/EngineContext.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
+#include "../Lua/LuaBindingContext.h"
 #include "../Renderer/Renderer.h"
 
 class Registry;
 
-class Game {
+class Game : public LuaBindingContext {
  public:
   Game();
 
@@ -43,12 +44,15 @@ class Game {
   // True while running under the headless bake (`-m bake`). Asset-loading Lua globals
   // (`acquire_scene_assets`, `load_asset`) consult this to validate-and-count referenced ids
   // instead of uploading to a GPU/mixer that does not exist in this mode.
-  [[nodiscard]] bool IsBakeMode() const { return bake_mode_; }
+  [[nodiscard]] bool IsBakeMode() const override { return bake_mode_; }
 
   // Accumulate unresolved-reference failures found while a scene script runs under bake. Bake
   // sums these across the whole startup run and fails the process if any remain.
-  void RecordBakeValidationFailures(int failures) { bake_validation_failures_ += failures; }
+  void RecordBakeValidationFailures(int failures) override { bake_validation_failures_ += failures; }
   static void Quit() { s_is_running_ = false; }
+
+  // LuaBindingContext shutdown hook (the `quit_game` global) — forwards to the static flag.
+  void RequestQuit() override { Quit(); }
 
   // Optional startup-mode hint exposed to Lua as `oct_startup_mode`. Empty string means
   // "no override" — the startup script can show its normal menu. Set by Main from the
@@ -62,28 +66,28 @@ class Game {
   // In a shipped build (OCTARINE_SHIPPED) the manifest is used unconditionally and this is moot.
   void SetUseManifest(bool useManifest) { use_manifest_ = useManifest; }
 
-  [[nodiscard]] SDL_Renderer* GetRenderer() const { return sdl_renderer_; }
+  [[nodiscard]] SDL_Renderer* GetRenderer() const override { return sdl_renderer_; }
   [[nodiscard]] SDL_Window* GetWindow() const { return window_; }
 
-  [[nodiscard]] Registry* GetRegistry() const { return registry_.get(); }
+  [[nodiscard]] Registry* GetRegistry() const override { return registry_.get(); }
   [[nodiscard]] sol::state& GetLua() { return lua; }
 
   // Engine-level resource bundle (SDL handles, EventBus, AssetManager, GameConfig).
   // Lives as a Registry singleton — systems read it the same way via
   // `Registry::Get<EngineContext>()`. Game just forwards to the registry copy so
   // fields stay coherent across Initialize → Setup → AudioSystem::Init mutations.
-  [[nodiscard]] EngineContext& GetContext() { return registry_->Get<EngineContext>(); }
+  [[nodiscard]] EngineContext& GetContext() override { return registry_->Get<EngineContext>(); }
   [[nodiscard]] const EngineContext& GetContext() const { return registry_->Get<EngineContext>(); }
 
-  void LoadScene(const std::string& scenePath);
-  void ReloadScene();
-  void StopScene();
+  void LoadScene(const std::string& scenePath) override;
+  void ReloadScene() override;
+  void StopScene() override;
 
   // Record asset ids acquired for the current scene so StopScene/the next LoadScene releases
   // them. Deduped against ids already tracked. Called by the C++ scene loader and by the
   // `acquire_scene_assets` Lua global (which serves scenes that load via a side-effect script
   // rather than returning a table). Safe to call repeatedly with overlapping sets.
-  void TrackSceneAssets(const std::vector<std::string>& assetIds);
+  void TrackSceneAssets(const std::vector<std::string>& assetIds) override;
 
   // True between a successful LoadScene/ReloadScene and the next StopScene. The editor toolbar
   // uses this to decide whether Play should resume a paused scene or (re)start a stopped one.

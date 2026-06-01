@@ -6,5 +6,5 @@ struct AudioModule {};
 
 template <>
 struct LuaModuleBinding<AudioModule> {
-  static void install(sol::state& lua, Game& game);
+  static void install(sol::state& lua, LuaBindingContext& ctx);
 };
