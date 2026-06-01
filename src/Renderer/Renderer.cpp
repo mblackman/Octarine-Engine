@@ -6,16 +6,14 @@
 #include "General/Constants.h"
 #include "General/Logger.h"
 
-namespace
-{
+namespace {
 constexpr Uint8 kSceneClearGrey = 24;
 constexpr Uint8 kWindowClearBlack = 0;
 }  // namespace
 
 bool Renderer::CreateScene(SDL_Renderer* sdlRenderer, const int width, const int height) {
   if (sdlRenderer == nullptr) return false;
-  scene_texture_ =
-      SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height);
+  scene_texture_ = SDL_CreateTexture(sdlRenderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height);
   if (scene_texture_ == nullptr) {
     Logger::Error("Renderer::CreateScene SDL_CreateTexture failed: " + std::string(SDL_GetError()));
     return false;

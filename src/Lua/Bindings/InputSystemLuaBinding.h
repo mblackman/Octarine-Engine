@@ -10,7 +10,6 @@ class InputSystem;
 // global the scenes reach. Definition lives in InputSystemLuaBinding.cpp so InputSystem.h
 // doesn't have to host the sol-laden install body inline.
 template <>
-struct LuaSystemBinding<InputSystem>
-{
-    static void bind(sol::state& lua, InputSystem& system);
+struct LuaSystemBinding<InputSystem> {
+  static void bind(sol::state& lua, InputSystem& system);
 };

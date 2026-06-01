@@ -57,8 +57,7 @@ struct Box {
       const float ux = axis[0];
       const float uy = axis[1];
       const float aProj = hx * std::abs(ax0 * ux + ay0 * uy) + hy * std::abs(ax1 * ux + ay1 * uy);
-      const float bProj =
-          other.hx * std::abs(bx0 * ux + by0 * uy) + other.hy * std::abs(bx1 * ux + by1 * uy);
+      const float bProj = other.hx * std::abs(bx0 * ux + by0 * uy) + other.hy * std::abs(bx1 * ux + by1 * uy);
       const float distProj = std::abs(dx * ux + dy * uy);
       if (distProj > aProj + bProj) return false;
     }
@@ -141,9 +140,20 @@ class CollisionSystem {
         const bool rotated = transform.rotation != 0.0;
         const float aabbHx = hx * std::abs(rc) + hy * std::abs(rs);
         const float aabbHy = hx * std::abs(rs) + hy * std::abs(rc);
-        boxes[idx] = {entity, entityMask.mask, collider.collisionMask,
-                      cx - aabbHx, cy - aabbHy, cx + aabbHx, cy + aabbHy,
-                      cx, cy, hx, hy, rc, rs, rotated};
+        boxes[idx] = {entity,
+                      entityMask.mask,
+                      collider.collisionMask,
+                      cx - aabbHx,
+                      cy - aabbHy,
+                      cx + aabbHx,
+                      cy + aabbHy,
+                      cx,
+                      cy,
+                      hx,
+                      hy,
+                      rc,
+                      rs,
+                      rotated};
       });
     }
 

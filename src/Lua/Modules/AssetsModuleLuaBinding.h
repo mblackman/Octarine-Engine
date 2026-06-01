@@ -2,12 +2,9 @@
 
 #include "Lua/Modules/LuaModule.h"
 
-struct AssetsModule
-{
-};
+struct AssetsModule {};
 
 template <>
-struct LuaModuleBinding<AssetsModule>
-{
-    static void install(sol::state& lua, Game& game);
+struct LuaModuleBinding<AssetsModule> {
+  static void install(sol::state& lua, Game& game);
 };

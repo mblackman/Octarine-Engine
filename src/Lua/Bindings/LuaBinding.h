@@ -7,57 +7,47 @@
 
 #include "General/Color.h"
 
-namespace LuaComponentHelpers
-{
-    inline glm::vec2 SafeGetVec2(const sol::table& parentTable, const std::string& key, float defaultX = 0.0f,
-                                 float defaultY = 0.0f)
-    {
-        glm::vec2 result(defaultX, defaultY);
-        if (sol::optional<sol::table> vecTableOpt = parentTable[key]; vecTableOpt && vecTableOpt.value().valid())
-        {
-            sol::table& vecTable = vecTableOpt.value();
-            result.x = vecTable["x"].get_or(defaultX);
-            result.y = vecTable["y"].get_or(defaultY);
-        }
-        return result;
-    }
+namespace LuaComponentHelpers {
+inline glm::vec2 SafeGetVec2(const sol::table& parentTable, const std::string& key, float defaultX = 0.0f,
+                             float defaultY = 0.0f) {
+  glm::vec2 result(defaultX, defaultY);
+  if (sol::optional<sol::table> vecTableOpt = parentTable[key]; vecTableOpt && vecTableOpt.value().valid()) {
+    sol::table& vecTable = vecTableOpt.value();
+    result.x = vecTable["x"].get_or(defaultX);
+    result.y = vecTable["y"].get_or(defaultY);
+  }
+  return result;
+}
 
-    inline octarine::Color SafeGetColor(const sol::table& parentTable, const std::string& key,
-                                        std::uint8_t defaultR = 0, std::uint8_t defaultG = 0,
-                                        std::uint8_t defaultB = 0, std::uint8_t defaultA = 0)
-    {
-        octarine::Color result{defaultR, defaultG, defaultB, defaultA};
-        if (sol::optional<sol::table> vecTableOpt = parentTable[key]; vecTableOpt && vecTableOpt.value().valid())
-        {
-            sol::table& vecTable = vecTableOpt.value();
-            result.r = vecTable["r"].get_or(defaultR);
-            result.g = vecTable["g"].get_or(defaultG);
-            result.b = vecTable["b"].get_or(defaultB);
-            result.a = vecTable["a"].get_or(defaultA);
-        }
-        return result;
-    }
+inline octarine::Color SafeGetColor(const sol::table& parentTable, const std::string& key, std::uint8_t defaultR = 0,
+                                    std::uint8_t defaultG = 0, std::uint8_t defaultB = 0, std::uint8_t defaultA = 0) {
+  octarine::Color result{defaultR, defaultG, defaultB, defaultA};
+  if (sol::optional<sol::table> vecTableOpt = parentTable[key]; vecTableOpt && vecTableOpt.value().valid()) {
+    sol::table& vecTable = vecTableOpt.value();
+    result.r = vecTable["r"].get_or(defaultR);
+    result.g = vecTable["g"].get_or(defaultG);
+    result.b = vecTable["b"].get_or(defaultB);
+    result.a = vecTable["a"].get_or(defaultA);
+  }
+  return result;
+}
 
-    template <typename T>
-    T SafeGetOptionalValue(const sol::table& dataTable, const std::string& key, T defaultValue)
-    {
-        return dataTable[key].get_or(defaultValue);
-    }
+template <typename T>
+T SafeGetOptionalValue(const sol::table& dataTable, const std::string& key, T defaultValue) {
+  return dataTable[key].get_or(defaultValue);
+}
 
-    inline sol::protected_function SafeGetProtectedFunction(const sol::table& dataTable, const std::string& key)
-    {
-        return dataTable[key].get_or(sol::protected_function(sol::lua_nil));
-    }
+inline sol::protected_function SafeGetProtectedFunction(const sol::table& dataTable, const std::string& key) {
+  return dataTable[key].get_or(sol::protected_function(sol::lua_nil));
+}
 
-    inline sol::optional<sol::table> SafeGetOptionalTable(const sol::table& dataTable, const std::string& key)
-    {
-        if (dataTable[key].is<sol::table>())
-        {
-            return dataTable[key].get<sol::table>();
-        }
-        return sol::nullopt;
-    }
-} // namespace LuaComponentHelpers
+inline sol::optional<sol::table> SafeGetOptionalTable(const sol::table& dataTable, const std::string& key) {
+  if (dataTable[key].is<sol::table>()) {
+    return dataTable[key].get<sol::table>();
+  }
+  return sol::nullopt;
+}
+}  // namespace LuaComponentHelpers
 
 // Specialize for each component to expose it to Lua. Each specialization MUST provide:
 //   static constexpr const char* kLuaKey;          // entity-table key, e.g. "health"

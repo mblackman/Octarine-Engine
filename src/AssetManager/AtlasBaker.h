@@ -1,11 +1,11 @@
 #pragma once
 
+#include <SDL3/SDL.h>
+#include <SDL3_ttf/SDL_ttf.h>
+
 #include <cstdint>
 #include <string>
 #include <vector>
-
-#include <SDL3/SDL.h>
-#include <SDL3_ttf/SDL_ttf.h>
 
 // Bake-time glyph atlas writer: rasterize a fixed codepoint set into a single packed PNG +
 // sidecar Lua metrics, so a shipped build can draw text by sampling the atlas instead of paying

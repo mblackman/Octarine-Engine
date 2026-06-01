@@ -37,8 +37,8 @@ class TransformSystem {
   }
 
  private:
-  using TransformQuery = ComponentQuery<GlobalTransformComponent, Opt<PositionComponent>, Opt<ScaleComponent>,
-                                        Opt<RotationComponent>>;
+  using TransformQuery =
+      ComponentQuery<GlobalTransformComponent, Opt<PositionComponent>, Opt<ScaleComponent>, Opt<RotationComponent>>;
 
   void EnsureInitialized(Registry* registry) {
     if (optionalQuery_) return;
@@ -78,8 +78,7 @@ class TransformSystem {
   // Iterate every entity; write each root's global directly from its local and queue its
   // children for the descendants walk. Optional pointers come from the query's per-chunk
   // cache so no per-entity HasComponent/GetComponent lookups happen here.
-  void SeedRoots(Registry* registry, std::stack<TransformUpdateJob>& jobs) const
-  {
+  void SeedRoots(Registry* registry, std::stack<TransformUpdateJob>& jobs) const {
     PROFILE_NAMED_SCOPE("TransformSystem: Slow (roots rebuild + walk start)");
     optionalQuery_->ForEach([&](const Entity entity, GlobalTransformComponent& global, const PositionComponent* p,
                                 const ScaleComponent* s, const RotationComponent* r) {
@@ -101,8 +100,7 @@ class TransformSystem {
 
   // Drain the job stack: compose each entity's global from its parent's global and its own
   // local, then enqueue its children with the freshly-computed values as their parent state.
-  void WalkDescendants(const Registry* registry, std::stack<TransformUpdateJob>& jobs) const
-  {
+  void WalkDescendants(const Registry* registry, std::stack<TransformUpdateJob>& jobs) const {
     PROFILE_NAMED_SCOPE("TransformSystem: Slow (descendants walk)");
     while (!jobs.empty()) {
       const auto job = jobs.top();

@@ -12,8 +12,6 @@
 // inside the OCTARINE_WITH_EDITOR-gated section; the destructor inherited from
 // octarine::process::Process kills any still-running child at shutdown.
 
-#include "Process/Process.h"
-
 #include <cstddef>
 #include <deque>
 #include <filesystem>
@@ -22,79 +20,76 @@
 #include <string_view>
 #include <vector>
 
-namespace octarine::editor
-{
-    enum class PlayerStatus
-    {
-        Idle,
-        Running,
-        Exited,
-        FailedToLaunch,
-    };
+#include "Process/Process.h"
 
-    struct PlayerLogLine
-    {
-        bool is_stderr = false;
-        std::string text;
-    };
+namespace octarine::editor {
+enum class PlayerStatus {
+  Idle,
+  Running,
+  Exited,
+  FailedToLaunch,
+};
 
-    class PlayerLauncher
-    {
-    public:
-        // Resolves the player binary, spawns it pointed at `project_dir`, and starts capturing
-        // its stdout/stderr. Returns false when the binary cannot be located or `posix_spawn` /
-        // `CreateProcess` fails — both cases also push an explanatory line into the log buffer
-        // and flip status to FailedToLaunch. A no-op (returning true) when a player is already
-        // Running; v1 supports one concurrent player.
-        bool Run(const std::filesystem::path& project_dir);
+struct PlayerLogLine {
+  bool is_stderr = false;
+  std::string text;
+};
 
-        // Terminates the running player if any. No-op when not Running.
-        void Stop();
+class PlayerLauncher {
+ public:
+  // Resolves the player binary, spawns it pointed at `project_dir`, and starts capturing
+  // its stdout/stderr. Returns false when the binary cannot be located or `posix_spawn` /
+  // `CreateProcess` fails — both cases also push an explanatory line into the log buffer
+  // and flip status to FailedToLaunch. A no-op (returning true) when a player is already
+  // Running; v1 supports one concurrent player.
+  bool Run(const std::filesystem::path& project_dir);
 
-        // Drains the subprocess's captured stdout/stderr through the Process wrapper, splits the
-        // chunks into lines, and updates `status_` / `last_exit_code_` when the child exits.
-        // Cheap to call every frame; designed to live on the editor's main render path.
-        void Pump();
+  // Terminates the running player if any. No-op when not Running.
+  void Stop();
 
-        PlayerStatus Status() const { return status_; }
-        std::optional<int> LastExitCode() const { return last_exit_code_; }
-        const std::filesystem::path& ResolvedBinary() const { return resolved_binary_; }
+  // Drains the subprocess's captured stdout/stderr through the Process wrapper, splits the
+  // chunks into lines, and updates `status_` / `last_exit_code_` when the child exits.
+  // Cheap to call every frame; designed to live on the editor's main render path.
+  void Pump();
 
-        struct LogSnapshot
-        {
-            std::vector<PlayerLogLine> lines;
-            std::size_t total_dropped = 0; // lines dropped because the ring buffer was full
-        };
-        LogSnapshot LogCopy() const;
-        void ClearLog();
+  PlayerStatus Status() const { return status_; }
+  std::optional<int> LastExitCode() const { return last_exit_code_; }
+  const std::filesystem::path& ResolvedBinary() const { return resolved_binary_; }
 
-        // Probes the dev-tree layout (editor next to its build preset, player in a sibling preset
-        // dir) for `OctarineEngine-player[.exe]`. Public for unit testing — pass a synthetic
-        // editor dir + filesystem layout to exercise the candidates without spawning anything.
-        static std::optional<std::filesystem::path> ResolvePlayerBinary(const std::filesystem::path& editor_dir);
+  struct LogSnapshot {
+    std::vector<PlayerLogLine> lines;
+    std::size_t total_dropped = 0;  // lines dropped because the ring buffer was full
+  };
+  LogSnapshot LogCopy() const;
+  void ClearLog();
 
-    private:
-        static constexpr std::size_t kLogCap = 4096;
+  // Probes the dev-tree layout (editor next to its build preset, player in a sibling preset
+  // dir) for `OctarineEngine-player[.exe]`. Public for unit testing — pass a synthetic
+  // editor dir + filesystem layout to exercise the candidates without spawning anything.
+  static std::optional<std::filesystem::path> ResolvePlayerBinary(const std::filesystem::path& editor_dir);
 
-        std::optional<octarine::process::Process> process_;
-        PlayerStatus status_ = PlayerStatus::Idle;
-        std::optional<int> last_exit_code_;
-        std::filesystem::path resolved_binary_;
+ private:
+  static constexpr std::size_t kLogCap = 4096;
 
-        // Per-stream line splitter state: process chunks are not line-aligned, so we buffer the
-        // tail until a '\n' arrives (or the process exits, at which point we flush).
-        std::string stdout_partial_;
-        std::string stderr_partial_;
+  std::optional<octarine::process::Process> process_;
+  PlayerStatus status_ = PlayerStatus::Idle;
+  std::optional<int> last_exit_code_;
+  std::filesystem::path resolved_binary_;
 
-        // No mutex — Process callbacks run synchronously inside Pump() on the calling thread,
-        // so every append happens on the editor's main render thread.
-        std::deque<PlayerLogLine> log_;
-        std::size_t dropped_ = 0;
+  // Per-stream line splitter state: process chunks are not line-aligned, so we buffer the
+  // tail until a '\n' arrives (or the process exits, at which point we flush).
+  std::string stdout_partial_;
+  std::string stderr_partial_;
 
-        void SplatChunk(std::string_view chunk, bool is_stderr);
-        void AppendLine(bool is_stderr, std::string text);
-        void FlushPartialLines();
-    };
-} // namespace octarine::editor
+  // No mutex — Process callbacks run synchronously inside Pump() on the calling thread,
+  // so every append happens on the editor's main render thread.
+  std::deque<PlayerLogLine> log_;
+  std::size_t dropped_ = 0;
 
-#endif // OCTARINE_WITH_EDITOR
+  void SplatChunk(std::string_view chunk, bool is_stderr);
+  void AppendLine(bool is_stderr, std::string text);
+  void FlushPartialLines();
+};
+}  // namespace octarine::editor
+
+#endif  // OCTARINE_WITH_EDITOR

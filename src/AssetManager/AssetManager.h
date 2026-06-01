@@ -94,8 +94,7 @@ class AssetManager {
   // `stream` plumbs the catalog's `meta.stream` flag into SDL_mixer's predecode toggle: false for
   // SFX (eager decode = predictable play latency), true for long music + ambient beds (lazy decode
   // = decode-as-played, keeps the loading footprint flat at the cost of a touch more per-play cost).
-  void AddAudioClip(MIX_Mixer* mixer, const std::string& assetId, const std::string& path,
-                    bool stream = false);
+  void AddAudioClip(MIX_Mixer* mixer, const std::string& assetId, const std::string& path, bool stream = false);
   [[nodiscard]] MIX_Audio* GetAudioClip(const std::string& assetId) const;
   [[nodiscard]] std::string GetFullPath(const std::string& relativePath) const;
   void SetDefaultScaleMode(const std::string& scaleMode);
@@ -130,8 +129,7 @@ class AssetManager {
 
   // Perform the actual SDL/MIX load for a catalog entry (no refcount bookkeeping). Returns whether
   // the handle is resident afterwards.
-  bool LoadFromCatalog(const CatalogEntry& entry, const std::string& assetId, SDL_Renderer* renderer,
-                       MIX_Mixer* mixer);
+  bool LoadFromCatalog(const CatalogEntry& entry, const std::string& assetId, SDL_Renderer* renderer, MIX_Mixer* mixer);
 
   // Destroy and erase whichever resident handle backs `assetId` (texture/font/audio). Bumps
   // texture_generation_ when a texture is dropped so cached SDL_Texture* pointers re-resolve.

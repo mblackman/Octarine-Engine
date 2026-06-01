@@ -69,7 +69,8 @@ void Logger::Init() {
 void Logger::SetLevel(const std::string& level) {
   const auto parsed = ParseLevelName(level);
   if (parsed == spdlog::level::n_levels) {
-    Logger::Warn("Unknown log level '" + level + "' — expected trace|debug|info|warn|error|critical|off. Keeping current.");
+    Logger::Warn("Unknown log level '" + level +
+                 "' — expected trace|debug|info|warn|error|critical|off. Keeping current.");
     return;
   }
   spdlog::set_level(parsed);

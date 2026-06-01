@@ -17,8 +17,8 @@ struct ScriptComponent;
 class ScriptHotReload {
  public:
   struct ReloadInfo {
-    std::string path;       // empty until first reload
-    std::string error;      // non-empty if last reload failed
+    std::string path;   // empty until first reload
+    std::string error;  // non-empty if last reload failed
     int totalReloads = 0;
     int totalFailures = 0;
   };

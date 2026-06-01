@@ -5,9 +5,8 @@
 #include <fstream>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "stb/stb_image_write.h"
-
 #include "General/Logger.h"
+#include "stb/stb_image_write.h"
 
 namespace {
 constexpr int kAtlasWidth = 512;
@@ -15,118 +14,114 @@ constexpr int kPad = 1;  // 1px gutter between glyphs — keeps bilinear samples
 constexpr SDL_Color kWhite{255, 255, 255, 255};
 
 struct StagedGlyph {
-    std::uint32_t cp;
-    SDL_Surface* surface;
-    int minx, miny, advance, w, h;
-    int atlasX{0};
-    int atlasY{0};
+  std::uint32_t cp;
+  SDL_Surface* surface;
+  int minx, miny, advance, w, h;
+  int atlasX{0};
+  int atlasY{0};
 };
 }  // namespace
 
 std::vector<std::uint32_t> AtlasBaker::DefaultAsciiPrintable() {
-    std::vector<std::uint32_t> out;
-    out.reserve(95);
-    for (std::uint32_t cp = 0x20; cp <= 0x7E; ++cp) out.push_back(cp);
-    return out;
+  std::vector<std::uint32_t> out;
+  out.reserve(95);
+  for (std::uint32_t cp = 0x20; cp <= 0x7E; ++cp) out.push_back(cp);
+  return out;
 }
 
 bool AtlasBaker::Bake(TTF_Font* font, float fontSize, const std::vector<std::uint32_t>& codepoints,
-                     const std::string& outPngPath, const std::string& outLuaPath) {
-    if (font == nullptr || codepoints.empty()) {
-        Logger::Error("AtlasBaker::Bake: null font or empty codepoint set");
-        return false;
-    }
-    const int lineSkip = TTF_GetFontLineSkip(font);
+                      const std::string& outPngPath, const std::string& outLuaPath) {
+  if (font == nullptr || codepoints.empty()) {
+    Logger::Error("AtlasBaker::Bake: null font or empty codepoint set");
+    return false;
+  }
+  const int lineSkip = TTF_GetFontLineSkip(font);
 
-    // Rasterize each codepoint up front. We need width/height to drive the packer; metrics alone
-    // wouldn't give the actual rasterized bounds the Blended path produces.
-    std::vector<StagedGlyph> staged;
-    staged.reserve(codepoints.size());
-    for (const std::uint32_t cp : codepoints) {
-        int minx = 0, maxx = 0, miny = 0, maxy = 0, advance = 0;
-        if (!TTF_GetGlyphMetrics(font, cp, &minx, &maxx, &miny, &maxy, &advance)) {
-            // Glyph not in the face; skip rather than fail — caller's codepoint list might be
-            // over-broad. Whoever later renders an unknown codepoint will hit the TTF fallback.
-            continue;
-        }
-        SDL_Surface* surf = TTF_RenderGlyph_Blended(font, cp, kWhite);
-        if (surf == nullptr) {
-            continue;
-        }
-        staged.push_back({cp, surf, minx, miny, advance, surf->w, surf->h, 0, 0});
+  // Rasterize each codepoint up front. We need width/height to drive the packer; metrics alone
+  // wouldn't give the actual rasterized bounds the Blended path produces.
+  std::vector<StagedGlyph> staged;
+  staged.reserve(codepoints.size());
+  for (const std::uint32_t cp : codepoints) {
+    int minx = 0, maxx = 0, miny = 0, maxy = 0, advance = 0;
+    if (!TTF_GetGlyphMetrics(font, cp, &minx, &maxx, &miny, &maxy, &advance)) {
+      // Glyph not in the face; skip rather than fail — caller's codepoint list might be
+      // over-broad. Whoever later renders an unknown codepoint will hit the TTF fallback.
+      continue;
     }
+    SDL_Surface* surf = TTF_RenderGlyph_Blended(font, cp, kWhite);
+    if (surf == nullptr) {
+      continue;
+    }
+    staged.push_back({cp, surf, minx, miny, advance, surf->w, surf->h, 0, 0});
+  }
 
-    // Shelf-pack tallest-first. Glyphs at one face/size cluster around a single height, so this is
-    // close to optimal and dead simple — no stb_rect_pack needed.
-    std::sort(staged.begin(), staged.end(),
-              [](const StagedGlyph& a, const StagedGlyph& b) { return a.h > b.h; });
+  // Shelf-pack tallest-first. Glyphs at one face/size cluster around a single height, so this is
+  // close to optimal and dead simple — no stb_rect_pack needed.
+  std::sort(staged.begin(), staged.end(), [](const StagedGlyph& a, const StagedGlyph& b) { return a.h > b.h; });
 
-    int rowX = 0, rowY = 0, rowH = 0, atlasH = 0;
-    for (auto& g : staged) {
-        if (rowX + g.w + kPad > kAtlasWidth) {
-            rowY += rowH + kPad;
-            rowX = 0;
-            rowH = 0;
-        }
-        g.atlasX = rowX;
-        g.atlasY = rowY;
-        rowX += g.w + kPad;
-        rowH = std::max(rowH, g.h);
-        atlasH = std::max(atlasH, rowY + rowH);
+  int rowX = 0, rowY = 0, rowH = 0, atlasH = 0;
+  for (auto& g : staged) {
+    if (rowX + g.w + kPad > kAtlasWidth) {
+      rowY += rowH + kPad;
+      rowX = 0;
+      rowH = 0;
     }
+    g.atlasX = rowX;
+    g.atlasY = rowY;
+    rowX += g.w + kPad;
+    rowH = std::max(rowH, g.h);
+    atlasH = std::max(atlasH, rowY + rowH);
+  }
 
-    // Allocate the atlas pixel buffer (RGBA8, zero-init). Composite every glyph surface in.
-    std::vector<std::uint8_t> pixels(static_cast<std::size_t>(kAtlasWidth) * atlasH * 4, 0);
-    for (const auto& g : staged) {
-        // TTF_RenderGlyph_Blended yields an RGBA surface. Just memcpy each row at the destination
-        // offset — same pixel format, no conversion needed.
-        SDL_Surface* surf = g.surface;
-        SDL_LockSurface(surf);
-        const auto* src = static_cast<const std::uint8_t*>(surf->pixels);
-        for (int row = 0; row < g.h; ++row) {
-            const int dstY = g.atlasY + row;
-            std::uint8_t* dst = pixels.data() + (static_cast<std::size_t>(dstY) * kAtlasWidth + g.atlasX) * 4;
-            std::memcpy(dst, src + static_cast<std::ptrdiff_t>(row) * surf->pitch,
-                        static_cast<std::size_t>(g.w) * 4);
-        }
-        SDL_UnlockSurface(surf);
+  // Allocate the atlas pixel buffer (RGBA8, zero-init). Composite every glyph surface in.
+  std::vector<std::uint8_t> pixels(static_cast<std::size_t>(kAtlasWidth) * atlasH * 4, 0);
+  for (const auto& g : staged) {
+    // TTF_RenderGlyph_Blended yields an RGBA surface. Just memcpy each row at the destination
+    // offset — same pixel format, no conversion needed.
+    SDL_Surface* surf = g.surface;
+    SDL_LockSurface(surf);
+    const auto* src = static_cast<const std::uint8_t*>(surf->pixels);
+    for (int row = 0; row < g.h; ++row) {
+      const int dstY = g.atlasY + row;
+      std::uint8_t* dst = pixels.data() + (static_cast<std::size_t>(dstY) * kAtlasWidth + g.atlasX) * 4;
+      std::memcpy(dst, src + static_cast<std::ptrdiff_t>(row) * surf->pitch, static_cast<std::size_t>(g.w) * 4);
     }
+    SDL_UnlockSurface(surf);
+  }
 
-    const int writeOk = stbi_write_png(outPngPath.c_str(), kAtlasWidth, atlasH, 4, pixels.data(),
-                                       kAtlasWidth * 4);
-    for (auto& g : staged) SDL_DestroySurface(g.surface);
-    if (writeOk == 0) {
-        Logger::Error("AtlasBaker::Bake: stbi_write_png failed for " + outPngPath);
-        return false;
-    }
+  const int writeOk = stbi_write_png(outPngPath.c_str(), kAtlasWidth, atlasH, 4, pixels.data(), kAtlasWidth * 4);
+  for (auto& g : staged) SDL_DestroySurface(g.surface);
+  if (writeOk == 0) {
+    Logger::Error("AtlasBaker::Bake: stbi_write_png failed for " + outPngPath);
+    return false;
+  }
 
-    // Metrics sidecar. Lua return-table so the loader is just dofile + table walk — same shape
-    // asset_manifest.lua already uses. Glyphs keyed by codepoint integer; rows packed for easy
-    // diffing.
-    std::ofstream lua(outLuaPath, std::ios::trunc);
-    if (!lua) {
-        Logger::Error("AtlasBaker::Bake: cannot open " + outLuaPath);
-        return false;
-    }
-    lua << "-- Generated by AtlasBaker. Do not hand-edit.\n";
-    lua << "return {\n";
-    lua << "  size = " << fontSize << ",\n";
-    lua << "  atlas_width = " << kAtlasWidth << ",\n";
-    lua << "  atlas_height = " << atlasH << ",\n";
-    lua << "  line_skip = " << lineSkip << ",\n";
-    lua << "  glyphs = {\n";
-    for (const auto& g : staged) {
-        lua << "    [" << g.cp << "] = { x=" << g.atlasX << ", y=" << g.atlasY
-            << ", w=" << g.w << ", h=" << g.h
-            << ", advance=" << g.advance << ", minx=" << g.minx << ", miny=" << g.miny << " },\n";
-    }
-    lua << "  },\n";
-    lua << "}\n";
-    if (!lua) {
-        Logger::Error("AtlasBaker::Bake: write error on " + outLuaPath);
-        return false;
-    }
-    Logger::Info("AtlasBaker: wrote " + std::to_string(staged.size()) + " glyphs to " + outPngPath +
-                 " (+ metrics " + outLuaPath + ")");
-    return true;
+  // Metrics sidecar. Lua return-table so the loader is just dofile + table walk — same shape
+  // asset_manifest.lua already uses. Glyphs keyed by codepoint integer; rows packed for easy
+  // diffing.
+  std::ofstream lua(outLuaPath, std::ios::trunc);
+  if (!lua) {
+    Logger::Error("AtlasBaker::Bake: cannot open " + outLuaPath);
+    return false;
+  }
+  lua << "-- Generated by AtlasBaker. Do not hand-edit.\n";
+  lua << "return {\n";
+  lua << "  size = " << fontSize << ",\n";
+  lua << "  atlas_width = " << kAtlasWidth << ",\n";
+  lua << "  atlas_height = " << atlasH << ",\n";
+  lua << "  line_skip = " << lineSkip << ",\n";
+  lua << "  glyphs = {\n";
+  for (const auto& g : staged) {
+    lua << "    [" << g.cp << "] = { x=" << g.atlasX << ", y=" << g.atlasY << ", w=" << g.w << ", h=" << g.h
+        << ", advance=" << g.advance << ", minx=" << g.minx << ", miny=" << g.miny << " },\n";
+  }
+  lua << "  },\n";
+  lua << "}\n";
+  if (!lua) {
+    Logger::Error("AtlasBaker::Bake: write error on " + outLuaPath);
+    return false;
+  }
+  Logger::Info("AtlasBaker: wrote " + std::to_string(staged.size()) + " glyphs to " + outPngPath + " (+ metrics " +
+               outLuaPath + ")");
+  return true;
 }

@@ -6,15 +6,14 @@
 
 #if !defined(_WIN32) && !defined(__APPLE__)
 
-namespace octarine::secrets
-{
-    bool IsAvailable() { return false; }
+namespace octarine::secrets {
+bool IsAvailable() { return false; }
 
-    bool Set(std::string_view /*key*/, std::string_view /*value*/) { return false; }
+bool Set(std::string_view /*key*/, std::string_view /*value*/) { return false; }
 
-    std::optional<std::string> Get(std::string_view /*key*/) { return std::nullopt; }
+std::optional<std::string> Get(std::string_view /*key*/) { return std::nullopt; }
 
-    bool Clear(std::string_view /*key*/) { return false; }
-} // namespace octarine::secrets
+bool Clear(std::string_view /*key*/) { return false; }
+}  // namespace octarine::secrets
 
 #endif

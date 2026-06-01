@@ -12,7 +12,6 @@
 #include "../Components/GlobalTransformComponent.h"
 #include "../Components/HealthComponent.h"
 #include "../Components/NameComponent.h"
-#include "../Components/ViewportInfo.h"
 #include "../Components/PositionComponent.h"
 #include "../Components/ProjectileComponent.h"
 #include "../Components/ProjectileEmitterComponent.h"
@@ -23,6 +22,7 @@
 #include "../Components/SquarePrimitiveComponent.h"
 #include "../Components/TextLabelComponent.h"
 #include "../Components/UIButtonComponent.h"
+#include "../Components/ViewportInfo.h"
 #include "../Game/Game.h"
 #include "../Game/GameConfig.h"
 #include "imgui.h"
@@ -33,88 +33,83 @@
 #ifdef OCTARINE_WITH_EDITOR
 #include "../Editor/EditorLayoutPresets.h"
 #include "../Editor/EditorPersistence.h"
+#include "../Editor/ExportBuilder.h"
 #include "../Editor/Inspectors/ComponentInspectorRegistry.h"
 #include "../Editor/Inspectors/InspectorWidgets.h"
-#include "../Editor/ExportBuilder.h"
 #include "../Editor/PlayerLauncher.h"
 #include "../Project/ProjectIni.h"
 #include "../Secrets/SecretStore.h"
 
-namespace
-{
-    void SDLCALL OnProjectFolderSelected(void* userdata, const char* const* filelist, int /*filter*/)
-    {
-        auto* game = static_cast<Game*>(userdata);
-        if (filelist && *filelist)
-        {
-            auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
-            editorPersistence.lastProjectPath = *filelist;
-            editorPersistence.SaveGlobal();
-            Logger::Info("Project folder selected: " + std::string(*filelist));
-        }
-    }
+namespace {
+void SDLCALL OnProjectFolderSelected(void* userdata, const char* const* filelist, int /*filter*/) {
+  auto* game = static_cast<Game*>(userdata);
+  if (filelist && *filelist) {
+    auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
+    editorPersistence.lastProjectPath = *filelist;
+    editorPersistence.SaveGlobal();
+    Logger::Info("Project folder selected: " + std::string(*filelist));
+  }
+}
 
-    void SDLCALL OnSceneFileSelected(void* userdata, const char* const* filelist, int /*filter*/)
-    {
-        auto* game = static_cast<Game*>(userdata);
-        if (filelist && *filelist)
-        {
-            auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
-            auto& assetManager = game->GetRegistry()->Get<AssetManager>();
-            const std::filesystem::path selectedPath(*filelist);
-            const std::filesystem::path basePath(assetManager.GetBasePath());
+void SDLCALL OnSceneFileSelected(void* userdata, const char* const* filelist, int /*filter*/) {
+  auto* game = static_cast<Game*>(userdata);
+  if (filelist && *filelist) {
+    auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
+    auto& assetManager = game->GetRegistry()->Get<AssetManager>();
+    const std::filesystem::path selectedPath(*filelist);
+    const std::filesystem::path basePath(assetManager.GetBasePath());
 
-            // Prefer a project-relative path (e.g. "scripts/level1.lua"), but only when the file
-            // actually lives inside the project — a relative result starting with ".." escapes it,
-            // so keep the absolute path in that case.
-            std::error_code ec;
-            const std::filesystem::path relativePath = std::filesystem::relative(selectedPath, basePath, ec);
-            const bool insideProject = !ec && !relativePath.empty() && relativePath.begin()->string() != "..";
-            const std::string scenePath = insideProject ? relativePath.generic_string() : selectedPath.string();
+    // Prefer a project-relative path (e.g. "scripts/level1.lua"), but only when the file
+    // actually lives inside the project — a relative result starting with ".." escapes it,
+    // so keep the absolute path in that case.
+    std::error_code ec;
+    const std::filesystem::path relativePath = std::filesystem::relative(selectedPath, basePath, ec);
+    const bool insideProject = !ec && !relativePath.empty() && relativePath.begin()->string() != "..";
+    const std::string scenePath = insideProject ? relativePath.generic_string() : selectedPath.string();
 
-            editorPersistence.currentScenePath = scenePath;
-            Logger::Info("Scene file selected: " + scenePath);
-        }
-    }
-} // namespace
+    editorPersistence.currentScenePath = scenePath;
+    Logger::Info("Scene file selected: " + scenePath);
+  }
+}
+}  // namespace
 #endif
 
-void RenderDebugGUISystem::Render(Game * game, SDL_Renderer * renderer,
+void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer,
 #ifdef OCTARINE_WITH_EDITOR
-SDL_Texture *gameTexture,
+                                  SDL_Texture* gameTexture,
 #else
-SDL_Texture* /*gameTexture*/,
+                                  SDL_Texture* /*gameTexture*/,
 #endif
-const float deltaTime) {
+                                  const float deltaTime) {
   auto* registry = game->GetRegistry();
   auto& gameConfig = registry->Get<GameConfig>();
   auto& engineOptions = gameConfig.GetEngineOptions();
   const bool projectLoaded = gameConfig.HasLoadedConfig();
 #ifdef OCTARINE_WITH_EDITOR
-auto& editorPersistence = registry->Get<EditorPersistence>();
-auto& playerLauncher = registry->Get<octarine::editor::PlayerLauncher>();
-playerLauncher.Pump();
-auto& exportBuilder = registry->Get<octarine::editor::ExportBuilder>();
-exportBuilder.Pump();
-const bool editorSession = gameConfig.IsEditorMode() || !projectLoaded;
-const bool showEditorUI = editorSession;
+  auto& editorPersistence = registry->Get<EditorPersistence>();
+  auto& playerLauncher = registry->Get<octarine::editor::PlayerLauncher>();
+  playerLauncher.Pump();
+  auto& exportBuilder = registry->Get<octarine::editor::ExportBuilder>();
+  exportBuilder.Pump();
+  const bool editorSession = gameConfig.IsEditorMode() || !projectLoaded;
+  const bool showEditorUI = editorSession;
 #endif
-const bool showGameOverlays = engineOptions.showDebugGUI;
+  const bool showGameOverlays = engineOptions.showDebugGUI;
 
 #ifdef OCTARINE_WITH_EDITOR
-if (!showEditorUI&&!showGameOverlays&&!engineOptions.showFpsCounter) {
+  if (!showEditorUI && !showGameOverlays && !engineOptions.showFpsCounter) {
     return;
   }
 #else
-if (!showGameOverlays&&!engineOptions.showFpsCounter) {
+  if (!showGameOverlays && !engineOptions.showFpsCounter) {
     return;
   }
 #endif
 
-PROFILE_NAMED_SCOPE ("RenderDebugGUISystem::Render");
+  PROFILE_NAMED_SCOPE("RenderDebugGUISystem::Render");
 
 #ifdef OCTARINE_WITH_EDITOR
-if (!editorPersistence.pendingLayoutLoad.empty()) {
+  if (!editorPersistence.pendingLayoutLoad.empty()) {
     if (editorPersistence.pendingLayoutLoad == "__default__") {
       octarine::editor::layouts::ApplyDefaultPreset(editorPersistence);
     } else {
@@ -124,355 +119,306 @@ if (!editorPersistence.pendingLayoutLoad.empty()) {
   }
 #endif
 
-ImGui_ImplSDLRenderer3_NewFrame();
-ImGui_ImplSDL3_NewFrame();
-ImGui::NewFrame();
+  ImGui_ImplSDLRenderer3_NewFrame();
+  ImGui_ImplSDL3_NewFrame();
+  ImGui::NewFrame();
 
 #ifdef OCTARINE_WITH_EDITOR
-static bool showProjectSelector = false;
-static bool openSaveLayoutModal = false;
-static bool openExportBuildModal = false;
+  static bool showProjectSelector = false;
+  static bool openSaveLayoutModal = false;
+  static bool openExportBuildModal = false;
 
-  if (showEditorUI)
-{
+  if (showEditorUI) {
     ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0, 0, 0, 0));
     ImGui::DockSpaceOverViewport(0, ImGui::GetMainViewport());
     ImGui::PopStyleColor();
 
-    if (ImGui::BeginMainMenuBar())
-    {
-        if (ImGui::BeginMenu("File"))
-        {
-            if (ImGui::MenuItem("Open Project...", "Ctrl+O"))
-            {
-                showProjectSelector = true;
-            }
-            if (ImGui::MenuItem("Save Preferences", "Ctrl+S"))
-            {
-                gameConfig.SaveUserPreferences();
-                editorPersistence.audioMuted = !engineOptions.audioEnabled;
-                editorPersistence.masterVolume = engineOptions.masterVolume;
-                editorPersistence.SaveGlobal();
-                if (projectLoaded) editorPersistence.SaveProject(gameConfig.GetAssetPath());
-            }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Quit", "Alt+F4"))
-            {
-                Game::Quit();
-            }
-            ImGui::EndMenu();
+    if (ImGui::BeginMainMenuBar()) {
+      if (ImGui::BeginMenu("File")) {
+        if (ImGui::MenuItem("Open Project...", "Ctrl+O")) {
+          showProjectSelector = true;
         }
-        if (ImGui::BeginMenu("Layout"))
-        {
-            const auto presets = octarine::editor::layouts::ListPresets();
-            if (ImGui::BeginMenu("Apply", !presets.empty()))
-            {
-                for (const auto& name : presets)
-                {
-                    if (ImGui::MenuItem(name.c_str()))
-                    {
-                        editorPersistence.pendingLayoutLoad = name;
-                    }
-                }
-                ImGui::EndMenu();
-            }
-            if (ImGui::BeginMenu("Delete", !presets.empty()))
-            {
-                for (const auto& name : presets)
-                {
-                    if (ImGui::MenuItem(name.c_str()))
-                    {
-                        octarine::editor::layouts::DeletePreset(name);
-                    }
-                }
-                ImGui::EndMenu();
-            }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Save Current As..."))
-            {
-                openSaveLayoutModal = true;
-            }
-            if (ImGui::MenuItem("Reset to Default"))
-            {
-                editorPersistence.pendingLayoutLoad = "__default__";
-            }
-            ImGui::EndMenu();
+        if (ImGui::MenuItem("Save Preferences", "Ctrl+S")) {
+          gameConfig.SaveUserPreferences();
+          editorPersistence.audioMuted = !engineOptions.audioEnabled;
+          editorPersistence.masterVolume = engineOptions.masterVolume;
+          editorPersistence.SaveGlobal();
+          if (projectLoaded) editorPersistence.SaveProject(gameConfig.GetAssetPath());
         }
-        if (ImGui::BeginMenu("Windows"))
-        {
-            ImGui::MenuItem("Scene View", nullptr, &editorPersistence.showSceneWindow);
-            ImGui::MenuItem("Scene Management", nullptr, &editorPersistence.showSceneManagement);
-            ImGui::MenuItem("Hierarchy", nullptr, &editorPersistence.showHierarchy);
-            ImGui::MenuItem("Asset Browser", nullptr, &editorPersistence.showAssetBrowser);
-            ImGui::MenuItem("Lua Console", nullptr, &editorPersistence.showLuaConsole);
-            ImGui::MenuItem("Performance Profiler", nullptr, &editorPersistence.showProfiler);
-            ImGui::MenuItem("Engine Options", nullptr, &editorPersistence.showEngineOptions);
-            ImGui::MenuItem("Editor Settings", nullptr, &editorPersistence.showEditorSettings);
-            ImGui::MenuItem("Player Output", nullptr, &editorPersistence.showPlayerOutput);
-            ImGui::MenuItem("Export Output", nullptr, &editorPersistence.showExportOutput);
-            ImGui::MenuItem("Signing Settings", nullptr, &editorPersistence.showSigningSettings);
-            ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI);
-            ImGui::Separator();
-            ImGui::MenuItem("FPS Counter", nullptr, &engineOptions.showFpsCounter);
-            ImGui::MenuItem("ImGui Demo Window", nullptr, &engineOptions.showImGuiDemoWindow);
-            ImGui::EndMenu();
+        ImGui::Separator();
+        if (ImGui::MenuItem("Quit", "Alt+F4")) {
+          Game::Quit();
         }
-        ImGui::EndMainMenuBar();
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Layout")) {
+        const auto presets = octarine::editor::layouts::ListPresets();
+        if (ImGui::BeginMenu("Apply", !presets.empty())) {
+          for (const auto& name : presets) {
+            if (ImGui::MenuItem(name.c_str())) {
+              editorPersistence.pendingLayoutLoad = name;
+            }
+          }
+          ImGui::EndMenu();
+        }
+        if (ImGui::BeginMenu("Delete", !presets.empty())) {
+          for (const auto& name : presets) {
+            if (ImGui::MenuItem(name.c_str())) {
+              octarine::editor::layouts::DeletePreset(name);
+            }
+          }
+          ImGui::EndMenu();
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Save Current As...")) {
+          openSaveLayoutModal = true;
+        }
+        if (ImGui::MenuItem("Reset to Default")) {
+          editorPersistence.pendingLayoutLoad = "__default__";
+        }
+        ImGui::EndMenu();
+      }
+      if (ImGui::BeginMenu("Windows")) {
+        ImGui::MenuItem("Scene View", nullptr, &editorPersistence.showSceneWindow);
+        ImGui::MenuItem("Scene Management", nullptr, &editorPersistence.showSceneManagement);
+        ImGui::MenuItem("Hierarchy", nullptr, &editorPersistence.showHierarchy);
+        ImGui::MenuItem("Asset Browser", nullptr, &editorPersistence.showAssetBrowser);
+        ImGui::MenuItem("Lua Console", nullptr, &editorPersistence.showLuaConsole);
+        ImGui::MenuItem("Performance Profiler", nullptr, &editorPersistence.showProfiler);
+        ImGui::MenuItem("Engine Options", nullptr, &editorPersistence.showEngineOptions);
+        ImGui::MenuItem("Editor Settings", nullptr, &editorPersistence.showEditorSettings);
+        ImGui::MenuItem("Player Output", nullptr, &editorPersistence.showPlayerOutput);
+        ImGui::MenuItem("Export Output", nullptr, &editorPersistence.showExportOutput);
+        ImGui::MenuItem("Signing Settings", nullptr, &editorPersistence.showSigningSettings);
+        ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI);
+        ImGui::Separator();
+        ImGui::MenuItem("FPS Counter", nullptr, &engineOptions.showFpsCounter);
+        ImGui::MenuItem("ImGui Demo Window", nullptr, &engineOptions.showImGuiDemoWindow);
+        ImGui::EndMenu();
+      }
+      ImGui::EndMainMenuBar();
     }
 
     // Playback toolbar: a fixed full-width bar pinned directly under the main menu bar.
     // Submitting it as an Up side-bar after the menu bar stacks it beneath the menu.
     {
-        ImGuiViewport* vp = ImGui::GetMainViewport();
-        if (ImGui::BeginViewportSideBar("##PlaybackToolbar", vp, ImGuiDir_Up, ImGui::GetFrameHeight(),
-                                        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar))
-        {
-            if (ImGui::BeginMenuBar())
-            {
-                const bool hasScene = !editorPersistence.currentScenePath.empty();
+      ImGuiViewport* vp = ImGui::GetMainViewport();
+      if (ImGui::BeginViewportSideBar("##PlaybackToolbar", vp, ImGuiDir_Up, ImGui::GetFrameHeight(),
+                                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_MenuBar)) {
+        if (ImGui::BeginMenuBar()) {
+          const bool hasScene = !editorPersistence.currentScenePath.empty();
 
-                // Play — resume execution. If a configured scene was stopped, (re)start it first.
-                // Disabled while already running so the button reads as the current state.
-                ImGui::BeginDisabled(!engineOptions.isPaused);
-                if (ImGui::Button("Play"))
-                {
-                    if (!game->IsSceneRunning() && hasScene)
-                    {
-                        game->ReloadScene();
-                    }
-                    engineOptions.isPaused = false;
-                }
-                ImGui::EndDisabled();
-                ImGui::SameLine();
-                ImGui::BeginDisabled(engineOptions.isPaused);
-                if (ImGui::Button("Pause"))
-                {
-                    engineOptions.isPaused = true;
-                }
-                ImGui::EndDisabled();
-                ImGui::SameLine();
-                if (ImGui::Button("Step")) // freeze, then advance exactly one frame
-                {
-                    engineOptions.isPaused = true;
-                    engineOptions.stepFrame = true;
-                }
-                ImGui::SameLine();
-                if (ImGui::Button("Stop"))
-                {
-                    game->StopScene();
-                    engineOptions.isPaused = true; // back to the default ready-but-paused state
-                }
-
-                ImGui::SameLine();
-                if (ImGui::Button(engineOptions.audioEnabled ? "Mute" : "Unmute"))
-                {
-                    engineOptions.audioEnabled = !engineOptions.audioEnabled;
-                    editorPersistence.audioMuted = !engineOptions.audioEnabled;
-                    editorPersistence.masterVolume = engineOptions.masterVolume;
-                    editorPersistence.SaveGlobal(); // persist immediately
-                }
-
-                ImGui::SameLine();
-                // Run Player / Stop Player: spawns the standalone OctarineEngine-player process
-                // pointed at the currently-loaded project. Separate from the embedded Play button
-                // above, which only resumes the in-editor scene.
-                {
-                    const bool playerRunning =
-                        playerLauncher.Status() == octarine::editor::PlayerStatus::Running;
-                    const bool canRun = projectLoaded || !registry->Get<AssetManager>().GetBasePath().empty();
-                    ImGui::BeginDisabled(!playerRunning && !canRun);
-                    if (ImGui::Button(playerRunning ? "Stop Player" : "Run Player"))
-                    {
-                        if (playerRunning)
-                        {
-                            playerLauncher.Stop();
-                        }
-                        else
-                        {
-                            // Player Output panel auto-opens so the dev sees launch / spawn errors.
-                            editorPersistence.showPlayerOutput = true;
-                            const std::string projectDir = registry->Get<AssetManager>().GetBasePath();
-                            playerLauncher.Run(std::filesystem::path(projectDir));
-                        }
-                    }
-                    ImGui::EndDisabled();
-                }
-
-                ImGui::SameLine();
-                // Export Build: opens a modal to spawn the project's scaffolded
-                // scripts/build-desktop.{sh,ps1}. Disabled while a build is in flight; reads as
-                // "Stop Export" so the dev can cancel.
-                {
-                    const bool exportRunning =
-                        exportBuilder.Status() == octarine::editor::ExportStatus::Building;
-                    const bool canExport = projectLoaded || !registry->Get<AssetManager>().GetBasePath().empty();
-                    ImGui::BeginDisabled(!exportRunning && !canExport);
-                    if (ImGui::Button(exportRunning ? "Stop Export" : "Export Build..."))
-                    {
-                        if (exportRunning)
-                        {
-                            exportBuilder.Stop();
-                        }
-                        else
-                        {
-                            openExportBuildModal = true;
-                        }
-                    }
-                    ImGui::EndDisabled();
-                }
-                ImGui::EndMenuBar();
+          // Play — resume execution. If a configured scene was stopped, (re)start it first.
+          // Disabled while already running so the button reads as the current state.
+          ImGui::BeginDisabled(!engineOptions.isPaused);
+          if (ImGui::Button("Play")) {
+            if (!game->IsSceneRunning() && hasScene) {
+              game->ReloadScene();
             }
+            engineOptions.isPaused = false;
+          }
+          ImGui::EndDisabled();
+          ImGui::SameLine();
+          ImGui::BeginDisabled(engineOptions.isPaused);
+          if (ImGui::Button("Pause")) {
+            engineOptions.isPaused = true;
+          }
+          ImGui::EndDisabled();
+          ImGui::SameLine();
+          if (ImGui::Button("Step"))  // freeze, then advance exactly one frame
+          {
+            engineOptions.isPaused = true;
+            engineOptions.stepFrame = true;
+          }
+          ImGui::SameLine();
+          if (ImGui::Button("Stop")) {
+            game->StopScene();
+            engineOptions.isPaused = true;  // back to the default ready-but-paused state
+          }
+
+          ImGui::SameLine();
+          if (ImGui::Button(engineOptions.audioEnabled ? "Mute" : "Unmute")) {
+            engineOptions.audioEnabled = !engineOptions.audioEnabled;
+            editorPersistence.audioMuted = !engineOptions.audioEnabled;
+            editorPersistence.masterVolume = engineOptions.masterVolume;
+            editorPersistence.SaveGlobal();  // persist immediately
+          }
+
+          ImGui::SameLine();
+          // Run Player / Stop Player: spawns the standalone OctarineEngine-player process
+          // pointed at the currently-loaded project. Separate from the embedded Play button
+          // above, which only resumes the in-editor scene.
+          {
+            const bool playerRunning = playerLauncher.Status() == octarine::editor::PlayerStatus::Running;
+            const bool canRun = projectLoaded || !registry->Get<AssetManager>().GetBasePath().empty();
+            ImGui::BeginDisabled(!playerRunning && !canRun);
+            if (ImGui::Button(playerRunning ? "Stop Player" : "Run Player")) {
+              if (playerRunning) {
+                playerLauncher.Stop();
+              } else {
+                // Player Output panel auto-opens so the dev sees launch / spawn errors.
+                editorPersistence.showPlayerOutput = true;
+                const std::string projectDir = registry->Get<AssetManager>().GetBasePath();
+                playerLauncher.Run(std::filesystem::path(projectDir));
+              }
+            }
+            ImGui::EndDisabled();
+          }
+
+          ImGui::SameLine();
+          // Export Build: opens a modal to spawn the project's scaffolded
+          // scripts/build-desktop.{sh,ps1}. Disabled while a build is in flight; reads as
+          // "Stop Export" so the dev can cancel.
+          {
+            const bool exportRunning = exportBuilder.Status() == octarine::editor::ExportStatus::Building;
+            const bool canExport = projectLoaded || !registry->Get<AssetManager>().GetBasePath().empty();
+            ImGui::BeginDisabled(!exportRunning && !canExport);
+            if (ImGui::Button(exportRunning ? "Stop Export" : "Export Build...")) {
+              if (exportRunning) {
+                exportBuilder.Stop();
+              } else {
+                openExportBuildModal = true;
+              }
+            }
+            ImGui::EndDisabled();
+          }
+          ImGui::EndMenuBar();
         }
-        ImGui::End();
+      }
+      ImGui::End();
     }
 
-    if (openSaveLayoutModal)
-    {
-        ImGui::OpenPopup("Save Layout Preset");
-        openSaveLayoutModal = false;
+    if (openSaveLayoutModal) {
+      ImGui::OpenPopup("Save Layout Preset");
+      openSaveLayoutModal = false;
     }
 
-    if (openExportBuildModal)
-    {
-        ImGui::OpenPopup("Export Build");
-        openExportBuildModal = false;
+    if (openExportBuildModal) {
+      ImGui::OpenPopup("Export Build");
+      openExportBuildModal = false;
     }
-    if (ImGui::BeginPopupModal("Export Build", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        static char versionNameBuf[32] = "";
-        static char versionCodeBuf[16] = "";
-        static std::string lastProjectDir;
-        static std::vector<std::string> validationErrors;
-        static int targetIdx = 0; // 0=Desktop, 1=AndroidDebug, 2=AndroidRelease
+    if (ImGui::BeginPopupModal("Export Build", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      static char versionNameBuf[32] = "";
+      static char versionCodeBuf[16] = "";
+      static std::string lastProjectDir;
+      static std::vector<std::string> validationErrors;
+      static int targetIdx = 0;  // 0=Desktop, 1=AndroidDebug, 2=AndroidRelease
 
-        constexpr const char* kTargetLabels[] = {
-            "Desktop (host OS, ship-release)",
-            "Android (debug APK)",
-            "Android (release AAB)",
-        };
-        const auto targetForIdx = [](int idx) {
-            switch (idx)
-            {
-            case 1: return octarine::editor::ExportTarget::AndroidDebug;
-            case 2: return octarine::editor::ExportTarget::AndroidRelease;
-            default: return octarine::editor::ExportTarget::Desktop;
-            }
-        };
-
-        const std::string projectDir = registry->Get<AssetManager>().GetBasePath();
-
-        // Refresh the version-field defaults and validation when the project switches under the
-        // modal. The buffers themselves are static so a dev can edit and have the override stick
-        // across reopens within the same project.
-        if (projectDir != lastProjectDir)
-        {
-            lastProjectDir = projectDir;
-            versionNameBuf[0] = '\0';
-            versionCodeBuf[0] = '\0';
-            if (!projectDir.empty())
-            {
-                if (auto ini = octarine::project::ProjectIni::Load(std::filesystem::path(projectDir)))
-                {
-                    std::snprintf(versionNameBuf, sizeof(versionNameBuf), "%s", ini->version_name.c_str());
-                    std::snprintf(versionCodeBuf, sizeof(versionCodeBuf), "%s", ini->version_code.c_str());
-                }
-            }
-            validationErrors = octarine::editor::ExportBuilder::Validate(
-                std::filesystem::path(projectDir), targetForIdx(targetIdx));
+      constexpr const char* kTargetLabels[] = {
+          "Desktop (host OS, ship-release)",
+          "Android (debug APK)",
+          "Android (release AAB)",
+      };
+      const auto targetForIdx = [](int idx) {
+        switch (idx) {
+          case 1:
+            return octarine::editor::ExportTarget::AndroidDebug;
+          case 2:
+            return octarine::editor::ExportTarget::AndroidRelease;
+          default:
+            return octarine::editor::ExportTarget::Desktop;
         }
+      };
 
-        ImGui::TextDisabled("Project: %s", projectDir.empty() ? "(none)" : projectDir.c_str());
-        ImGui::SetNextItemWidth(260);
-        if (ImGui::Combo("Target", &targetIdx, kTargetLabels, IM_ARRAYSIZE(kTargetLabels)))
-        {
-            validationErrors = octarine::editor::ExportBuilder::Validate(
-                std::filesystem::path(projectDir), targetForIdx(targetIdx));
+      const std::string projectDir = registry->Get<AssetManager>().GetBasePath();
+
+      // Refresh the version-field defaults and validation when the project switches under the
+      // modal. The buffers themselves are static so a dev can edit and have the override stick
+      // across reopens within the same project.
+      if (projectDir != lastProjectDir) {
+        lastProjectDir = projectDir;
+        versionNameBuf[0] = '\0';
+        versionCodeBuf[0] = '\0';
+        if (!projectDir.empty()) {
+          if (auto ini = octarine::project::ProjectIni::Load(std::filesystem::path(projectDir))) {
+            std::snprintf(versionNameBuf, sizeof(versionNameBuf), "%s", ini->version_name.c_str());
+            std::snprintf(versionCodeBuf, sizeof(versionCodeBuf), "%s", ini->version_code.c_str());
+          }
         }
+        validationErrors =
+            octarine::editor::ExportBuilder::Validate(std::filesystem::path(projectDir), targetForIdx(targetIdx));
+      }
+
+      ImGui::TextDisabled("Project: %s", projectDir.empty() ? "(none)" : projectDir.c_str());
+      ImGui::SetNextItemWidth(260);
+      if (ImGui::Combo("Target", &targetIdx, kTargetLabels, IM_ARRAYSIZE(kTargetLabels))) {
+        validationErrors =
+            octarine::editor::ExportBuilder::Validate(std::filesystem::path(projectDir), targetForIdx(targetIdx));
+      }
+      ImGui::Separator();
+
+      ImGui::SetNextItemWidth(180);
+      ImGui::InputText("Version name", versionNameBuf, sizeof(versionNameBuf));
+      ImGui::SetNextItemWidth(180);
+      ImGui::InputText("Version code", versionCodeBuf, sizeof(versionCodeBuf));
+      ImGui::TextDisabled("Leave blank to fall through to project.ini.");
+
+      if (targetIdx == 2) {
         ImGui::Separator();
+        ImGui::TextColored(ImVec4(1.0F, 0.85F, 0.4F, 1.0F), "Android-release expects signing creds in env:");
+        ImGui::BulletText("OCTARINE_ANDROID_KEYSTORE_PATH");
+        ImGui::BulletText("OCTARINE_ANDROID_STORE_PASSWORD");
+        ImGui::BulletText("OCTARINE_ANDROID_KEY_ALIAS");
+        ImGui::BulletText("OCTARINE_ANDROID_KEY_PASSWORD");
+        ImGui::TextDisabled("Unset = falls back to the Gradle debug key. In-editor secret storage lands in PR-C.");
+      }
 
-        ImGui::SetNextItemWidth(180);
-        ImGui::InputText("Version name", versionNameBuf, sizeof(versionNameBuf));
-        ImGui::SetNextItemWidth(180);
-        ImGui::InputText("Version code", versionCodeBuf, sizeof(versionCodeBuf));
-        ImGui::TextDisabled("Leave blank to fall through to project.ini.");
-
-        if (targetIdx == 2)
-        {
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(1.0F, 0.85F, 0.4F, 1.0F),
-                               "Android-release expects signing creds in env:");
-            ImGui::BulletText("OCTARINE_ANDROID_KEYSTORE_PATH");
-            ImGui::BulletText("OCTARINE_ANDROID_STORE_PASSWORD");
-            ImGui::BulletText("OCTARINE_ANDROID_KEY_ALIAS");
-            ImGui::BulletText("OCTARINE_ANDROID_KEY_PASSWORD");
-            ImGui::TextDisabled(
-                "Unset = falls back to the Gradle debug key. In-editor secret storage lands in PR-C.");
-        }
-
-        if (!validationErrors.empty())
-        {
-            ImGui::Separator();
-            ImGui::TextColored(ImVec4(1.0F, 0.5F, 0.5F, 1.0F), "Validation errors:");
-            for (const auto& e : validationErrors)
-            {
-                ImGui::BulletText("%s", e.c_str());
-            }
-        }
-
+      if (!validationErrors.empty()) {
         ImGui::Separator();
+        ImGui::TextColored(ImVec4(1.0F, 0.5F, 0.5F, 1.0F), "Validation errors:");
+        for (const auto& e : validationErrors) {
+          ImGui::BulletText("%s", e.c_str());
+        }
+      }
 
-        const bool canBuild = validationErrors.empty() && !projectDir.empty();
-        ImGui::BeginDisabled(!canBuild);
-        if (ImGui::Button("Build"))
-        {
-            octarine::editor::ExportOptions opts;
-            opts.project_dir = std::filesystem::path(projectDir);
-            opts.target = targetForIdx(targetIdx);
-            opts.version_name = versionNameBuf;
-            opts.version_code = versionCodeBuf;
+      ImGui::Separator();
 
-            editorPersistence.showExportOutput = true;
-            exportBuilder.ClearLog();
-            exportBuilder.Run(opts);
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndDisabled();
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel"))
-        {
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Re-validate"))
-        {
-            validationErrors = octarine::editor::ExportBuilder::Validate(
-                std::filesystem::path(projectDir), targetForIdx(targetIdx));
-        }
-        ImGui::EndPopup();
+      const bool canBuild = validationErrors.empty() && !projectDir.empty();
+      ImGui::BeginDisabled(!canBuild);
+      if (ImGui::Button("Build")) {
+        octarine::editor::ExportOptions opts;
+        opts.project_dir = std::filesystem::path(projectDir);
+        opts.target = targetForIdx(targetIdx);
+        opts.version_name = versionNameBuf;
+        opts.version_code = versionCodeBuf;
+
+        editorPersistence.showExportOutput = true;
+        exportBuilder.ClearLog();
+        exportBuilder.Run(opts);
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      if (ImGui::Button("Cancel")) {
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::SameLine();
+      if (ImGui::Button("Re-validate")) {
+        validationErrors =
+            octarine::editor::ExportBuilder::Validate(std::filesystem::path(projectDir), targetForIdx(targetIdx));
+      }
+      ImGui::EndPopup();
     }
-    if (ImGui::BeginPopupModal("Save Layout Preset", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        static char nameBuf[64] = "";
-        ImGui::Text("Preset name:");
-        ImGui::SetNextItemWidth(260);
-        const bool enter = ImGui::InputText("##layoutname", nameBuf, sizeof(nameBuf),
-                                            ImGuiInputTextFlags_EnterReturnsTrue);
-        const bool hasName = nameBuf[0] != '\0';
-        ImGui::BeginDisabled(!hasName);
-        if (ImGui::Button("Save") || (enter && hasName))
-        {
-            octarine::editor::layouts::SavePreset(nameBuf, editorPersistence);
-            nameBuf[0] = '\0';
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndDisabled();
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel"))
-        {
-            nameBuf[0] = '\0';
-            ImGui::CloseCurrentPopup();
-        }
-        ImGui::EndPopup();
+    if (ImGui::BeginPopupModal("Save Layout Preset", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+      static char nameBuf[64] = "";
+      ImGui::Text("Preset name:");
+      ImGui::SetNextItemWidth(260);
+      const bool enter =
+          ImGui::InputText("##layoutname", nameBuf, sizeof(nameBuf), ImGuiInputTextFlags_EnterReturnsTrue);
+      const bool hasName = nameBuf[0] != '\0';
+      ImGui::BeginDisabled(!hasName);
+      if (ImGui::Button("Save") || (enter && hasName)) {
+        octarine::editor::layouts::SavePreset(nameBuf, editorPersistence);
+        nameBuf[0] = '\0';
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndDisabled();
+      ImGui::SameLine();
+      if (ImGui::Button("Cancel")) {
+        nameBuf[0] = '\0';
+        ImGui::CloseCurrentPopup();
+      }
+      ImGui::EndPopup();
     }
 
     if (editorPersistence.showSceneWindow) SceneWindow(game, gameTexture, &editorPersistence.showSceneWindow);
@@ -482,51 +428,44 @@ static bool openExportBuildModal = false;
     if (editorPersistence.showAssetBrowser) AssetBrowserWindow(registry);
     if (editorPersistence.showLuaConsole) LuaConsoleWindow(game->GetLua());
     if (editorPersistence.showProfiler) PerformanceProfilerWindow();
-    if (editorPersistence.showEngineOptions)
-        EngineOptionsWindow(engineOptions, &editorPersistence.showEngineOptions);
+    if (editorPersistence.showEngineOptions) EngineOptionsWindow(engineOptions, &editorPersistence.showEngineOptions);
     if (editorPersistence.showEditorSettings)
-        EditorSettingsWindow(editorPersistence, &editorPersistence.showEditorSettings);
-    if (editorPersistence.showPlayerOutput)
-        PlayerOutputWindow(game, &editorPersistence.showPlayerOutput);
-    if (editorPersistence.showExportOutput)
-        ExportOutputWindow(game, &editorPersistence.showExportOutput);
-    if (editorPersistence.showSigningSettings)
-        SigningSettingsWindow(&editorPersistence.showSigningSettings);
+      EditorSettingsWindow(editorPersistence, &editorPersistence.showEditorSettings);
+    if (editorPersistence.showPlayerOutput) PlayerOutputWindow(game, &editorPersistence.showPlayerOutput);
+    if (editorPersistence.showExportOutput) ExportOutputWindow(game, &editorPersistence.showExportOutput);
+    if (editorPersistence.showSigningSettings) SigningSettingsWindow(&editorPersistence.showSigningSettings);
 
-    if (engineOptions.showImGuiDemoWindow)
-    {
-        ImGui::ShowDemoWindow();
+    if (engineOptions.showImGuiDemoWindow) {
+      ImGui::ShowDemoWindow();
     }
-}
+  }
 #endif
 
-if (showGameOverlays)
-{
-    if (projectLoaded)
-    {
-        auto query = registry->CreateQuery<ScriptComponent>();
-        RenderDebugGUISystem system;
-        query->ForEach(system);
+  if (showGameOverlays) {
+    if (projectLoaded) {
+      auto query = registry->CreateQuery<ScriptComponent>();
+      RenderDebugGUISystem system;
+      query->ForEach(system);
     }
     EntityInfoWindow(registry);
     FPSWindow(deltaTime);
-}else if (engineOptions.showFpsCounter) {
+  } else if (engineOptions.showFpsCounter) {
     FPSWindow(deltaTime);
   }
 
 #ifdef OCTARINE_WITH_EDITOR
-if (!projectLoaded|| showProjectSelector) {
+  if (!projectLoaded || showProjectSelector) {
     ProjectSelectorWindow(game, &showProjectSelector);
   }
 #endif
 
-ImGui::Render();
-ImGui_ImplSDLRenderer3_RenderDrawData (ImGui::GetDrawData(), renderer);
+  ImGui::Render();
+  ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 
 #ifdef OCTARINE_WITH_EDITOR
-// Honor any deferred font-rebuild requests now that the ImGui frame has ended.
-// Atlas rebuilds inside an active frame would corrupt draw state.
-if (editorPersistence.fontRebuildPending) {
+  // Honor any deferred font-rebuild requests now that the ImGui frame has ended.
+  // Atlas rebuilds inside an active frame would corrupt draw state.
+  if (editorPersistence.fontRebuildPending) {
     RebuildEditorFont(editorPersistence.editorFontSize);
     ApplyEditorStyle(editorPersistence.editorStyleIndex, editorPersistence.editorFontSize);
     editorPersistence.fontRebuildPending = false;
@@ -535,836 +474,706 @@ if (editorPersistence.fontRebuildPending) {
 }
 
 #ifdef OCTARINE_WITH_EDITOR
-void RenderDebugGUISystem::SceneManagementWindow(Game* game)
-{
-    auto* registry = game->GetRegistry();
-    auto& editorPersistence = registry->Get<EditorPersistence>();
+void RenderDebugGUISystem::SceneManagementWindow(Game* game) {
+  auto* registry = game->GetRegistry();
+  auto& editorPersistence = registry->Get<EditorPersistence>();
 
-    ImGui::Begin("Scene Management", &editorPersistence.showSceneManagement);
+  ImGui::Begin("Scene Management", &editorPersistence.showSceneManagement);
 
-    static std::string scenePath;
-    static std::string lastKnownScenePath;
-    if (lastKnownScenePath != editorPersistence.currentScenePath)
-    {
-        scenePath = editorPersistence.currentScenePath;
-        lastKnownScenePath = editorPersistence.currentScenePath;
+  static std::string scenePath;
+  static std::string lastKnownScenePath;
+  if (lastKnownScenePath != editorPersistence.currentScenePath) {
+    scenePath = editorPersistence.currentScenePath;
+    lastKnownScenePath = editorPersistence.currentScenePath;
+  }
+
+  ImGui::Text("Scene Script Path:");
+  // Reserve exactly the width of the trailing "..." + "Load" buttons so the input field doesn't
+  // push them off-screen at large editor font sizes.
+  const ImGuiStyle& style = ImGui::GetStyle();
+  const float sceneButtonsWidth = ImGui::CalcTextSize("...").x + ImGui::CalcTextSize("Load").x +
+                                  style.FramePadding.x * 4.0F + style.ItemSpacing.x * 2.0F;
+  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - sceneButtonsWidth);
+  octarine::editor::inspectors::InputTextString("##scenepath", scenePath);
+  ImGui::SameLine();
+  if (ImGui::Button("...")) {
+    const SDL_DialogFileFilter filters[] = {{"Lua Scripts", "lua"}, {"All Files", "*"}};
+    SDL_ShowOpenFileDialog(OnSceneFileSelected, game, game->GetWindow(), filters, 2, nullptr, false);
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Load")) {
+    game->LoadScene(scenePath);
+  }
+
+  ImGui::Separator();
+
+  if (!editorPersistence.currentScenePath.empty()) {
+    ImGui::Text("Current Scene: %s", editorPersistence.currentScenePath.c_str());
+    if (ImGui::Button("Reload")) {
+      game->ReloadScene();
     }
-
-    ImGui::Text("Scene Script Path:");
-    // Reserve exactly the width of the trailing "..." + "Load" buttons so the input field doesn't
-    // push them off-screen at large editor font sizes.
-    const ImGuiStyle& style = ImGui::GetStyle();
-    const float sceneButtonsWidth = ImGui::CalcTextSize("...").x + ImGui::CalcTextSize("Load").x +
-        style.FramePadding.x * 4.0F + style.ItemSpacing.x * 2.0F;
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - sceneButtonsWidth);
-    octarine::editor::inspectors::InputTextString("##scenepath", scenePath);
     ImGui::SameLine();
-    if (ImGui::Button("..."))
-    {
-        const SDL_DialogFileFilter filters[] = {{"Lua Scripts", "lua"}, {"All Files", "*"}};
-        SDL_ShowOpenFileDialog(OnSceneFileSelected, game, game->GetWindow(), filters, 2, nullptr, false);
+    if (ImGui::Button("Stop")) {
+      game->StopScene();
     }
-    ImGui::SameLine();
-    if (ImGui::Button("Load"))
-    {
-        game->LoadScene(scenePath);
-    }
+  } else {
+    ImGui::Text("No scene currently loaded.");
+  }
 
-    ImGui::Separator();
+  ImGui::Separator();
+  ImGui::TextDisabled("Enter path relative to project root (e.g. scripts/level1.lua)");
 
-    if (!editorPersistence.currentScenePath.empty())
-    {
-        ImGui::Text("Current Scene: %s", editorPersistence.currentScenePath.c_str());
-        if (ImGui::Button("Reload"))
-        {
-            game->ReloadScene();
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Stop"))
-        {
-            game->StopScene();
-        }
-    }
-    else
-    {
-        ImGui::Text("No scene currently loaded.");
-    }
-
-    ImGui::Separator();
-    ImGui::TextDisabled("Enter path relative to project root (e.g. scripts/level1.lua)");
-
-    ImGui::End();
+  ImGui::End();
 }
 
-void RenderDebugGUISystem::EngineOptionsWindow(EngineOptions& options, bool* p_open)
-{
-    // Runtime engine options only. Window show/hide lives in the Windows menu (single source of truth).
-    ImGui::Begin("Engine Options", p_open);
-    ImGui::Checkbox("Show ImGui Demo Window", &options.showImGuiDemoWindow);
-    ImGui::Checkbox("Show FPS Counter", &options.showFpsCounter);
-    ImGui::Checkbox("Show Entity Info", &options.showEntityInfo);
-    ImGui::Checkbox("Draw Colliders", &options.drawColliders);
-    ImGui::Checkbox("Log Input Events", &options.logInputEvents);
-    ImGui::Checkbox("Audio Enabled", &options.audioEnabled);
-    ImGui::SliderFloat("Master Volume", &options.masterVolume, 0.0F, 1.0F);
-    ImGui::Separator();
-    ImGui::Checkbox("Pause Execution", &options.isPaused);
-    ImGui::SameLine();
-    if (ImGui::Button("Step Frame"))
-    {
-        options.stepFrame = true;
-    }
-    ImGui::SliderFloat("Time Scale", &options.timeScale, 0.0F, 5.0F);
-    ImGui::End();
+void RenderDebugGUISystem::EngineOptionsWindow(EngineOptions& options, bool* p_open) {
+  // Runtime engine options only. Window show/hide lives in the Windows menu (single source of truth).
+  ImGui::Begin("Engine Options", p_open);
+  ImGui::Checkbox("Show ImGui Demo Window", &options.showImGuiDemoWindow);
+  ImGui::Checkbox("Show FPS Counter", &options.showFpsCounter);
+  ImGui::Checkbox("Show Entity Info", &options.showEntityInfo);
+  ImGui::Checkbox("Draw Colliders", &options.drawColliders);
+  ImGui::Checkbox("Log Input Events", &options.logInputEvents);
+  ImGui::Checkbox("Audio Enabled", &options.audioEnabled);
+  ImGui::SliderFloat("Master Volume", &options.masterVolume, 0.0F, 1.0F);
+  ImGui::Separator();
+  ImGui::Checkbox("Pause Execution", &options.isPaused);
+  ImGui::SameLine();
+  if (ImGui::Button("Step Frame")) {
+    options.stepFrame = true;
+  }
+  ImGui::SliderFloat("Time Scale", &options.timeScale, 0.0F, 5.0F);
+  ImGui::End();
 }
 
-void RenderDebugGUISystem::EditorSettingsWindow(EditorPersistence& editorPersistence, bool* p_open)
-{
-    ImGui::Begin("Editor Settings", p_open);
+void RenderDebugGUISystem::EditorSettingsWindow(EditorPersistence& editorPersistence, bool* p_open) {
+  ImGui::Begin("Editor Settings", p_open);
 
-    ImGui::SeparatorText("Appearance");
+  ImGui::SeparatorText("Appearance");
 
-    float fontSize =
-        (editorPersistence.editorFontSize > 0.0F) ? editorPersistence.editorFontSize : kBaselineFontSize;
-    if (ImGui::SliderFloat("Font Size", &fontSize, 10.0F, 40.0F, "%.0f px"))
-    {
-        editorPersistence.editorFontSize = fontSize;
-    }
-    // Defer the actual atlas rebuild until the user releases the slider — rebuilding
-    // every frame while dragging is visibly laggy.
-    if (ImGui::IsItemDeactivatedAfterEdit())
-    {
-        editorPersistence.fontRebuildPending = true;
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Reset"))
-    {
-        editorPersistence.editorFontSize = kBaselineFontSize;
-        editorPersistence.fontRebuildPending = true;
-    }
+  float fontSize = (editorPersistence.editorFontSize > 0.0F) ? editorPersistence.editorFontSize : kBaselineFontSize;
+  if (ImGui::SliderFloat("Font Size", &fontSize, 10.0F, 40.0F, "%.0f px")) {
+    editorPersistence.editorFontSize = fontSize;
+  }
+  // Defer the actual atlas rebuild until the user releases the slider — rebuilding
+  // every frame while dragging is visibly laggy.
+  if (ImGui::IsItemDeactivatedAfterEdit()) {
+    editorPersistence.fontRebuildPending = true;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Reset")) {
+    editorPersistence.editorFontSize = kBaselineFontSize;
+    editorPersistence.fontRebuildPending = true;
+  }
 
-    const char* styles[] = {"Dark", "Light", "Classic"};
-    if (ImGui::Combo("Theme", &editorPersistence.editorStyleIndex, styles, IM_ARRAYSIZE(styles)))
-    {
-        ApplyEditorStyle(editorPersistence.editorStyleIndex, editorPersistence.editorFontSize);
-    }
+  const char* styles[] = {"Dark", "Light", "Classic"};
+  if (ImGui::Combo("Theme", &editorPersistence.editorStyleIndex, styles, IM_ARRAYSIZE(styles))) {
+    ApplyEditorStyle(editorPersistence.editorStyleIndex, editorPersistence.editorFontSize);
+  }
 
-    ImGui::End();
+  ImGui::End();
 }
 #endif
 
-void RenderDebugGUISystem::FPSWindow(const float deltaTime)
-{
-    static float fpsHistory[120] = {};
-    static int fpsOffset = 0;
-    const float fps = (deltaTime > 0.0f) ? 1.0f / deltaTime : 0.0f;
-    fpsHistory[fpsOffset] = fps;
-    fpsOffset = (fpsOffset + 1) % 120;
+void RenderDebugGUISystem::FPSWindow(const float deltaTime) {
+  static float fpsHistory[120] = {};
+  static int fpsOffset = 0;
+  const float fps = (deltaTime > 0.0f) ? 1.0f / deltaTime : 0.0f;
+  fpsHistory[fpsOffset] = fps;
+  fpsOffset = (fpsOffset + 1) % 120;
 
-    ImGui::Begin("FPS");
-    char overlay[32];
-    snprintf(overlay, sizeof(overlay), "%.1f FPS", static_cast<double>(fps));
-    ImGui::PlotLines("##fps", fpsHistory, 120, fpsOffset, overlay, 0.0f, 120.0f, ImVec2(0, 50));
-    ImGui::End();
+  ImGui::Begin("FPS");
+  char overlay[32];
+  snprintf(overlay, sizeof(overlay), "%.1f FPS", static_cast<double>(fps));
+  ImGui::PlotLines("##fps", fpsHistory, 120, fpsOffset, overlay, 0.0f, 120.0f, ImVec2(0, 50));
+  ImGui::End();
 }
 
-void RenderDebugGUISystem::EntityInfoWindow(const Registry* registry)
-{
-    const auto count = registry->GetUserEntityCount();
-    ImGui::Begin("Entity Info");
-    ImGui::Text("Entity Count: %llu", static_cast<unsigned long long>(count));
-    ImGui::End();
+void RenderDebugGUISystem::EntityInfoWindow(const Registry* registry) {
+  const auto count = registry->GetUserEntityCount();
+  ImGui::Begin("Entity Info");
+  ImGui::Text("Entity Count: %llu", static_cast<unsigned long long>(count));
+  ImGui::End();
 }
 
 #ifdef OCTARINE_WITH_EDITOR
-void RenderDebugGUISystem::PerformanceProfilerWindow()
-{
-    ImGui::Begin("Performance Profiler");
-    const auto times = PerfUtils::ProfilingAccumulator::GetAccumulatedTimes();
-    if (ImGui::BeginTable("profiler_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
-    {
-        ImGui::TableSetupColumn("System/Scope");
-        ImGui::TableSetupColumn("Time (ms)");
-        ImGui::TableHeadersRow();
+void RenderDebugGUISystem::PerformanceProfilerWindow() {
+  ImGui::Begin("Performance Profiler");
+  const auto times = PerfUtils::ProfilingAccumulator::GetAccumulatedTimes();
+  if (ImGui::BeginTable("profiler_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+    ImGui::TableSetupColumn("System/Scope");
+    ImGui::TableSetupColumn("Time (ms)");
+    ImGui::TableHeadersRow();
 
-        for (const auto& [name, duration_us] : times)
-        {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::Text("%s", name.c_str());
-            ImGui::TableSetColumnIndex(1);
-            ImGui::Text("%.3f", static_cast<double>(duration_us) * 0.001);
-        }
-        ImGui::EndTable();
+    for (const auto& [name, duration_us] : times) {
+      ImGui::TableNextRow();
+      ImGui::TableSetColumnIndex(0);
+      ImGui::Text("%s", name.c_str());
+      ImGui::TableSetColumnIndex(1);
+      ImGui::Text("%.3f", static_cast<double>(duration_us) * 0.001);
+    }
+    ImGui::EndTable();
+  }
+
+  ImGui::Separator();
+  const auto counters = PerfUtils::PerfCounters::GetCounters();
+  if (!counters.empty() && ImGui::BeginTable("counters_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg)) {
+    ImGui::TableSetupColumn("Counter");
+    ImGui::TableSetupColumn("Value");
+    ImGui::TableHeadersRow();
+
+    for (const auto& [name, value] : counters) {
+      ImGui::TableNextRow();
+      ImGui::TableSetColumnIndex(0);
+      ImGui::Text("%s", name.c_str());
+      ImGui::TableSetColumnIndex(1);
+      ImGui::Text("%lld", value);
+    }
+    ImGui::EndTable();
+  }
+  ImGui::End();
+}
+
+void RenderDebugGUISystem::HierarchyWindow(Registry* registry) {
+  ImGui::Begin("Hierarchy / Entity Inspector");
+  const auto entities = registry->GetUserEntities();
+  ImGui::Text("Total User Entities: %zu", entities.size());
+  if (ImGui::Button("Create Entity")) {
+    registry->CreateEntity();
+  }
+
+  static Entity selectedEntity{UINT64_MAX};
+  static ImGuiTextFilter entityFilter;
+  entityFilter.Draw("##filter", 140);
+
+  ImGui::BeginChild("EntityList", ImVec2(150, 0), true);
+  for (const auto& entity : entities) {
+    std::string label;
+    if (registry->HasComponent<NameComponent>(entity)) {
+      label = registry->GetComponent<NameComponent>(entity).name;
+    }
+    if (label.empty()) label = "Entity " + std::to_string(entity.id);
+    if (!entityFilter.PassFilter(label.c_str())) continue;
+    if (ImGui::Selectable(label.c_str(), selectedEntity == entity)) {
+      selectedEntity = entity;
+    }
+  }
+  ImGui::EndChild();
+
+  ImGui::SameLine();
+
+  ImGui::BeginChild("EntityDetails", ImVec2(0, 0), true);
+  if (registry->IsAlive(selectedEntity)) {
+    ImGui::Text("Selected Entity ID: %u", selectedEntity.GetId());
+    ImGui::SameLine();
+    if (ImGui::Button("Destroy Entity")) {
+      registry->BlamEntity(selectedEntity);
+      selectedEntity = Entity{UINT64_MAX};
+    }
+    if (registry->IsAlive(selectedEntity)) {
+      std::string name;
+      if (registry->HasComponent<NameComponent>(selectedEntity)) {
+        name = registry->GetComponent<NameComponent>(selectedEntity).name;
+      }
+      if (octarine::editor::inspectors::InputTextString("Name", name)) {
+        registry->AddComponent(selectedEntity, NameComponent(name));
+      }
+    }
+    ImGui::Separator();
+
+    // Per-component inspector blocks are driven by ComponentInspectorRegistry — each entry
+    // renders its own collapsing header when the entity has that component.
+    for (const auto& inspector : ComponentInspectorRegistry::all()) {
+      inspector.draw(registry, selectedEntity);
     }
 
     ImGui::Separator();
-    const auto counters = PerfUtils::PerfCounters::GetCounters();
-    if (!counters.empty() && ImGui::BeginTable("counters_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
-    {
-        ImGui::TableSetupColumn("Counter");
-        ImGui::TableSetupColumn("Value");
-        ImGui::TableHeadersRow();
-
-        for (const auto& [name, value] : counters)
-        {
-            ImGui::TableNextRow();
-            ImGui::TableSetColumnIndex(0);
-            ImGui::Text("%s", name.c_str());
-            ImGui::TableSetColumnIndex(1);
-            ImGui::Text("%lld", value);
+    if (ImGui::BeginCombo("Add Component", "Select...")) {
+      for (const auto& inspector : ComponentInspectorRegistry::all()) {
+        if (inspector.addDefault && !inspector.has(registry, selectedEntity) &&
+            ImGui::Selectable(inspector.displayName.c_str())) {
+          inspector.addDefault(registry, selectedEntity);
         }
-        ImGui::EndTable();
+      }
+      ImGui::EndCombo();
     }
-    ImGui::End();
+  } else {
+    ImGui::Text("No entity selected or entity destroyed.");
+  }
+  ImGui::EndChild();
+  ImGui::End();
 }
 
-void RenderDebugGUISystem::HierarchyWindow(Registry* registry)
-{
-    ImGui::Begin("Hierarchy / Entity Inspector");
-    const auto entities = registry->GetUserEntities();
-    ImGui::Text("Total User Entities: %zu", entities.size());
-    if (ImGui::Button("Create Entity"))
-    {
-        registry->CreateEntity();
-    }
-
-    static Entity selectedEntity{UINT64_MAX};
-    static ImGuiTextFilter entityFilter;
-    entityFilter.Draw("##filter", 140);
-
-    ImGui::BeginChild("EntityList", ImVec2(150, 0), true);
-    for (const auto& entity : entities)
-    {
-        std::string label;
-        if (registry->HasComponent<NameComponent>(entity))
-        {
-            label = registry->GetComponent<NameComponent>(entity).name;
-        }
-        if (label.empty()) label = "Entity " + std::to_string(entity.id);
-        if (!entityFilter.PassFilter(label.c_str())) continue;
-        if (ImGui::Selectable(label.c_str(), selectedEntity == entity))
-        {
-            selectedEntity = entity;
-        }
-    }
-    ImGui::EndChild();
-
-    ImGui::SameLine();
-
-    ImGui::BeginChild("EntityDetails", ImVec2(0, 0), true);
-    if (registry->IsAlive(selectedEntity))
-    {
-        ImGui::Text("Selected Entity ID: %u", selectedEntity.GetId());
-        ImGui::SameLine();
-        if (ImGui::Button("Destroy Entity"))
-        {
-            registry->BlamEntity(selectedEntity);
-            selectedEntity = Entity{UINT64_MAX};
-        }
-        if (registry->IsAlive(selectedEntity))
-        {
-            std::string name;
-            if (registry->HasComponent<NameComponent>(selectedEntity))
-            {
-                name = registry->GetComponent<NameComponent>(selectedEntity).name;
-            }
-            if (octarine::editor::inspectors::InputTextString("Name", name))
-            {
-                registry->AddComponent(selectedEntity, NameComponent(name));
-            }
-        }
-        ImGui::Separator();
-
-        // Per-component inspector blocks are driven by ComponentInspectorRegistry — each entry
-        // renders its own collapsing header when the entity has that component.
-        for (const auto& inspector : ComponentInspectorRegistry::all())
-        {
-            inspector.draw(registry, selectedEntity);
-        }
-
-        ImGui::Separator();
-        if (ImGui::BeginCombo("Add Component", "Select..."))
-        {
-            for (const auto& inspector : ComponentInspectorRegistry::all())
-            {
-                if (inspector.addDefault && !inspector.has(registry, selectedEntity) &&
-                    ImGui::Selectable(inspector.displayName.c_str()))
-                {
-                    inspector.addDefault(registry, selectedEntity);
-                }
-            }
-            ImGui::EndCombo();
-        }
-    }
-    else
-    {
-        ImGui::Text("No entity selected or entity destroyed.");
-    }
-    ImGui::EndChild();
+void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open) {
+  ImGui::SetNextWindowSize(ImVec2(400, 240), ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Project Selector", p_open, ImGuiWindowFlags_NoDocking)) {
     ImGui::End();
-}
+    return;
+  }
+  auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
+  static std::string projectPath;
+  static std::string lastKnownProjectPath;
+  if (lastKnownProjectPath != editorPersistence.lastProjectPath) {
+    projectPath = editorPersistence.lastProjectPath;
+    lastKnownProjectPath = editorPersistence.lastProjectPath;
+  }
 
-void RenderDebugGUISystem::ProjectSelectorWindow(Game* game, bool* p_open)
-{
-    ImGui::SetNextWindowSize(ImVec2(400, 240), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Project Selector", p_open, ImGuiWindowFlags_NoDocking))
-    {
-        ImGui::End();
-        return;
-    }
-    auto& editorPersistence = game->GetRegistry()->Get<EditorPersistence>();
-    static std::string projectPath;
-    static std::string lastKnownProjectPath;
-    if (lastKnownProjectPath != editorPersistence.lastProjectPath)
-    {
-        projectPath = editorPersistence.lastProjectPath;
-        lastKnownProjectPath = editorPersistence.lastProjectPath;
-    }
+  ImGui::Text("Enter Project Path:");
+  // Reserve the trailing "..." button width so the input scales with the editor font size.
+  const ImGuiStyle& style = ImGui::GetStyle();
+  const float browseButtonWidth = ImGui::CalcTextSize("...").x + style.FramePadding.x * 2.0F + style.ItemSpacing.x;
+  ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - browseButtonWidth);
+  octarine::editor::inspectors::InputTextString("##path", projectPath);
+  ImGui::SameLine();
+  if (ImGui::Button("...")) {
+    SDL_ShowOpenFolderDialog(OnProjectFolderSelected, game, game->GetWindow(), nullptr, false);
+  }
 
-    ImGui::Text("Enter Project Path:");
-    // Reserve the trailing "..." button width so the input scales with the editor font size.
-    const ImGuiStyle& style = ImGui::GetStyle();
-    const float browseButtonWidth = ImGui::CalcTextSize("...").x + style.FramePadding.x * 2.0F + style.ItemSpacing.x;
-    ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x - browseButtonWidth);
-    octarine::editor::inspectors::InputTextString("##path", projectPath);
-    ImGui::SameLine();
-    if (ImGui::Button("..."))
-    {
-        SDL_ShowOpenFolderDialog(OnProjectFolderSelected, game, game->GetWindow(), nullptr, false);
-    }
-
-    if (ImGui::Button("Open Project", ImVec2(ImGui::GetContentRegionAvail().x, 0)))
-    {
-        editorPersistence.lastProjectPath = projectPath;
-        editorPersistence.SaveGlobal();
-        *p_open = false;
-        ImGui::OpenPopup("Restart Required");
-    }
-    if (ImGui::BeginPopupModal("Restart Required", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::Text("Project path saved. Please restart the engine to load the new project.");
-        if (ImGui::Button("OK", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
-        ImGui::EndPopup();
-    }
-    if (!editorPersistence.lastProjectPath.empty())
-    {
-        ImGui::Separator();
-        ImGui::Text("Last Project: %s", editorPersistence.lastProjectPath.c_str());
-        if (ImGui::Button("Load Last Project"))
-            projectPath = editorPersistence.lastProjectPath;
-    }
-    ImGui::End();
-}
-
-void RenderDebugGUISystem::SceneWindow(Game* game, SDL_Texture* gameTexture, bool* p_open)
-{
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    if (ImGui::Begin("Scene View", p_open))
-    {
-        ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
-        if (gameTexture)
-        {
-            float texW = 0, texH = 0;
-            SDL_GetTextureSize(gameTexture, &texW, &texH);
-            if (texW > 0 && texH > 0)
-            {
-                float aspectRatio = texW / texH;
-                float targetW = viewportPanelSize.x;
-                float targetH = targetW / aspectRatio;
-                if (targetH > viewportPanelSize.y)
-                {
-                    targetH = viewportPanelSize.y;
-                    targetW = targetH * aspectRatio;
-                }
-                ImVec2 imageSize(targetW, targetH);
-
-                // Center the image within the available content area.
-                float offsetX = (viewportPanelSize.x - imageSize.x) * 0.5f;
-                float offsetY = (viewportPanelSize.y - imageSize.y) * 0.5f;
-                ImVec2 contentStartPos = ImGui::GetCursorPos();
-                ImGui::SetCursorPos(ImVec2(contentStartPos.x + offsetX, contentStartPos.y + offsetY));
-
-                // Record the image's screen rect (relative to the main viewport origin) so input
-                // systems can map window-space cursor coordinates into the shrunken game viewport.
-                ImVec2 imageScreenPos = ImGui::GetCursorScreenPos();
-                ImVec2 windowPos = ImGui::GetMainViewport()->Pos;
-                auto& viewportInfo = game->GetRegistry()->Get<ViewportInfo>();
-                viewportInfo.x = imageScreenPos.x - windowPos.x;
-                viewportInfo.y = imageScreenPos.y - windowPos.y;
-                viewportInfo.width = imageSize.x;
-                viewportInfo.height = imageSize.y;
-
-                ImGui::Image(reinterpret_cast<ImTextureID>(gameTexture), imageSize);
-                viewportInfo.isHovered = ImGui::IsItemHovered();
-                viewportInfo.isFocused = ImGui::IsWindowFocused();
-            }
-        }
-    }
-    ImGui::End();
-    ImGui::PopStyleVar();
-}
-
-void RenderDebugGUISystem::AssetBrowserWindow(Registry* registry)
-{
-    ImGui::Begin("Asset Browser");
-    auto& assetManager = registry->Get<AssetManager>();
-    if (ImGui::CollapsingHeader("Textures", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        const auto& textures = assetManager.GetTextures();
-        ImGui::Text("Loaded: %zu", textures.size());
-        for (const auto& [id, texture] : textures) ImGui::BulletText("%s", id.c_str());
-    }
-    if (ImGui::CollapsingHeader("Fonts", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        const auto& fonts = assetManager.GetFonts();
-        ImGui::Text("Loaded: %zu", fonts.size());
-        for (const auto& [id, font] : fonts) ImGui::BulletText("%s", id.c_str());
-    }
-    if (ImGui::CollapsingHeader("Audio Clips", ImGuiTreeNodeFlags_DefaultOpen))
-    {
-        const auto& audioClips = assetManager.GetAudioClips();
-        ImGui::Text("Loaded: %zu", audioClips.size());
-        for (const auto& [id, clip] : audioClips) ImGui::BulletText("%s", id.c_str());
-    }
-    ImGui::End();
-}
-
-void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua)
-{
-    static char inputBuffer[256] = "";
-    static std::vector<std::string> commandHistory;
-    static int commandHistoryIndex = -1;
-    static bool scrollToBottom = true;
-    static bool reclaimFocus = false;
-
-    ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Lua Console", nullptr, ImGuiWindowFlags_NoScrollbar))
-    {
-        ImGui::End();
-        return;
-    }
-
-    if (ImGui::Button("Clear"))
-    {
-        Logger::ClearHistory();
-    }
-    ImGui::SameLine();
-    ImGui::TextDisabled("Type Lua commands below. Use Up/Down for history.");
-
-    const float footerHeightToReserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
-    ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footerHeightToReserve), false,
-                      ImGuiWindowFlags_HorizontalScrollbar);
-
-    Logger::ForEachHistory([](const std::string& line)
-    {
-        ImVec4 color = ImVec4(1.0F, 1.0F, 1.0F, 1.0F);
-        if (line.find("[Error]") != std::string::npos)
-        {
-            color = ImVec4(1.0F, 0.4F, 0.4F, 1.0F);
-        }
-        else if (line.find("[Warn]") != std::string::npos)
-        {
-            color = ImVec4(1.0F, 1.0F, 0.4F, 1.0F);
-        }
-        else if (line.find("[Info]") != std::string::npos)
-        {
-            color = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
-        }
-        else if (line.find("> ") == 0)
-        {
-            color = ImVec4(0.4F, 0.8F, 1.0F, 1.0F);
-        }
-        ImGui::PushStyleColor(ImGuiCol_Text, color);
-        ImGui::TextUnformatted(line.c_str());
-        ImGui::PopStyleColor();
-    });
-
-    // Snap to bottom on an explicit request (open / new command) or when already pinned to the
-    // bottom so fresh logs keep scrolling in. Scrolling up disengages the auto-follow.
-    if (scrollToBottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
-    {
-        ImGui::SetScrollHereY(1.0f);
-    }
-    scrollToBottom = false;
-    ImGui::EndChild();
-
+  if (ImGui::Button("Open Project", ImVec2(ImGui::GetContentRegionAvail().x, 0))) {
+    editorPersistence.lastProjectPath = projectPath;
+    editorPersistence.SaveGlobal();
+    *p_open = false;
+    ImGui::OpenPopup("Restart Required");
+  }
+  if (ImGui::BeginPopupModal("Restart Required", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    ImGui::Text("Project path saved. Please restart the engine to load the new project.");
+    if (ImGui::Button("OK", ImVec2(120, 0))) ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+  }
+  if (!editorPersistence.lastProjectPath.empty()) {
     ImGui::Separator();
-
-    struct CallbackData
-    {
-        std::vector<std::string>* history;
-        int* index;
-    } cbData{&commandHistory, &commandHistoryIndex};
-
-    auto wrappedCallback = [](ImGuiInputTextCallbackData* data) -> int
-    {
-        auto* cb = static_cast<CallbackData*>(data->UserData);
-        if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory)
-        {
-            if (data->EventKey == ImGuiKey_UpArrow)
-            {
-                if (*cb->index == -1)
-                {
-                    *cb->index = static_cast<int>(cb->history->size()) - 1;
-                }
-                else if (*cb->index > 0)
-                {
-                    (*cb->index)--;
-                }
-            }
-            else if (data->EventKey == ImGuiKey_DownArrow)
-            {
-                if (*cb->index != -1)
-                {
-                    if (*cb->index < static_cast<int>(cb->history->size()) - 1)
-                    {
-                        (*cb->index)++;
-                    }
-                    else
-                    {
-                        *cb->index = -1;
-                    }
-                }
-            }
-            if (*cb->index != -1)
-            {
-                data->DeleteChars(0, data->BufTextLen);
-                data->InsertChars(0, (*cb->history)[static_cast<size_t>(*cb->index)].c_str());
-            }
-            else
-            {
-                data->DeleteChars(0, data->BufTextLen);
-            }
-        }
-        return 0;
-    };
-
-    ImGuiInputTextFlags inputTextFlags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory;
-    ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::InputText("##Input", inputBuffer, IM_ARRAYSIZE(inputBuffer), inputTextFlags, wrappedCallback, &cbData))
-    {
-        std::string command(inputBuffer);
-        if (!command.empty())
-        {
-            Logger::LogLua("> " + command);
-            commandHistory.push_back(command);
-            commandHistoryIndex = -1;
-
-            auto result = lua.safe_script(command, sol::script_pass_on_error);
-            if (!result.valid())
-            {
-                const sol::error err = result;
-                Logger::ErrorLua(std::string(err.what()));
-            }
-
-            inputBuffer[0] = '\0';
-            scrollToBottom = true;
-            reclaimFocus = true;
-        }
-    }
-
-    // Only refocus the input right after submitting a command. Don't steal focus whenever the
-    // window is focused — that prevented scrolling the log with the keyboard.
-    if (reclaimFocus)
-    {
-        ImGui::SetKeyboardFocusHere(-1);
-        reclaimFocus = false;
-    }
-
-    ImGui::End();
+    ImGui::Text("Last Project: %s", editorPersistence.lastProjectPath.c_str());
+    if (ImGui::Button("Load Last Project")) projectPath = editorPersistence.lastProjectPath;
+  }
+  ImGui::End();
 }
 
-void RenderDebugGUISystem::PlayerOutputWindow(Game* game, bool* p_open)
-{
-    auto& launcher = game->GetRegistry()->Get<octarine::editor::PlayerLauncher>();
+void RenderDebugGUISystem::SceneWindow(Game* game, SDL_Texture* gameTexture, bool* p_open) {
+  ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+  if (ImGui::Begin("Scene View", p_open)) {
+    ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
+    if (gameTexture) {
+      float texW = 0, texH = 0;
+      SDL_GetTextureSize(gameTexture, &texW, &texH);
+      if (texW > 0 && texH > 0) {
+        float aspectRatio = texW / texH;
+        float targetW = viewportPanelSize.x;
+        float targetH = targetW / aspectRatio;
+        if (targetH > viewportPanelSize.y) {
+          targetH = viewportPanelSize.y;
+          targetW = targetH * aspectRatio;
+        }
+        ImVec2 imageSize(targetW, targetH);
 
-    ImGui::SetNextWindowSize(ImVec2(560, 400), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Player Output", p_open, ImGuiWindowFlags_NoScrollbar))
-    {
-        ImGui::End();
-        return;
+        // Center the image within the available content area.
+        float offsetX = (viewportPanelSize.x - imageSize.x) * 0.5f;
+        float offsetY = (viewportPanelSize.y - imageSize.y) * 0.5f;
+        ImVec2 contentStartPos = ImGui::GetCursorPos();
+        ImGui::SetCursorPos(ImVec2(contentStartPos.x + offsetX, contentStartPos.y + offsetY));
+
+        // Record the image's screen rect (relative to the main viewport origin) so input
+        // systems can map window-space cursor coordinates into the shrunken game viewport.
+        ImVec2 imageScreenPos = ImGui::GetCursorScreenPos();
+        ImVec2 windowPos = ImGui::GetMainViewport()->Pos;
+        auto& viewportInfo = game->GetRegistry()->Get<ViewportInfo>();
+        viewportInfo.x = imageScreenPos.x - windowPos.x;
+        viewportInfo.y = imageScreenPos.y - windowPos.y;
+        viewportInfo.width = imageSize.x;
+        viewportInfo.height = imageSize.y;
+
+        ImGui::Image(reinterpret_cast<ImTextureID>(gameTexture), imageSize);
+        viewportInfo.isHovered = ImGui::IsItemHovered();
+        viewportInfo.isFocused = ImGui::IsWindowFocused();
+      }
     }
+  }
+  ImGui::End();
+  ImGui::PopStyleVar();
+}
 
-    const auto status = launcher.Status();
-    const char* statusText = "Idle";
-    ImVec4 statusColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
-    switch (status)
-    {
+void RenderDebugGUISystem::AssetBrowserWindow(Registry* registry) {
+  ImGui::Begin("Asset Browser");
+  auto& assetManager = registry->Get<AssetManager>();
+  if (ImGui::CollapsingHeader("Textures", ImGuiTreeNodeFlags_DefaultOpen)) {
+    const auto& textures = assetManager.GetTextures();
+    ImGui::Text("Loaded: %zu", textures.size());
+    for (const auto& [id, texture] : textures) ImGui::BulletText("%s", id.c_str());
+  }
+  if (ImGui::CollapsingHeader("Fonts", ImGuiTreeNodeFlags_DefaultOpen)) {
+    const auto& fonts = assetManager.GetFonts();
+    ImGui::Text("Loaded: %zu", fonts.size());
+    for (const auto& [id, font] : fonts) ImGui::BulletText("%s", id.c_str());
+  }
+  if (ImGui::CollapsingHeader("Audio Clips", ImGuiTreeNodeFlags_DefaultOpen)) {
+    const auto& audioClips = assetManager.GetAudioClips();
+    ImGui::Text("Loaded: %zu", audioClips.size());
+    for (const auto& [id, clip] : audioClips) ImGui::BulletText("%s", id.c_str());
+  }
+  ImGui::End();
+}
+
+void RenderDebugGUISystem::LuaConsoleWindow(sol::state& lua) {
+  static char inputBuffer[256] = "";
+  static std::vector<std::string> commandHistory;
+  static int commandHistoryIndex = -1;
+  static bool scrollToBottom = true;
+  static bool reclaimFocus = false;
+
+  ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Lua Console", nullptr, ImGuiWindowFlags_NoScrollbar)) {
+    ImGui::End();
+    return;
+  }
+
+  if (ImGui::Button("Clear")) {
+    Logger::ClearHistory();
+  }
+  ImGui::SameLine();
+  ImGui::TextDisabled("Type Lua commands below. Use Up/Down for history.");
+
+  const float footerHeightToReserve = ImGui::GetStyle().ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
+  ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footerHeightToReserve), false, ImGuiWindowFlags_HorizontalScrollbar);
+
+  Logger::ForEachHistory([](const std::string& line) {
+    ImVec4 color = ImVec4(1.0F, 1.0F, 1.0F, 1.0F);
+    if (line.find("[Error]") != std::string::npos) {
+      color = ImVec4(1.0F, 0.4F, 0.4F, 1.0F);
+    } else if (line.find("[Warn]") != std::string::npos) {
+      color = ImVec4(1.0F, 1.0F, 0.4F, 1.0F);
+    } else if (line.find("[Info]") != std::string::npos) {
+      color = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
+    } else if (line.find("> ") == 0) {
+      color = ImVec4(0.4F, 0.8F, 1.0F, 1.0F);
+    }
+    ImGui::PushStyleColor(ImGuiCol_Text, color);
+    ImGui::TextUnformatted(line.c_str());
+    ImGui::PopStyleColor();
+  });
+
+  // Snap to bottom on an explicit request (open / new command) or when already pinned to the
+  // bottom so fresh logs keep scrolling in. Scrolling up disengages the auto-follow.
+  if (scrollToBottom || ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+    ImGui::SetScrollHereY(1.0f);
+  }
+  scrollToBottom = false;
+  ImGui::EndChild();
+
+  ImGui::Separator();
+
+  struct CallbackData {
+    std::vector<std::string>* history;
+    int* index;
+  } cbData{&commandHistory, &commandHistoryIndex};
+
+  auto wrappedCallback = [](ImGuiInputTextCallbackData* data) -> int {
+    auto* cb = static_cast<CallbackData*>(data->UserData);
+    if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory) {
+      if (data->EventKey == ImGuiKey_UpArrow) {
+        if (*cb->index == -1) {
+          *cb->index = static_cast<int>(cb->history->size()) - 1;
+        } else if (*cb->index > 0) {
+          (*cb->index)--;
+        }
+      } else if (data->EventKey == ImGuiKey_DownArrow) {
+        if (*cb->index != -1) {
+          if (*cb->index < static_cast<int>(cb->history->size()) - 1) {
+            (*cb->index)++;
+          } else {
+            *cb->index = -1;
+          }
+        }
+      }
+      if (*cb->index != -1) {
+        data->DeleteChars(0, data->BufTextLen);
+        data->InsertChars(0, (*cb->history)[static_cast<size_t>(*cb->index)].c_str());
+      } else {
+        data->DeleteChars(0, data->BufTextLen);
+      }
+    }
+    return 0;
+  };
+
+  ImGuiInputTextFlags inputTextFlags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_CallbackHistory;
+  ImGui::SetNextItemWidth(-FLT_MIN);
+  if (ImGui::InputText("##Input", inputBuffer, IM_ARRAYSIZE(inputBuffer), inputTextFlags, wrappedCallback, &cbData)) {
+    std::string command(inputBuffer);
+    if (!command.empty()) {
+      Logger::LogLua("> " + command);
+      commandHistory.push_back(command);
+      commandHistoryIndex = -1;
+
+      auto result = lua.safe_script(command, sol::script_pass_on_error);
+      if (!result.valid()) {
+        const sol::error err = result;
+        Logger::ErrorLua(std::string(err.what()));
+      }
+
+      inputBuffer[0] = '\0';
+      scrollToBottom = true;
+      reclaimFocus = true;
+    }
+  }
+
+  // Only refocus the input right after submitting a command. Don't steal focus whenever the
+  // window is focused — that prevented scrolling the log with the keyboard.
+  if (reclaimFocus) {
+    ImGui::SetKeyboardFocusHere(-1);
+    reclaimFocus = false;
+  }
+
+  ImGui::End();
+}
+
+void RenderDebugGUISystem::PlayerOutputWindow(Game* game, bool* p_open) {
+  auto& launcher = game->GetRegistry()->Get<octarine::editor::PlayerLauncher>();
+
+  ImGui::SetNextWindowSize(ImVec2(560, 400), ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Player Output", p_open, ImGuiWindowFlags_NoScrollbar)) {
+    ImGui::End();
+    return;
+  }
+
+  const auto status = launcher.Status();
+  const char* statusText = "Idle";
+  ImVec4 statusColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
+  switch (status) {
     case octarine::editor::PlayerStatus::Running:
-        statusText = "Running";
-        statusColor = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
-        break;
+      statusText = "Running";
+      statusColor = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
+      break;
     case octarine::editor::PlayerStatus::Exited:
-        statusText = "Exited";
-        statusColor = ImVec4(1.0F, 1.0F, 0.4F, 1.0F);
-        break;
+      statusText = "Exited";
+      statusColor = ImVec4(1.0F, 1.0F, 0.4F, 1.0F);
+      break;
     case octarine::editor::PlayerStatus::FailedToLaunch:
-        statusText = "Failed to launch";
-        statusColor = ImVec4(1.0F, 0.4F, 0.4F, 1.0F);
-        break;
+      statusText = "Failed to launch";
+      statusColor = ImVec4(1.0F, 0.4F, 0.4F, 1.0F);
+      break;
     case octarine::editor::PlayerStatus::Idle:
     default:
-        break;
-    }
-    ImGui::TextDisabled("Status:");
+      break;
+  }
+  ImGui::TextDisabled("Status:");
+  ImGui::SameLine();
+  ImGui::TextColored(statusColor, "%s", statusText);
+  if (const auto code = launcher.LastExitCode()) {
     ImGui::SameLine();
-    ImGui::TextColored(statusColor, "%s", statusText);
-    if (const auto code = launcher.LastExitCode())
-    {
-        ImGui::SameLine();
-        ImGui::TextDisabled("(exit %d)", *code);
-    }
-    if (!launcher.ResolvedBinary().empty())
-    {
-        ImGui::TextDisabled("Binary: %s", launcher.ResolvedBinary().string().c_str());
-    }
+    ImGui::TextDisabled("(exit %d)", *code);
+  }
+  if (!launcher.ResolvedBinary().empty()) {
+    ImGui::TextDisabled("Binary: %s", launcher.ResolvedBinary().string().c_str());
+  }
 
-    if (ImGui::Button("Clear"))
-    {
-        launcher.ClearLog();
-    }
-    ImGui::SameLine();
-    static bool autoScroll = true;
-    ImGui::Checkbox("Auto-scroll", &autoScroll);
+  if (ImGui::Button("Clear")) {
+    launcher.ClearLog();
+  }
+  ImGui::SameLine();
+  static bool autoScroll = true;
+  ImGui::Checkbox("Auto-scroll", &autoScroll);
 
-    ImGui::Separator();
+  ImGui::Separator();
 
-    ImGui::BeginChild("PlayerOutputScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
-    const auto snap = launcher.LogCopy();
-    if (snap.total_dropped > 0)
-    {
-        ImGui::TextDisabled("[older %zu lines dropped]", snap.total_dropped);
+  ImGui::BeginChild("PlayerOutputScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+  const auto snap = launcher.LogCopy();
+  if (snap.total_dropped > 0) {
+    ImGui::TextDisabled("[older %zu lines dropped]", snap.total_dropped);
+  }
+  for (const auto& line : snap.lines) {
+    if (line.is_stderr) {
+      ImGui::TextColored(ImVec4(1.0F, 0.5F, 0.5F, 1.0F), "%s", line.text.c_str());
+    } else {
+      ImGui::TextUnformatted(line.text.c_str());
     }
-    for (const auto& line : snap.lines)
-    {
-        if (line.is_stderr)
-        {
-            ImGui::TextColored(ImVec4(1.0F, 0.5F, 0.5F, 1.0F), "%s", line.text.c_str());
-        }
-        else
-        {
-            ImGui::TextUnformatted(line.text.c_str());
-        }
-    }
-    if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
-    {
-        ImGui::SetScrollHereY(1.0F);
-    }
-    ImGui::EndChild();
+  }
+  if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+    ImGui::SetScrollHereY(1.0F);
+  }
+  ImGui::EndChild();
 
-    ImGui::End();
+  ImGui::End();
 }
 
-void RenderDebugGUISystem::ExportOutputWindow(Game* game, bool* p_open)
-{
-    auto& builder = game->GetRegistry()->Get<octarine::editor::ExportBuilder>();
+void RenderDebugGUISystem::ExportOutputWindow(Game* game, bool* p_open) {
+  auto& builder = game->GetRegistry()->Get<octarine::editor::ExportBuilder>();
 
-    ImGui::SetNextWindowSize(ImVec2(620, 420), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Export Output", p_open, ImGuiWindowFlags_NoScrollbar))
-    {
-        ImGui::End();
-        return;
-    }
+  ImGui::SetNextWindowSize(ImVec2(620, 420), ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Export Output", p_open, ImGuiWindowFlags_NoScrollbar)) {
+    ImGui::End();
+    return;
+  }
 
-    const auto status = builder.Status();
-    const char* statusText = "Idle";
-    ImVec4 statusColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
-    switch (status)
-    {
+  const auto status = builder.Status();
+  const char* statusText = "Idle";
+  ImVec4 statusColor = ImVec4(0.7F, 0.7F, 0.7F, 1.0F);
+  switch (status) {
     case octarine::editor::ExportStatus::Building:
-        statusText = "Building";
-        statusColor = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
-        break;
+      statusText = "Building";
+      statusColor = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
+      break;
     case octarine::editor::ExportStatus::Succeeded:
-        statusText = "Succeeded";
-        statusColor = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
-        break;
+      statusText = "Succeeded";
+      statusColor = ImVec4(0.4F, 1.0F, 0.4F, 1.0F);
+      break;
     case octarine::editor::ExportStatus::Failed:
-        statusText = "Failed";
-        statusColor = ImVec4(1.0F, 0.4F, 0.4F, 1.0F);
-        break;
+      statusText = "Failed";
+      statusColor = ImVec4(1.0F, 0.4F, 0.4F, 1.0F);
+      break;
     case octarine::editor::ExportStatus::Idle:
     default:
-        break;
-    }
-    ImGui::TextDisabled("Status:");
+      break;
+  }
+  ImGui::TextDisabled("Status:");
+  ImGui::SameLine();
+  ImGui::TextColored(statusColor, "%s", statusText);
+  if (const auto code = builder.LastExitCode()) {
     ImGui::SameLine();
-    ImGui::TextColored(statusColor, "%s", statusText);
-    if (const auto code = builder.LastExitCode())
-    {
-        ImGui::SameLine();
-        ImGui::TextDisabled("(exit %d)", *code);
-    }
-    if (!builder.ResolvedScript().empty())
-    {
-        ImGui::TextDisabled("Script: %s", builder.ResolvedScript().string().c_str());
-    }
+    ImGui::TextDisabled("(exit %d)", *code);
+  }
+  if (!builder.ResolvedScript().empty()) {
+    ImGui::TextDisabled("Script: %s", builder.ResolvedScript().string().c_str());
+  }
 
-    if (ImGui::Button("Clear"))
-    {
-        builder.ClearLog();
-    }
-    ImGui::SameLine();
-    static bool autoScroll = true;
-    ImGui::Checkbox("Auto-scroll", &autoScroll);
+  if (ImGui::Button("Clear")) {
+    builder.ClearLog();
+  }
+  ImGui::SameLine();
+  static bool autoScroll = true;
+  ImGui::Checkbox("Auto-scroll", &autoScroll);
 
-    ImGui::Separator();
+  ImGui::Separator();
 
-    ImGui::BeginChild("ExportOutputScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
-    const auto snap = builder.LogCopy();
-    if (snap.total_dropped > 0)
-    {
-        ImGui::TextDisabled("[older %zu lines dropped]", snap.total_dropped);
+  ImGui::BeginChild("ExportOutputScroll", ImVec2(0, 0), false, ImGuiWindowFlags_HorizontalScrollbar);
+  const auto snap = builder.LogCopy();
+  if (snap.total_dropped > 0) {
+    ImGui::TextDisabled("[older %zu lines dropped]", snap.total_dropped);
+  }
+  for (const auto& line : snap.lines) {
+    if (line.is_stderr) {
+      ImGui::TextColored(ImVec4(1.0F, 0.5F, 0.5F, 1.0F), "%s", line.text.c_str());
+    } else {
+      ImGui::TextUnformatted(line.text.c_str());
     }
-    for (const auto& line : snap.lines)
-    {
-        if (line.is_stderr)
-        {
-            ImGui::TextColored(ImVec4(1.0F, 0.5F, 0.5F, 1.0F), "%s", line.text.c_str());
-        }
-        else
-        {
-            ImGui::TextUnformatted(line.text.c_str());
-        }
-    }
-    if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY())
-    {
-        ImGui::SetScrollHereY(1.0F);
-    }
-    ImGui::EndChild();
+  }
+  if (autoScroll && ImGui::GetScrollY() >= ImGui::GetScrollMaxY()) {
+    ImGui::SetScrollHereY(1.0F);
+  }
+  ImGui::EndChild();
 
-    ImGui::End();
+  ImGui::End();
 }
 
-void RenderDebugGUISystem::SigningSettingsWindow(bool* p_open)
-{
-    ImGui::SetNextWindowSize(ImVec2(540, 360), ImGuiCond_FirstUseEver);
-    if (!ImGui::Begin("Signing Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize))
-    {
-        ImGui::End();
-        return;
-    }
-
-    // Per-field buffers persisted across frames. Populated with the placeholder string when an
-    // entry already exists in SecretStore so the dev sees "value stored" rather than the secret
-    // round-tripped into a visible password field.
-    static char keystorePathBuf[260] = "";
-    static char storePasswordBuf[128] = "";
-    static char keyAliasBuf[64] = "";
-    static char keyPasswordBuf[128] = "";
-    static bool initialized = false;
-    static bool keystorePathLoaded = false;
-
-    constexpr const char* kKeyPath  = "octarine.android.keystore_path";
-    constexpr const char* kKeyStore = "octarine.android.store_password";
-    constexpr const char* kKeyAlias = "octarine.android.key_alias";
-    constexpr const char* kKeyPwd   = "octarine.android.key_password";
-
-    if (!octarine::secrets::IsAvailable())
-    {
-        ImGui::TextColored(ImVec4(1.0F, 0.85F, 0.4F, 1.0F),
-                           "Secret storage is not available on this platform.");
-        ImGui::TextWrapped(
-            "Set the OCTARINE_ANDROID_* env vars (KEYSTORE_PATH, STORE_PASSWORD, KEY_ALIAS, "
-            "KEY_PASSWORD) in the shell that launches the editor. The Export Build modal will "
-            "pick them up via the editor's inherited environment.");
-        ImGui::End();
-        return;
-    }
-
-    // Lazy first-time load: the keystore path is non-secret-by-itself so we surface it directly;
-    // password / alias fields stay blank with a "Stored" indicator beside them so the secrets
-    // never round-trip through ImGui's input cache.
-    if (!initialized)
-    {
-        if (auto v = octarine::secrets::Get(kKeyPath))
-        {
-            std::snprintf(keystorePathBuf, sizeof(keystorePathBuf), "%s", v->c_str());
-            keystorePathLoaded = true;
-        }
-        if (auto v = octarine::secrets::Get(kKeyAlias))
-        {
-            std::snprintf(keyAliasBuf, sizeof(keyAliasBuf), "%s", v->c_str());
-        }
-        initialized = true;
-    }
-
-    const auto storedHint = [](const char* key) {
-        return octarine::secrets::Get(key).has_value() ? "(stored)" : "(empty)";
-    };
-
-    ImGui::TextWrapped(
-        "Android-release signing credentials. Stored via the OS secret backend (DPAPI on Windows, "
-        "Keychain on macOS) and injected into the build subprocess as OCTARINE_ANDROID_* env vars.");
-    ImGui::Separator();
-
-    ImGui::SetNextItemWidth(360);
-    ImGui::InputText("Keystore path", keystorePathBuf, sizeof(keystorePathBuf));
-
-    ImGui::SetNextItemWidth(220);
-    ImGui::InputText("Store password", storePasswordBuf, sizeof(storePasswordBuf),
-                     ImGuiInputTextFlags_Password);
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", storedHint(kKeyStore));
-
-    ImGui::SetNextItemWidth(220);
-    ImGui::InputText("Key alias", keyAliasBuf, sizeof(keyAliasBuf));
-
-    ImGui::SetNextItemWidth(220);
-    ImGui::InputText("Key password", keyPasswordBuf, sizeof(keyPasswordBuf),
-                     ImGuiInputTextFlags_Password);
-    ImGui::SameLine();
-    ImGui::TextDisabled("%s", storedHint(kKeyPwd));
-
-    ImGui::Separator();
-
-    if (ImGui::Button("Save"))
-    {
-        // Only overwrite secrets the dev typed something into this frame; preserves stored values
-        // when the dev only edits, say, the keystore path. The keystore path itself always writes
-        // (even when emptied, which Clears it via the empty-string branch).
-        if (keystorePathBuf[0] != '\0')
-        {
-            octarine::secrets::Set(kKeyPath, keystorePathBuf);
-            keystorePathLoaded = true;
-        }
-        if (storePasswordBuf[0] != '\0')
-        {
-            octarine::secrets::Set(kKeyStore, storePasswordBuf);
-        }
-        if (keyAliasBuf[0] != '\0')
-        {
-            octarine::secrets::Set(kKeyAlias, keyAliasBuf);
-        }
-        if (keyPasswordBuf[0] != '\0')
-        {
-            octarine::secrets::Set(kKeyPwd, keyPasswordBuf);
-        }
-        // Wipe the in-memory password buffers immediately after storing so they don't linger.
-        std::memset(storePasswordBuf, 0, sizeof(storePasswordBuf));
-        std::memset(keyPasswordBuf, 0, sizeof(keyPasswordBuf));
-    }
-    ImGui::SameLine();
-    if (ImGui::Button("Clear all"))
-    {
-        octarine::secrets::Clear(kKeyPath);
-        octarine::secrets::Clear(kKeyStore);
-        octarine::secrets::Clear(kKeyAlias);
-        octarine::secrets::Clear(kKeyPwd);
-        std::memset(keystorePathBuf, 0, sizeof(keystorePathBuf));
-        std::memset(storePasswordBuf, 0, sizeof(storePasswordBuf));
-        std::memset(keyAliasBuf, 0, sizeof(keyAliasBuf));
-        std::memset(keyPasswordBuf, 0, sizeof(keyPasswordBuf));
-        keystorePathLoaded = false;
-    }
-    ImGui::SameLine();
-    if (keystorePathLoaded)
-    {
-        ImGui::TextColored(ImVec4(0.4F, 1.0F, 0.4F, 1.0F), "Credentials saved.");
-    }
-
+void RenderDebugGUISystem::SigningSettingsWindow(bool* p_open) {
+  ImGui::SetNextWindowSize(ImVec2(540, 360), ImGuiCond_FirstUseEver);
+  if (!ImGui::Begin("Signing Settings", p_open, ImGuiWindowFlags_AlwaysAutoResize)) {
     ImGui::End();
+    return;
+  }
+
+  // Per-field buffers persisted across frames. Populated with the placeholder string when an
+  // entry already exists in SecretStore so the dev sees "value stored" rather than the secret
+  // round-tripped into a visible password field.
+  static char keystorePathBuf[260] = "";
+  static char storePasswordBuf[128] = "";
+  static char keyAliasBuf[64] = "";
+  static char keyPasswordBuf[128] = "";
+  static bool initialized = false;
+  static bool keystorePathLoaded = false;
+
+  constexpr const char* kKeyPath = "octarine.android.keystore_path";
+  constexpr const char* kKeyStore = "octarine.android.store_password";
+  constexpr const char* kKeyAlias = "octarine.android.key_alias";
+  constexpr const char* kKeyPwd = "octarine.android.key_password";
+
+  if (!octarine::secrets::IsAvailable()) {
+    ImGui::TextColored(ImVec4(1.0F, 0.85F, 0.4F, 1.0F), "Secret storage is not available on this platform.");
+    ImGui::TextWrapped(
+        "Set the OCTARINE_ANDROID_* env vars (KEYSTORE_PATH, STORE_PASSWORD, KEY_ALIAS, "
+        "KEY_PASSWORD) in the shell that launches the editor. The Export Build modal will "
+        "pick them up via the editor's inherited environment.");
+    ImGui::End();
+    return;
+  }
+
+  // Lazy first-time load: the keystore path is non-secret-by-itself so we surface it directly;
+  // password / alias fields stay blank with a "Stored" indicator beside them so the secrets
+  // never round-trip through ImGui's input cache.
+  if (!initialized) {
+    if (auto v = octarine::secrets::Get(kKeyPath)) {
+      std::snprintf(keystorePathBuf, sizeof(keystorePathBuf), "%s", v->c_str());
+      keystorePathLoaded = true;
+    }
+    if (auto v = octarine::secrets::Get(kKeyAlias)) {
+      std::snprintf(keyAliasBuf, sizeof(keyAliasBuf), "%s", v->c_str());
+    }
+    initialized = true;
+  }
+
+  const auto storedHint = [](const char* key) {
+    return octarine::secrets::Get(key).has_value() ? "(stored)" : "(empty)";
+  };
+
+  ImGui::TextWrapped(
+      "Android-release signing credentials. Stored via the OS secret backend (DPAPI on Windows, "
+      "Keychain on macOS) and injected into the build subprocess as OCTARINE_ANDROID_* env vars.");
+  ImGui::Separator();
+
+  ImGui::SetNextItemWidth(360);
+  ImGui::InputText("Keystore path", keystorePathBuf, sizeof(keystorePathBuf));
+
+  ImGui::SetNextItemWidth(220);
+  ImGui::InputText("Store password", storePasswordBuf, sizeof(storePasswordBuf), ImGuiInputTextFlags_Password);
+  ImGui::SameLine();
+  ImGui::TextDisabled("%s", storedHint(kKeyStore));
+
+  ImGui::SetNextItemWidth(220);
+  ImGui::InputText("Key alias", keyAliasBuf, sizeof(keyAliasBuf));
+
+  ImGui::SetNextItemWidth(220);
+  ImGui::InputText("Key password", keyPasswordBuf, sizeof(keyPasswordBuf), ImGuiInputTextFlags_Password);
+  ImGui::SameLine();
+  ImGui::TextDisabled("%s", storedHint(kKeyPwd));
+
+  ImGui::Separator();
+
+  if (ImGui::Button("Save")) {
+    // Only overwrite secrets the dev typed something into this frame; preserves stored values
+    // when the dev only edits, say, the keystore path. The keystore path itself always writes
+    // (even when emptied, which Clears it via the empty-string branch).
+    if (keystorePathBuf[0] != '\0') {
+      octarine::secrets::Set(kKeyPath, keystorePathBuf);
+      keystorePathLoaded = true;
+    }
+    if (storePasswordBuf[0] != '\0') {
+      octarine::secrets::Set(kKeyStore, storePasswordBuf);
+    }
+    if (keyAliasBuf[0] != '\0') {
+      octarine::secrets::Set(kKeyAlias, keyAliasBuf);
+    }
+    if (keyPasswordBuf[0] != '\0') {
+      octarine::secrets::Set(kKeyPwd, keyPasswordBuf);
+    }
+    // Wipe the in-memory password buffers immediately after storing so they don't linger.
+    std::memset(storePasswordBuf, 0, sizeof(storePasswordBuf));
+    std::memset(keyPasswordBuf, 0, sizeof(keyPasswordBuf));
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Clear all")) {
+    octarine::secrets::Clear(kKeyPath);
+    octarine::secrets::Clear(kKeyStore);
+    octarine::secrets::Clear(kKeyAlias);
+    octarine::secrets::Clear(kKeyPwd);
+    std::memset(keystorePathBuf, 0, sizeof(keystorePathBuf));
+    std::memset(storePasswordBuf, 0, sizeof(storePasswordBuf));
+    std::memset(keyAliasBuf, 0, sizeof(keyAliasBuf));
+    std::memset(keyPasswordBuf, 0, sizeof(keyPasswordBuf));
+    keystorePathLoaded = false;
+  }
+  ImGui::SameLine();
+  if (keystorePathLoaded) {
+    ImGui::TextColored(ImVec4(0.4F, 1.0F, 0.4F, 1.0F), "Credentials saved.");
+  }
+
+  ImGui::End();
 }
 #endif
 #endif

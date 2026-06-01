@@ -3,14 +3,13 @@
 #include <SDL3/SDL.h>
 #include <SDL3_ttf/SDL_ttf.h>
 
-#include <glm/glm.hpp>
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <glm/glm.hpp>
 #include <string>
 #include <unordered_map>
-
-#include <atomic>
 
 #include "../AssetManager/AssetManager.h"
 #include "../AssetManager/GlyphAtlas.h"
@@ -163,8 +162,7 @@ class RenderTextSystem {
     for (const char c : text) {
       const auto cp = static_cast<std::uint32_t>(static_cast<unsigned char>(c));
       const auto* g = atlas.Find(cp);
-      SDL_Rect srcR{static_cast<int>(g->x), static_cast<int>(g->y), static_cast<int>(g->w),
-                    static_cast<int>(g->h)};
+      SDL_Rect srcR{static_cast<int>(g->x), static_cast<int>(g->y), static_cast<int>(g->w), static_cast<int>(g->h)};
       SDL_Rect dstR{static_cast<int>(pen), 0, static_cast<int>(g->w), static_cast<int>(g->h)};
       SDL_BlitSurface(src, &srcR, dst, &dstR);
       pen += g->advance;
