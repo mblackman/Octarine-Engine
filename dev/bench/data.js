@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1780267086155,
+  "lastUpdate": 1780328135578,
   "repoUrl": "https://github.com/mblackman/Octarine-Engine",
   "entries": {
     "Octarine Engine Micro-Benchmarks": [
@@ -7488,6 +7488,112 @@ window.BENCHMARK_DATA = {
             "value": 633269.5173160157,
             "unit": "ns/iter",
             "extra": "iterations: 1108\ncpu: 633206.045126355 ns\nthreads: 1"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "mblackman",
+            "username": "mblackman",
+            "email": "mblackman@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "e2209d2b5c8188062e6e304c89fd98a54ab05586",
+          "message": "Add spatial-audio culling + resume-at-offset (Sound plan Phase 5) (#92)\n\nAdds AudioCullingSystem and AudioActiveTag to keep the audible voice count\nbounded by an explicit listener radius. Spatial emitters outside\nEngineOptions::audioListenerRadius (default 1500 world units) have their\nMIX_Track stopped, their playback frame captured onto the source, and\ntheir AudioSinkComponent removed — the track returns to the pool for some\nother emitter to claim.\n\nWhen a culled emitter comes back into range CullingSystem re-adds the tag,\nand AudioSystem's \"resume-from-cull\" path spawns a fresh sink and seeks\nMIX_SetTrackPlaybackPosition to the stored frame so looping clips pick up\nmid-loop without restart-from-zero glitches.\n\nAudioSystem's \"new sink\" branch now gates spatial sources on\nHasTag<AudioActiveTag> so the resume / cull pair can't oscillate\n(otherwise an out-of-range source would re-acquire a track every frame and\nCullingSystem would immediately drop it again).\n\nCommandBuffer gains RemoveComponent / AddTag / RemoveTag template ops to\nkeep the per-entity archetype transitions deferred until after the system\nloop, same pattern as the existing AddComponent.\n\nOut of scope for this stage: spatial-hash broadphase (plan defers it past\n~1k emitters). The flat sweep is sufficient at current scales and the\nhashmap-free perf hygiene from Phase 3/4 keeps the constant factor low.",
+          "timestamp": "2026-06-01T02:38:02Z",
+          "url": "https://github.com/mblackman/Octarine-Engine/commit/e2209d2b5c8188062e6e304c89fd98a54ab05586"
+        },
+        "date": 1780328124899,
+        "tool": "googlecpp",
+        "benches": [
+          {
+            "name": "BM_EntityCreateAndBlam/8",
+            "value": 4028.633232663131,
+            "unit": "ns/iter",
+            "extra": "iterations: 169414\ncpu: 4061.695414782784 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/64",
+            "value": 16247.615677860756,
+            "unit": "ns/iter",
+            "extra": "iterations: 42950\ncpu: 16290.21960418949 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/512",
+            "value": 108274.51065946315,
+            "unit": "ns/iter",
+            "extra": "iterations: 6459\ncpu: 108329.80616194515 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/4096",
+            "value": 879060.7389888946,
+            "unit": "ns/iter",
+            "extra": "iterations: 807\ncpu: 879131.6059479647 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlam/8192",
+            "value": 1710351.9487960879,
+            "unit": "ns/iter",
+            "extra": "iterations: 406\ncpu: 1710376.2783251132 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/8",
+            "value": 2236.3419867599305,
+            "unit": "ns/iter",
+            "extra": "iterations: 318875\ncpu: 2227.1226969814006 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/64",
+            "value": 10035.181083945532,
+            "unit": "ns/iter",
+            "extra": "iterations: 69825\ncpu: 10022.532287865195 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/512",
+            "value": 70819.87207497886,
+            "unit": "ns/iter",
+            "extra": "iterations: 9980\ncpu: 70788.96262525511 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityCreateAndBlamWithPairs/2048",
+            "value": 398708.8327362755,
+            "unit": "ns/iter",
+            "extra": "iterations: 1732\ncpu: 398629.34930714685 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8",
+            "value": 2154.8446240995577,
+            "unit": "ns/iter",
+            "extra": "iterations: 328298\ncpu: 2119.019933109018 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/64",
+            "value": 6537.1895648704285,
+            "unit": "ns/iter",
+            "extra": "iterations: 108455\ncpu: 6498.13413857905 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/512",
+            "value": 40812.75512313503,
+            "unit": "ns/iter",
+            "extra": "iterations: 17121\ncpu: 40767.51463114823 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/4096",
+            "value": 317491.1125259913,
+            "unit": "ns/iter",
+            "extra": "iterations: 2221\ncpu: 317320.7901845643 ns\nthreads: 1"
+          },
+          {
+            "name": "BM_EntityPoolSpawnAndPark/8192",
+            "value": 628520.7193127297,
+            "unit": "ns/iter",
+            "extra": "iterations: 1096\ncpu: 628440.7910586251 ns\nthreads: 1"
           }
         ]
       }
