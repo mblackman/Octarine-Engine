@@ -74,17 +74,20 @@ CI (`.github/workflows/build.yml`) runs both on the Linux editor-release leg on 
 | To add… | Touch points |
 |---------|--------------|
 | A **component** | `src/Components/X.h` + `src/Lua/Bindings/XLuaBinding.h` + a `registerComponent<X>()` line in `src/Lua/Bindings/RegisterAllBindings.cpp`. Header-only — no CMake edit. |
-| A **Lua module** (free-function globals) | `src/Lua/Modules/XModuleLuaBinding.{h,cpp}` + an `install` line in `src/Lua/Modules/RegisterAllModules.cpp` + append the `.cpp` to `SRC_FILES` in `CMakeLists.txt`. |
-| A **system** | `src/Systems/X.h` + a registration call in `Game::Setup` (`RegisterSystem` / `RegisterParallelSystem` / `RegisterBulkSystem`). Optional `LuaSystemBinding<X>` if it exposes a Lua surface. Mind `Game::Setup` ordering — see [`docs/lua-scripting.md`](lua-scripting.md). |
-| An **event** | `src/Events/X.h` + `EmitEvent<X>(...)` in producers + `SubscribeEvent<X>(...)` in each consumer's `Init`. |
-| A **new `.cpp`** under `src/` | Append to `SRC_FILES` in `CMakeLists.txt`. |
+| A **Lua module** (free-function globals) | `src/Lua/Modules/XModuleLuaBinding.{h,cpp}` + an `install` line in `src/Lua/Modules/RegisterAllModules.cpp` + add the `.cpp` to the `octarine_lua` list in `src/CMakeLists.txt`. |
+| A **system** | `src/Systems/X.h` + a registration call in `Game::Setup` (`RegisterSystem` / `RegisterParallelSystem` / `RegisterBulkSystem`). Optional `LuaSystemBinding<X>` if it exposes a Lua surface. Mind registration order — see [`docs/systems.md`](systems.md). |
+| An **event** | `src/Events/X.h` + `EmitEvent<X>(...)` in producers + `SubscribeEvent<X>(...)` in each consumer's `Init` — see [`docs/events.md`](events.md). |
+| A **new `.cpp`** under `src/` | Add it to the matching per-layer source list in `src/CMakeLists.txt` (`octarine_core`/`_assets`/`_renderer`/`_lua`/`_systems`/`_editor`/`_engine`). |
 
 ## Deeper reading
 
 - [`docs/ecs-architecture.md`](ecs-architecture.md) — archetype graph, chunk storage, query model
 - [`docs/ecs-components.md`](ecs-components.md) — every component's Lua shape
 - [`docs/lua-scripting.md`](lua-scripting.md) — how Lua scripts wire into the engine
+- [`docs/systems.md`](systems.md) — built-in systems and the order they run in
+- [`docs/events.md`](events.md) — the event bus and every event type
 - [`docs/scenes.md`](scenes.md) — scene file shape, lifecycle, `load_scene` / `reload_scene`
 - [`docs/asset-pipeline.md`](asset-pipeline.md) — `.meta` sidecars, bake step, atlases, audio normalize
+- [`docs/profiling.md`](profiling.md) — profiling build, PerfUtils, benchmarks, the perf dashboard
 - [`docs/device-builds.md`](device-builds.md) — shipping artifacts for desktop and Android
 - `lua_api.smoke.lua` — generated, exhaustive reference for the live Lua surface
