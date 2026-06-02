@@ -286,20 +286,27 @@ option(OCTARINE_ENABLE_BENCHMARKS "Build benchmarks" OFF)
 if (OCTARINE_ENABLE_BENCHMARKS)
     find_package(benchmark CONFIG REQUIRED)
 
-    # ECS + Logger are the only engine TUs the benchmark exercises; link octarine_core to pull
-    # their .obj plus the standard compile flags. Skips the rest of the engine — bench runs are
-    # microbenchmarks, not full-engine timings.
-    add_executable(OctarineBenchmarks tests/benchmarks/EntityPoolBenchmark.cpp)
+    # octarine_core pulls the ECS + Logger TUs (and SDL3, glm, spdlog transitively) plus the
+    # standard compile flags. The spatial-audio systems benchmarked here are header-only, so no
+    # other engine lib is needed — bench runs are microbenchmarks, not full-engine timings.
+    add_executable(OctarineBenchmarks
+            tests/benchmarks/EntityPoolBenchmark.cpp
+            tests/benchmarks/SpatialAudioBenchmark.cpp
+    )
     set_target_properties(OctarineBenchmarks PROPERTIES
             CXX_STANDARD 20
             CXX_STANDARD_REQUIRED ON
             CXX_EXTENSIONS OFF
     )
 
+    # SDL3_mixer is required by SpatialAudioBenchmark: the fixture initializes a real MIX_Mixer
+    # (under the "dummy" audio driver) and allocates real MIX_Tracks so the systems' MIX_Set* call
+    # path is exercised end-to-end rather than mocked. SDL3 itself comes in via octarine_core.
     target_link_libraries(OctarineBenchmarks PRIVATE
             octarine_core
             benchmark::benchmark
             benchmark::benchmark_main
+            $<IF:$<TARGET_EXISTS:SDL3_mixer::SDL3_mixer>,SDL3_mixer::SDL3_mixer,SDL3_mixer::SDL3_mixer-static>
     )
 
     if (MSVC)
