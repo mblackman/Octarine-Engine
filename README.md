@@ -80,7 +80,7 @@ see [`docs/device-builds.md`](docs/device-builds.md). Shipping config is the `sh
 preset (and `ship-mac-universal` for universal macOS).
 
 Contributing? See [`CONTRIBUTING.md`](CONTRIBUTING.md) for workflow, coding
-standards, commit style, and the `SRC_FILES` rule.
+standards, commit style, and how to register new source files.
 
 ### Running the Engine
 
