@@ -12,6 +12,7 @@
 #include "../ECS/Query.h"
 #include "../Engine/EngineContext.h"
 #include "../Engine/EngineRuntime.h"
+#include "../Engine/SceneLoader.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
 #include "../Lua/LuaBindingContext.h"
@@ -90,19 +91,18 @@ class Game : public LuaBindingContext {
   [[nodiscard]] EngineContext& GetContext() override { return registry_->Get<EngineContext>(); }
   [[nodiscard]] const EngineContext& GetContext() const { return registry_->Get<EngineContext>(); }
 
-  void LoadScene(const std::string& scenePath) override;
-  void ReloadScene() override;
-  void StopScene() override;
-
-  // Record asset ids acquired for the current scene so StopScene/the next LoadScene releases
-  // them. Deduped against ids already tracked. Called by the C++ scene loader and by the
-  // `acquire_scene_assets` Lua global (which serves scenes that load via a side-effect script
-  // rather than returning a table). Safe to call repeatedly with overlapping sets.
-  void TrackSceneAssets(const std::vector<std::string>& assetIds) override;
+  // Scene lifecycle lives in SceneLoader; these LuaBindingContext overrides delegate so the
+  // `scene.*` Lua module (and the editor toolbar) drive it through Game unchanged.
+  void LoadScene(const std::string& scenePath) override { scene_loader_->LoadScene(scenePath); }
+  void ReloadScene() override { scene_loader_->ReloadScene(); }
+  void StopScene() override { scene_loader_->StopScene(); }
+  void TrackSceneAssets(const std::vector<std::string>& assetIds) override {
+    scene_loader_->TrackSceneAssets(assetIds);
+  }
 
   // True between a successful LoadScene/ReloadScene and the next StopScene. The editor toolbar
   // uses this to decide whether Play should resume a paused scene or (re)start a stopped one.
-  [[nodiscard]] bool IsSceneRunning() const { return scene_running_; }
+  [[nodiscard]] bool IsSceneRunning() const { return scene_loader_->IsSceneRunning(); }
 
  private:
   void ProcessInput() const;
@@ -115,16 +115,11 @@ class Game : public LuaBindingContext {
   // its scene references via the bake-mode asset globals), then writes the manifest. Returns false
   // on a load/scan/write failure or any unresolved reference.
   [[nodiscard]] bool RunBakeValidation(const std::string& assetPath);
-  // Clear the current scene's user entities and reset per-scene Lua input state, without
-  // touching acquired assets. Asset release is sequenced separately so a scene swap can acquire
-  // the next scene's set before releasing the previous one (acquire-before-release).
-  void clearSceneEntities();
   void OnKeyInputEvent(const KeyInputEvent& event);
   static KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);
 
   EngineRuntime runtime_;
   static inline bool s_is_running_{false};
-  bool scene_running_ = false;
   bool bake_mode_ = false;
   bool use_manifest_ = false;
 #ifndef OCTARINE_SHIPPED
@@ -133,9 +128,6 @@ class Game : public LuaBindingContext {
 #endif
   int bake_validation_failures_ = 0;
   Uint64 milliseconds_previous_frame_ = 0;
-  // Asset ids acquired for the currently loaded scene. StopScene releases these; LoadScene
-  // acquires the next scene's set first (acquire-before-release) so shared assets never churn.
-  std::vector<std::string> current_scene_assets_;
 
   sol::state lua;
   std::string startup_mode_;
@@ -143,4 +135,7 @@ class Game : public LuaBindingContext {
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
   std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent>> collider_query_;
+  // Scene lifecycle. Constructed in the Game ctor once registry_ exists; holds non-owning refs
+  // to registry_ + lua, so it is declared last and torn down first.
+  std::unique_ptr<SceneLoader> scene_loader_;
 };
