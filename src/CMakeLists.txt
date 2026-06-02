@@ -201,10 +201,16 @@ endif ()
 # symbols (RenderDebugGUISystem::Render, EditorPersistence::*, SecretStore::*) resolve at the
 # final exe link without forcing the engine TU to know about editor concretely.
 # -----------------------------------------------------------------------------
-octarine_library(octarine_engine
+set(OCTARINE_ENGINE_SOURCES
         Engine/EngineBootstrap.cpp
         Game/Game.cpp
 )
+# DevListenServer (Stage 6): TCP listener for the dev iterate loop. Available in editor + player
+# presets; compile-stripped from ship-release (OCTARINE_SHIPPED).
+if (NOT OCTARINE_SHIPPED)
+    list(APPEND OCTARINE_ENGINE_SOURCES Dev/DevListenServer.cpp)
+endif ()
+octarine_library(octarine_engine ${OCTARINE_ENGINE_SOURCES})
 target_link_libraries(octarine_engine PUBLIC
         octarine_core
         octarine_assets
@@ -214,4 +220,9 @@ target_link_libraries(octarine_engine PUBLIC
 )
 if (TARGET octarine_editor)
     target_link_libraries(octarine_engine PUBLIC octarine_editor)
+endif ()
+# Winsock provides the BSD-socket API (ws2_32) on Windows; POSIX sockets come from libc so no
+# extra link is needed there. Only when the dev server is compiled in (non-shipped builds).
+if (NOT OCTARINE_SHIPPED AND WIN32)
+    target_link_libraries(octarine_engine PUBLIC ws2_32)
 endif ()

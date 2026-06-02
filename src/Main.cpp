@@ -13,6 +13,8 @@ int main(const int argc, char* argv[]) {
   std::string gamePath;
   std::string startupMode;
   bool useManifest = false;
+  int devListenPort = 0;      // 0 = disabled; >0 = bind on that TCP port
+  bool devListenAll = false;  // false = 127.0.0.1; true = 0.0.0.0 (LAN-exposed)
 
   // Parse command-line arguments
   for (int i = 1; i < argc; ++i) {
@@ -31,6 +33,35 @@ int main(const int argc, char* argv[]) {
       // uses it unconditionally). Lets the asset_manifest.lua path be exercised without packaging.
       useManifest = true;
       Logger::Info("Asset manifest loading forced ON (--use-manifest).");
+    } else if (currentArg == "--dev-listen") {
+#ifdef OCTARINE_SHIPPED
+      Logger::Warn("--dev-listen is stripped from shipped builds; ignoring.");
+      if (i + 1 < argc) ++i;  // consume the port argument so it does not parse as gamePath
+#else
+      if (i + 1 < argc) {
+        try {
+          devListenPort = std::stoi(argv[++i]);
+        } catch (const std::exception&) {
+          Logger::Error("Error: --dev-listen requires an integer port (got '" + std::string(argv[i]) + "').");
+          return 1;
+        }
+        if (devListenPort <= 0 || devListenPort > 65535) {
+          Logger::Error("Error: --dev-listen port out of range (got " + std::to_string(devListenPort) + ").");
+          return 1;
+        }
+        Logger::Info("Dev-listen requested on port " + std::to_string(devListenPort) + ".");
+      } else {
+        Logger::Error("Error: --dev-listen flag requires a port argument.");
+        return 1;
+      }
+#endif
+    } else if (currentArg == "--dev-listen-all") {
+#ifdef OCTARINE_SHIPPED
+      Logger::Warn("--dev-listen-all is stripped from shipped builds; ignoring.");
+#else
+      devListenAll = true;
+      Logger::Warn("--dev-listen-all set; will bind 0.0.0.0 instead of 127.0.0.1.");
+#endif
     } else if (currentArg.starts_with("-")) {
       Logger::Warn("Unknown command-line argument: " + currentArg);
     } else {
@@ -48,6 +79,12 @@ int main(const int argc, char* argv[]) {
   Game game{};
   game.SetStartupMode(startupMode);
   game.SetUseManifest(useManifest);
+#ifndef OCTARINE_SHIPPED
+  game.SetDevListen(devListenPort, devListenAll);
+#else
+  (void)devListenPort;
+  (void)devListenAll;
+#endif
 
   if (game.Initialize(gamePath)) {
     game.Run();

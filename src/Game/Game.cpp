@@ -92,6 +92,10 @@
 #include "../Editor/PlayerLauncher.h"
 #endif
 
+#ifndef OCTARINE_SHIPPED
+#include "../Dev/DevListenServer.h"
+#endif
+
 namespace {
 // Read a file's bytes through SDL_IO so the same path resolves on desktop, inside an APK asset
 // root, or inside a .app bundle. Lua's stock fopen-based loader only sees a real filesystem and
@@ -166,6 +170,21 @@ bool Game::Initialize(const std::string& assetPath) {
 
   registry_->Set<GameConfig>(GameConfig());
   auto& gameConfig = registry_->Get<GameConfig>();
+
+#ifndef OCTARINE_SHIPPED
+  // DevListenServer (Stage 6): TCP listener on 127.0.0.1:<port> when --dev-listen given.
+  // Compile-stripped from shipped builds. Available in editor + player presets alike so the
+  // standalone player can host the dev-iterate loop too.
+  auto& devListen = registry_->Set<octarine::dev::DevListenServer>(octarine::dev::DevListenServer());
+  if (dev_listen_port_ > 0) {
+    octarine::dev::ServerOptions opts;
+    opts.port = static_cast<std::uint16_t>(dev_listen_port_);
+    opts.listen_all = dev_listen_all_;
+    if (!devListen.Start(opts)) {
+      Logger::Error("DevListenServer failed to start; --dev-listen flag had no effect.");
+    }
+  }
+#endif
 
   std::string effectivePath = assetPath;
 #ifdef OCTARINE_WITH_EDITOR
@@ -346,6 +365,14 @@ bool Game::Initialize(const std::string& assetPath) {
 
 void Game::Destroy() {
   if (registry_) {
+#ifndef OCTARINE_SHIPPED
+    // Stop the dev listener before the registry teardown drops it so the listener thread
+    // joins cleanly while the engine is still alive.
+    if (auto* devListen = registry_->TryGet<octarine::dev::DevListenServer>()) {
+      devListen->Stop();
+    }
+#endif
+
     auto& gameConfig = registry_->Get<GameConfig>();
     gameConfig.SaveUserPreferences();
 #ifdef OCTARINE_WITH_EDITOR
@@ -786,6 +813,12 @@ void Game::Update(const float deltaTime) {
   PerfUtils::PerfCounters::ResetValues();
 #endif
   PROFILE_NAMED_SCOPE("Game::Update (total)");
+
+#ifndef OCTARINE_SHIPPED
+  if (auto* devListen = registry_->TryGet<octarine::dev::DevListenServer>()) {
+    devListen->Pump();
+  }
+#endif
 
   auto& options = registry_->Get<GameConfig>().GetEngineOptions();
 
