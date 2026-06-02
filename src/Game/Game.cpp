@@ -80,7 +80,6 @@
 #include "Systems/VelocityIntegrationSystem.h"
 
 #ifdef OCTARINE_WITH_IMGUI
-#include "Systems/RenderDebugGUISystem.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
@@ -90,6 +89,7 @@
 #include "../Editor/EditorLayoutPresets.h"
 #include "../Editor/EditorPersistence.h"
 #include "../Editor/ExportBuilder.h"
+#include "../Editor/Panels/EditorImGuiBackend.h"
 #include "../Editor/PlayerLauncher.h"
 #endif
 
@@ -282,8 +282,8 @@ bool Game::Initialize(const std::string& assetPath) {
     fontSize = 17.0F * dpiScale;
     editorPersistence.editorFontSize = fontSize;
   }
-  RenderDebugGUISystem::RebuildEditorFont(fontSize);
-  RenderDebugGUISystem::ApplyEditorStyle(editorPersistence.editorStyleIndex, fontSize);
+  octarine::editor::panels::RebuildEditorFont(fontSize);
+  octarine::editor::panels::ApplyEditorStyle(editorPersistence.editorStyleIndex, fontSize);
 
   // First-run: if ImGui has no saved layout for this project / pref dir, apply
   // the bundled default so the user sees a curated workspace instead of a pile
