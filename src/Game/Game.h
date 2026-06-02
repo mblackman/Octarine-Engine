@@ -12,6 +12,7 @@
 #include "../ECS/Query.h"
 #include "../Engine/EngineContext.h"
 #include "../Engine/EngineRuntime.h"
+#include "../Engine/FrameLoop.h"
 #include "../Engine/SceneLoader.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
@@ -105,18 +106,12 @@ class Game : public LuaBindingContext {
   [[nodiscard]] bool IsSceneRunning() const { return scene_loader_->IsSceneRunning(); }
 
  private:
-  void ProcessInput() const;
-  void Update(float deltaTime);
-  void Render(float deltaTime);
-  [[nodiscard]] float WaitTime();
   void Setup();
   // Headless instance method behind the static Bake(): wires the minimal singleton + Lua surface
   // the startup script touches, force-scans the catalog, runs the startup script (which validates
   // its scene references via the bake-mode asset globals), then writes the manifest. Returns false
   // on a load/scan/write failure or any unresolved reference.
   [[nodiscard]] bool RunBakeValidation(const std::string& assetPath);
-  void OnKeyInputEvent(const KeyInputEvent& event);
-  static KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);
 
   EngineRuntime runtime_;
   static inline bool s_is_running_{false};
@@ -127,15 +122,14 @@ class Game : public LuaBindingContext {
   bool dev_listen_all_ = false;
 #endif
   int bake_validation_failures_ = 0;
-  Uint64 milliseconds_previous_frame_ = 0;
 
   sol::state lua;
   std::string startup_mode_;
   std::unique_ptr<Registry> registry_;
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;
-  std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent>> collider_query_;
-  // Scene lifecycle. Constructed in the Game ctor once registry_ exists; holds non-owning refs
-  // to registry_ + lua, so it is declared last and torn down first.
+  // Scene + frame helpers. Constructed in the Game ctor once registry_/renderer_ exist; they hold
+  // non-owning refs back into Game's members, so they are declared last and torn down first.
   std::unique_ptr<SceneLoader> scene_loader_;
+  std::unique_ptr<FrameLoop> frame_loop_;
 };
