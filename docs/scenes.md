@@ -60,7 +60,8 @@ return {
     -- Optional: ids the static scan can't see (runtime spawns, load-time injection).
     preload = { "explosion", "music-gameplay" },
 
-    -- Optional: tilemap drives a parallel asset reference and renders into the world.
+    -- Optional: only texture_asset_id is tracked as an asset reference today; the `map`
+    -- file is not yet parsed or rendered by the engine. See docs/tilemaps.md.
     tilemap = {
         texture_asset_id = assets["tilemap-forest"],
         map = "tilemaps/forest.map",
