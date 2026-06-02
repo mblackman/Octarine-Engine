@@ -7,6 +7,13 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+# Cancel a PR's in-flight build when a newer commit lands on it — e.g. the fixup the autoformat
+# workflow pushes — so the full matrix doesn't run twice. Pushes to main are NOT cancelled (each
+# gets its own group via github.ref) so every mainline build completes.
+concurrency:
+  group: build-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
 
