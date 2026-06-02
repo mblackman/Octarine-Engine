@@ -1,0 +1,74 @@
+name: autoformat
+
+# Auto-applies clang-format to a PR's changed C/C++ sources and pushes the fixup back to the PR
+# branch, so contributors don't have to format by hand. The blocking `lint (clang-format)` job in
+# build.yml stays as the gate — it covers fork PRs (which this job can't push to) and acts as the
+# required status. Keep this job's clang-format version identical to that gate's.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [main]
+
+# Needed to push the fixup commit back to the PR branch.
+permissions:
+  contents: write
+
+# Supersede an in-flight autoformat when new commits land on the same PR.
+concurrency:
+  group: autoformat-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  autoformat:
+    name: autoformat (clang-format)
+    runs-on: ubuntu-latest
+    # Skip fork PRs: the token is read-only for forks and the push would fail. The lint gate still
+    # blocks them, so a fork contributor formats locally instead.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      # MUST match build.yml's lint job. Bump both together and re-run the format target tree-wide.
+      CLANG_FORMAT_VERSION: 18.1.8
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+          # AUTOFORMAT_PAT (fine-grained PAT, contents:write) lets the fixup push re-trigger the
+          # lint/build checks on the new commit. With the default GITHUB_TOKEN the push still works,
+          # but pushed commits do NOT re-trigger workflows, so the required checks would stay on the
+          # pre-fix commit. See CONTRIBUTING.md "Format".
+          token: ${{ secrets.AUTOFORMAT_PAT || github.token }}
+
+      - name: Install pinned clang-format
+        run: pipx install "clang-format==${CLANG_FORMAT_VERSION}"
+
+      - name: Format changed files
+        shell: bash
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- 'src/*' 'tests/*' \
+            | grep -E '\.(cpp|h|hpp)$' || true)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No changed C/C++ sources to format."
+            exit 0
+          fi
+          printf 'formatting:\n%s\n' "$(printf '  %s\n' "${files[@]}")"
+          clang-format -i -style=file "${files[@]}"
+
+      - name: Commit and push if anything changed
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "Already correctly formatted — nothing to push."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # No [skip ci]: with AUTOFORMAT_PAT this push must re-trigger lint/build on the fixed
+          # commit. No infinite loop — the re-triggered autoformat run finds nothing left to format
+          # and exits without pushing.
+          git commit -am "style: apply clang-format"
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
+          echo "::notice::Applied clang-format and pushed a fixup commit to this PR."
