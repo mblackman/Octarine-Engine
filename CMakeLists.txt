@@ -30,6 +30,22 @@ if (OCTARINE_USE_CCACHE AND NOT CMAKE_CXX_COMPILER_LAUNCHER)
     endif ()
 endif ()
 
+# Architecture tuning for optimized (non-Debug) GCC/Clang builds. -march=native pins codegen to the
+# BUILD machine's exact CPU, which is unsafe two ways: (1) a ccache object built on one CI runner and
+# reused on another with fewer instructions crashes at runtime via SIGILL, and (2) shipping artifacts
+# won't run on older end-user CPUs than the build box. Default to a portable baseline (x86-64-v3 ~ the
+# Windows /arch:AVX2 floor: AVX2 + BMI + FMA, Haswell-era 2013+). Opt into -march=native locally with
+# -DOCTARINE_NATIVE_ARCH=ON where build and run are the same machine. MSVC uses /arch:AVX2 below and
+# ignores this; Android gets its arch from the NDK toolchain (this var is empty there).
+option(OCTARINE_NATIVE_ARCH "Tune optimized builds for the local CPU (-march=native); not portable, keep off for CI/shipping" OFF)
+if (OCTARINE_NATIVE_ARCH)
+    set(OCTARINE_ARCH_FLAG "-march=native")
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64|amd64)$")
+    set(OCTARINE_ARCH_FLAG "-march=x86-64-v3")
+else ()
+    set(OCTARINE_ARCH_FLAG "")  # non-x86 (e.g. Apple Silicon): leave the compiler's portable default
+endif ()
+
 # LTO for non-Debug builds. Combines with --gc-sections to drop unreferenced
 # code/data from statically linked third-party libs (SDL3, Lua, etc).
 include(CheckIPOSupported)
@@ -200,7 +216,7 @@ else ()
         )
     else ()
         target_compile_options(${PROJECT_NAME} PRIVATE
-                $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
+                $<IF:$<CONFIG:Debug>,,-Werror ${OCTARINE_ARCH_FLAG} -ffast-math>
         )
     endif ()
     target_compile_options(${PROJECT_NAME} PRIVATE
@@ -317,7 +333,7 @@ if (OCTARINE_ENABLE_BENCHMARKS)
     else ()
         target_compile_options(OctarineBenchmarks PRIVATE -Wall -Wextra -Wpedantic)
         target_compile_options(OctarineBenchmarks PRIVATE
-                $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
+                $<IF:$<CONFIG:Debug>,,-Werror ${OCTARINE_ARCH_FLAG} -ffast-math>
         )
     endif ()
 
