@@ -62,7 +62,7 @@ function(octarine_library NAME)
             )
         else ()
             target_compile_options(${NAME} PRIVATE
-                    $<IF:$<CONFIG:Debug>,,-Werror -march=native -ffast-math>
+                    $<IF:$<CONFIG:Debug>,,-Werror ${OCTARINE_ARCH_FLAG} -ffast-math>
             )
         endif ()
         target_compile_options(${NAME} PRIVATE
