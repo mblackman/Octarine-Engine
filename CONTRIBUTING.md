@@ -57,8 +57,27 @@ CI runs both on the Linux editor-release leg.
 ### Format
 
 `.clang-format` is foundational. Run it before committing — most editors do
-this on save with the right config. CI does not currently auto-format, but
-PRs with format-noise diffs will get pushback.
+this on save with the right config.
+
+**Pinned version.** clang-format output differs between major versions, so CI
+pins an exact one (`CLANG_FORMAT_VERSION` in `.github/workflows/build.yml`).
+Match it locally — the simplest way is the pip wheel:
+
+```
+pipx install clang-format==18.1.8      # then: cmake --build <preset> --target format
+```
+
+**CI behavior.** Two jobs back this up:
+
+- `lint (clang-format)` (in build.yml) — blocking gate; fails a PR whose changed
+  files aren't formatted with the pinned version.
+- `autoformat` (autoformat.yml) — for same-repo PRs, formats the changed files
+  and pushes a fixup commit back to your branch automatically, so the gate goes
+  green on its own. Fork PRs aren't auto-pushed; format locally instead.
+
+> Maintainer setup: the auto-push uses a fine-grained PAT secret
+> `AUTOFORMAT_PAT` (repo scope, `contents: write`). Without it the job still runs
+> but its fixup commit won't re-trigger the required checks.
 
 ### Lint
 
