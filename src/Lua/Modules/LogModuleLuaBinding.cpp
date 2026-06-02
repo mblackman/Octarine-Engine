@@ -20,7 +20,7 @@ int LuaHandler(lua_State* /*lua_state*/, sol::optional<const std::exception&> ex
 }
 }  // namespace
 
-void LuaModuleBinding<LogModule>::install(sol::state& lua, Game& /*game*/) {
+void LuaModuleBinding<LogModule>::install(sol::state& lua, LuaBindingContext& /*ctx*/) {
   lua.set_function("log", &Logger::LogLua);
   lua.set_function("log_e", &Logger::ErrorLua);
   lua.set_function("log_w", &Logger::WarnLua);

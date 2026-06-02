@@ -7,9 +7,9 @@
 #include "Components/PositionComponent.h"
 #include "Components/SpriteComponent.h"
 #include "ECS/Registry.h"
-#include "Game/Game.h"
 #include "General/Logger.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
+#include "Lua/LuaBindingContext.h"
 
 namespace {
 glm::vec2 GetEntityPosition(Registry* registry, const Entity entity) {
@@ -58,29 +58,29 @@ void SetEntitySpriteSrcRect(Registry* registry, const Entity entity, const float
 }
 }  // namespace
 
-void LuaModuleBinding<EntityModule>::install(sol::state& lua, Game& game) {
-  lua.set_function("blam", [&game](const Entity entity) { game.GetRegistry()->BlamEntity(entity); });
-  lua.set_function("get_name", [&game](const Entity entity) { return GetEntityName(game.GetRegistry(), entity); });
-  lua.set_function("set_name", [&game](const Entity entity, const std::string& name) {
-    SetEntityName(game.GetRegistry(), entity, name);
+void LuaModuleBinding<EntityModule>::install(sol::state& lua, LuaBindingContext& ctx) {
+  lua.set_function("blam", [&ctx](const Entity entity) { ctx.GetRegistry()->BlamEntity(entity); });
+  lua.set_function("get_name", [&ctx](const Entity entity) { return GetEntityName(ctx.GetRegistry(), entity); });
+  lua.set_function("set_name", [&ctx](const Entity entity, const std::string& name) {
+    SetEntityName(ctx.GetRegistry(), entity, name);
   });
-  lua.set_function("find_entity_by_name", [&game](sol::this_state state, const std::string& name) {
-    return FindEntityByName(state, game.GetRegistry(), name);
+  lua.set_function("find_entity_by_name", [&ctx](sol::this_state state, const std::string& name) {
+    return FindEntityByName(state, ctx.GetRegistry(), name);
   });
   lua.set_function("get_position",
-                   [&game](const Entity entity) { return GetEntityPosition(game.GetRegistry(), entity); });
-  lua.set_function("set_position", [&game](const Entity entity, const double x, const double y) {
-    SetEntityPosition(game.GetRegistry(), entity, x, y);
+                   [&ctx](const Entity entity) { return GetEntityPosition(ctx.GetRegistry(), entity); });
+  lua.set_function("set_position", [&ctx](const Entity entity, const double x, const double y) {
+    SetEntityPosition(ctx.GetRegistry(), entity, x, y);
   });
-  lua.set_function("set_sprite_src_rect", [&game](const Entity entity, const float x, const float y) {
-    SetEntitySpriteSrcRect(game.GetRegistry(), entity, x, y);
+  lua.set_function("set_sprite_src_rect", [&ctx](const Entity entity, const float x, const float y) {
+    SetEntitySpriteSrcRect(ctx.GetRegistry(), entity, x, y);
   });
 
   lua["registry"] = lua.create_table();
   sol::table reg = lua["registry"];
 
-  reg.set_function("get_parent", [&game](sol::this_state state, const Entity entity) -> sol::object {
-    const auto parent = game.GetRegistry()->GetParent(entity);
+  reg.set_function("get_parent", [&ctx](sol::this_state state, const Entity entity) -> sol::object {
+    const auto parent = ctx.GetRegistry()->GetParent(entity);
     if (!parent.has_value()) return sol::lua_nil;
     return sol::make_object(state, parent.value());
   });
@@ -88,6 +88,6 @@ void LuaModuleBinding<EntityModule>::install(sol::state& lua, Game& game) {
   // Component has_/get_ accessors — driven by LuaComponentRegistry. Adding a new
   // component automatically exposes `registry.has_<key>` and `registry.get_<key>`.
   for (const auto& entry : LuaComponentRegistry::all()) {
-    entry.bindRegistryAccessors(reg, game.GetRegistry());
+    entry.bindRegistryAccessors(reg, ctx.GetRegistry());
   }
 }

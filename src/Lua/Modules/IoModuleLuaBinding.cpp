@@ -31,6 +31,6 @@ std::vector<std::string> ReadFileLines(const std::string& filename) {
 }
 }  // namespace
 
-void LuaModuleBinding<IoModule>::install(sol::state& lua, Game& /*game*/) {
+void LuaModuleBinding<IoModule>::install(sol::state& lua, LuaBindingContext& /*ctx*/) {
   lua.set_function("read_file_lines", &ReadFileLines);
 }

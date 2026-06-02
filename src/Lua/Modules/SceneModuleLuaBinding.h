@@ -6,5 +6,5 @@ struct SceneModule {};
 
 template <>
 struct LuaModuleBinding<SceneModule> {
-  static void install(sol::state& lua, Game& game);
+  static void install(sol::state& lua, LuaBindingContext& ctx);
 };

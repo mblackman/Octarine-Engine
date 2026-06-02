@@ -6,12 +6,12 @@
 #include "Engine/EngineContext.h"
 #include "EventBus/EventBus.h"
 #include "Events/AudioPlayEvent.h"
-#include "Game/Game.h"
 #include "General/Logger.h"
+#include "Lua/LuaBindingContext.h"
 
-void LuaModuleBinding<AudioModule>::install(sol::state& lua, Game& game) {
-  lua.set_function("play_sound", [&game](const std::string& clipId, const sol::optional<float> volume) {
-    auto* eventBus = game.GetContext().eventBus;
+void LuaModuleBinding<AudioModule>::install(sol::state& lua, LuaBindingContext& ctx) {
+  lua.set_function("play_sound", [&ctx](const std::string& clipId, const sol::optional<float> volume) {
+    auto* eventBus = ctx.GetContext().eventBus;
     if (!eventBus) {
       Logger::Error("play_sound called before event bus is ready");
       return;

@@ -16,6 +16,6 @@ const std::vector<LuaModuleDescriptor> kLuaModules = {
     {"Game", &LuaModuleBinding<GameModule>::install},
 };
 
-void RegisterAllLuaModules(sol::state& lua, Game& game) {
-  for (const auto& m : kLuaModules) m.install(lua, game);
+void RegisterAllLuaModules(sol::state& lua, LuaBindingContext& ctx) {
+  for (const auto& m : kLuaModules) m.install(lua, ctx);
 }
