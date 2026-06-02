@@ -203,6 +203,9 @@ endif ()
 # -----------------------------------------------------------------------------
 set(OCTARINE_ENGINE_SOURCES
         Engine/EngineBootstrap.cpp
+        Engine/EngineRuntime.cpp
+        Engine/FrameLoop.cpp
+        Engine/SceneLoader.cpp
         Game/Game.cpp
 )
 # DevListenServer (Stage 6): TCP listener for the dev iterate loop. Available in editor + player

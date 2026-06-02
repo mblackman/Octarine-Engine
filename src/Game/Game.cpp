@@ -42,6 +42,7 @@
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
 #include "Engine/EngineBootstrap.h"
+#include "Engine/SdlFileReader.h"
 #include "Events/MouseInputEvent.h"
 #include "Events/MouseWheelEvent.h"
 #include "GameConfig.h"
@@ -96,29 +97,6 @@
 #include "../Dev/DevListenServer.h"
 #endif
 
-namespace {
-// Read a file's bytes through SDL_IO so the same path resolves on desktop, inside an APK asset
-// root, or inside a .app bundle. Lua's stock fopen-based loader only sees a real filesystem and
-// misses AAssetManager-backed entries on Android. Used by LoadGame + LoadScene; the dofile
-// override that exposes this to scripts lives in engine_bootstrap::InstallLuaLibraries.
-std::optional<std::string> ReadFileViaSDL(const std::string& path) {
-  SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
-  if (!io) {
-    Logger::Error("SDL_IOFromFile failed for '" + path + "': " + std::string(SDL_GetError()));
-    return std::nullopt;
-  }
-  std::size_t size = 0;
-  void* data = SDL_LoadFile_IO(io, &size, true);  // closes io
-  if (!data) {
-    Logger::Error("SDL_LoadFile_IO failed for '" + path + "': " + std::string(SDL_GetError()));
-    return std::nullopt;
-  }
-  std::string out(static_cast<const char*>(data), size);
-  SDL_free(data);
-  return out;
-}
-}  // namespace
-
 inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const GameConfig& gameConfig) {
   const auto filePath = assetManager.GetFullPath(gameConfig.GetStartupScript());
 
@@ -146,25 +124,19 @@ inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const Ga
   Logger::Info("Just opened entry script: " + filePath);
 }
 
-Game::Game() : window_(nullptr), sdl_renderer_(nullptr) {
+Game::Game() {
   registry_ = std::make_unique<Registry>();
   event_bus_ = std::make_unique<EventBus>();
   renderer_ = std::make_unique<Renderer>();
+  scene_loader_ = std::make_unique<SceneLoader>(registry_.get(), lua);
+  frame_loop_ = std::make_unique<FrameLoop>(this, registry_.get(), event_bus_.get(), renderer_.get(), &runtime_, lua);
   Logger::Info("Game Constructor called.");
 }
 
 Game::~Game() { Logger::Info("Game Destructor called."); }
 
 bool Game::Initialize(const std::string& assetPath) {
-  constexpr auto SDL_INI = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD;
-
-  if (!SDL_Init(SDL_INI)) {
-    Logger::Error("SDL_Init Error: " + std::string(SDL_GetError()));
-    return false;
-  }
-
-  if (!TTF_Init()) {
-    Logger::Error("TTF_Init Error: " + std::string(SDL_GetError()));
+  if (!runtime_.InitSubsystems()) {
     return false;
   }
 
@@ -273,50 +245,27 @@ bool Game::Initialize(const std::string& assetPath) {
   gameConfig.windowHeight = projectLoaded ? gameConfig.GetDefaultHeight() : Constants::kDefaultWindowHeight;
   std::string title = projectLoaded ? gameConfig.GetGameTitle() : "Octarine Engine - Editor";
 
-  SDL_CreateWindowAndRenderer(title.c_str(), gameConfig.windowWidth, gameConfig.windowHeight, SDL_WINDOW_RESIZABLE,
-                              &window_, &sdl_renderer_);
-
-  if (!window_) {
-    Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
+  if (!runtime_.CreateWindow(title, gameConfig.windowWidth, gameConfig.windowHeight)) {
     return false;
   }
 
-  if (!sdl_renderer_) {
-    Logger::Error("SDL_CreateRenderer Error: " + std::string(SDL_GetError()));
-    return false;
-  }
-
-  if (!renderer_->CreateScene(sdl_renderer_, gameConfig.windowWidth, gameConfig.windowHeight)) {
+  if (!renderer_->CreateScene(runtime_.SdlRenderer(), gameConfig.windowWidth, gameConfig.windowHeight)) {
     return false;
   }
 
 #ifdef OCTARINE_WITH_IMGUI
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  (void)io;
-
+  // io.IniFilename holds the raw pointer for the context's lifetime, so the backing string must
+  // outlive InitImGui — keep it static.
   static std::string imguiIniPath;
   if (gameConfig.HasLoadedConfig()) {
     imguiIniPath = gameConfig.GetAssetPath() + "/imgui.ini";
-    io.IniFilename = imguiIniPath.c_str();
+  } else if (char* prefPath = SDL_GetPrefPath("Octarine", "Engine")) {
+    imguiIniPath = std::string(prefPath) + "imgui_editor.ini";
+    SDL_free(prefPath);
   } else {
-    char* prefPath = SDL_GetPrefPath("Octarine", "Engine");
-    if (prefPath) {
-      imguiIniPath = std::string(prefPath) + "imgui_editor.ini";
-      io.IniFilename = imguiIniPath.c_str();
-      SDL_free(prefPath);
-    } else {
-      io.IniFilename = "imgui_editor.ini";
-    }
+    imguiIniPath = "imgui_editor.ini";
   }
-
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-  ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
-  ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
+  runtime_.InitImGui(imguiIniPath.c_str());
 
 #ifdef OCTARINE_WITH_EDITOR
   // --- Resolve editor font size (DPI-aware default on first launch) ---
@@ -343,6 +292,7 @@ bool Game::Initialize(const std::string& assetPath) {
     octarine::editor::layouts::ApplyDefaultPreset(editorPersistence);
   }
 #else
+  ImGuiIO& io = ImGui::GetIO();
   io.Fonts->Clear();
   io.Fonts->AddFontDefault();
   io.Fonts->Build();
@@ -353,8 +303,8 @@ bool Game::Initialize(const std::string& assetPath) {
   // filled in by Setup once those exist; consumers read the same instance via
   // Registry::Get<EngineContext>().
   EngineContext ctx;
-  ctx.sdlWindow = window_;
-  ctx.sdlRenderer = sdl_renderer_;
+  ctx.sdlWindow = runtime_.Window();
+  ctx.sdlRenderer = runtime_.SdlRenderer();
   ctx.eventBus = event_bus_.get();
   ctx.config = &gameConfig;
   registry_->Set<EngineContext>(ctx);
@@ -393,21 +343,12 @@ void Game::Destroy() {
   registry_.reset();
   event_bus_.reset();
 
-  if (sdl_renderer_) {
+  // Free the off-screen scene target while the SDL renderer is still live (EngineRuntime owns
+  // the ImGui backend + window/renderer destroy + SDL_Quit, in that order).
+  if (runtime_.SdlRenderer()) {
     renderer_->DestroyScene();
-#ifdef OCTARINE_WITH_IMGUI
-    ImGui_ImplSDLRenderer3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
-#endif
-    SDL_DestroyRenderer(sdl_renderer_);
   }
-
-  if (window_) {
-    SDL_DestroyWindow(window_);
-  }
-
-  SDL_Quit();
+  runtime_.Shutdown();
 }
 
 bool Game::Bake(const std::string& assetPath) {
@@ -576,13 +517,13 @@ void Game::Run() {
   Setup();
 
   // Seed previous-frame tick so the first WaitTime call produces a sane delta.
-  milliseconds_previous_frame_ = SDL_GetTicks();
+  frame_loop_->Begin();
 
   while (s_is_running_) {
-    ProcessInput();
-    const float deltaTime = WaitTime();
-    Update(deltaTime);
-    Render(deltaTime);
+    frame_loop_->ProcessInput();
+    const float deltaTime = frame_loop_->WaitTime();
+    frame_loop_->Update(deltaTime);
+    frame_loop_->Render(deltaTime);
   }
 }
 
@@ -738,7 +679,7 @@ void Game::Setup() {
   registry_->RegisterParallelSystem<SquarePrimitiveComponent, GlobalTransformComponent>(RenderPrimitiveSystem());
 
   // Event subscriptions (one-time)
-  event_bus_->SubscribeEvent<Game, KeyInputEvent>(this, &Game::OnKeyInputEvent);
+  event_bus_->SubscribeEvent<FrameLoop, KeyInputEvent>(frame_loop_.get(), &FrameLoop::OnKeyInputEvent);
   // Event-driven systems with no per-frame Update — owned by the Registry instead of
   // living as parallel members on Game. Keeps the registry as the single source of truth.
   auto& uiButtonSystem = registry_->Set<UIButtonSystem>(UIButtonSystem());
@@ -748,437 +689,7 @@ void Game::Setup() {
   damageSystem.Init(registry_.get(), event_bus_);
   obstacleBounceSystem.Init(registry_.get(), event_bus_);
 
-  // Pre-build the debug-collider query once so we don't allocate per render frame.
-  collider_query_ = registry_->CreateQuery<GlobalTransformComponent, BoxColliderComponent>();
-
   // Hot reload owns its own ScriptWatcher + (path -> entities) discovery loop. Compiled out
   // under OCTARINE_SHIPPED; in dev/editor builds the runtime gate lives on EngineOptions.
   registry_->Set<ScriptHotReload>(ScriptHotReload());
-}
-
-void Game::ProcessInput() const {
-  PROFILE_NAMED_SCOPE("Game::ProcessInput");
-  SDL_Event event;
-
-  while (SDL_PollEvent(&event)) {
-#ifdef OCTARINE_WITH_IMGUI
-    ImGui_ImplSDL3_ProcessEvent(&event);
-    auto& io = ImGui::GetIO();
-    float mouseX, mouseY;
-    const unsigned int buttons = SDL_GetMouseState(&mouseX, &mouseY);
-    io.MousePos = ImVec2(mouseX, mouseY);
-    io.MouseDown[0] = buttons & SDL_BUTTON_MASK(SDL_BUTTON_LEFT);
-    io.MouseDown[1] = buttons & SDL_BUTTON_MASK(SDL_BUTTON_RIGHT);
-#endif
-
-    switch (event.type) {
-      case SDL_EVENT_QUIT:
-        s_is_running_ = false;
-        break;
-
-      case SDL_EVENT_KEY_DOWN:
-      case SDL_EVENT_KEY_UP: {
-        KeyInputEvent keyInputEvent = GetKeyInputEvent(&event.key);
-        event_bus_->EmitEvent<KeyInputEvent>(keyInputEvent);
-        break;
-      }
-      case SDL_EVENT_MOUSE_BUTTON_DOWN:
-      case SDL_EVENT_MOUSE_BUTTON_UP: {
-        SDL_MouseButtonEvent mouseButtonEvent = event.button;
-        event_bus_->EmitEvent<MouseInputEvent>(mouseButtonEvent);
-        break;
-      }
-      case SDL_EVENT_MOUSE_WHEEL: {
-        event_bus_->EmitEvent<MouseWheelEvent>(event.wheel.x, event.wheel.y);
-        break;
-      }
-      case SDL_EVENT_WINDOW_RESIZED:
-      case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
-        auto& viewportInfo = registry_->Get<ViewportInfo>();
-        int windowW, windowH;
-        SDL_GetWindowSize(window_, &windowW, &windowH);
-        viewportInfo.width = static_cast<float>(windowW);
-        viewportInfo.height = static_cast<float>(windowH);
-        break;
-      }
-      default:
-        break;
-    }
-  }
-}
-
-void Game::Update(const float deltaTime) {
-#ifdef OCTARINE_PROFILING
-  PerfUtils::ProfilingAccumulator::Clear();
-  PerfUtils::PerfCounters::ResetValues();
-#endif
-  PROFILE_NAMED_SCOPE("Game::Update (total)");
-
-#ifndef OCTARINE_SHIPPED
-  if (auto* devListen = registry_->TryGet<octarine::dev::DevListenServer>()) {
-    devListen->Pump();
-  }
-#endif
-
-  auto& options = registry_->Get<GameConfig>().GetEngineOptions();
-
-  // Master volume + mute live at the mixer level so they apply to every track (including loops
-  // already playing). Synced every frame — and outside the pause gate — so toggling mute reacts
-  // immediately even while execution is paused.
-  if (auto* mixer = registry_->Get<EngineContext>().mixer) {
-    const float masterGain = options.audioEnabled ? std::max(0.0F, options.masterVolume) : 0.0F;
-    MIX_SetMixerGain(mixer, masterGain);
-  }
-
-  auto* inputSystem = registry_->TryGet<InputSystem>();
-  if (inputSystem) {
-    inputSystem->BeginFrame();
-  }
-
-#ifndef OCTARINE_SHIPPED
-  // Run hot reload even when paused — authors iterate code with the editor paused all the time,
-  // and the swap is cheap. Uses real deltaTime (not time-scaled) so the poll cadence is stable.
-  if (options.hotReloadEnabled) {
-    if (auto* hotReload = registry_->TryGet<ScriptHotReload>()) {
-      hotReload->Tick(*registry_, lua, deltaTime, options.hotReloadPollSeconds);
-    }
-  }
-#endif
-
-  if (!options.isPaused || options.stepFrame) {
-    registry_->Update(deltaTime * options.timeScale);
-    options.stepFrame = false;
-  } else {
-    // If paused, we might still want to clear some per-frame signals so they don't get stuck.
-  }
-
-  // Pressed/released keys and wheel deltas are per-frame edge signals — clear after every
-  // system in this frame has observed them.
-  if (inputSystem) {
-    inputSystem->ClearPerFrameInput();
-  }
-}
-
-void Game::Render([[maybe_unused]] const float deltaTime) {
-  PROFILE_NAMED_SCOPE("Game::Render (total)");
-  auto& renderQueue = registry_->Get<RenderQueue>();
-  auto& gameConfig = registry_->Get<GameConfig>();
-
-  PROFILE_COUNTER_SET("RenderQueue: Size", static_cast<long long>(renderQueue.Size()));
-  PROFILE_COUNTER_SET("Entities: User", static_cast<long long>(registry_->GetUserEntityCount()));
-
-  renderer_->BeginScene(sdl_renderer_);
-
-#ifdef OCTARINE_PROFILING
-  {
-    PerfUtils::ScopedTimer sortTimer("Render: Sort");
-    renderQueue.Sort();
-  }
-  {
-    PerfUtils::ScopedTimer drawTimer("Render: Draw");
-    renderer_->DrawQueue(renderQueue, sdl_renderer_);
-  }
-#else
-  renderQueue.Sort();
-  renderer_->DrawQueue(renderQueue, sdl_renderer_);
-#endif
-
-  if (gameConfig.GetEngineOptions().drawColliders && collider_query_) {
-    collider_query_->Update();
-    DrawColliderSystem drawColliderSystem;
-    collider_query_->ForEach(drawColliderSystem);
-  }
-
-  renderer_->EndScene(sdl_renderer_);
-
-  auto& options = gameConfig.GetEngineOptions();
-  const bool editorSession = gameConfig.IsEditorMode() || !gameConfig.HasLoadedConfig();
-
-  // Update viewport info for non-editor sessions or when ImGui is disabled.
-  // In editor mode with ImGui, RenderDebugGUISystem::Render will override this with the Scene window bounds.
-  auto& viewportInfo = registry_->Get<ViewportInfo>();
-  viewportInfo.x = 0;
-  viewportInfo.y = 0;
-  int windowW, windowH;
-  SDL_GetWindowSize(window_, &windowW, &windowH);
-  viewportInfo.width = static_cast<float>(windowW);
-  viewportInfo.height = static_cast<float>(windowH);
-
-#ifdef OCTARINE_WITH_IMGUI
-  auto& io = ImGui::GetIO();
-  viewportInfo.isHovered = !io.WantCaptureMouse;
-  viewportInfo.isFocused = !io.WantCaptureKeyboard;
-#else
-  viewportInfo.isHovered = true;
-  viewportInfo.isFocused = true;
-#endif
-
-  if (!IsBenchMode()) {
-    // Only draw the game texture to the full window if we are NOT in an editor session
-    // and NOT showing debug overlays. In editor mode, the Scene window handles drawing this texture.
-    if (!editorSession && !options.showDebugGUI) {
-      renderer_->CompositeSceneToWindow(sdl_renderer_);
-    }
-#ifdef OCTARINE_WITH_IMGUI
-    RenderDebugGUISystem::Render(this, sdl_renderer_, renderer_->GetSceneTexture(), deltaTime);
-#endif
-  }
-
-#ifdef OCTARINE_PROFILING
-  {
-    PerfUtils::ScopedTimer presentTimer("Render: Present");
-    renderer_->Present(sdl_renderer_);
-  }
-#else
-  renderer_->Present(sdl_renderer_);
-#endif
-  // Emit per-frame counters as COUNTER lines so headless bench runs can capture them
-  // alongside TIMER lines. All systems for this frame have already written their values.
-  PROFILE_COUNTERS_REPORT();
-  renderQueue.Clear();
-}
-
-float Game::WaitTime() {
-  PROFILE_NAMED_SCOPE("Game::WaitTime");
-  const Uint64 elapsedTime = SDL_GetTicks() - milliseconds_previous_frame_;
-  if (elapsedTime < Constants::kMillisecondsPerFrame) {
-    const Uint32 timeToWait = Constants::kMillisecondsPerFrame - static_cast<Uint32>(elapsedTime);
-    SDL_Delay(timeToWait);
-  }
-
-  // Calculate delta time
-  const auto intermediate = static_cast<double>(SDL_GetTicks() - milliseconds_previous_frame_) /
-                            static_cast<double>(Constants::kMillisecondsPerSecond);
-  const auto deltaTime = static_cast<float>(intermediate);
-
-  milliseconds_previous_frame_ = SDL_GetTicks();
-
-  return deltaTime;
-}
-
-void Game::OnKeyInputEvent(const KeyInputEvent& event) {
-  if (!event.isPressed) {
-    return;
-  }
-
-  auto& gameConfig = registry_->Get<GameConfig>();
-
-  switch (event.inputKey) {
-    case SDLK_ESCAPE:
-      s_is_running_ = false;
-      break;
-    case SDLK_GRAVE:
-      gameConfig.GetEngineOptions().showDebugGUI = !gameConfig.GetEngineOptions().showDebugGUI;
-      break;
-    default:
-      break;
-  }
-}
-
-void Game::LoadScene(const std::string& scenePath) {
-  if (scenePath.empty()) {
-    Logger::Warn("LoadScene called with empty path.");
-    return;
-  }
-
-  auto& assetManager = registry_->Get<AssetManager>();
-
-  // Use the full path relative to the asset directory if it's a relative path.
-  std::string fullPath = assetManager.GetFullPath(scenePath);
-
-  Logger::Info("Loading scene: " + fullPath);
-
-  // Acquire-before-release: stash the previous scene's tracked assets but defer releasing them
-  // until the new scene's assets are resident, so any id shared by both scenes never
-  // unloads/reloads across the swap. Entities are a different story — a scene script may spawn
-  // entities as a side effect while it runs (the no-table path), so the old entities are cleared
-  // up front, before the script executes, rather than after (which would wipe the new ones).
-  std::vector<std::string> previousSceneAssets = std::move(current_scene_assets_);
-  current_scene_assets_.clear();
-  clearSceneEntities();
-
-  auto releasePrevious = [&]() { assetManager.ReleaseAll(previousSceneAssets); };
-
-#ifdef OCTARINE_WITH_EDITOR
-  if (auto* editorPersistence = registry_->TryGet<EditorPersistence>()) {
-    editorPersistence->currentScenePath = scenePath;
-    editorPersistence->showSceneWindow = true;
-  }
-#endif
-
-  auto sceneBytes = ReadFileViaSDL(fullPath);
-  sol::protected_function_result result;
-  if (sceneBytes) {
-    result = lua.safe_script(*sceneBytes, sol::script_pass_on_error, "@" + fullPath);
-  }
-  if (!sceneBytes || !result.valid()) {
-    if (!sceneBytes) {
-      Logger::Error("Failed to read scene '" + fullPath + "'");
-    } else {
-      const sol::error err = result;
-      Logger::Error("Failed to load scene '" + fullPath + "': " + std::string(err.what()));
-    }
-    releasePrevious();
-  } else if (result.return_count() > 0) {
-    if (result[0].is<sol::table>()) {
-      Logger::Info("Scene script returned a table. Attempting to load assets and entities...");
-      sol::table sceneTable = result[0];
-
-      // 1. Load Assets
-      sol::optional<sol::table> assets = sceneTable["assets"];
-      if (assets && assets->valid()) {
-        auto& am = registry_->Get<AssetManager>();
-        auto* mixer = registry_->Get<EngineContext>().mixer;
-        int assetCount = 0;
-        for (auto& [key, value] : *assets) {
-          if (value.is<sol::table>()) {
-            sol::table asset = value.as<sol::table>();
-            std::string type = asset["type"];
-            std::string id = asset["id"];
-            std::string file = asset["file"];
-            if (type == "texture") {
-              am.AddTexture(sdl_renderer_, id, file);
-            } else if (type == "font") {
-              float fontSize = asset["font_size"];
-              am.AddFont(id, file, fontSize);
-            } else if (type == "audio_clip") {
-              if (mixer) am.AddAudioClip(mixer, id, file);
-            }
-            assetCount++;
-          }
-        }
-        Logger::Info("Loaded " + std::to_string(assetCount) + " assets from scene table.");
-      }
-
-      // 1b. Derive the scene's required asset set from its data (sprite/font/audio ids +
-      // tilemap + preload), validate every reference against the catalog, then acquire up
-      // front before entities load.
-      {
-        auto& am = registry_->Get<AssetManager>();
-        MIX_Mixer* mixer = registry_->Get<EngineContext>().mixer;
-        const std::vector<AssetReference> refs = SceneAssetScanner::CollectRefs(sceneTable);
-
-        if (const int failures = am.Validate(refs); failures > 0) {
-          Logger::Error("Scene '" + fullPath + "' has " + std::to_string(failures) + " unresolved asset reference(s).");
-          if (registry_->Get<GameConfig>().GetEngineOptions().assetValidationFatal) {
-            Logger::Error("assetValidationFatal is set — aborting scene load.");
-            releasePrevious();
-            return;
-          }
-        }
-
-        const int acquired = am.AcquireAll(refs, sdl_renderer_, mixer);
-        Logger::Info("Scene scan acquired " + std::to_string(acquired) + " required asset(s).");
-
-        // New scene's assets are now resident. Track them, then release the previous
-        // scene's set — ids shared by both stay loaded thanks to refcounting.
-        std::vector<std::string> newSceneAssets;
-        std::set<std::string> seen;
-        for (const auto& ref : refs) {
-          if (seen.insert(ref.id).second) newSceneAssets.push_back(ref.id);
-        }
-        TrackSceneAssets(newSceneAssets);
-        releasePrevious();
-      }
-
-      // 2. Load Entities
-      sol::optional<sol::table> entities = sceneTable["entities"];
-      if (entities && entities->valid()) {
-        int entityCount = 0;
-        for (auto& [key, value] : *entities) {
-          if (value.is<sol::table>()) {
-            LuaEntityLoader::LoadEntityFromLua(registry_.get(), value.as<sol::table>());
-            entityCount++;
-          }
-        }
-        Logger::Info("Loaded " + std::to_string(entityCount) + " entities from scene table.");
-      }
-
-      // 3. Try to call a 'run' or 'load' or 'setup' function if present
-      sol::optional<sol::function> runFunc = sceneTable["run"];
-      if (!runFunc) runFunc = sceneTable["load"].get<sol::optional<sol::function>>();
-      if (!runFunc) runFunc = sceneTable["setup"].get<sol::optional<sol::function>>();
-
-      if (runFunc && runFunc->valid()) {
-        Logger::Info("Found 'run/load/setup' function in scene table. Calling it...");
-        auto funcResult = (*runFunc)(sceneTable);
-        if (!funcResult.valid()) {
-          sol::error err = funcResult;
-          Logger::Error("Failed to run scene function: " + std::string(err.what()));
-        }
-      }
-    } else if (result[0].is<sol::function>()) {
-      // No scene table to scan up front. The returned function spawns the scene (and may
-      // call acquire_scene_assets, which tracks its ids via TrackSceneAssets). Run it, then
-      // release the previous scene's assets — shared ids it already re-acquired survive.
-      Logger::Info("Scene script returned a function. Calling it...");
-      sol::function sceneFunc = result[0].as<sol::function>();
-      auto funcResult = sceneFunc();
-      if (!funcResult.valid()) {
-        sol::error err = funcResult;
-        Logger::Error("Failed to run scene function: " + std::string(err.what()));
-      }
-      releasePrevious();
-    } else {
-      releasePrevious();
-    }
-  } else {
-    // No return value: the script built the scene as a side effect while it ran (entities +
-    // any acquire_scene_assets call). Those are already in place; just release the old set.
-    releasePrevious();
-  }
-
-  scene_running_ = true;
-}
-
-void Game::ReloadScene() {
-#ifdef OCTARINE_WITH_EDITOR
-  if (auto* editorPersistence = registry_->TryGet<EditorPersistence>();
-      editorPersistence != nullptr && !editorPersistence->currentScenePath.empty()) {
-    LoadScene(editorPersistence->currentScenePath);
-    return;
-  }
-#endif
-  Logger::Warn("ReloadScene called but no scene is currently loaded.");
-}
-
-void Game::clearSceneEntities() {
-  registry_->ClearUserEntities();
-  if (auto* inputSystem = registry_->TryGet<InputSystem>()) {
-    inputSystem->ResetLuaState();
-  }
-  // Drop cached SDL_Texture* lookups for entities that just got blammed; the next sprite-emit
-  // pass repopulates as those entities are recreated by the new scene's load.
-  if (auto* spriteCache = registry_->TryGet<SpriteRenderCache>()) {
-    spriteCache->Clear();
-  }
-}
-
-void Game::TrackSceneAssets(const std::vector<std::string>& assetIds) {
-  for (const auto& id : assetIds) {
-    if (std::ranges::find(current_scene_assets_, id) == current_scene_assets_.end()) {
-      current_scene_assets_.push_back(id);
-    }
-  }
-}
-
-void Game::StopScene() {
-  Logger::Info("Stopping current scene (clearing entities).");
-  clearSceneEntities();
-
-  // Release the assets this scene acquired. (LoadScene sequences acquire-before-release itself
-  // and does not route through here; this is the explicit-stop path.)
-  if (!current_scene_assets_.empty()) {
-    if (auto* assetManager = registry_->TryGet<AssetManager>()) {
-      assetManager->ReleaseAll(current_scene_assets_);
-    }
-    current_scene_assets_.clear();
-  }
-
-  scene_running_ = false;
-}
-
-KeyInputEvent Game::GetKeyInputEvent(SDL_KeyboardEvent* event) {
-  bool isPressed = event->down;
-  return {event->key, event->mod, isPressed};
 }
