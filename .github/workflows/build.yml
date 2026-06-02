@@ -123,25 +123,34 @@ jobs:
             modules.json
           if-no-files-found: error
 
-      # Advisory clang-tidy over the PR's changed .cpp files, using the compile_commands.json the
-      # editor-release build just emitted. Non-blocking (continue-on-error) for now: the 81-check
-      # ruleset against a codebase with no tidy history surfaces pre-existing debt, so gating hard
-      # would block unrelated PRs. Staged to changed-lines-as-errors later once the set is clean.
-      - name: clang-tidy (advisory)
+      # Blocking clang-tidy over the PR's changed LINES (not whole files), using the
+      # compile_commands.json the editor-release build just emitted. clang-tidy-diff.py with -U0
+      # restricts diagnostics to lines the PR actually touched, so pre-existing debt in a modified
+      # file never blocks an unrelated change while any new violation fails the job. (Previously
+      # advisory/continue-on-error; tightened now that the changed-file set is reliably clean.)
+      - name: clang-tidy (changed lines, blocking)
         if: matrix.platform == 'linux' && matrix.preset == 'editor-release' && github.event_name == 'pull_request'
-        continue-on-error: true
         shell: bash
         run: |
-          sudo apt-get update && sudo apt-get install -y clang-tidy
+          sudo apt-get update && sudo apt-get install -y clang-tidy-18
           base="${{ github.event.pull_request.base.sha }}"
-          mapfile -t files < <(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- 'src/*' 'tests/*' \
-            | grep -E '\.cpp$' || true)
-          if [ ${#files[@]} -eq 0 ]; then
+          changed="$(git diff --name-only --diff-filter=ACMR "$base"...HEAD -- 'src/*' 'tests/*' | grep -E '\.cpp$' || true)"
+          if [ -z "$changed" ]; then
             echo "No changed .cpp files to lint."
             exit 0
           fi
-          printf 'tidying:\n%s\n' "$(printf '  %s\n' "${files[@]}")"
-          clang-tidy -p build/${{ matrix.preset }} "${files[@]}"
+          printf 'tidying changed lines in:\n%s\n' "$(printf '  %s\n' $changed)"
+          # clang-tidy-diff.py ships inside the llvm-18 toolchain; fall back to the pinned upstream copy.
+          diff_tool="$(find /usr/lib/llvm-18 -name 'clang-tidy-diff.py' 2>/dev/null | head -1)"
+          if [ -z "$diff_tool" ]; then
+            diff_tool="$RUNNER_TEMP/clang-tidy-diff.py"
+            curl -fsSL https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-18.1.8/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py -o "$diff_tool"
+          fi
+          # -p1 strips the a/ b/ diff prefixes; -path points at compile_commands.json; any diagnostic
+          # on a touched line is promoted to an error and fails the step.
+          git diff -U0 "$base"...HEAD -- 'src/*' 'tests/*' \
+            | python3 "$diff_tool" -p1 -path "build/${{ matrix.preset }}" \
+                -clang-tidy-binary clang-tidy-18 -warnings-as-errors='*'
 
       - name: Stage runtime DLLs (Windows)
         if: matrix.platform == 'windows'
@@ -164,8 +173,8 @@ jobs:
 
   # Style gate. Lightweight (no vcpkg/SDL): formats only the files a PR actually changed, so the
   # large pre-existing tree never blocks on legacy style. Auto-fixable via the CMake `format` target.
-  # clang-tidy runs as an advisory (non-blocking) step in the editor-release build leg above, which
-  # has the compile_commands.json it needs; it will be tightened to blocking on changed lines later.
+  # clang-tidy runs as a blocking changed-lines gate in the editor-release build leg above, which
+  # has the compile_commands.json it needs. This job also drift-gates the static system/event catalogs.
   lint:
     name: lint (clang-format)
     runs-on: ubuntu-latest
@@ -198,5 +207,16 @@ jobs:
           printf 'checking:\n%s\n' "$(printf '  %s\n' "${files[@]}")"
           if ! clang-format --dry-run --Werror -style=file "${files[@]}"; then
             echo "::error::clang-format violations. Fix with pinned clang-format ${CLANG_FORMAT_VERSION}: cmake --build build/editor-release --target format"
+            exit 1
+          fi
+
+      # systems.json / events.json are produced by static source inspection (no build needed), so
+      # the drift gate lives here in the lightweight lint job rather than the editor-release leg that
+      # gates the runtime-introspected components.json / modules.json. Regenerate + diff.
+      - name: Check system/event catalog drift
+        shell: bash
+        run: |
+          if ! python3 scripts/gen_api_catalogs.py --check; then
+            git diff -- systems.json events.json | head -200
             exit 1
           fi
