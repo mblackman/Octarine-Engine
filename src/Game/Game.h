@@ -11,6 +11,7 @@
 #include "../Components/GlobalTransformComponent.h"
 #include "../ECS/Query.h"
 #include "../Engine/EngineContext.h"
+#include "../Engine/EngineRuntime.h"
 #include "../EventBus/EventBus.h"
 #include "../Events/KeyInputEvent.h"
 #include "../Lua/LuaBindingContext.h"
@@ -76,8 +77,8 @@ class Game : public LuaBindingContext {
   }
 #endif
 
-  [[nodiscard]] SDL_Renderer* GetRenderer() const override { return sdl_renderer_; }
-  [[nodiscard]] SDL_Window* GetWindow() const { return window_; }
+  [[nodiscard]] SDL_Renderer* GetRenderer() const override { return runtime_.SdlRenderer(); }
+  [[nodiscard]] SDL_Window* GetWindow() const { return runtime_.Window(); }
 
   [[nodiscard]] Registry* GetRegistry() const override { return registry_.get(); }
   [[nodiscard]] sol::state& GetLua() { return lua; }
@@ -121,8 +122,7 @@ class Game : public LuaBindingContext {
   void OnKeyInputEvent(const KeyInputEvent& event);
   static KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);
 
-  SDL_Window* window_;
-  SDL_Renderer* sdl_renderer_;
+  EngineRuntime runtime_;
   static inline bool s_is_running_{false};
   bool scene_running_ = false;
   bool bake_mode_ = false;

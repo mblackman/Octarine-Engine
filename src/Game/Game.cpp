@@ -146,7 +146,7 @@ inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const Ga
   Logger::Info("Just opened entry script: " + filePath);
 }
 
-Game::Game() : window_(nullptr), sdl_renderer_(nullptr) {
+Game::Game() {
   registry_ = std::make_unique<Registry>();
   event_bus_ = std::make_unique<EventBus>();
   renderer_ = std::make_unique<Renderer>();
@@ -156,15 +156,7 @@ Game::Game() : window_(nullptr), sdl_renderer_(nullptr) {
 Game::~Game() { Logger::Info("Game Destructor called."); }
 
 bool Game::Initialize(const std::string& assetPath) {
-  constexpr auto SDL_INI = SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS | SDL_INIT_GAMEPAD;
-
-  if (!SDL_Init(SDL_INI)) {
-    Logger::Error("SDL_Init Error: " + std::string(SDL_GetError()));
-    return false;
-  }
-
-  if (!TTF_Init()) {
-    Logger::Error("TTF_Init Error: " + std::string(SDL_GetError()));
+  if (!runtime_.InitSubsystems()) {
     return false;
   }
 
@@ -273,50 +265,27 @@ bool Game::Initialize(const std::string& assetPath) {
   gameConfig.windowHeight = projectLoaded ? gameConfig.GetDefaultHeight() : Constants::kDefaultWindowHeight;
   std::string title = projectLoaded ? gameConfig.GetGameTitle() : "Octarine Engine - Editor";
 
-  SDL_CreateWindowAndRenderer(title.c_str(), gameConfig.windowWidth, gameConfig.windowHeight, SDL_WINDOW_RESIZABLE,
-                              &window_, &sdl_renderer_);
-
-  if (!window_) {
-    Logger::Error("SDL_CreateWindow Error: " + std::string(SDL_GetError()));
+  if (!runtime_.CreateWindow(title, gameConfig.windowWidth, gameConfig.windowHeight)) {
     return false;
   }
 
-  if (!sdl_renderer_) {
-    Logger::Error("SDL_CreateRenderer Error: " + std::string(SDL_GetError()));
-    return false;
-  }
-
-  if (!renderer_->CreateScene(sdl_renderer_, gameConfig.windowWidth, gameConfig.windowHeight)) {
+  if (!renderer_->CreateScene(runtime_.SdlRenderer(), gameConfig.windowWidth, gameConfig.windowHeight)) {
     return false;
   }
 
 #ifdef OCTARINE_WITH_IMGUI
-  IMGUI_CHECKVERSION();
-  ImGui::CreateContext();
-  ImGuiIO& io = ImGui::GetIO();
-  (void)io;
-
+  // io.IniFilename holds the raw pointer for the context's lifetime, so the backing string must
+  // outlive InitImGui — keep it static.
   static std::string imguiIniPath;
   if (gameConfig.HasLoadedConfig()) {
     imguiIniPath = gameConfig.GetAssetPath() + "/imgui.ini";
-    io.IniFilename = imguiIniPath.c_str();
+  } else if (char* prefPath = SDL_GetPrefPath("Octarine", "Engine")) {
+    imguiIniPath = std::string(prefPath) + "imgui_editor.ini";
+    SDL_free(prefPath);
   } else {
-    char* prefPath = SDL_GetPrefPath("Octarine", "Engine");
-    if (prefPath) {
-      imguiIniPath = std::string(prefPath) + "imgui_editor.ini";
-      io.IniFilename = imguiIniPath.c_str();
-      SDL_free(prefPath);
-    } else {
-      io.IniFilename = "imgui_editor.ini";
-    }
+    imguiIniPath = "imgui_editor.ini";
   }
-
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-  io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
-  io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
-  ImGui_ImplSDL3_InitForSDLRenderer(window_, sdl_renderer_);
-  ImGui_ImplSDLRenderer3_Init(sdl_renderer_);
+  runtime_.InitImGui(imguiIniPath.c_str());
 
 #ifdef OCTARINE_WITH_EDITOR
   // --- Resolve editor font size (DPI-aware default on first launch) ---
@@ -343,6 +312,7 @@ bool Game::Initialize(const std::string& assetPath) {
     octarine::editor::layouts::ApplyDefaultPreset(editorPersistence);
   }
 #else
+  ImGuiIO& io = ImGui::GetIO();
   io.Fonts->Clear();
   io.Fonts->AddFontDefault();
   io.Fonts->Build();
@@ -353,8 +323,8 @@ bool Game::Initialize(const std::string& assetPath) {
   // filled in by Setup once those exist; consumers read the same instance via
   // Registry::Get<EngineContext>().
   EngineContext ctx;
-  ctx.sdlWindow = window_;
-  ctx.sdlRenderer = sdl_renderer_;
+  ctx.sdlWindow = runtime_.Window();
+  ctx.sdlRenderer = runtime_.SdlRenderer();
   ctx.eventBus = event_bus_.get();
   ctx.config = &gameConfig;
   registry_->Set<EngineContext>(ctx);
@@ -393,21 +363,12 @@ void Game::Destroy() {
   registry_.reset();
   event_bus_.reset();
 
-  if (sdl_renderer_) {
+  // Free the off-screen scene target while the SDL renderer is still live (EngineRuntime owns
+  // the ImGui backend + window/renderer destroy + SDL_Quit, in that order).
+  if (runtime_.SdlRenderer()) {
     renderer_->DestroyScene();
-#ifdef OCTARINE_WITH_IMGUI
-    ImGui_ImplSDLRenderer3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
-#endif
-    SDL_DestroyRenderer(sdl_renderer_);
   }
-
-  if (window_) {
-    SDL_DestroyWindow(window_);
-  }
-
-  SDL_Quit();
+  runtime_.Shutdown();
 }
 
 bool Game::Bake(const std::string& assetPath) {
@@ -796,7 +757,7 @@ void Game::ProcessInput() const {
       case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED: {
         auto& viewportInfo = registry_->Get<ViewportInfo>();
         int windowW, windowH;
-        SDL_GetWindowSize(window_, &windowW, &windowH);
+        SDL_GetWindowSize(runtime_.Window(), &windowW, &windowH);
         viewportInfo.width = static_cast<float>(windowW);
         viewportInfo.height = static_cast<float>(windowH);
         break;
@@ -867,7 +828,7 @@ void Game::Render([[maybe_unused]] const float deltaTime) {
   PROFILE_COUNTER_SET("RenderQueue: Size", static_cast<long long>(renderQueue.Size()));
   PROFILE_COUNTER_SET("Entities: User", static_cast<long long>(registry_->GetUserEntityCount()));
 
-  renderer_->BeginScene(sdl_renderer_);
+  renderer_->BeginScene(runtime_.SdlRenderer());
 
 #ifdef OCTARINE_PROFILING
   {
@@ -876,11 +837,11 @@ void Game::Render([[maybe_unused]] const float deltaTime) {
   }
   {
     PerfUtils::ScopedTimer drawTimer("Render: Draw");
-    renderer_->DrawQueue(renderQueue, sdl_renderer_);
+    renderer_->DrawQueue(renderQueue, runtime_.SdlRenderer());
   }
 #else
   renderQueue.Sort();
-  renderer_->DrawQueue(renderQueue, sdl_renderer_);
+  renderer_->DrawQueue(renderQueue, runtime_.SdlRenderer());
 #endif
 
   if (gameConfig.GetEngineOptions().drawColliders && collider_query_) {
@@ -889,7 +850,7 @@ void Game::Render([[maybe_unused]] const float deltaTime) {
     collider_query_->ForEach(drawColliderSystem);
   }
 
-  renderer_->EndScene(sdl_renderer_);
+  renderer_->EndScene(runtime_.SdlRenderer());
 
   auto& options = gameConfig.GetEngineOptions();
   const bool editorSession = gameConfig.IsEditorMode() || !gameConfig.HasLoadedConfig();
@@ -900,7 +861,7 @@ void Game::Render([[maybe_unused]] const float deltaTime) {
   viewportInfo.x = 0;
   viewportInfo.y = 0;
   int windowW, windowH;
-  SDL_GetWindowSize(window_, &windowW, &windowH);
+  SDL_GetWindowSize(runtime_.Window(), &windowW, &windowH);
   viewportInfo.width = static_cast<float>(windowW);
   viewportInfo.height = static_cast<float>(windowH);
 
@@ -917,20 +878,20 @@ void Game::Render([[maybe_unused]] const float deltaTime) {
     // Only draw the game texture to the full window if we are NOT in an editor session
     // and NOT showing debug overlays. In editor mode, the Scene window handles drawing this texture.
     if (!editorSession && !options.showDebugGUI) {
-      renderer_->CompositeSceneToWindow(sdl_renderer_);
+      renderer_->CompositeSceneToWindow(runtime_.SdlRenderer());
     }
 #ifdef OCTARINE_WITH_IMGUI
-    RenderDebugGUISystem::Render(this, sdl_renderer_, renderer_->GetSceneTexture(), deltaTime);
+    RenderDebugGUISystem::Render(this, runtime_.SdlRenderer(), renderer_->GetSceneTexture(), deltaTime);
 #endif
   }
 
 #ifdef OCTARINE_PROFILING
   {
     PerfUtils::ScopedTimer presentTimer("Render: Present");
-    renderer_->Present(sdl_renderer_);
+    renderer_->Present(runtime_.SdlRenderer());
   }
 #else
-  renderer_->Present(sdl_renderer_);
+  renderer_->Present(runtime_.SdlRenderer());
 #endif
   // Emit per-frame counters as COUNTER lines so headless bench runs can capture them
   // alongside TIMER lines. All systems for this frame have already written their values.
@@ -1037,7 +998,7 @@ void Game::LoadScene(const std::string& scenePath) {
             std::string id = asset["id"];
             std::string file = asset["file"];
             if (type == "texture") {
-              am.AddTexture(sdl_renderer_, id, file);
+              am.AddTexture(runtime_.SdlRenderer(), id, file);
             } else if (type == "font") {
               float fontSize = asset["font_size"];
               am.AddFont(id, file, fontSize);
@@ -1067,7 +1028,7 @@ void Game::LoadScene(const std::string& scenePath) {
           }
         }
 
-        const int acquired = am.AcquireAll(refs, sdl_renderer_, mixer);
+        const int acquired = am.AcquireAll(refs, runtime_.SdlRenderer(), mixer);
         Logger::Info("Scene scan acquired " + std::to_string(acquired) + " required asset(s).");
 
         // New scene's assets are now resident. Track them, then release the previous
