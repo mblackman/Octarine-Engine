@@ -467,5 +467,35 @@ if (OCTARINE_ENABLE_TESTS)
         add_test(NAME DevListenServerTest COMMAND OctarineDevListenServerTest)
     endif ()
 
+    # Lua behavior test: calls bound component methods from Lua and verifies the C++ side mutated
+    # (damage/heal round-trip, clamping setters, fromLua defaults). Links the full engine via
+    # octarine_engine — same surface as the smoke test, minus Main.cpp.
+    add_executable(OctarineLuaBehaviorTest tests/LuaBehaviorTest.cpp)
+    set_target_properties(OctarineLuaBehaviorTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF)
+    target_link_libraries(OctarineLuaBehaviorTest PRIVATE octarine_engine)
+    if (MSVC)
+        target_compile_options(OctarineLuaBehaviorTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
+    endif ()
+    add_test(NAME LuaBehaviorTest COMMAND OctarineLuaBehaviorTest)
+
+    # Game bake test: headless Game construction + Game::Bake against a minimal fixture project +
+    # SceneAssetScanner::CollectRefs provenance / cross-scene delta. BAKE_FIXTURE_DIR points the
+    # end-to-end bake check at tests/fixtures/bake-project.
+    add_executable(OctarineGameBakeTest tests/GameBakeTest.cpp)
+    set_target_properties(OctarineGameBakeTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF)
+    target_compile_definitions(OctarineGameBakeTest PRIVATE
+            BAKE_FIXTURE_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/fixtures/bake-project")
+    target_link_libraries(OctarineGameBakeTest PRIVATE octarine_engine)
+    if (MSVC)
+        target_compile_options(OctarineGameBakeTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
+    endif ()
+    add_test(NAME GameBakeTest COMMAND OctarineGameBakeTest)
+
     message(STATUS "Octarine: Tests ENABLED")
 endif ()
