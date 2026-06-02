@@ -158,6 +158,22 @@ if (OCTARINE_WITH_IMGUI OR OCTARINE_WITH_EDITOR)
                 Editor/ExportBuilder.cpp
                 Editor/PlayerLauncher.cpp
                 Editor/Inspectors/RegisterAllInspectors.cpp
+                # Editor UI panels (Stage 9 split of RenderDebugGUISystem). Each owns one window /
+                # service; RenderDebugGUISystem keeps only the IMGUI-shared frame begin/end + game
+                # overlays and delegates the editor chrome to EditorPanelHost.
+                Editor/Panels/EditorAssetBrowserPanel.cpp
+                Editor/Panels/EditorBuildDialog.cpp
+                Editor/Panels/EditorConsolePanel.cpp
+                Editor/Panels/EditorDialogService.cpp
+                Editor/Panels/EditorHierarchyPanel.cpp
+                Editor/Panels/EditorImGuiBackend.cpp
+                Editor/Panels/EditorOutputPanels.cpp
+                Editor/Panels/EditorPanelHost.cpp
+                Editor/Panels/EditorProjectPanels.cpp
+                Editor/Panels/EditorSceneWindow.cpp
+                Editor/Panels/EditorSettingsPanels.cpp
+                Editor/Panels/EditorSigningPanel.cpp
+                Editor/Panels/EditorToolbarPanel.cpp
         )
         # SecretStore: one backend per host so the OS-native API links cleanly without
         # cross-platform shims. Linux backend is a no-op stub the editor UI falls back
