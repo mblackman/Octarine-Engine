@@ -1,0 +1,302 @@
+{
+  "_generated_by": "scripts/gen_api_catalogs.py",
+  "_note": "Static catalog of src/Systems. Regenerate with scripts/gen_api_catalogs.py.",
+  "systems": [
+    {
+      "name": "AnimationSystem",
+      "source": "src/Systems/AnimationSystem.h",
+      "tier": "parallel",
+      "setup_order": 2,
+      "queried_components": [
+        "SpriteComponent",
+        "AnimationComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "AudioCullingSystem",
+      "source": "src/Systems/AudioCullingSystem.h",
+      "tier": "serial",
+      "setup_order": 9,
+      "queried_components": [
+        "GlobalTransformComponent",
+        "AudioSourceComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "AudioSystem",
+      "source": "src/Systems/AudioSystem.h",
+      "tier": "serial",
+      "setup_order": 1,
+      "queried_components": [
+        "AudioSourceComponent"
+      ],
+      "emits": [],
+      "subscribes": [
+        "AudioPlayEvent"
+      ],
+      "lua_surface": false
+    },
+    {
+      "name": "CameraFollowSystem",
+      "source": "src/Systems/CameraFollowSystem.h",
+      "tier": "serial",
+      "setup_order": 12,
+      "queried_components": [
+        "PositionComponent",
+        "CameraFollowComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "CollisionSystem",
+      "source": "src/Systems/CollisionSystem.h",
+      "tier": "bulk",
+      "setup_order": 7,
+      "queried_components": [],
+      "emits": [
+        "CollisionEvent"
+      ],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "DamageSystem",
+      "source": "src/Systems/DamageSystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [
+        "CollisionEvent"
+      ],
+      "lua_surface": false
+    },
+    {
+      "name": "DopplerSystem",
+      "source": "src/Systems/DopplerSystem.h",
+      "tier": "serial",
+      "setup_order": 11,
+      "queried_components": [
+        "GlobalTransformComponent",
+        "RigidBodyComponent",
+        "AudioSourceComponent",
+        "AudioSinkComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "DrawColliderSystem",
+      "source": "src/Systems/DrawColliderSystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "EntityPoolSystem",
+      "source": "src/Systems/EntityPoolSystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "InputSystem",
+      "source": "src/Systems/InputSystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [
+        "KeyInputEvent",
+        "MouseInputEvent",
+        "MouseWheelEvent"
+      ],
+      "lua_surface": true
+    },
+    {
+      "name": "ObstacleBounceSystem",
+      "source": "src/Systems/ObstacleBounceSystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [
+        "CollisionEvent"
+      ],
+      "lua_surface": false
+    },
+    {
+      "name": "OffScreenDespawnSystem",
+      "source": "src/Systems/OffScreenDespawnSystem.h",
+      "tier": "parallel",
+      "setup_order": 5,
+      "queried_components": [
+        "PositionComponent",
+        "SpriteComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "ProjectileEmitSystem",
+      "source": "src/Systems/ProjectileEmitSystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "ProjectileLifecycleSystem",
+      "source": "src/Systems/ProjectileLifecycleSystem.h",
+      "tier": "parallel",
+      "setup_order": 3,
+      "queried_components": [
+        "ProjectileComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "RenderDebugGUISystem",
+      "source": "src/Systems/RenderDebugGUISystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "RenderPrimitiveSystem",
+      "source": "src/Systems/RenderPrimitiveSystem.h",
+      "tier": "parallel",
+      "setup_order": 15,
+      "queried_components": [
+        "SquarePrimitiveComponent",
+        "GlobalTransformComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "RenderSpriteSystem",
+      "source": "src/Systems/RenderSpriteSystem.h",
+      "tier": "parallel",
+      "setup_order": 13,
+      "queried_components": [
+        "GlobalTransformComponent",
+        "SpriteComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "RenderTextSystem",
+      "source": "src/Systems/RenderTextSystem.h",
+      "tier": "serial",
+      "setup_order": 14,
+      "queried_components": [
+        "TextLabelComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "ScriptSystem",
+      "source": "src/Systems/ScriptSystem.h",
+      "tier": "serial",
+      "setup_order": 0,
+      "queried_components": [
+        "ScriptComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "SpatialAudioSystem",
+      "source": "src/Systems/SpatialAudioSystem.h",
+      "tier": "serial",
+      "setup_order": 10,
+      "queried_components": [
+        "GlobalTransformComponent",
+        "AudioSourceComponent",
+        "AudioSinkComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "TransformSystem",
+      "source": "src/Systems/TransformSystem.h",
+      "tier": "bulk",
+      "setup_order": 6,
+      "queried_components": [
+        "GlobalTransformComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "UIButtonSystem",
+      "source": "src/Systems/UIButtonSystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [
+        "MouseInputEvent"
+      ],
+      "lua_surface": false
+    },
+    {
+      "name": "UpdateListenerTransformSystem",
+      "source": "src/Systems/UpdateListenerTransformSystem.h",
+      "tier": "bulk",
+      "setup_order": 8,
+      "queried_components": [
+        "GlobalTransformComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "VelocityIntegrationSystem",
+      "source": "src/Systems/VelocityIntegrationSystem.h",
+      "tier": "parallel",
+      "setup_order": 4,
+      "queried_components": [
+        "PositionComponent",
+        "RigidBodyComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    }
+  ]
+}

@@ -88,6 +88,7 @@ CI (`.github/workflows/build.yml`) runs both on the Linux editor-release leg on 
 - [`docs/events.md`](events.md) — the event bus and every event type
 - [`docs/editor.md`](editor.md) — editor windows, hotkeys, Run Player, Export Build
 - [`docs/scenes.md`](scenes.md) — scene file shape, lifecycle, `load_scene` / `reload_scene`
+- [`docs/tilemaps.md`](tilemaps.md) — what the scene `tilemap` field does (and doesn't) today
 - [`docs/asset-pipeline.md`](asset-pipeline.md) — `.meta` sidecars, bake step, atlases, audio normalize
 - [`docs/profiling.md`](profiling.md) — profiling build, PerfUtils, benchmarks, the perf dashboard
 - [`docs/device-builds.md`](device-builds.md) — shipping artifacts for desktop and Android

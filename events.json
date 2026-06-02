@@ -1,0 +1,161 @@
+{
+  "_generated_by": "scripts/gen_api_catalogs.py",
+  "_note": "Static catalog of src/Events. Regenerate with scripts/gen_api_catalogs.py.",
+  "events": [
+    {
+      "name": "AudioPlayEvent",
+      "kind": "struct",
+      "source": "src/Events/AudioPlayEvent.h",
+      "fields": [
+        {
+          "type": "std::string",
+          "name": "clipId"
+        },
+        {
+          "type": "float",
+          "name": "volume"
+        }
+      ],
+      "emit_sites": [
+        {
+          "file": "src/Lua/Modules/AudioModuleLuaBinding.cpp",
+          "line": 19
+        }
+      ],
+      "subscribe_sites": [
+        {
+          "file": "src/Systems/AudioSystem.cpp",
+          "line": 65,
+          "owner": "AudioSystem"
+        }
+      ]
+    },
+    {
+      "name": "CollisionEvent",
+      "kind": "class",
+      "source": "src/Events/CollisionEvent.h",
+      "fields": [
+        {
+          "type": "Entity",
+          "name": "entityA"
+        },
+        {
+          "type": "Entity",
+          "name": "entityB"
+        }
+      ],
+      "emit_sites": [
+        {
+          "file": "src/Systems/CollisionSystem.h",
+          "line": 106
+        }
+      ],
+      "subscribe_sites": [
+        {
+          "file": "src/Systems/DamageSystem.h",
+          "line": 16,
+          "owner": "DamageSystem"
+        },
+        {
+          "file": "src/Systems/ObstacleBounceSystem.h",
+          "line": 19,
+          "owner": "ObstacleBounceSystem"
+        }
+      ]
+    },
+    {
+      "name": "KeyInputEvent",
+      "kind": "struct",
+      "source": "src/Events/KeyInputEvent.h",
+      "fields": [
+        {
+          "type": "SDL_Keycode",
+          "name": "inputKey"
+        },
+        {
+          "type": "SDL_Keymod",
+          "name": "inputModifier"
+        },
+        {
+          "type": "bool",
+          "name": "isPressed"
+        }
+      ],
+      "emit_sites": [
+        {
+          "file": "src/Engine/FrameLoop.cpp",
+          "line": 68
+        }
+      ],
+      "subscribe_sites": [
+        {
+          "file": "src/Game/Game.cpp",
+          "line": 682,
+          "owner": "FrameLoop"
+        },
+        {
+          "file": "src/Systems/InputSystem.h",
+          "line": 49,
+          "owner": "InputSystem"
+        }
+      ]
+    },
+    {
+      "name": "MouseInputEvent",
+      "kind": "struct",
+      "source": "src/Events/MouseInputEvent.h",
+      "fields": [
+        {
+          "type": "SDL_MouseButtonEvent",
+          "name": "event"
+        }
+      ],
+      "emit_sites": [
+        {
+          "file": "src/Engine/FrameLoop.cpp",
+          "line": 74
+        }
+      ],
+      "subscribe_sites": [
+        {
+          "file": "src/Systems/InputSystem.h",
+          "line": 50,
+          "owner": "InputSystem"
+        },
+        {
+          "file": "src/Systems/UIButtonSystem.h",
+          "line": 24,
+          "owner": "UIButtonSystem"
+        }
+      ]
+    },
+    {
+      "name": "MouseWheelEvent",
+      "kind": "struct",
+      "source": "src/Events/MouseWheelEvent.h",
+      "fields": [
+        {
+          "type": "float",
+          "name": "dx"
+        },
+        {
+          "type": "float",
+          "name": "dy"
+        }
+      ],
+      "emit_sites": [
+        {
+          "file": "src/Engine/FrameLoop.cpp",
+          "line": 78
+        }
+      ],
+      "subscribe_sites": [
+        {
+          "file": "src/Systems/InputSystem.h",
+          "line": 51,
+          "owner": "InputSystem"
+        }
+      ]
+    }
+  ]
+}
