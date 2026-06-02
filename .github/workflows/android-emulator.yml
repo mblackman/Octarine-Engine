@@ -114,12 +114,21 @@ jobs:
           adb install -r "$apk"
           adb logcat -c
           # Read applicationId from project.ini fallback chain — example_repo's package_id is the
-          # canonical value; if missing, fall back to the gradle default. Component is
-          # <pkg>/org.libsdl.app.SDLActivity (SDL3's stock activity, unchanged).
+          # canonical value; if missing, fall back to the gradle default.
           pkg=$(awk -F= '/^[[:space:]]*package_id[[:space:]]*=/{gsub(/[[:space:]]/,"",$2); print $2; exit}' \
             "$GITHUB_WORKSPACE/example_repo/project.ini" 2>/dev/null || true)
           [ -n "$pkg" ] || pkg="com.octarine.example"
-          adb shell am start -W -n "$pkg/org.libsdl.app.SDLActivity"
+          # Resolve the declared LAUNCHER activity from the installed package instead of assuming a
+          # fixed class. The host ships com.octarine.host.MainActivity (a thin SDLActivity subclass,
+          # see android/app/src/main/AndroidManifest.xml) and downstream projects can swap in their
+          # own subclass — hardcoding org.libsdl.app.SDLActivity here errors with "Activity class
+          # does not exist". `cmd package resolve-activity --brief <pkg>` prints <pkg>/<activity>.
+          cmp=$(adb shell cmd package resolve-activity --brief "$pkg" | tail -n1 | tr -d '\r')
+          case "$cmp" in
+            "$pkg/"*) ;;
+            *) echo "could not resolve launcher activity for $pkg (got: '$cmp')"; exit 1 ;;
+          esac
+          adb shell am start -W -n "$cmp"
           manifest=0
           for i in $(seq 1 24); do
             adb logcat -d -s Octarine:I OctarineLua:I '*:S' > logcat.txt 2>&1 || true
