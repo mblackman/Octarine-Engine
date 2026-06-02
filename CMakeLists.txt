@@ -444,5 +444,28 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
     add_test(NAME EventBusTest COMMAND OctarineEventBusTest)
 
+    # DevListenServer smoke test (Stage 6 PR-A): standalone — only the server source + Logger.
+    # Bound to the same OCTARINE_SHIPPED gate as the engine-side server.
+    if (NOT OCTARINE_SHIPPED)
+        add_executable(OctarineDevListenServerTest
+                src/Dev/DevListenServer.cpp
+                src/General/Logger.cpp
+                tests/DevListenServerTest.cpp)
+        set_target_properties(OctarineDevListenServerTest PROPERTIES
+                CXX_STANDARD 20
+                CXX_STANDARD_REQUIRED ON
+                CXX_EXTENSIONS OFF)
+        target_include_directories(OctarineDevListenServerTest PRIVATE
+                ${CMAKE_CURRENT_SOURCE_DIR}/src)
+        target_link_libraries(OctarineDevListenServerTest PRIVATE spdlog::spdlog Threads::Threads)
+        if (WIN32)
+            target_link_libraries(OctarineDevListenServerTest PRIVATE ws2_32)
+        endif ()
+        if (MSVC)
+            target_compile_options(OctarineDevListenServerTest PRIVATE /W4 /permissive- /MP /EHsc)
+        endif ()
+        add_test(NAME DevListenServerTest COMMAND OctarineDevListenServerTest)
+    endif ()
+
     message(STATUS "Octarine: Tests ENABLED")
 endif ()

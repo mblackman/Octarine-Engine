@@ -66,6 +66,16 @@ class Game : public LuaBindingContext {
   // In a shipped build (OCTARINE_SHIPPED) the manifest is used unconditionally and this is moot.
   void SetUseManifest(bool useManifest) { use_manifest_ = useManifest; }
 
+#ifndef OCTARINE_SHIPPED
+  // Dev-only: opt into the DevListenServer (Stage 6 of EditorBuildAndDeployPlan). port=0 leaves
+  // the server stopped. listenAll=true binds 0.0.0.0; default 127.0.0.1. Called by Main from
+  // --dev-listen / --dev-listen-all and stripped from shipped binaries.
+  void SetDevListen(int port, bool listenAll) {
+    dev_listen_port_ = port;
+    dev_listen_all_ = listenAll;
+  }
+#endif
+
   [[nodiscard]] SDL_Renderer* GetRenderer() const override { return sdl_renderer_; }
   [[nodiscard]] SDL_Window* GetWindow() const { return window_; }
 
@@ -117,6 +127,10 @@ class Game : public LuaBindingContext {
   bool scene_running_ = false;
   bool bake_mode_ = false;
   bool use_manifest_ = false;
+#ifndef OCTARINE_SHIPPED
+  int dev_listen_port_ = 0;
+  bool dev_listen_all_ = false;
+#endif
   int bake_validation_failures_ = 0;
   Uint64 milliseconds_previous_frame_ = 0;
   // Asset ids acquired for the currently loaded scene. StopScene releases these; LoadScene
