@@ -86,6 +86,7 @@ CI (`.github/workflows/build.yml`) runs both on the Linux editor-release leg on 
 - [`docs/lua-scripting.md`](lua-scripting.md) — how Lua scripts wire into the engine
 - [`docs/systems.md`](systems.md) — built-in systems and the order they run in
 - [`docs/events.md`](events.md) — the event bus and every event type
+- [`docs/editor.md`](editor.md) — editor windows, hotkeys, Run Player, Export Build
 - [`docs/scenes.md`](scenes.md) — scene file shape, lifecycle, `load_scene` / `reload_scene`
 - [`docs/asset-pipeline.md`](asset-pipeline.md) — `.meta` sidecars, bake step, atlases, audio normalize
 - [`docs/profiling.md`](profiling.md) — profiling build, PerfUtils, benchmarks, the perf dashboard
