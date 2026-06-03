@@ -146,11 +146,17 @@ jobs:
             diff_tool="$RUNNER_TEMP/clang-tidy-diff.py"
             curl -fsSL https://raw.githubusercontent.com/llvm/llvm-project/llvmorg-18.1.8/clang-tools-extra/clang-tidy/tool/clang-tidy-diff.py -o "$diff_tool"
           fi
-          # -p1 strips the a/ b/ diff prefixes; -path points at compile_commands.json; any diagnostic
-          # on a touched line is promoted to an error and fails the step.
-          git diff -U0 "$base"...HEAD -- 'src/*' 'tests/*' \
-            | python3 "$diff_tool" -p1 -path "build/${{ matrix.preset }}" \
-                -clang-tidy-binary clang-tidy-18 -warnings-as-errors='*'
+          # -p1 strips the a/ b/ diff prefixes; -path points at compile_commands.json. Note: no
+          # released clang-tidy-diff.py accepts -warnings-as-errors (it forwards only post-`--` args,
+          # and those go to the *compiler*, not clang-tidy), and the wrapper exits 0 on warnings — so
+          # we capture its output and fail the step ourselves on any diagnostic against a touched line.
+          report="$(git diff -U0 "$base"...HEAD -- 'src/*' 'tests/*' \
+            | python3 "$diff_tool" -p1 -path "build/${{ matrix.preset }}" -clang-tidy-binary clang-tidy-18 2>&1)"
+          printf '%s\n' "$report"
+          if printf '%s\n' "$report" | grep -qE '^[^ ]+:[0-9]+:[0-9]+: (warning|error):'; then
+            echo "::error::clang-tidy reported issues on changed lines (see log above)."
+            exit 1
+          fi
 
       - name: Stage runtime DLLs (Windows)
         if: matrix.platform == 'windows'
