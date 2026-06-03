@@ -221,9 +221,11 @@ endif ()
 # final exe link without forcing the engine TU to know about editor concretely.
 # -----------------------------------------------------------------------------
 set(OCTARINE_ENGINE_SOURCES
+        Engine/EditorBootstrap.cpp
         Engine/EngineBootstrap.cpp
         Engine/EngineRuntime.cpp
         Engine/FrameLoop.cpp
+        Engine/Platform/PlatformPaths.cpp
         Engine/SceneLoader.cpp
         Game/Game.cpp
 )

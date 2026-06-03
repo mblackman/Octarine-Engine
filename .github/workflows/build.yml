@@ -150,10 +150,23 @@ jobs:
           # released clang-tidy-diff.py accepts -warnings-as-errors (it forwards only post-`--` args,
           # and those go to the *compiler*, not clang-tidy), and the wrapper exits 0 on warnings — so
           # we capture its output and fail the step ourselves on any diagnostic against a touched line.
+          #
+          # `|| true`: clang-tidy-diff.py exits non-zero whenever clang-tidy hits a file-level compiler
+          # error — including the harmless `-fno-fat-lto-objects` that a GCC-built (LTO) editor-release
+          # compile_commands carries but clang rejects. Under `set -e -o pipefail` that non-zero would
+          # abort the capture *before* we print/grep, so the step would die with no diagnostics shown.
+          # We judge on real `file:line:col:` diagnostics below, not on the wrapper's exit code.
           report="$(git diff -U0 "$base"...HEAD -- 'src/*' 'tests/*' \
-            | python3 "$diff_tool" -p1 -path "build/${{ matrix.preset }}" -clang-tidy-binary clang-tidy-18 2>&1)"
+            | python3 "$diff_tool" -p1 -path "build/${{ matrix.preset }}" -clang-tidy-binary clang-tidy-18 2>&1)" || true
           printf '%s\n' "$report"
-          if printf '%s\n' "$report" | grep -qE '^[^ ]+:[0-9]+:[0-9]+: (warning|error):'; then
+          # Count only clang-tidy CHECK findings on the changed lines. Drop [clang-diagnostic-*]:
+          # those are the clang *frontend's* own diagnostics that clang-tidy passes through — clang
+          # choking on a GCC-only flag in the LTO compile_commands, or on a sol2+glm template
+          # instantiation that GCC accepts. The GCC -Werror build is the compiler-error gate; this
+          # step is for lint checks, whose names never start with clang-diagnostic-.
+          findings="$(printf '%s\n' "$report" \
+            | grep -E '^[^ ]+:[0-9]+:[0-9]+: (warning|error):' | grep -v '\[clang-diagnostic-' || true)"
+          if [ -n "$findings" ]; then
             echo "::error::clang-tidy reported issues on changed lines (see log above)."
             exit 1
           fi

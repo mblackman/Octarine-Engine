@@ -107,6 +107,17 @@ class Game : public LuaBindingContext {
 
  private:
   void Setup();
+  // Resolve the ImGui ini path (project dir / pref dir / cwd fallback), init the backend, and hand
+  // off to EditorBootstrap for font + style. Empty in non-ImGui builds; called unconditionally from
+  // Initialize so the feature gate stays out of that function.
+  void InitImGuiBackend();
+  // Start the dev-iterate TCP listener when --dev-listen was passed. Empty in shipped builds.
+  // const: it mutates only Registry-owned state through the registry_ pointer, like the other
+  // const accessors here.
+  void StartDevListenServer() const;
+  // Size + create the window and the off-screen scene target. Returns false (→ Initialize aborts)
+  // on window or render-target creation failure.
+  [[nodiscard]] bool CreateWindowAndScene(bool projectLoaded);
   // Headless instance method behind the static Bake(): wires the minimal singleton + Lua surface
   // the startup script touches, force-scans the catalog, runs the startup script (which validates
   // its scene references via the bake-mode asset globals), then writes the manifest. Returns false

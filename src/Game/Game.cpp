@@ -41,7 +41,9 @@
 #include "ECS/Iterable.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
+#include "Engine/EditorBootstrap.h"
 #include "Engine/EngineBootstrap.h"
+#include "Engine/Platform/PlatformPaths.h"
 #include "Engine/SdlFileReader.h"
 #include "Events/MouseInputEvent.h"
 #include "Events/MouseWheelEvent.h"
@@ -83,14 +85,6 @@
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
-#endif
-
-#ifdef OCTARINE_WITH_EDITOR
-#include "../Editor/EditorLayoutPresets.h"
-#include "../Editor/EditorPersistence.h"
-#include "../Editor/ExportBuilder.h"
-#include "../Editor/Panels/EditorImGuiBackend.h"
-#include "../Editor/PlayerLauncher.h"
 #endif
 
 #ifndef OCTARINE_SHIPPED
@@ -143,161 +137,50 @@ bool Game::Initialize(const std::string& assetPath) {
   registry_->Set<GameConfig>(GameConfig());
   auto& gameConfig = registry_->Get<GameConfig>();
 
-#ifndef OCTARINE_SHIPPED
-  // DevListenServer (Stage 6): TCP listener on 127.0.0.1:<port> when --dev-listen given.
-  // Compile-stripped from shipped builds. Available in editor + player presets alike so the
-  // standalone player can host the dev-iterate loop too.
-  auto& devListen = registry_->Set<octarine::dev::DevListenServer>(octarine::dev::DevListenServer());
-  if (dev_listen_port_ > 0) {
-    octarine::dev::ServerOptions opts;
-    opts.port = static_cast<std::uint16_t>(dev_listen_port_);
-    opts.listen_all = dev_listen_all_;
-    if (!devListen.Start(opts)) {
-      Logger::Error("DevListenServer failed to start; --dev-listen flag had no effect.");
-    }
-  }
-#endif
+  StartDevListenServer();
 
   std::string effectivePath = assetPath;
-#ifdef OCTARINE_WITH_EDITOR
-  registry_->Set<EditorPersistence>(EditorPersistence());
-  auto& editorPersistence = registry_->Get<EditorPersistence>();
-  editorPersistence.LoadGlobal();
-  registry_->Set<octarine::editor::PlayerLauncher>(octarine::editor::PlayerLauncher());
-  registry_->Set<octarine::editor::ExportBuilder>(octarine::editor::ExportBuilder());
-  if (effectivePath.empty()) {
-    effectivePath = editorPersistence.lastProjectPath;
-    if (!effectivePath.empty()) {
-      Logger::Info("No project path provided, attempting to load last project: " + effectivePath);
-    }
-  }
-#endif
+  // Editor builds Set their editor singletons (persistence/launcher/export) and may default
+  // effectivePath to the last-opened project here; player builds no-op. See EditorBootstrap.
+  engine_bootstrap::editor::InstallSingletons(*registry_, effectivePath);
 
-  // No explicit path (and, in editor builds, no remembered project): default the asset base to the
-  // executable/bundle location. On desktop this is the exe dir; in a .app it is Contents/Resources,
-  // on iOS the bundle root. Keeps the same code path working for packaged builds with no -p argument.
-  //
-  // Android is the exception: assets live inside the APK, reached by SDL_OpenTitleStorage /
-  // SDL_IOFromFile resolving *relative* paths against the APK asset root. SDL_GetBasePath() there
-  // returns the app's internal data dir (not the APK), so the base path must stay empty and config
-  // loading must still run against that empty base.
-#ifndef __ANDROID__
-  if (effectivePath.empty()) {
-    if (const char* basePath = SDL_GetBasePath()) {
-      effectivePath = basePath;
-      Logger::Info("No project path provided; defaulting asset base path to: " + effectivePath);
-    }
-  }
-#else
-  Logger::Info("Android: resolving assets from the APK asset root (empty base path).");
-#endif
+  // With no explicit path (and, in editor builds, no remembered project) default the asset base to
+  // the executable/bundle dir on desktop; Android keeps it empty so assets resolve against the APK
+  // asset root. The Android/desktop fork lives in PlatformPaths, not here.
+  engine_bootstrap::platform::ApplyDefaultBasePath(effectivePath);
 
   bool projectLoaded = false;
-#ifdef __ANDROID__
-  const bool attemptProjectLoad = true;  // empty base → APK title storage
-#else
-  const bool attemptProjectLoad = !effectivePath.empty();
-#endif
-  if (attemptProjectLoad) {
+  if (engine_bootstrap::platform::ShouldAttemptProjectLoad(effectivePath)) {
     if (gameConfig.LoadConfigFromFile(effectivePath)) {
       gameConfig.LoadUserPreferences();
-#ifdef OCTARINE_WITH_EDITOR
-      editorPersistence.LoadProject(effectivePath);
-      editorPersistence.lastProjectPath = effectivePath;
-      editorPersistence.SaveGlobal();
-#endif
+      engine_bootstrap::editor::OnProjectLoaded(*registry_, effectivePath);
       projectLoaded = true;
     } else {
       Logger::Warn("Failed to load project from path: " + effectivePath);
     }
   }
 
-#ifdef OCTARINE_WITH_EDITOR
-  // Editor-global audio prefs are authoritative for editor sessions, so apply them after the
-  // per-project LoadUserPreferences above (which may have set masterVolume from preferences.ini).
-  auto& audioOptions = gameConfig.GetEngineOptions();
-  audioOptions.audioEnabled = !editorPersistence.audioMuted;
-  audioOptions.masterVolume = editorPersistence.masterVolume;
-#endif
+  // Editor-global audio prefs (mute + master volume) layered over the per-project preferences.
+  engine_bootstrap::editor::ApplyAudioPrefs(*registry_);
 
-#ifdef OCTARINE_WITH_EDITOR
-  const bool defaultToEditor = startup_mode_.empty() || startup_mode_ == "editor";
-#else
-  if (startup_mode_ == "editor") {
-    Logger::Error(
-        "--startup-mode editor was requested but this is a player build (built without OCTARINE_WITH_EDITOR).");
+  // Editor builds default into editor mode (unless a non-editor mode was requested); player builds
+  // never do and reject `--startup-mode editor` (ok=false → abort).
+  const auto startupDecision = engine_bootstrap::editor::DecideStartupMode(startup_mode_);
+  if (!startupDecision.ok) {
     return false;
   }
-  const bool defaultToEditor = false;
-#endif
 
-  if (!projectLoaded || defaultToEditor) {
+  if (!projectLoaded || startupDecision.defaultToEditor) {
     Logger::Info("Starting in Editor Mode.");
     gameConfig.SetIsEditorMode(true);
-#ifdef OCTARINE_WITH_EDITOR
-    // Open the editor with gameplay paused so the scene sits ready to inspect; the toolbar Play
-    // button starts it. Player builds are unaffected (this branch only runs for editor sessions).
-    gameConfig.GetEngineOptions().isPaused = true;
-#endif
+    engine_bootstrap::editor::PauseForEditorSession(*registry_);
   }
 
-  gameConfig.windowWidth = projectLoaded ? gameConfig.GetDefaultWidth() : Constants::kDefaultWindowWidth;
-  gameConfig.windowHeight = projectLoaded ? gameConfig.GetDefaultHeight() : Constants::kDefaultWindowHeight;
-  std::string title = projectLoaded ? gameConfig.GetGameTitle() : "Octarine Engine - Editor";
-
-  if (!runtime_.CreateWindow(title, gameConfig.windowWidth, gameConfig.windowHeight)) {
+  if (!CreateWindowAndScene(projectLoaded)) {
     return false;
   }
 
-  if (!renderer_->CreateScene(runtime_.SdlRenderer(), gameConfig.windowWidth, gameConfig.windowHeight)) {
-    return false;
-  }
-
-#ifdef OCTARINE_WITH_IMGUI
-  // io.IniFilename holds the raw pointer for the context's lifetime, so the backing string must
-  // outlive InitImGui — keep it static.
-  static std::string imguiIniPath;
-  if (gameConfig.HasLoadedConfig()) {
-    imguiIniPath = gameConfig.GetAssetPath() + "/imgui.ini";
-  } else if (char* prefPath = SDL_GetPrefPath("Octarine", "Engine")) {
-    imguiIniPath = std::string(prefPath) + "imgui_editor.ini";
-    SDL_free(prefPath);
-  } else {
-    imguiIniPath = "imgui_editor.ini";
-  }
-  runtime_.InitImGui(imguiIniPath.c_str());
-
-#ifdef OCTARINE_WITH_EDITOR
-  // --- Resolve editor font size (DPI-aware default on first launch) ---
-  // Roboto renders a bit smaller than ProggyClean at the same px, so we use 17
-  // as the unscaled default rather than 16.
-  float fontSize = editorPersistence.editorFontSize;
-  if (fontSize <= 0.0F) {
-    const SDL_DisplayID displayId = SDL_GetPrimaryDisplay();
-    const SDL_DisplayMode* mode = SDL_GetCurrentDisplayMode(displayId);
-    float dpiScale = 1.0F;
-    if (mode != nullptr && mode->pixel_density > 0.0F) {
-      dpiScale = mode->pixel_density;
-    }
-    fontSize = 17.0F * dpiScale;
-    editorPersistence.editorFontSize = fontSize;
-  }
-  octarine::editor::panels::RebuildEditorFont(fontSize);
-  octarine::editor::panels::ApplyEditorStyle(editorPersistence.editorStyleIndex, fontSize);
-
-  // First-run: if ImGui has no saved layout for this project / pref dir, apply
-  // the bundled default so the user sees a curated workspace instead of a pile
-  // of floating windows.
-  if (!octarine::editor::layouts::HasImGuiIni()) {
-    octarine::editor::layouts::ApplyDefaultPreset(editorPersistence);
-  }
-#else
-  ImGuiIO& io = ImGui::GetIO();
-  io.Fonts->Clear();
-  io.Fonts->AddFontDefault();
-  io.Fonts->Build();
-#endif
-#endif
+  InitImGuiBackend();
 
   // Populate the engine-level resource bundle now that SDL is up. AssetManager + mixer are
   // filled in by Setup once those exist; consumers read the same instance via
@@ -313,6 +196,57 @@ bool Game::Initialize(const std::string& assetPath) {
   return true;
 }
 
+void Game::InitImGuiBackend() {
+#ifdef OCTARINE_WITH_IMGUI
+  auto& gameConfig = registry_->Get<GameConfig>();
+  // io.IniFilename holds the raw pointer for the context's lifetime, so the backing string must
+  // outlive InitImGui — keep it static.
+  static std::string imguiIniPath;
+  if (gameConfig.HasLoadedConfig()) {
+    imguiIniPath = gameConfig.GetAssetPath() + "/imgui.ini";
+  } else if (char* prefPath = SDL_GetPrefPath("Octarine", "Engine")) {
+    imguiIniPath = std::string(prefPath) + "imgui_editor.ini";
+    SDL_free(prefPath);
+  } else {
+    imguiIniPath = "imgui_editor.ini";
+  }
+  runtime_.InitImGui(imguiIniPath.c_str());
+
+  // Editor: bundled Roboto at the persisted size + theme + the default layout on first run.
+  // Player-with-ImGui: the built-in default font. The editor/player fork lives in EditorBootstrap.
+  engine_bootstrap::editor::SetupEditorImGui(*registry_);
+#endif
+}
+
+void Game::StartDevListenServer() const {
+#ifndef OCTARINE_SHIPPED
+  // DevListenServer (Stage 6): TCP listener on 127.0.0.1:<port> when --dev-listen given.
+  // Compile-stripped from shipped builds. Available in editor + player presets alike so the
+  // standalone player can host the dev-iterate loop too.
+  auto& devListen = registry_->Set<octarine::dev::DevListenServer>(octarine::dev::DevListenServer());
+  if (dev_listen_port_ > 0) {
+    octarine::dev::ServerOptions opts;
+    opts.port = static_cast<std::uint16_t>(dev_listen_port_);
+    opts.listen_all = dev_listen_all_;
+    if (!devListen.Start(opts)) {
+      Logger::Error("DevListenServer failed to start; --dev-listen flag had no effect.");
+    }
+  }
+#endif
+}
+
+bool Game::CreateWindowAndScene(bool projectLoaded) {
+  auto& gameConfig = registry_->Get<GameConfig>();
+  gameConfig.windowWidth = projectLoaded ? gameConfig.GetDefaultWidth() : Constants::kDefaultWindowWidth;
+  gameConfig.windowHeight = projectLoaded ? gameConfig.GetDefaultHeight() : Constants::kDefaultWindowHeight;
+  const std::string title = projectLoaded ? gameConfig.GetGameTitle() : "Octarine Engine - Editor";
+
+  if (!runtime_.CreateWindow(title, gameConfig.windowWidth, gameConfig.windowHeight)) {
+    return false;
+  }
+  return renderer_->CreateScene(runtime_.SdlRenderer(), gameConfig.windowWidth, gameConfig.windowHeight);
+}
+
 void Game::Destroy() {
   if (registry_) {
 #ifndef OCTARINE_SHIPPED
@@ -325,17 +259,8 @@ void Game::Destroy() {
 
     auto& gameConfig = registry_->Get<GameConfig>();
     gameConfig.SaveUserPreferences();
-#ifdef OCTARINE_WITH_EDITOR
-    if (auto* editorPersistence = registry_->TryGet<EditorPersistence>()) {
-      const auto& audioOptions = gameConfig.GetEngineOptions();
-      editorPersistence->audioMuted = !audioOptions.audioEnabled;
-      editorPersistence->masterVolume = audioOptions.masterVolume;
-      editorPersistence->SaveGlobal();
-      if (gameConfig.HasLoadedConfig()) {
-        editorPersistence->SaveProject(gameConfig.GetAssetPath());
-      }
-    }
-#endif
+    // Persist editor prefs (audio + per-project layout); no-op in player builds.
+    engine_bootstrap::editor::SaveOnShutdown(*registry_);
   }
 
   // Tear registry/event bus down BEFORE SDL_Quit so owned systems (AudioSystem -> MIX_Quit,
@@ -562,24 +487,16 @@ void Game::Setup() {
   }
 
   if (IsBenchMode() && startup_mode_ != "editor") {
-    // Bench runs shouldn't pay for debug overlays. Force-zero every toggle that would
+    // Bench runs shouldn't pay for debug overlays. Force-zero every toggle that would add per-frame
+    // work. These EngineOptions fields exist in every build (and read as no-ops without ImGui); the
+    // editor-only window toggles move into EditorBootstrap (no-op in player builds).
     auto& options = gameConfig.GetEngineOptions();
     options.showDebugGUI = false;
-#ifdef OCTARINE_WITH_IMGUI
     options.showFpsCounter = false;
     options.showEntityInfo = false;
-#endif
-#ifdef OCTARINE_WITH_EDITOR
-    auto& bench_editor = registry_->Get<EditorPersistence>();
-    bench_editor.showProfiler = false;
-    bench_editor.showHierarchy = false;
-    bench_editor.showAssetBrowser = false;
-    bench_editor.showSceneWindow = false;
-    bench_editor.showLuaConsole = false;
-    bench_editor.showSceneManagement = false;
     options.showImGuiDemoWindow = false;
-#endif
     options.drawColliders = false;
+    engine_bootstrap::editor::DisableBenchOverlays(*registry_);
   }
 
   auto& assetManager = registry_->Get<AssetManager>();
