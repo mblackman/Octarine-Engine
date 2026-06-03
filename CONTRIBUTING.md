@@ -79,6 +79,21 @@ pipx install clang-format==18.1.8      # then: cmake --build <preset> --target f
 > `AUTOFORMAT_PAT` (repo scope, `contents: write`). Without it the job still runs
 > but its fixup commit won't re-trigger the required checks.
 
+**Pre-commit hook (optional, recommended).** To catch formatting before it leaves
+your machine — and skip the CI fixup round-trip — enable the tracked hook once per
+clone:
+
+```bash
+git config core.hooksPath scripts/hooks
+```
+
+`scripts/hooks/pre-commit` runs clang-format (`--dry-run --Werror`) over your staged
+`src/`/`tests/` C/C++ files using the same filter as the CI gate, and blocks the
+commit on violations. Bypass a single commit with `git commit --no-verify`. It
+prefers `clang-format-18` and falls back to `clang-format` with a version warning.
+(Setting `core.hooksPath` points git at `scripts/hooks` for all hooks, so move any
+existing local hooks there if you rely on them.)
+
 ### Lint
 
 `.clang-tidy` enforces a curated check set. Two thresholds worth knowing:
@@ -89,6 +104,26 @@ pipx install clang-format==18.1.8      # then: cmake --build <preset> --target f
 If you trip either, the right fix is almost always to extract a helper.
 Suppressing with `// NOLINT` is reserved for genuinely unavoidable cases —
 add a one-line comment justifying it.
+
+**Local vs CI — where it's advisory, where it bites.** `.clang-tidy` deliberately
+leaves `WarningsAsErrors` empty, so clang-tidy stays *advisory* locally: editor
+squiggles and whole-tree `-DOCTARINE_ENABLE_LINTING=ON` builds surface warnings
+without hard-failing on pre-existing debt in files you didn't touch. The
+enforcement happens in CI, which promotes every check to an **error over your
+PR's changed lines only** (via `clang-tidy-diff`). So a check can scroll past
+locally as a warning yet fail the PR.
+
+To get CI's exact verdict before you push:
+
+```bash
+cmake --preset editor-release          # emits build/editor-release/compile_commands.json
+scripts/lint-diff.sh                   # tidies your changed lines, warnings-as-errors, vs origin/main
+```
+
+`scripts/lint-diff.sh [BASE_REF] [BUILD_DIR]` mirrors the CI gate line-for-line.
+Match CI's pinned major version for identical results — `apt install clang-tidy-18`
+(the script prefers `clang-tidy-18`, falling back to whatever `clang-tidy` is on
+`PATH` with a warning).
 
 ### Naming
 
