@@ -40,6 +40,10 @@ FrameLoop::FrameLoop(Game* game, Registry* registry, EventBus* eventBus, Rendere
   collider_query_ = registry_->CreateQuery<GlobalTransformComponent, BoxColliderComponent>();
 }
 
+void FrameLoop::SubscribeToEvents() {
+  key_input_subscription_ = event_bus_->SubscribeEvent<FrameLoop, KeyInputEvent>(this, &FrameLoop::OnKeyInputEvent);
+}
+
 void FrameLoop::Begin() { milliseconds_previous_frame_ = SDL_GetTicks(); }
 
 void FrameLoop::ProcessInput() {

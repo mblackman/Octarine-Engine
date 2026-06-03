@@ -62,4 +62,5 @@ class AudioSystem {
   Registry* registry_ = nullptr;
   std::shared_ptr<AudioSystemState> state_;
   CommandBuffer cmd_buffer_;
+  EventBus::SubscriptionHandle audio_subscription_;
 };

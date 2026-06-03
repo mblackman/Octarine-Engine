@@ -595,8 +595,8 @@ void Game::Setup() {
   registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
   registry_->RegisterParallelSystem<SquarePrimitiveComponent, GlobalTransformComponent>(RenderPrimitiveSystem());
 
-  // Event subscriptions (one-time)
-  event_bus_->SubscribeEvent<FrameLoop, KeyInputEvent>(frame_loop_.get(), &FrameLoop::OnKeyInputEvent);
+  // Event subscriptions (one-time). FrameLoop holds its own RAII subscription handle.
+  frame_loop_->SubscribeToEvents();
   // Event-driven systems with no per-frame Update — owned by the Registry instead of
   // living as parallel members on Game. Keeps the registry as the single source of truth.
   auto& uiButtonSystem = registry_->Set<UIButtonSystem>(UIButtonSystem());
