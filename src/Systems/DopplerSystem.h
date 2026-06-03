@@ -6,6 +6,7 @@
 #include <cmath>
 #include <glm/glm.hpp>
 
+#include "Audio/AudioTrackCache.h"
 #include "Components/AudioListenerComponent.h"
 #include "Components/AudioSinkComponent.h"
 #include "Components/AudioSourceComponent.h"
@@ -31,16 +32,24 @@
 // sink.lastRatio so an unchanged ratio (the steady-state case) costs zero mixer calls.
 class DopplerSystem {
  public:
-  void operator()(const ContextFacade& ctx, const GlobalTransformComponent& transform,
+  void operator()(const ContextFacade& ctx, Entity entity, const GlobalTransformComponent& transform,
                   const RigidBodyComponent& rigidBody, AudioSourceComponent& source, AudioSinkComponent& sink) {
-    if (sink.finished || !sink.track) return;
+    if (sink.finished) return;
 
-    if (!cache_) cache_ = &ctx.GetRegistry()->Get<AudioListenerCache>();
+    // Resolve both singleton caches together on the first tick (Set once at bootstrap, never
+    // reseated), mirroring SpatialAudioSystem.
+    if (!cache_) {
+      cache_ = &ctx.GetRegistry()->Get<AudioListenerCache>();
+      track_cache_ = &ctx.GetRegistry()->Get<AudioTrackCache>();
+    }
     const auto& cache = *cache_;
+
+    MIX_Track* track = track_cache_->Track(entity);
+    if (!track) return;
 
     const float ratio = ComputeRatio(transform, rigidBody, source, cache);
     if (ratio != sink.lastRatio) {
-      MIX_SetTrackFrequencyRatio(sink.track, ratio);
+      MIX_SetTrackFrequencyRatio(track, ratio);
       sink.lastRatio = ratio;
     }
   }
@@ -73,4 +82,5 @@ class DopplerSystem {
   }
 
   const AudioListenerCache* cache_ = nullptr;
+  AudioTrackCache* track_cache_ = nullptr;
 };

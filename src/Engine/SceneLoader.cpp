@@ -8,6 +8,7 @@
 
 #include "AssetManager/AssetManager.h"
 #include "AssetManager/SceneAssetScanner.h"
+#include "Audio/AudioTrackCache.h"
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
 #include "Engine/SdlFileReader.h"
@@ -198,6 +199,11 @@ void SceneLoader::clearSceneEntities() {
   // pass repopulates as those entities are recreated by the new scene's load.
   if (auto* spriteCache = registry_->TryGet<SpriteRenderCache>()) {
     spriteCache->Clear();
+  }
+  // Same for cached MIX_Track* handles — the just-blammed emitters' sinks are gone; AudioSystem
+  // re-acquires + re-caches tracks for the new scene's emitters as they play.
+  if (auto* trackCache = registry_->TryGet<AudioTrackCache>()) {
+    trackCache->Clear();
   }
 }
 

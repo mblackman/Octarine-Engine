@@ -6,6 +6,7 @@
 #include <cmath>
 #include <glm/glm.hpp>
 
+#include "Audio/AudioTrackCache.h"
 #include "Components/AudioListenerComponent.h"
 #include "Components/AudioSinkComponent.h"
 #include "Components/AudioSourceComponent.h"
@@ -25,27 +26,23 @@
 // the pointer is stable for the registry's lifetime.
 class SpatialAudioSystem {
  public:
-  void operator()(const ContextFacade& ctx, const GlobalTransformComponent& transform, AudioSourceComponent& source,
-                  AudioSinkComponent& sink) {
-    if (sink.finished || !sink.track) return;
+  void operator()(const ContextFacade& ctx, Entity entity, const GlobalTransformComponent& transform,
+                  AudioSourceComponent& source, AudioSinkComponent& sink) {
+    if (sink.finished) return;
 
-    if (!cache_) cache_ = &ctx.GetRegistry()->Get<AudioListenerCache>();
+    // cache_ and track_cache_ are both Set once during bootstrap and never reseated, so resolving
+    // them together on the first tick keeps the pointers stable for the registry's lifetime.
+    if (!cache_) {
+      cache_ = &ctx.GetRegistry()->Get<AudioListenerCache>();
+      track_cache_ = &ctx.GetRegistry()->Get<AudioTrackCache>();
+    }
     const auto& cache = *cache_;
 
+    MIX_Track* track = track_cache_->Track(entity);
+    if (!track) return;
+
     if (!source.spatial || !cache.valid) {
-      // Source isn't (or no longer is) spatial: clear any prior stereo override once on
-      // the transition and let the gain reflect raw source.volume. Subsequent frames
-      // skip both calls when nothing changed.
-      if (sink.stereoApplied) {
-        MIX_SetTrackStereo(sink.track, nullptr);
-        sink.stereoApplied = false;
-        sink.lastPan = 2.0f;
-      }
-      const float gain = std::max(0.0f, source.volume);
-      if (gain != sink.lastGain) {
-        MIX_SetTrackGain(sink.track, gain);
-        sink.lastGain = gain;
-      }
+      ApplyNonSpatial(track, source, sink);
       return;
     }
 
@@ -69,7 +66,7 @@ class SpatialAudioSystem {
 
     const float gain = baseVolume * std::clamp(attenuation, 0.0f, 1.0f);
     if (gain != sink.lastGain) {
-      MIX_SetTrackGain(sink.track, gain);
+      MIX_SetTrackGain(track, gain);
       sink.lastGain = gain;
     }
 
@@ -87,12 +84,28 @@ class SpatialAudioSystem {
       MIX_StereoGains gains{};
       gains.left = std::clamp(1.0f - pan, 0.0f, 1.0f);
       gains.right = std::clamp(1.0f + pan, 0.0f, 1.0f);
-      MIX_SetTrackStereo(sink.track, &gains);
+      MIX_SetTrackStereo(track, &gains);
       sink.stereoApplied = true;
       sink.lastPan = pan;
     }
   }
 
  private:
+  // Source isn't (or no longer is) spatial: clear any prior stereo override once on the transition
+  // and let the gain reflect raw source.volume. Subsequent frames skip both calls when unchanged.
+  static void ApplyNonSpatial(MIX_Track* track, const AudioSourceComponent& source, AudioSinkComponent& sink) {
+    if (sink.stereoApplied) {
+      MIX_SetTrackStereo(track, nullptr);
+      sink.stereoApplied = false;
+      sink.lastPan = AudioSinkComponent::kPanSentinel;
+    }
+    const float gain = std::max(0.0f, source.volume);
+    if (gain != sink.lastGain) {
+      MIX_SetTrackGain(track, gain);
+      sink.lastGain = gain;
+    }
+  }
+
   const AudioListenerCache* cache_ = nullptr;
+  AudioTrackCache* track_cache_ = nullptr;
 };

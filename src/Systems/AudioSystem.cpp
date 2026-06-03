@@ -71,10 +71,10 @@ bool AudioSystem::Init(Registry* registry, const std::unique_ptr<EventBus>& even
 
 void AudioSystem::Shutdown() { state_.reset(); }
 
-bool AudioSystem::SinkOwnsTrack(const AudioSinkComponent& sink) const {
-  if (!state_ || !sink.track) return false;
+bool AudioSystem::SinkOwnsTrack(const AudioTrackCache::Entry& entry) const {
+  if (!state_ || !entry.track) return false;
   for (const TrackSlot& slot : state_->track_pool) {
-    if (slot.track == sink.track) return slot.generation == sink.generation;
+    if (slot.track == entry.track) return slot.generation == entry.generation;
   }
   return false;
 }
@@ -137,81 +137,94 @@ void AudioSystem::operator()(Entity entity, AudioSourceComponent& source) {
   const auto& engineOptions = registry_->Get<GameConfig>().GetEngineOptions();
   if (!engineOptions.audioEnabled) return;
 
+  if (!track_cache_) track_cache_ = &registry_->Get<AudioTrackCache>();
+
+  // No sink yet: try to acquire + start a track for this source. Split out to keep this dispatch
+  // small; the existing-sink path (gain refresh / finish) stays inline below.
   if (!registry_->HasComponent<AudioSinkComponent>(entity)) {
-    // Spatial sources are gated by AudioCullingSystem's AudioActiveTag: an out-of-range
-    // emitter has no tag, so even a resume-pending source waits here until it comes back
-    // into the listener radius. Without this gate the resume + cull pair would oscillate
-    // (AudioSystem re-spawns the sink, CullingSystem culls it again next frame).
-    if (source.spatial && !registry_->HasTag<AudioActiveTag>(entity)) return;
-
-    // Resume-from-cull is a second valid play trigger alongside playOnSpawn: when
-    // AudioCullingSystem halts a culled emitter it stashes the frame offset on the
-    // source and removes the sink, so the entity arrives here with a >=0 offset
-    // waiting to be consumed.
-    const bool resumingFromCull = source.playbackOffsetFrames >= 0;
-    if (!source.playOnSpawn && !resumingFromCull) return;
-
-    auto& assetManager = registry_->Get<AssetManager>();
-    MIX_Audio* clip = assetManager.GetAudioClip(source.clipId);
-    if (!clip) {
-      Logger::Warn("AudioSystem: Clip not found: " + source.clipId);
-      // Mark "tried" by attaching a finished sink — prevents per-frame retry without mutating the source.
-      AudioSinkComponent sink;
-      sink.finished = true;
-      cmd_buffer_.AddComponent<AudioSinkComponent>(entity, sink);
-      return;
-    }
-
-    const Acquired acquired = AcquireTrack();
-    if (!acquired.track) return;  // pool full, retry next frame
-
-    if (!MIX_SetTrackAudio(acquired.track, clip)) {
-      Logger::Warn("MIX_SetTrackAudio failed for " + source.clipId + ": " + std::string(SDL_GetError()));
-      return;
-    }
-    const float gain = std::max(0.0F, source.volume);
-    MIX_SetTrackGain(acquired.track, gain);
-
-    // SDL3_mixer: MIX_PlayTrack's second arg is an SDL_PropertiesID, not a loop count.
-    // Encode looping via MIX_PROP_PLAY_LOOPS_NUMBER (-1 = infinite).
-    SDL_PropertiesID props = 0;
-    if (source.loop) {
-      props = SDL_CreateProperties();
-      SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
-    }
-    const bool played = MIX_PlayTrack(acquired.track, props);
-    if (props) SDL_DestroyProperties(props);
-    if (!played) {
-      Logger::Warn("MIX_PlayTrack failed for " + source.clipId + ": " + std::string(SDL_GetError()));
-      return;
-    }
-
-    // Seek AFTER play: SDL_mixer accepts position changes on a playing track and the
-    // seek-then-play path skips an extra paused-state transition.
-    if (resumingFromCull) {
-      MIX_SetTrackPlaybackPosition(acquired.track, source.playbackOffsetFrames);
-      source.playbackOffsetFrames = -1;
-    }
-    cmd_buffer_.AddComponent<AudioSinkComponent>(entity, AudioSinkComponent(acquired.track, acquired.generation));
+    SpawnSinkForSource(entity, source);
     return;
   }
 
   auto& sink = registry_->GetComponent<AudioSinkComponent>(entity);
-  if (sink.finished || !sink.track) return;
+  if (sink.finished) return;
 
-  // Validate the sink still owns its track — generation guards against pool reuse stealing it
+  const AudioTrackCache::Entry* entry = track_cache_->Lookup(entity);
+  if (!entry || !entry->track) return;
+
+  // Validate the cached track is still ours — generation guards against pool reuse stealing it
   // after our clip stopped. Treat a stolen track the same as a natural finish.
-  const bool stillOwns = SinkOwnsTrack(sink);
-  if (stillOwns && MIX_TrackPlaying(sink.track)) {
+  const bool stillOwns = SinkOwnsTrack(*entry);
+  if (stillOwns && MIX_TrackPlaying(entry->track)) {
     const float gain = std::max(0.0F, source.volume);
-    MIX_SetTrackGain(sink.track, gain);
+    MIX_SetTrackGain(entry->track, gain);
     return;
   }
 
   sink.finished = true;
-  sink.track = nullptr;
+  track_cache_->Forget(entity);
 
   if (source.despawnOnFinish) {
     cmd_buffer_.EmplaceBlam(entity);
   }
+}
+
+void AudioSystem::SpawnSinkForSource(Entity entity, AudioSourceComponent& source) {
+  // Spatial sources are gated by AudioCullingSystem's AudioActiveTag: an out-of-range
+  // emitter has no tag, so even a resume-pending source waits here until it comes back
+  // into the listener radius. Without this gate the resume + cull pair would oscillate
+  // (AudioSystem re-spawns the sink, CullingSystem culls it again next frame).
+  if (source.spatial && !registry_->HasTag<AudioActiveTag>(entity)) return;
+
+  // Resume-from-cull is a second valid play trigger alongside playOnSpawn: when
+  // AudioCullingSystem halts a culled emitter it stashes the frame offset on the
+  // source and removes the sink, so the entity arrives here with a >=0 offset
+  // waiting to be consumed.
+  const bool resumingFromCull = source.playbackOffsetFrames >= 0;
+  if (!source.playOnSpawn && !resumingFromCull) return;
+
+  auto& assetManager = registry_->Get<AssetManager>();
+  MIX_Audio* clip = assetManager.GetAudioClip(source.clipId);
+  if (!clip) {
+    Logger::Warn("AudioSystem: Clip not found: " + source.clipId);
+    // Mark "tried" by attaching a finished sink — prevents per-frame retry without mutating the source.
+    AudioSinkComponent sink;
+    sink.finished = true;
+    cmd_buffer_.AddComponent<AudioSinkComponent>(entity, sink);
+    return;
+  }
+
+  const Acquired acquired = AcquireTrack();
+  if (!acquired.track) return;  // pool full, retry next frame
+
+  if (!MIX_SetTrackAudio(acquired.track, clip)) {
+    Logger::Warn("MIX_SetTrackAudio failed for " + source.clipId + ": " + std::string(SDL_GetError()));
+    return;
+  }
+  const float gain = std::max(0.0F, source.volume);
+  MIX_SetTrackGain(acquired.track, gain);
+
+  // SDL3_mixer: MIX_PlayTrack's second arg is an SDL_PropertiesID, not a loop count.
+  // Encode looping via MIX_PROP_PLAY_LOOPS_NUMBER (-1 = infinite).
+  SDL_PropertiesID props = 0;
+  if (source.loop) {
+    props = SDL_CreateProperties();
+    SDL_SetNumberProperty(props, MIX_PROP_PLAY_LOOPS_NUMBER, -1);
+  }
+  const bool played = MIX_PlayTrack(acquired.track, props);
+  if (props) SDL_DestroyProperties(props);
+  if (!played) {
+    Logger::Warn("MIX_PlayTrack failed for " + source.clipId + ": " + std::string(SDL_GetError()));
+    return;
+  }
+
+  // Seek AFTER play: SDL_mixer accepts position changes on a playing track and the
+  // seek-then-play path skips an extra paused-state transition.
+  if (resumingFromCull) {
+    MIX_SetTrackPlaybackPosition(acquired.track, source.playbackOffsetFrames);
+    source.playbackOffsetFrames = -1;
+  }
+  // The MIX_Track* lives in AudioTrackCache (keyed by entity), not on the POD sink component.
+  track_cache_->Store(entity, acquired.track, acquired.generation);
+  cmd_buffer_.AddComponent<AudioSinkComponent>(entity, AudioSinkComponent{});
 }

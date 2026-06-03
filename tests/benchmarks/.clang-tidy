@@ -1,0 +1,11 @@
+# Benchmark harness code. Synthetic magic numbers (test geometry, frame deltas, listener params)
+# and hand-rolled RAII fixtures (e.g. AudioBenchEnv: delete-copy + a teardown dtor, no move needed)
+# are expected here and are not production-code smells, so they shouldn't trip the blocking
+# changed-lines clang-tidy gate. Inherit the project's check set, then drop the ones that only add
+# noise for micro-benchmarks.
+InheritParentConfig: true
+Checks: >
+  -readability-magic-numbers,
+  -cppcoreguidelines-special-member-functions,
+  -readability-function-cognitive-complexity,
+  -readability-function-size

@@ -6,6 +6,7 @@
 #include <memory>
 #include <vector>
 
+#include "Audio/AudioTrackCache.h"
 #include "Components/AudioSinkComponent.h"
 #include "Components/AudioSourceComponent.h"
 #include "ECS/CommandBuffer.h"
@@ -55,12 +56,20 @@ class AudioSystem {
   };
   Acquired AcquireTrack();
 
-  // True if the sink's (track, generation) pair still matches the pool slot — guards against
+  // Per-entity helper for operator(): acquire a pool track, start the clip (honoring loop +
+  // resume-from-cull), cache the MIX_Track* in AudioTrackCache, and attach a POD AudioSinkComponent.
+  // Split from operator() so each stays a single, readable responsibility.
+  void SpawnSinkForSource(Entity entity, AudioSourceComponent& source);
+
+  // True if the cached (track, generation) pair still matches the pool slot — guards against
   // a pool slot being reissued to a different emitter after a track stops.
-  [[nodiscard]] bool SinkOwnsTrack(const AudioSinkComponent& sink) const;
+  [[nodiscard]] bool SinkOwnsTrack(const AudioTrackCache::Entry& entry) const;
 
   Registry* registry_ = nullptr;
   std::shared_ptr<AudioSystemState> state_;
   CommandBuffer cmd_buffer_;
   EventBus::SubscriptionHandle audio_subscription_;
+  // Resolved lazily on first per-entity tick; the cache singleton is Set during bootstrap and
+  // never reseated, so the pointer is stable for the registry's lifetime.
+  AudioTrackCache* track_cache_ = nullptr;
 };
