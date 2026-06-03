@@ -90,7 +90,7 @@
       "subscribe_sites": [
         {
           "file": "src/Game/Game.cpp",
-          "line": 682,
+          "line": 599,
           "owner": "FrameLoop"
         },
         {
