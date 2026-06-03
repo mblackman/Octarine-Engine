@@ -153,7 +153,7 @@ class EventBus {
     const std::uint64_t id = next_id_++;
     dispatcher_->subscribers[eventTypeId].push_back(
         std::make_unique<EventCallback<TOwner, TEvent>>(id, ownerInstance, callbackFunction));
-    return SubscriptionHandle(dispatcher_, eventTypeId, id);
+    return {dispatcher_, eventTypeId, id};
   }
 
   template <typename TOwner, typename TEvent>
@@ -163,7 +163,7 @@ class EventBus {
     const std::uint64_t id = next_id_++;
     dispatcher_->subscribers[eventTypeId].push_back(
         std::make_unique<EventCallback<TOwner, TEvent>>(id, ownerInstance, callbackFunction));
-    return SubscriptionHandle(dispatcher_, eventTypeId, id);
+    return {dispatcher_, eventTypeId, id};
   }
 
   template <typename TEvent, typename... TArgs>
