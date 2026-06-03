@@ -2,10 +2,10 @@
 
 #include <SDL3/SDL.h>
 
-#include "../General/Logger.h"
 #include "Components/ScriptComponent.h"
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
+#include "General/Logger.h"
 
 #ifdef OCTARINE_WITH_IMGUI
 

@@ -239,3 +239,16 @@ jobs:
             git diff -- systems.json events.json | head -200
             exit 1
           fi
+
+      # Includes under src/ must be src-rooted (src/ is on every target's include path via
+      # cmake/octarine_library.cmake), never parent-relative ("../"). Parent-relative paths are
+      # brittle (break when a file moves) and the same header ends up spelled two ways across the
+      # tree. Keep this an invariant, not a one-time cleanup.
+      - name: Check for parent-relative includes under src/
+        shell: bash
+        run: |
+          if hits="$(git grep -n '#include "\.\.' -- 'src/' || true)" && [ -n "$hits" ]; then
+            echo "::error::parent-relative ('../') includes found under src/. Use src-rooted paths (e.g. \"EventBus/EventBus.h\"):"
+            echo "$hits"
+            exit 1
+          fi

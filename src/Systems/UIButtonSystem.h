@@ -5,17 +5,17 @@
 #include <memory>
 #include <sol/sol.hpp>
 
-#include "../Components/BoxColliderComponent.h"
-#include "../Components/CameraComponents.h"
-#include "../Components/GlobalTransformComponent.h"
-#include "../Components/UIButtonComponent.h"
-#include "../Components/ViewportInfo.h"
-#include "../EventBus/EventBus.h"
-#include "../Events/MouseInputEvent.h"
-#include "../Game/GameConfig.h"
-#include "../General/Logger.h"
+#include "Components/BoxColliderComponent.h"
+#include "Components/CameraComponents.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/UIButtonComponent.h"
+#include "Components/ViewportInfo.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
+#include "EventBus/EventBus.h"
+#include "Events/MouseInputEvent.h"
+#include "Game/GameConfig.h"
+#include "General/Logger.h"
 
 class UIButtonSystem {
  public:

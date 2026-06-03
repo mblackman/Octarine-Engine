@@ -5,10 +5,10 @@
 #include <algorithm>
 #include <string>
 
-#include "../AssetManager/AssetManager.h"
-#include "../Components/AudioActiveTag.h"
-#include "../Game/GameConfig.h"
-#include "../General/Logger.h"
+#include "AssetManager/AssetManager.h"
+#include "Components/AudioActiveTag.h"
+#include "Game/GameConfig.h"
+#include "General/Logger.h"
 
 AudioSystem::AudioSystemState::~AudioSystemState() {
   for (TrackSlot& slot : track_pool) {

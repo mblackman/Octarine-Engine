@@ -1,18 +1,18 @@
 #include "RenderDebugGUISystem.h"
 
 #ifdef OCTARINE_WITH_IMGUI
-#include "../Game/Game.h"
-#include "../Game/GameConfig.h"
-#include "../General/PerfUtils.h"
+#include "Game/Game.h"
+#include "Game/GameConfig.h"
+#include "General/PerfUtils.h"
 #include "imgui.h"
 #include "imgui_impl_sdl3.h"
 #include "imgui_impl_sdlrenderer3.h"
 
 #ifdef OCTARINE_WITH_EDITOR
-#include "../Editor/EditorPersistence.h"
-#include "../Editor/ExportBuilder.h"
-#include "../Editor/Panels/EditorPanelHost.h"
-#include "../Editor/PlayerLauncher.h"
+#include "Editor/EditorPersistence.h"
+#include "Editor/ExportBuilder.h"
+#include "Editor/Panels/EditorPanelHost.h"
+#include "Editor/PlayerLauncher.h"
 #endif
 
 void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_unused]] SDL_Texture* gameTexture,

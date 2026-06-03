@@ -5,15 +5,15 @@
 #include <stack>
 #include <vector>
 
-#include "../Components/GlobalTransformComponent.h"
-#include "../Components/PositionComponent.h"
-#include "../Components/RotationComponent.h"
-#include "../Components/ScaleComponent.h"
-#include "../ECS/Iterable.h"
-#include "../ECS/Query.h"
-#include "../ECS/Registry.h"
-#include "../General/Logger.h"
-#include "../General/PerfUtils.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/PositionComponent.h"
+#include "Components/RotationComponent.h"
+#include "Components/ScaleComponent.h"
+#include "ECS/Iterable.h"
+#include "ECS/Query.h"
+#include "ECS/Registry.h"
+#include "General/Logger.h"
+#include "General/PerfUtils.h"
 
 struct TransformUpdateJob {
   Entity entity;

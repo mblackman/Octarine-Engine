@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../ECS/Entity.h"
-#include "../General/Constants.h"
+#include "ECS/Entity.h"
+#include "General/Constants.h"
 
 struct EntityMaskComponent {
   EntityMask mask;

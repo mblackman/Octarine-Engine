@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "../EventBus/Event.h"
+#include "EventBus/Event.h"
 
 struct AudioPlayEvent : Event {
   std::string clipId;

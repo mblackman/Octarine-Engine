@@ -4,9 +4,9 @@
 #include <glm/glm.hpp>
 #include <sol/sol.hpp>
 
-#include "../Components/ScriptComponent.h"
-#include "../General/Color.h"
-#include "../General/Logger.h"
+#include "Components/ScriptComponent.h"
+#include "General/Color.h"
+#include "General/Logger.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
 
 #ifdef OCTARINE_WITH_IMGUI

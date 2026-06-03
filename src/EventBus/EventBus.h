@@ -8,8 +8,8 @@
 #include <typeindex>
 #include <utility>
 
-#include "../General/Logger.h"
 #include "Event.h"  // Assuming Event is a base class or relevant type
+#include "General/Logger.h"
 
 // Each subscription is tagged with a process-unique id so a SubscriptionHandle can later find and
 // drop exactly the one callback it owns. Replaces the old `void* owner` identity, which forced

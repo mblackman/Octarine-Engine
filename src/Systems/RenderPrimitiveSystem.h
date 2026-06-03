@@ -2,15 +2,15 @@
 
 #include <atomic>
 
-#include "../Components/GlobalTransformComponent.h"
-#include "../Components/SquarePrimitiveComponent.h"
-#include "../General/PerfUtils.h"
-#include "../General/Rect.h"
-#include "../Renderer/RenderCulling.h"
-#include "../Renderer/RenderQueue.h"
 #include "Components/CameraComponents.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/SquarePrimitiveComponent.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"
+#include "General/PerfUtils.h"
+#include "General/Rect.h"
+#include "Renderer/RenderCulling.h"
+#include "Renderer/RenderQueue.h"
 
 class RenderPrimitiveSystem {
  public:

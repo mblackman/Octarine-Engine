@@ -6,12 +6,12 @@
 #include <memory>
 #include <vector>
 
-#include "../Components/AudioSinkComponent.h"
-#include "../Components/AudioSourceComponent.h"
-#include "../EventBus/EventBus.h"
-#include "../Events/AudioPlayEvent.h"
+#include "Components/AudioSinkComponent.h"
+#include "Components/AudioSourceComponent.h"
 #include "ECS/CommandBuffer.h"
 #include "ECS/Registry.h"
+#include "EventBus/EventBus.h"
+#include "Events/AudioPlayEvent.h"
 
 class AudioSystem {
  public:

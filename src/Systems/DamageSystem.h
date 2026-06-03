@@ -1,10 +1,10 @@
 #pragma once
 
-#include "../Components/HealthComponent.h"
-#include "../Components/ProjectileComponent.h"
-#include "../EventBus/EventBus.h"
-#include "../Events/CollisionEvent.h"
+#include "Components/HealthComponent.h"
+#include "Components/ProjectileComponent.h"
 #include "ECS/Iterable.h"
+#include "EventBus/EventBus.h"
+#include "Events/CollisionEvent.h"
 
 class DamageSystem {
  public:

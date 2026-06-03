@@ -2,13 +2,13 @@
 
 #include <glm/glm.hpp>
 
-#include "../Components/AudioListenerComponent.h"
-#include "../Components/GlobalTransformComponent.h"
-#include "../Components/RigidBodyComponent.h"
-#include "../ECS/Iterable.h"
-#include "../ECS/Query.h"
-#include "../ECS/Registry.h"
-#include "../General/Logger.h"
+#include "Components/AudioListenerComponent.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/RigidBodyComponent.h"
+#include "ECS/Iterable.h"
+#include "ECS/Query.h"
+#include "ECS/Registry.h"
+#include "General/Logger.h"
 
 // Bulk system: snapshots the (first) AudioListenerComponent entity each frame into the
 // AudioListenerCache singleton on the Registry. Runs after TransformSystem so the cached

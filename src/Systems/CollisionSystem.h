@@ -7,15 +7,15 @@
 #include <utility>
 #include <vector>
 
-#include "../Components/BoxColliderComponent.h"
-#include "../Components/EntityMaskComponent.h"
-#include "../Components/GlobalTransformComponent.h"
-#include "../ECS/Entity.h"
-#include "../ECS/Iterable.h"
-#include "../ECS/Registry.h"
-#include "../Engine/EngineContext.h"
-#include "../EventBus/EventBus.h"
-#include "../Events/CollisionEvent.h"
+#include "Components/BoxColliderComponent.h"
+#include "Components/EntityMaskComponent.h"
+#include "Components/GlobalTransformComponent.h"
+#include "ECS/Entity.h"
+#include "ECS/Iterable.h"
+#include "ECS/Registry.h"
+#include "Engine/EngineContext.h"
+#include "EventBus/EventBus.h"
+#include "Events/CollisionEvent.h"
 #include "General/PerfUtils.h"
 
 constexpr int kMaxDimensions = 2;

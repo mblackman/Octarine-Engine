@@ -6,10 +6,10 @@
 #include <tuple>
 #include <type_traits>
 
-#include "../General/Logger.h"
 #include "ArchetypeQuery.h"
 #include "Context.h"
 #include "Entity.h"
+#include "General/Logger.h"
 #include "Registry.h"
 
 class Registry;

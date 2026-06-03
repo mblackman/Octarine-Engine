@@ -11,12 +11,12 @@
 #include <unordered_set>
 #include <vector>
 
-#include "../ECS/Registry.h"
-#include "../EventBus/EventBus.h"
-#include "../Events/KeyInputEvent.h"
-#include "../Events/MouseInputEvent.h"
-#include "../Events/MouseWheelEvent.h"
-#include "../General/Logger.h"
+#include "ECS/Registry.h"
+#include "EventBus/EventBus.h"
+#include "Events/KeyInputEvent.h"
+#include "Events/MouseInputEvent.h"
+#include "Events/MouseWheelEvent.h"
+#include "General/Logger.h"
 
 // Per-frame input state machine: held/pressed/released sets for keys + mouse buttons, accumulated
 // mouse wheel delta, action map (named action → list of keys), and the script-installed
