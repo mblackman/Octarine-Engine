@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Pre-commit hook: block a commit whose staged C/C++ changes aren't clang-format-clean, mirroring the
+# blocking `lint (clang-format)` gate in .github/workflows/build.yml. Catching it here avoids the CI
+# round-trip where autoformat.yml pushes a "style: apply clang-format" fixup back onto your branch.
+#
+# Enable once per clone:   git config core.hooksPath scripts/hooks
+# Bypass for one commit:   git commit --no-verify
+#
+# Checks the working-tree copy of staged files (clang-format needs the on-disk path for -style=file
+# discovery). For whole-file stages — the common case — that's the same content being committed.
+set -euo pipefail
+
+# Match CI's filter exactly: staged add/copy/modify/rename under src/ or tests/, C/C++ extensions.
+mapfile -t files < <(git diff --cached --name-only --diff-filter=ACMR -- 'src/*' 'tests/*' \
+  | grep -E '\.(cpp|h|hpp)$' || true)
+if [ ${#files[@]} -eq 0 ]; then
+  exit 0
+fi
+
+# Prefer the CI-pinned major version; fall back to whatever clang-format is on PATH with a warning,
+# since output differs across clang-format versions (CI pins 18.1.8).
+if command -v clang-format-18 >/dev/null 2>&1; then
+  fmt=clang-format-18
+elif command -v clang-format >/dev/null 2>&1; then
+  fmt=clang-format
+  echo "pre-commit: clang-format-18 not found; using '$fmt'. CI pins clang-format 18.1.8 — output can differ." >&2
+else
+  echo "pre-commit: no clang-format on PATH; skipping format check (CI still gates it)." >&2
+  exit 0
+fi
+
+if ! "$fmt" --dry-run --Werror -style=file "${files[@]}"; then
+  echo >&2
+  echo "pre-commit: staged C/C++ files aren't clang-format-clean (diff above)." >&2
+  echo "  Fix:     cmake --build build/<preset> --target format   (or: $fmt -i -style=file <files>)" >&2
+  echo "  Bypass:  git commit --no-verify" >&2
+  exit 1
+fi

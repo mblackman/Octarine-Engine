@@ -159,6 +159,11 @@ readability-string-compare,
 readability-uniqueptr-delete-release,
 readability-use-anyofallof'
 
+# Kept empty on purpose: clang-tidy stays advisory for editor integration and for whole-tree
+# `-DOCTARINE_ENABLE_LINTING=ON` builds, neither of which should hard-fail on pre-existing debt in
+# untouched files. CI enforces the gate where it matters — promoting every check to an error over a
+# PR's *changed lines only* (`-warnings-as-errors='*'` via clang-tidy-diff in build.yml). Reproduce
+# that exact verdict locally with `scripts/lint-diff.sh` before pushing. See CONTRIBUTING.md § Lint.
 WarningsAsErrors: ''
 
 HeaderFilterRegex: 'src/.*'
