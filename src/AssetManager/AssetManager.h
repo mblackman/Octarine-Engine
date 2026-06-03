@@ -6,43 +6,43 @@
 
 #include <cstdint>
 #include <map>
-#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
 
 #include "AssetManager/AssetCatalog.h"
+#include "AssetManager/AssetRefcounter.h"
 #include "AssetManager/AssetReference.h"
+#include "AssetManager/AudioClipStore.h"
+#include "AssetManager/FontStore.h"
+#include "AssetManager/TextureStore.h"
 
 class AssetPak;
 class GameConfig;
 class GlyphAtlas;
 
+// Composes the asset subsystem: the AssetCatalog (what exists + how to load it), three typed handle
+// stores (TextureStore / FontStore / AudioClipStore — the resident SDL/TTF/MIX handles), and an
+// AssetRefcounter (acquire counts). AssetManager itself owns only the cross-cutting concerns the
+// pieces can't: the project base path, the optional shipped-bundle pak, IO resolution, and the
+// Acquire/Release orchestration that ties refcounts to catalog-driven loads. Public API is
+// unchanged from the pre-split monolith — consumers see the same surface.
 class AssetManager {
   std::string base_path_;
-  std::map<std::string, SDL_Texture*> textures_;
-  std::map<std::string, TTF_Font*> fonts_;
-  std::map<std::string, MIX_Audio*> audio_clips_;
-  std::optional<SDL_ScaleMode> default_scale_mode_;
-  // Index of every discoverable asset (id -> file + metadata). Loads nothing on its own;
-  // Acquire consults it to load on demand.
+  // Index of every discoverable asset (id -> file + metadata). Loads nothing on its own; Acquire
+  // consults it to load on demand.
   AssetCatalog catalog_;
-  // Per-id acquire count. The 0 -> 1 transition loads the underlying handle; the N -> 0
-  // transition unloads it. Assets loaded via the legacy load_asset path are adopted at refcount 1
-  // on first Acquire. Entries at zero are erased.
-  std::map<std::string, int> refcounts_;
-  // Bumped whenever a texture is added or replaced. Sprite renderers compare against
-  // their cached generation to know when to re-resolve a stale SDL_Texture* pointer.
-  std::uint64_t texture_generation_{0};
+  TextureStore texture_store_;
+  FontStore font_store_;
+  AudioClipStore audio_store_;
+  // Per-id acquire count. The 0 -> 1 transition loads the underlying handle; the N -> 0 transition
+  // unloads it. Assets loaded via the legacy load_asset path are adopted at refcount 1 on first
+  // Acquire.
+  AssetRefcounter refcounter_;
   // Optional shipped-bundle archive (Stage 14 / B4). When set, AssetManager prefers reading each
   // asset's bytes from the pak over the loose file at `fullPath`. Non-owning — the Registry owns
   // the AssetPak instance.
   const AssetPak* asset_pak_{nullptr};
-  // Per-font glyph atlases (Stage 14 / B3) keyed by catalog asset id (e.g. "main-16"). Populated
-  // lazily inside AddFont when a `<basePath>/atlases/<id>.atlas.{png,lua}` sidecar pair is present;
-  // consumed by RenderTextSystem's compose path. unique_ptr to keep GlyphAtlas pinned across the
-  // map's rehashes (the surface wraps a vector<uint8_t> that must not be moved underneath SDL).
-  std::map<std::string, std::unique_ptr<GlyphAtlas>> glyph_atlases_;
 
  public:
   AssetManager() = default;
@@ -82,8 +82,8 @@ class AssetManager {
 
   void AddTexture(SDL_Renderer* renderer, const std::string& assetId, const std::string& path);
   // Resolves to the SDL_Texture under `assetId`. For atlas-member ids this walks the catalog to
-  // the backing atlas (whose SDL_Texture* lives in textures_) — members themselves never appear
-  // in textures_, which is what lets one atlas keep one SDL handle even with N member ids.
+  // the backing atlas (whose SDL_Texture* lives in the texture store) — members themselves never
+  // appear in the store, which is what lets one atlas keep one SDL handle even with N member ids.
   [[nodiscard]] SDL_Texture* GetTexture(const std::string& assetId) const;
   // Pixel-rect of `assetId` within its atlas, when `assetId` is an atlas member. Nullopt for
   // loose textures and non-textures. Sprite render adds slice.x/y to the sprite's logical
@@ -98,7 +98,7 @@ class AssetManager {
   [[nodiscard]] MIX_Audio* GetAudioClip(const std::string& assetId) const;
   [[nodiscard]] std::string GetFullPath(const std::string& relativePath) const;
   void SetDefaultScaleMode(const std::string& scaleMode);
-  [[nodiscard]] std::uint64_t TextureGeneration() const { return texture_generation_; }
+  [[nodiscard]] std::uint64_t TextureGeneration() const { return texture_store_.Generation(); }
 
   [[nodiscard]] AssetCatalog& GetCatalog() { return catalog_; }
   [[nodiscard]] const AssetCatalog& GetCatalog() const { return catalog_; }
@@ -117,9 +117,9 @@ class AssetManager {
   // Current acquire count for an id (0 if untracked). Test/diagnostic aid.
   [[nodiscard]] int RefCount(const std::string& assetId) const;
 
-  [[nodiscard]] const std::map<std::string, SDL_Texture*>& GetTextures() const { return textures_; }
-  [[nodiscard]] const std::map<std::string, TTF_Font*>& GetFonts() const { return fonts_; }
-  [[nodiscard]] const std::map<std::string, MIX_Audio*>& GetAudioClips() const { return audio_clips_; }
+  [[nodiscard]] const std::map<std::string, SDL_Texture*>& GetTextures() const { return texture_store_.All(); }
+  [[nodiscard]] const std::map<std::string, TTF_Font*>& GetFonts() const { return font_store_.All(); }
+  [[nodiscard]] const std::map<std::string, MIX_Audio*>& GetAudioClips() const { return audio_store_.All(); }
 
  private:
   // Open a read-only SDL_IOStream over `fullPath`. Tries the wired AssetPak first (lookup by
@@ -131,7 +131,7 @@ class AssetManager {
   // the handle is resident afterwards.
   bool LoadFromCatalog(const CatalogEntry& entry, const std::string& assetId, SDL_Renderer* renderer, MIX_Mixer* mixer);
 
-  // Destroy and erase whichever resident handle backs `assetId` (texture/font/audio). Bumps
-  // texture_generation_ when a texture is dropped so cached SDL_Texture* pointers re-resolve.
+  // Destroy and erase whichever resident handle backs `assetId` (texture/font/audio). The texture
+  // store bumps its generation when a texture is dropped so cached SDL_Texture* pointers re-resolve.
   void UnloadAsset(const std::string& assetId);
 };

@@ -68,9 +68,12 @@ octarine_library(octarine_assets
         AssetManager/AssetManager.cpp
         AssetManager/AssetPak.cpp
         AssetManager/AtlasBaker.cpp
+        AssetManager/AudioClipStore.cpp
         AssetManager/AudioNormalizer.cpp
+        AssetManager/FontStore.cpp
         AssetManager/GlyphAtlas.cpp
         AssetManager/TextureAtlasBaker.cpp
+        AssetManager/TextureStore.cpp
         AssetManager/SceneAssetScanner.cpp
 )
 set_source_files_properties(
