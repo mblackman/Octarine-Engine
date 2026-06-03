@@ -2,14 +2,14 @@
 
 #include <glm/glm.hpp>
 
-#include "../Components/GlobalTransformComponent.h"
-#include "../Components/PositionComponent.h"
-#include "../Components/ScaleComponent.h"
-#include "../Components/SpriteComponent.h"
-#include "../ECS/Entity.h"
-#include "../ECS/Registry.h"
-#include "../Game/GameConfig.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/PositionComponent.h"
+#include "Components/ScaleComponent.h"
+#include "Components/SpriteComponent.h"
 #include "ECS/CommandBuffer.h"
+#include "ECS/Entity.h"
+#include "ECS/Registry.h"
+#include "Game/GameConfig.h"
 
 class OffScreenDespawnSystem {
  public:

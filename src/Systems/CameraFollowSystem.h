@@ -4,9 +4,9 @@
 
 #include <algorithm>
 
-#include "../Components/CameraFollowComponent.h"
-#include "../Components/PositionComponent.h"
 #include "Components/CameraComponents.h"
+#include "Components/CameraFollowComponent.h"
+#include "Components/PositionComponent.h"
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"

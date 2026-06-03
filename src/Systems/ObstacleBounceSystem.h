@@ -2,13 +2,13 @@
 
 #include <memory>
 
-#include "../Components/RigidBodyComponent.h"
-#include "../Components/SpriteComponent.h"
-#include "../ECS/Entity.h"
-#include "../ECS/Registry.h"
-#include "../EventBus/EventBus.h"
-#include "../Events/CollisionEvent.h"
-#include "../General/SpriteFlip.h"
+#include "Components/RigidBodyComponent.h"
+#include "Components/SpriteComponent.h"
+#include "ECS/Entity.h"
+#include "ECS/Registry.h"
+#include "EventBus/EventBus.h"
+#include "Events/CollisionEvent.h"
+#include "General/SpriteFlip.h"
 
 class ObstacleBounceSystem {
  public:

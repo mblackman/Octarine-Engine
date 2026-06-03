@@ -4,15 +4,15 @@
 
 #include <glm/glm.hpp>
 
-#include "../Components/AudioActiveTag.h"
-#include "../Components/AudioListenerComponent.h"
-#include "../Components/AudioSinkComponent.h"
-#include "../Components/AudioSourceComponent.h"
-#include "../Components/GlobalTransformComponent.h"
-#include "../ECS/CommandBuffer.h"
-#include "../ECS/Iterable.h"
-#include "../ECS/Registry.h"
-#include "../Game/GameConfig.h"
+#include "Components/AudioActiveTag.h"
+#include "Components/AudioListenerComponent.h"
+#include "Components/AudioSinkComponent.h"
+#include "Components/AudioSourceComponent.h"
+#include "Components/GlobalTransformComponent.h"
+#include "ECS/CommandBuffer.h"
+#include "ECS/Iterable.h"
+#include "ECS/Registry.h"
+#include "Game/GameConfig.h"
 
 // Per-emitter system: gates spatial sources by listener radius. Inside the radius the
 // emitter carries AudioActiveTag and plays normally; outside, the system stashes the

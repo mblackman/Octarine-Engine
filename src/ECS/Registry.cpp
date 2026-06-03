@@ -2,11 +2,11 @@
 
 #include <algorithm>
 
-#include "../General/Logger.h"
-#include "../General/PerfUtils.h"
-#include "../Systems/EntityPoolSystem.h"
 #include "CommandBuffer.h"
+#include "General/Logger.h"
+#include "General/PerfUtils.h"
 #include "Query.h"
+#include "Systems/EntityPoolSystem.h"
 
 void Registry::Update(const float deltaTime) {
   PROFILE_NAMED_SCOPE("Registry::Update (total)");

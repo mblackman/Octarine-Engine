@@ -5,11 +5,11 @@
 #include <filesystem>
 #include <system_error>
 
-#include "../../Components/ScriptComponent.h"
-#include "../../ECS/Query.h"
-#include "../../ECS/Registry.h"
-#include "../../General/Logger.h"
-#include "../Bindings/LuaBinding.h"
+#include "Components/ScriptComponent.h"
+#include "ECS/Query.h"
+#include "ECS/Registry.h"
+#include "General/Logger.h"
+#include "Lua/Bindings/LuaBinding.h"
 
 namespace {
 std::string Canonicalize(const std::string& absPath) {

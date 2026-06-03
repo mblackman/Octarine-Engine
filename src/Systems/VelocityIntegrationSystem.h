@@ -1,7 +1,7 @@
 #pragma once
 
-#include "../Components/PositionComponent.h"
-#include "../Components/RigidBodyComponent.h"
+#include "Components/PositionComponent.h"
+#include "Components/RigidBodyComponent.h"
 
 class VelocityIntegrationSystem {
  public:

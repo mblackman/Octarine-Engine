@@ -7,9 +7,9 @@
 #include <utility>
 #include <vector>
 
-#include "../ECS/ECS.h"
-#include "../ECS/Registry.h"
-#include "../General/PerfUtils.h"
+#include "ECS/ECS.h"
+#include "ECS/Registry.h"
+#include "General/PerfUtils.h"
 
 // Pool manager that recycles entities of a registered archetype shape via the active/inactive
 // chunk partition — entities never cross archetypes when parked or unparked. Storage stays in

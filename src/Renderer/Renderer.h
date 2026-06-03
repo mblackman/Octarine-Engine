@@ -2,8 +2,8 @@
 
 #include <SDL3/SDL.h>
 
-#include "../AssetManager/AssetManager.h"
 #include "./RenderQueue.h"
+#include "AssetManager/AssetManager.h"
 
 class Registry;
 

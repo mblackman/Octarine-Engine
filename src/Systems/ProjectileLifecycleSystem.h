@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Components/ProjectileComponent.h"
+#include "Components/ProjectileComponent.h"
 #include "ECS/CommandBuffer.h"
 
 class ProjectileLifecycleSystem {

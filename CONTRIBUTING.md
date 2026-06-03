@@ -125,6 +125,22 @@ Match CI's pinned major version for identical results — `apt install clang-tid
 (the script prefers `clang-tidy-18`, falling back to whatever `clang-tidy` is on
 `PATH` with a warning).
 
+### Includes
+
+Includes under `src/` are **src-rooted**, never parent-relative. `src/` is on every
+target's include path (via `cmake/octarine_library.cmake`), so spell a header by its
+path from `src/`:
+
+```cpp
+#include "EventBus/EventBus.h"      // ✅ src-rooted
+#include "../EventBus/EventBus.h"   // ❌ parent-relative — rejected by CI
+```
+
+Parent-relative paths break when a file moves and let the same header be spelled two
+ways across the tree. The `lint` job (and `scripts/hooks/pre-commit`) fail on any
+`#include "../...` under `src/`. Third-party/system includes (`<SDL3/SDL.h>`,
+`"imgui.h"`) are unaffected.
+
 ### Naming
 
 Match the surrounding code:

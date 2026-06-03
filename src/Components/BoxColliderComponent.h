@@ -2,8 +2,8 @@
 
 #include <glm/glm.hpp>
 
-#include "../ECS/Entity.h"
-#include "../General/Constants.h"
+#include "ECS/Entity.h"
+#include "General/Constants.h"
 
 struct BoxColliderComponent {
   int width;

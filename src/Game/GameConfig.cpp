@@ -12,7 +12,7 @@
 #include <sstream>
 #include <unordered_map>
 
-#include "../General/Logger.h"
+#include "General/Logger.h"
 
 inline constexpr auto kConfigFileName = "config.ini";
 inline constexpr auto kPreferencesFileName = "preferences.ini";

@@ -36,3 +36,15 @@ if ! "$fmt" --dry-run --Werror -style=file "${files[@]}"; then
   echo "  Bypass:  git commit --no-verify" >&2
   exit 1
 fi
+
+# Mirror the `lint` job's src-rooted-include gate: no parent-relative ("../") includes under src/.
+# src/ is on every target's include path, so "Layer/Header.h" always resolves — "../Layer/Header.h"
+# is brittle and spells the same header two ways. Only the staged src/ files are checked here.
+mapfile -t src_files < <(printf '%s\n' "${files[@]}" | grep -E '^src/' || true)
+if [ ${#src_files[@]} -gt 0 ] && hits="$(git grep -n '#include "\.\.' -- "${src_files[@]}" || true)" && [ -n "$hits" ]; then
+  echo >&2
+  echo "pre-commit: parent-relative ('../') includes under src/ — use src-rooted paths:" >&2
+  echo "$hits" >&2
+  echo "  Bypass:  git commit --no-verify" >&2
+  exit 1
+fi

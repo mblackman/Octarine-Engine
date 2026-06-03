@@ -5,9 +5,9 @@
 #include <filesystem>
 #include <set>
 
-#include "../Game/GameConfig.h"
-#include "../General/Logger.h"
 #include "AssetManager/AssetPak.h"
+#include "Game/GameConfig.h"
+#include "General/Logger.h"
 
 AssetManager::~AssetManager() { ClearAssets(); }
 

@@ -11,8 +11,8 @@
 #include <sstream>
 #include <string>
 
-#include "../General/Logger.h"
 #include "EditorPersistence.h"
+#include "General/Logger.h"
 #include "Layouts/DefaultLayout.h"
 
 namespace octarine::editor::layouts {

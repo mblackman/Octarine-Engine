@@ -7,17 +7,17 @@
 #include <string>
 #include <vector>
 
-#include "../Components/BoxColliderComponent.h"
-#include "../Components/GlobalTransformComponent.h"
-#include "../ECS/Query.h"
-#include "../Engine/EngineContext.h"
-#include "../Engine/EngineRuntime.h"
-#include "../Engine/FrameLoop.h"
-#include "../Engine/SceneLoader.h"
-#include "../EventBus/EventBus.h"
-#include "../Events/KeyInputEvent.h"
-#include "../Lua/LuaBindingContext.h"
-#include "../Renderer/Renderer.h"
+#include "Components/BoxColliderComponent.h"
+#include "Components/GlobalTransformComponent.h"
+#include "ECS/Query.h"
+#include "Engine/EngineContext.h"
+#include "Engine/EngineRuntime.h"
+#include "Engine/FrameLoop.h"
+#include "Engine/SceneLoader.h"
+#include "EventBus/EventBus.h"
+#include "Events/KeyInputEvent.h"
+#include "Lua/LuaBindingContext.h"
+#include "Renderer/Renderer.h"
 
 class Registry;
 

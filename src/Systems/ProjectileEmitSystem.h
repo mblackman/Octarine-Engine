@@ -2,19 +2,19 @@
 
 #include <glm/glm.hpp>
 
-#include "../Components/BoxColliderComponent.h"
-#include "../Components/EntityMaskComponent.h"
-#include "../Components/GlobalTransformComponent.h"
-#include "../Components/NameComponent.h"
-#include "../Components/PositionComponent.h"
-#include "../Components/ProjectileComponent.h"
-#include "../Components/ProjectileEmitterComponent.h"
-#include "../Components/RigidBodyComponent.h"
-#include "../Components/RotationComponent.h"
-#include "../Components/ScaleComponent.h"
-#include "../Components/SpriteComponent.h"
-#include "../ECS/ECS.h"
-#include "../ECS/Registry.h"
+#include "Components/BoxColliderComponent.h"
+#include "Components/EntityMaskComponent.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/NameComponent.h"
+#include "Components/PositionComponent.h"
+#include "Components/ProjectileComponent.h"
+#include "Components/ProjectileEmitterComponent.h"
+#include "Components/RigidBodyComponent.h"
+#include "Components/RotationComponent.h"
+#include "Components/ScaleComponent.h"
+#include "Components/SpriteComponent.h"
+#include "ECS/ECS.h"
+#include "ECS/Registry.h"
 #include "EntityPoolSystem.h"
 
 class ProjectileEmitSystem {

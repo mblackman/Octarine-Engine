@@ -4,8 +4,8 @@
 #include <memory>
 #include <type_traits>
 
-#include "../General/Logger.h"
 #include "Entity.h"
+#include "General/Logger.h"
 
 class Registry;
 

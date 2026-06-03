@@ -7,10 +7,10 @@
 #include <utility>
 #include <vector>
 
-#include "../General/PerfUtils.h"
-#include "../General/ThreadPool.h"
 #include "Component.h"
 #include "Entity.h"
+#include "General/PerfUtils.h"
+#include "General/ThreadPool.h"
 
 template <typename T>
 struct Opt;  // forward decl

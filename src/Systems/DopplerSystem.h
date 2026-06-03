@@ -6,13 +6,13 @@
 #include <cmath>
 #include <glm/glm.hpp>
 
-#include "../Components/AudioListenerComponent.h"
-#include "../Components/AudioSinkComponent.h"
-#include "../Components/AudioSourceComponent.h"
-#include "../Components/GlobalTransformComponent.h"
-#include "../Components/RigidBodyComponent.h"
-#include "../ECS/Iterable.h"
-#include "../ECS/Registry.h"
+#include "Components/AudioListenerComponent.h"
+#include "Components/AudioSinkComponent.h"
+#include "Components/AudioSourceComponent.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/RigidBodyComponent.h"
+#include "ECS/Iterable.h"
+#include "ECS/Registry.h"
 
 // Per-emitter system: applies Doppler shift via MIX_SetTrackFrequencyRatio. Registered on
 // the (GlobalTransform, RigidBody, AudioSource, AudioSink) archetype — a doppler-flagged

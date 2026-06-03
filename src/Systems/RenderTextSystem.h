@@ -11,21 +11,21 @@
 #include <string>
 #include <unordered_map>
 
-#include "../AssetManager/AssetManager.h"
-#include "../AssetManager/GlyphAtlas.h"
-#include "../Components/GlobalTransformComponent.h"
-#include "../Components/TextLabelComponent.h"
-#include "../Engine/EngineContext.h"
-#include "../General/Logger.h"
-#include "../General/PerfUtils.h"
-#include "../General/Rect.h"
-#include "../Renderer/RenderCommands.h"
-#include "../Renderer/RenderCulling.h"
-#include "../Renderer/RenderQueue.h"
+#include "AssetManager/AssetManager.h"
+#include "AssetManager/GlyphAtlas.h"
 #include "Components/CameraComponents.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/TextLabelComponent.h"
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
+#include "Engine/EngineContext.h"
 #include "Game/GameConfig.h"
+#include "General/Logger.h"
+#include "General/PerfUtils.h"
+#include "General/Rect.h"
+#include "Renderer/RenderCommands.h"
+#include "Renderer/RenderCulling.h"
+#include "Renderer/RenderQueue.h"
 
 class RenderTextSystem {
  public:

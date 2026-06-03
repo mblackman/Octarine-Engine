@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../EventBus/Event.h"
+#include "EventBus/Event.h"
 
 struct MouseWheelEvent : Event {
   float dx;

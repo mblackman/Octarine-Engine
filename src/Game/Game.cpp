@@ -11,11 +11,6 @@
 #include <string>
 #include <unordered_set>
 
-#include "../Events/KeyInputEvent.h"
-#include "../General/Logger.h"
-#include "../Renderer/RenderQueue.h"
-#include "../Renderer/Renderer.h"
-#include "../Renderer/SpriteRenderCache.h"
 #include "AssetManager/AssetCatalog.h"
 #include "AssetManager/AssetPak.h"
 #include "AssetManager/AtlasBaker.h"
@@ -45,11 +40,16 @@
 #include "Engine/EngineBootstrap.h"
 #include "Engine/Platform/PlatformPaths.h"
 #include "Engine/SdlFileReader.h"
+#include "Events/KeyInputEvent.h"
 #include "Events/MouseInputEvent.h"
 #include "Events/MouseWheelEvent.h"
 #include "GameConfig.h"
+#include "General/Logger.h"
 #include "General/PerfUtils.h"
 #include "General/Rect.h"
+#include "Renderer/RenderQueue.h"
+#include "Renderer/Renderer.h"
+#include "Renderer/SpriteRenderCache.h"
 // InputSystemLuaBinding specializes LuaSystemBinding<InputSystem> — needed below where
 // LuaSystemRegistry::registerSystem(inputSystem) instantiates the lookup. Don't drop.
 #include "Components/AudioActiveTag.h"
@@ -88,7 +88,7 @@
 #endif
 
 #ifndef OCTARINE_SHIPPED
-#include "../Dev/DevListenServer.h"
+#include "Dev/DevListenServer.h"
 #endif
 
 inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const GameConfig& gameConfig) {
