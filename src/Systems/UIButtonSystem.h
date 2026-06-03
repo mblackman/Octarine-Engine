@@ -21,7 +21,7 @@ class UIButtonSystem {
  public:
   void Init(Registry* registry, const std::unique_ptr<EventBus>& eventBus) {
     registry_ = registry;
-    eventBus->SubscribeEvent<UIButtonSystem, MouseInputEvent>(this, &UIButtonSystem::OnMouseInput);
+    subscription_ = eventBus->SubscribeEvent<UIButtonSystem, MouseInputEvent>(this, &UIButtonSystem::OnMouseInput);
   }
 
   void OnMouseInput(const MouseInputEvent& event) {
@@ -82,4 +82,5 @@ class UIButtonSystem {
 
  private:
   Registry* registry_ = nullptr;
+  EventBus::SubscriptionHandle subscription_;
 };

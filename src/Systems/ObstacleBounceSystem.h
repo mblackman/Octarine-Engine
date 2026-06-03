@@ -16,7 +16,8 @@ class ObstacleBounceSystem {
     registry_ = registry;
     enemies_ = registry_->TagId("enemies");
     obstacles_ = registry_->TagId("obstacles");
-    eventBus->SubscribeEvent<ObstacleBounceSystem, CollisionEvent>(this, &ObstacleBounceSystem::OnCollision);
+    subscription_ =
+        eventBus->SubscribeEvent<ObstacleBounceSystem, CollisionEvent>(this, &ObstacleBounceSystem::OnCollision);
   }
 
   void OnCollision(const CollisionEvent& event) {
@@ -46,4 +47,5 @@ class ObstacleBounceSystem {
   Registry* registry_ = nullptr;
   Entity enemies_{};
   Entity obstacles_{};
+  EventBus::SubscriptionHandle subscription_;
 };

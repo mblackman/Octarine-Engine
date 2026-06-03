@@ -13,27 +13,32 @@ usually receive it in their `Init` / `SubscribeToEvents` hook rather than fetchi
 
 API:
 
-- `SubscribeEvent<Owner, Event>(owner, &Owner::method)` — register a member-function handler. The
-  handler takes `Event&` or `const Event&` (both overloads exist).
+- `SubscribeEvent<Owner, Event>(owner, &Owner::method)` — register a member-function handler and
+  return a `[[nodiscard]] EventBus::SubscriptionHandle`. The handler takes `Event&` or `const Event&`
+  (both overloads exist). **You must keep the returned handle** — its destructor unsubscribes, so a
+  discarded handle unsubscribes immediately.
 - `EmitEvent<Event>(args...)` — construct an `Event` from `args` and dispatch it to every subscriber,
   synchronously, in subscription order. Emitting an event with no subscribers is a no-op.
-- `UnsubscribeAll(owner)` — drop every subscription owned by `owner`.
 
 ```cpp
-// Subscribe (typically in a system's Init/SubscribeToEvents):
-eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(this, &DamageSystem::OnCollision);
+// Subscribe (typically in a system's Init/SubscribeToEvents) — store the handle as a member:
+subscription_ = eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(this, &DamageSystem::OnCollision);
+// ...where the class declares:  EventBus::SubscriptionHandle subscription_;
+// (use a std::vector<EventBus::SubscriptionHandle> when a system subscribes to several events).
 
 // Emit (from wherever the thing happens):
 eventBus->EmitEvent<CollisionEvent>(entityA, entityB);
 ```
 
 Subscriptions are wired once during startup (`Game::Setup`, each system's `Init` /
-`SubscribeToEvents`) and persist for the lifetime of the bus.
+`SubscribeToEvents`) and last as long as the handle the subscriber holds.
 
-> **Dangling-callback hazard.** The bus stores raw owner pointers. If a subscriber is destroyed
-> before the bus, the next `EmitEvent` calls into freed memory. A subscriber whose lifetime can end
-> before the bus's must call `eventBus->UnsubscribeAll(this)` in its destructor. (Today's subscribers
-> all live as long as the bus, so none do — keep this in mind when adding a shorter-lived one.)
+> **Lifetime is RAII, order-independent.** `SubscriptionHandle` owns the subscription: its destructor
+> removes the callback, and it holds a `weak_ptr` to the bus's dispatch table, so destroying the handle
+> *after* the bus is a safe no-op. A subscriber simply keeps its handle(s) as a member and never has to
+> unsubscribe by hand — there is no `UnsubscribeAll` and no dangling-callback hazard. Call
+> `handle.Reset()` to unsubscribe early; `handle.Active()` reports whether the subscription is still
+> live on a surviving bus.
 
 ## Event catalog
 
@@ -41,7 +46,7 @@ Subscriptions are wired once during startup (`Game::Setup`, each system's `Init`
 |-------|---------|------------|---------------|
 | `AudioPlayEvent` | `clipId: string`, `volume: float` | Lua `play_sound()` (`AudioModuleLuaBinding.cpp`) | `AudioSystem::OnAudioPlay` |
 | `CollisionEvent` | `entityA: Entity`, `entityB: Entity` | `CollisionSystem` (narrowphase) | `DamageSystem::OnCollision`, `ObstacleBounceSystem::OnCollision` |
-| `KeyInputEvent` | `inputKey: SDL_Keycode`, `inputModifier: SDL_Keymod`, `isPressed: bool` | `Game::ProcessInput` (SDL key events) | `InputSystem::OnKeyInput`, `Game::OnKeyInputEvent` |
+| `KeyInputEvent` | `inputKey: SDL_Keycode`, `inputModifier: SDL_Keymod`, `isPressed: bool` | `Game::ProcessInput` (SDL key events) | `InputSystem::OnKeyInput`, `FrameLoop::OnKeyInputEvent` |
 | `MouseInputEvent` | `event: SDL_MouseButtonEvent` | `Game::ProcessInput` (SDL mouse-button events) | `InputSystem::OnMouseInput`, `UIButtonSystem::OnMouseInput` |
 | `MouseWheelEvent` | `dx: float`, `dy: float` | `Game::ProcessInput` (SDL wheel events) | `InputSystem::OnMouseWheel` |
 
@@ -50,8 +55,8 @@ Event types live in `src/Events/`.
 ### Flows at a glance
 
 - **Input:** SDL events → `Game::ProcessInput` emits `KeyInputEvent` / `MouseInputEvent` /
-  `MouseWheelEvent` → `InputSystem` folds them into per-frame state (also `Game` for engine hotkeys,
-  `UIButtonSystem` for clicks).
+  `MouseWheelEvent` → `InputSystem` folds them into per-frame state (also `FrameLoop` for engine
+  hotkeys, `UIButtonSystem` for clicks).
 - **Collision:** `CollisionSystem` detects overlaps and emits `CollisionEvent` → `DamageSystem` and
   `ObstacleBounceSystem` react.
 - **Audio:** Lua `play_sound(clip, volume)` emits `AudioPlayEvent` → `AudioSystem` plays the clip.

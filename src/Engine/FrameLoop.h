@@ -8,10 +8,10 @@
 #include "Components/BoxColliderComponent.h"
 #include "Components/GlobalTransformComponent.h"
 #include "ECS/Query.h"
+#include "EventBus/EventBus.h"
 
 class Game;
 class Registry;
-class EventBus;
 class Renderer;
 class EngineRuntime;
 // Defined in Events/KeyInputEvent.h. Forward-declared (not included) because that header is not
@@ -47,6 +47,10 @@ class FrameLoop {
   void Render(float deltaTime);
   [[nodiscard]] float WaitTime();
 
+  // Subscribe OnKeyInputEvent to the bus. Called once by Game during Setup; the returned RAII
+  // handle is held as a member so the subscription drops when this FrameLoop is destroyed.
+  void SubscribeToEvents();
+
   // KeyInputEvent subscriber (Esc → quit, backtick → toggle debug GUI). Public so Game can wire
   // it to the EventBus during Setup.
   void OnKeyInputEvent(const KeyInputEvent& event);
@@ -62,4 +66,5 @@ class FrameLoop {
   sol::state& lua_;
   Uint64 milliseconds_previous_frame_ = 0;
   std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent>> collider_query_;
+  EventBus::SubscriptionHandle key_input_subscription_;
 };

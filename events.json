@@ -58,7 +58,7 @@
         },
         {
           "file": "src/Systems/ObstacleBounceSystem.h",
-          "line": 19,
+          "line": 20,
           "owner": "ObstacleBounceSystem"
         }
       ]
@@ -84,18 +84,18 @@
       "emit_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 68
+          "line": 72
         }
       ],
       "subscribe_sites": [
         {
-          "file": "src/Game/Game.cpp",
-          "line": 599,
+          "file": "src/Engine/FrameLoop.cpp",
+          "line": 44,
           "owner": "FrameLoop"
         },
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 49,
+          "line": 50,
           "owner": "InputSystem"
         }
       ]
@@ -113,13 +113,13 @@
       "emit_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 74
+          "line": 78
         }
       ],
       "subscribe_sites": [
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 50,
+          "line": 51,
           "owner": "InputSystem"
         },
         {
@@ -146,13 +146,13 @@
       "emit_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 78
+          "line": 82
         }
       ],
       "subscribe_sites": [
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 51,
+          "line": 52,
           "owner": "InputSystem"
         }
       ]

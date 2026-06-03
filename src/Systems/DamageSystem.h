@@ -13,7 +13,7 @@ class DamageSystem {
     projectiles_ = registry_->Tag<ProjectileTag>();
     enemies_ = registry_->TagId("enemies");
     player_ = registry_->TagId("player");
-    eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(this, &DamageSystem::OnCollision);
+    subscription_ = eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(this, &DamageSystem::OnCollision);
   }
 
   void OnCollision(const CollisionEvent& event) {
@@ -47,4 +47,5 @@ class DamageSystem {
   Entity projectiles_{};
   Entity enemies_{};
   Entity player_{};
+  EventBus::SubscriptionHandle subscription_;
 };

@@ -46,9 +46,10 @@ class InputSystem {
 
   void SubscribeToEvents(const std::unique_ptr<EventBus>& eventBus, Registry* registry) {
     registry_ = registry;
-    eventBus->SubscribeEvent<InputSystem, KeyInputEvent>(this, &InputSystem::OnKeyInput);
-    eventBus->SubscribeEvent<InputSystem, MouseInputEvent>(this, &InputSystem::OnMouseInput);
-    eventBus->SubscribeEvent<InputSystem, MouseWheelEvent>(this, &InputSystem::OnMouseWheel);
+    subscriptions_.clear();
+    subscriptions_.push_back(eventBus->SubscribeEvent<InputSystem, KeyInputEvent>(this, &InputSystem::OnKeyInput));
+    subscriptions_.push_back(eventBus->SubscribeEvent<InputSystem, MouseInputEvent>(this, &InputSystem::OnMouseInput));
+    subscriptions_.push_back(eventBus->SubscribeEvent<InputSystem, MouseWheelEvent>(this, &InputSystem::OnMouseWheel));
   }
 
   // Called near the top of Game::Update so polling APIs see a fresh cursor position
@@ -151,6 +152,9 @@ class InputSystem {
   }
 
   Registry* registry_;
+  // One handle per SubscribeToEvents subscription; their destructors drop the bus callbacks when
+  // this system is torn down, regardless of whether the bus outlives it.
+  std::vector<EventBus::SubscriptionHandle> subscriptions_;
   std::unordered_set<std::string> pressedKeys_;
   std::unordered_set<std::string> releasedKeys_;
   std::unordered_set<std::string> heldKeys_;
