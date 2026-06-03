@@ -467,6 +467,21 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
     add_test(NAME EventBusTest COMMAND OctarineEventBusTest)
 
+    # AssetRefcounter unit test (Stage 10): the acquire-count policy split out of AssetManager is
+    # pure bookkeeping — no SDL, no renderer, no Logger — so the test links nothing but the standard
+    # library. This is the "catalog/asset logic testable without SDL_CreateRenderer" outcome.
+    add_executable(OctarineAssetRefcounterTest tests/AssetRefcounterTest.cpp)
+    set_target_properties(OctarineAssetRefcounterTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF)
+    target_include_directories(OctarineAssetRefcounterTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src)
+    if (MSVC)
+        target_compile_options(OctarineAssetRefcounterTest PRIVATE /W4 /permissive- /MP /EHsc)
+    endif ()
+    add_test(NAME AssetRefcounterTest COMMAND OctarineAssetRefcounterTest)
+
     # DevListenServer smoke test (Stage 6 PR-A): standalone — only the server source + Logger.
     # Bound to the same OCTARINE_SHIPPED gate as the engine-side server.
     if (NOT OCTARINE_SHIPPED)
