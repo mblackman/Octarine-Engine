@@ -92,8 +92,7 @@ class ArchetypeQuery {
             return array[entity_idx_];
           }
         }()...);
-      }
-      (std::index_sequence_for<TComponents...>{});
+      }(std::index_sequence_for<TComponents...>{});
     }
 
     Iterator& operator++() {
@@ -119,8 +118,7 @@ class ArchetypeQuery {
           }
           return current_archetype->template GetComponentArray<RawT>(chunk_idx_, type_[Is]);
         }()...);
-      }
-      (std::index_sequence_for<TComponents...>{});
+      }(std::index_sequence_for<TComponents...>{});
       current_entities_ = current_archetype->chunks_[chunk_idx_].GetEntityArray();
     }
 
@@ -288,8 +286,7 @@ class ArchetypeQuery {
           }
           return w.archetype->template GetComponentArray<RawT>(w.chunkIdx, type_[Is]);
         }()...);
-      }
-      (std::index_sequence_for<TComponents...>{});
+      }(std::index_sequence_for<TComponents...>{});
 
       const Entity* entities = w.archetype->chunks_[w.chunkIdx].GetEntityArray();
 
@@ -314,8 +311,7 @@ class ArchetypeQuery {
               }
             }()...);
           }
-        }
-        (std::index_sequence_for<TComponents...>{});
+        }(std::index_sequence_for<TComponents...>{});
       }
     }
   }
