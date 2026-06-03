@@ -7,6 +7,7 @@
 
 #include "AssetManager/AssetManager.h"
 #include "AssetManager/GlyphAtlas.h"
+#include "Audio/AudioTrackCache.h"
 #include "Components/CameraComponents.h"
 #include "Components/ViewportInfo.h"
 #include "ECS/Registry.h"
@@ -84,18 +85,20 @@ void InstallLuaLibraries(sol::state& lua) {
 }
 
 void InstallCoreSingletons(Registry& registry, EngineContext& context, const int windowWidth, const int windowHeight,
-                           const bool withSpriteRenderCache) {
+                           const bool withFramePathCaches) {
   const octarine::Rect camera{0, 0, static_cast<float>(windowWidth), static_cast<float>(windowHeight)};
 
   registry.Set<RenderQueue>(RenderQueue());
   registry.Set<CameraComponent>(CameraComponent{camera});
   registry.Set<AssetManager>(AssetManager());
   registry.Set<ViewportInfo>(ViewportInfo{0, 0, static_cast<float>(windowWidth), static_cast<float>(windowHeight)});
-  if (withSpriteRenderCache) {
-    // Render-side cache mapping Entity → cached SDL_Texture*. Replaces the mutable
-    // cachedTexture member that used to live on SpriteComponent; keeps SpriteComponent
-    // POD-no-SDL. Bake runs no frames, so skips this slot.
+  if (withFramePathCaches) {
+    // Entity-keyed backend-handle caches, each replacing a handle that used to live on a POD
+    // component: SpriteRenderCache ← SpriteComponent.cachedTexture (SDL_Texture*), AudioTrackCache
+    // ← AudioSinkComponent.track (MIX_Track*). Bake runs no frames and no audio systems, so it
+    // skips both slots.
     registry.Set<SpriteRenderCache>(SpriteRenderCache());
+    registry.Set<AudioTrackCache>(AudioTrackCache());
   }
 
   // Publish the now-live AssetManager onto the context so consumers reach it without a

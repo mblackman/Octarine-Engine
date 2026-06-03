@@ -317,10 +317,10 @@ bool Game::RunBakeValidation(const std::string& assetPath) {
   bakeCtx.config = &gameConfig;
   registry_->Set<EngineContext>(bakeCtx);
 
-  // Shared bootstrap spine. withSpriteRenderCache=false — bake runs no frames so the render
-  // cache slot is unused.
+  // Shared bootstrap spine. withFramePathCaches=false — bake runs no frames and no audio systems,
+  // so the SpriteRenderCache / AudioTrackCache slots are unused.
   engine_bootstrap::InstallCoreSingletons(*registry_, registry_->Get<EngineContext>(), gameConfig.windowWidth,
-                                          gameConfig.windowHeight, /*withSpriteRenderCache=*/false);
+                                          gameConfig.windowHeight, /*withFramePathCaches=*/false);
   engine_bootstrap::InstallPoolAndProjectile(*registry_);
   auto& inputSystem = engine_bootstrap::InstallInputSystem(*registry_, event_bus_);
   engine_bootstrap::RegisterAllComponentBindings();
@@ -455,10 +455,11 @@ void Game::Run() {
 void Game::Setup() {
   auto& gameConfig = registry_->Get<GameConfig>();
 
-  // Shared bootstrap spine (see engine_bootstrap/EngineBootstrap.h). withSpriteRenderCache=true
-  // — the live game loop reads the cache from the parallel sprite-render pass.
+  // Shared bootstrap spine (see engine_bootstrap/EngineBootstrap.h). withFramePathCaches=true —
+  // the live game loop reads SpriteRenderCache from the sprite-render pass and AudioTrackCache
+  // from the spatial/Doppler/culling audio systems.
   engine_bootstrap::InstallCoreSingletons(*registry_, registry_->Get<EngineContext>(), gameConfig.windowWidth,
-                                          gameConfig.windowHeight, /*withSpriteRenderCache=*/true);
+                                          gameConfig.windowHeight, /*withFramePathCaches=*/true);
 
   // ScriptSystem is registered as a per-frame system (vs. Bake's stack instance) so its
   // operator() runs each tick. CreateLuaBindings still happens below in the bootstrap spine.
@@ -572,7 +573,8 @@ void Game::Setup() {
   // Spatial audio: snapshot the listener entity (UpdateListenerTransformSystem) then mutate
   // gain + stereo pan on live spatial tracks (SpatialAudioSystem). Both must run AFTER
   // TransformSystem so emitter + listener globals are this-frame values; AudioSystem (above)
-  // is the one that creates the AudioSinkComponent's MIX_Track that these mutate.
+  // is the one that adds the AudioSinkComponent and caches its MIX_Track in AudioTrackCache,
+  // which these resolve per entity.
   registry_->Set<AudioListenerCache>(AudioListenerCache{});
   registry_->RegisterBulkSystem<GlobalTransformComponent>(UpdateListenerTransformSystem());
   // Phase 5 culling: pre-register the AudioActiveTag so its component entity exists

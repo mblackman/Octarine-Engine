@@ -34,11 +34,12 @@ void InstallLuaLibraries(sol::state& lua);
 
 // Set the engine-level Registry singletons that the startup script + Lua modules read at
 // install time: RenderQueue, CameraComponent (sized to the window), AssetManager,
-// ViewportInfo, and optionally SpriteRenderCache (live-frame path only — bake skips it
-// since no frames render). Also plumbs the freshly-Set AssetManager pointer onto the
-// EngineContext; other context fields must already be populated by the caller.
+// ViewportInfo, and — on the live-frame path only (withFramePathCaches; bake skips them since
+// no frames render and no audio systems run) — the entity-keyed backend-handle caches
+// SpriteRenderCache and AudioTrackCache. Also plumbs the freshly-Set AssetManager pointer onto
+// the EngineContext; other context fields must already be populated by the caller.
 void InstallCoreSingletons(Registry& registry, EngineContext& context, int windowWidth, int windowHeight,
-                           bool withSpriteRenderCache);
+                           bool withFramePathCaches);
 
 // EntityPoolManager + ProjectileEmitSystem. ProjectileEmitSystem::Init calls RegisterPool
 // against the EntityPoolManager, so EntityPoolManager must be Set first. Both bind Lua
