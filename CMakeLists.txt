@@ -149,10 +149,12 @@ if (OCTARINE_SHIPPED)
     message(STATUS "Octarine: SHIPPED build — asset catalog loads baked manifest (no scan)")
 endif ()
 
-# Vendored ImGui binding lib lives outside src/ so it stays untouched by the layer split. Only
-# meaningful when ImGui is on; pulled in PUBLIC by octarine_editor.
+# sol2 ImGui binding lib: consumed as a prebuilt, binary-cached vcpkg port
+# (vcpkg-overlay-ports/sol2-imgui-bindings) instead of an in-tree submodule + add_subdirectory, so
+# a clean build restores it from the vcpkg binary cache rather than recompiling the heavy generated
+# TUs. Only meaningful when ImGui is on; pulled in PUBLIC by octarine_editor.
 if (OCTARINE_WITH_IMGUI)
-    add_subdirectory(libs/sol2_ImGui_Bindings)
+    find_package(sol2_ImGui_Bindings CONFIG REQUIRED)
 endif ()
 
 # Standard compile flags + warnings, packaged as one helper so every static lib + the exe pick up

@@ -48,7 +48,7 @@ set(_OCTARINE_LICENSES_SKIP_REQUIRED
 #     features so this loop is a no-op — wired ahead of time to stay drift-free.
 #
 # Sets <OUT_VAR> in PARENT_SCOPE.
-function(_octarine_licenses_required_from_vcpkg OUT_VAR ENGINE_ROOT)
+function(_octarine_licenses_required_from_vcpkg OUT_VAR ENGINE_ROOT TRIPLET)
     set(_manifest "${ENGINE_ROOT}/vcpkg.json")
     if (NOT EXISTS "${_manifest}")
         message(FATAL_ERROR "octarine_collect_licenses: vcpkg.json not found at ${_manifest}; "
@@ -73,6 +73,11 @@ function(_octarine_licenses_required_from_vcpkg OUT_VAR ENGINE_ROOT)
             # triplet, so requiring its license here would falsely fail packaging on macOS /
             # Windows. Only the qualifiers this manifest actually uses are evaluated; an
             # unrecognized expression falls through as "required" (the safe default).
+            #
+            # linux/windows/osx are matched on CMAKE_SYSTEM_NAME (set at desktop configure time).
+            # android/!android are matched on the vcpkg TRIPLET instead: this aggregator also runs
+            # under `cmake -P scripts/run-licenses.cmake` (the Android/iOS path), where CMAKE_SYSTEM_NAME
+            # is not the target — but the triplet (e.g. arm64-android) always is.
             string(JSON _plat ERROR_VARIABLE _plat_err GET "${_manifest_json}" dependencies ${_i} platform)
             if (NOT _plat_err AND _plat)
                 set(_plat_matches TRUE)
@@ -81,6 +86,12 @@ function(_octarine_licenses_required_from_vcpkg OUT_VAR ENGINE_ROOT)
                 elseif (_plat STREQUAL "windows" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Windows")
                     set(_plat_matches FALSE)
                 elseif (_plat STREQUAL "osx" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+                    set(_plat_matches FALSE)
+                elseif (_plat STREQUAL "android" AND NOT TRIPLET MATCHES "android")
+                    set(_plat_matches FALSE)
+                elseif (_plat STREQUAL "!android" AND TRIPLET MATCHES "android")
+                    # sol2-imgui-bindings is excluded from Android (ImGui is forced off there), so
+                    # its license must not be required on the Android leg.
                     set(_plat_matches FALSE)
                 endif ()
                 if (NOT _plat_matches)
@@ -171,7 +182,7 @@ function(octarine_collect_licenses OUT_FILE)
         get_filename_component(OCL_ENGINE_ROOT "${_OCTARINE_LICENSES_SCRIPT_DIR}/.." ABSOLUTE)
     endif ()
     if (NOT OCL_REQUIRED_PORTS)
-        _octarine_licenses_required_from_vcpkg(OCL_REQUIRED_PORTS "${OCL_ENGINE_ROOT}")
+        _octarine_licenses_required_from_vcpkg(OCL_REQUIRED_PORTS "${OCL_ENGINE_ROOT}" "${OCL_TRIPLET}")
     endif ()
 
     if (NOT OCL_TRIPLET)
