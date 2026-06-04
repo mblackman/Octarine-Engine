@@ -488,7 +488,14 @@ overrides the stock `sol2` port. The NDK r28 clang (19.0.1) hits
 sol2 usertype member variables, failing the whole scripting surface. The
 overlay re-installs sol2 with the (optimization-only) `noexcept(…)` stripped
 from 10 call sites. One-time sol2 rebuild on first configure; nothing else
-changes. Desktop builds don't use the overlay.
+changes. This sol2 override is Android-only (it lives in
+`android/vcpkg-overlay-ports/sol2`); desktop builds don't apply it.
+
+Note this is separate from the top-level `vcpkg-overlay-ports/sol2-imgui-bindings`
+port, which *every* build (desktop included) pulls in via the `overlay-ports`
+entry in `vcpkg-configuration.json` — that's the engine's own sol2 ImGui bindings,
+consumed as a binary-cached vcpkg port pinned to a tagged release rather than an
+in-tree submodule.
 
 Do **not** toggle `SOL_NOEXCEPT_FUNCTION_TYPE=0` instead — desyncs sol2's
 traits from `__cpp_noexcept_function_type` and breaks differently.
