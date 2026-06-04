@@ -251,7 +251,9 @@ class CollisionSystem {
     }
   }
 
-  // NOLINTNEXTLINE(misc-no-recursion)
+  // Cognitive complexity is inherent to the two mirrored per-axis sweep branches; pre-existing and
+  // unchanged by the rename.
+  // NOLINTNEXTLINE(misc-no-recursion,readability-function-cognitive-complexity)
   void FindIntersectionsSweepBipartite(std::vector<Box>& boxes, const int begin1, const int end1, const int begin2,
                                        const int end2, const int dimension,
                                        std::vector<std::pair<Entity, Entity>>& pairs) {

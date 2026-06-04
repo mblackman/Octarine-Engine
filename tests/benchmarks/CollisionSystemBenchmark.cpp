@@ -45,8 +45,8 @@ struct CollisionCounter {
 // CollisionSystem builds its own query and ignores the Iterable argument, but the call signature
 // requires one. begin()/end() are never invoked, so throwing stubs are safe placeholders.
 Iterable MakeUnusedIterable() {
-  return Iterable([]() -> AnyIterator { throw std::logic_error("unused"); },
-                  []() -> AnyIterator { throw std::logic_error("unused"); });
+  return {[]() -> AnyIterator { throw std::logic_error("unused"); },
+          []() -> AnyIterator { throw std::logic_error("unused"); }};
 }
 
 // Two boxes overlap at the origin (guaranteeing >=1 collision per cycle, so every collect emits an

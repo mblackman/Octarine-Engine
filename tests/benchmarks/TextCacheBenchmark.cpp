@@ -19,23 +19,23 @@
 
 namespace {
 struct Label {
-  std::uint32_t entity;
+  std::uint32_t entity = 0;
   std::string fontId;
   std::string text;
-  std::uint32_t color;
+  std::uint32_t color = 0;
 };
 
 struct ContentEntry {
-  float width;
-  float height;
+  float width = 0.0F;
+  float height = 0.0F;
 };
 
 struct EntityEntry {
   std::string fontId;
   std::string text;
-  std::uint32_t color;
-  float width;
-  float height;
+  std::uint32_t color = 0;
+  float width = 0.0F;
+  float height = 0.0F;
 };
 
 // Representative UI labels: a shared font id and short, distinct strings (the realistic "Score:

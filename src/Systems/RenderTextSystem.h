@@ -69,41 +69,11 @@ class RenderTextSystem {
     const bool needsRaster = it == text_cache_.end() || it->second.color != packedColor ||
                              it->second.fontId != text.fontId || it->second.text != text.text;
     if (needsRaster) {
-      // text.color is now octarine::Color (Stage 2 POD-no-SDL). Convert to SDL_Color once at the
-      // render seam — both the atlas fast path and the TTF fallback take it.
-      const SDL_Color sdlColor{text.color.r, text.color.g, text.color.b, text.color.a};
-      // Atlas fast path: when every codepoint in the string is resident in the font's GlyphAtlas,
-      // compose the destination surface by blitting from the atlas. Falls back to
-      // TTF_RenderText_Blended when no atlas is baked or the string hits an uncovered glyph
-      // (extended Latin, emoji, etc.).
-      SDL_Surface* surface = nullptr;
-      const GlyphAtlas* atlas = assetManager.GetGlyphAtlas(text.fontId);
-      if (atlas != nullptr && atlas->IsLoaded()) {
-        surface = ComposeFromAtlas(*atlas, text.text, sdlColor);
-      }
-      if (surface == nullptr) {
-        surface = TTF_RenderText_Blended(font, text.text.c_str(), 0, sdlColor);
-      }
-      if (!surface) {
-        Logger::Error("RenderText: surface compose failed: " + std::string(SDL_GetError()));
-        return;
-      }
-      SDL_Texture* texture = SDL_CreateTextureFromSurface(sdlRenderer, surface);
-      SDL_DestroySurface(surface);
-      if (!texture) {
-        Logger::Error("SDL_CreateTextureFromSurface failed: " + std::string(SDL_GetError()));
-        return;
-      }
       float w = 0;
       float h = 0;
-      SDL_GetTextureSize(texture, &w, &h);
-      if (it != text_cache_.end()) {
-        if (it->second.texture != nullptr) SDL_DestroyTexture(it->second.texture);
-        it->second = {text.fontId, text.text, packedColor, texture, w, h};
-      } else {
-        it = text_cache_.emplace(entity.GetId(), TextCacheEntry{text.fontId, text.text, packedColor, texture, w, h})
-                 .first;
-      }
+      SDL_Texture* texture = RasterizeLabel(assetManager, sdlRenderer, font, text, w, h);
+      if (texture == nullptr) return;
+      it = StoreEntry(it, entity, text, packedColor, texture, w, h);
     }
 
     glm::vec2 origin = text.position;
@@ -152,6 +122,55 @@ class RenderTextSystem {
   // fine for typical UI label counts. Entries for despawned text entities persist until the system
   // is destroyed (its destructor frees every cached texture).
   mutable std::unordered_map<EcsId, TextCacheEntry> text_cache_;
+
+  // Store the freshly rasterized texture as this entity's cache entry, freeing any texture it was
+  // previously holding, and return the iterator to the live entry. `it` is this entity's current
+  // slot (text_cache_.end() if it had none).
+  std::unordered_map<EcsId, TextCacheEntry>::iterator StoreEntry(std::unordered_map<EcsId, TextCacheEntry>::iterator it,
+                                                                 Entity entity, const TextLabelComponent& text,
+                                                                 Uint32 color, SDL_Texture* texture, float width,
+                                                                 float height) const {
+    if (it != text_cache_.end()) {
+      if (it->second.texture != nullptr) SDL_DestroyTexture(it->second.texture);
+      it->second = {text.fontId, text.text, color, texture, width, height};
+      return it;
+    }
+    return text_cache_.emplace(entity.GetId(), TextCacheEntry{text.fontId, text.text, color, texture, width, height})
+        .first;
+  }
+
+  // Rasterize `text` to a freshly created SDL_Texture, writing its size into outW/outH. text.color
+  // is octarine::Color (Stage 2 POD-no-SDL); convert to SDL_Color once here at the render seam. The
+  // atlas fast path composes the surface by blitting resident glyphs from the font's GlyphAtlas and
+  // falls back to TTF_RenderText_Blended when no atlas is baked or the string hits an uncovered
+  // glyph (extended Latin, emoji, etc.). Returns nullptr (and logs) on failure; the caller owns the
+  // returned texture.
+  static SDL_Texture* RasterizeLabel(const AssetManager& assetManager, SDL_Renderer* sdlRenderer, TTF_Font* font,
+                                     const TextLabelComponent& text, float& outW, float& outH) {
+    const SDL_Color sdlColor{text.color.r, text.color.g, text.color.b, text.color.a};
+    SDL_Surface* surface = nullptr;
+    const GlyphAtlas* atlas = assetManager.GetGlyphAtlas(text.fontId);
+    if (atlas != nullptr && atlas->IsLoaded()) {
+      surface = ComposeFromAtlas(*atlas, text.text, sdlColor);
+    }
+    if (surface == nullptr) {
+      surface = TTF_RenderText_Blended(font, text.text.c_str(), 0, sdlColor);
+    }
+    if (surface == nullptr) {
+      Logger::Error("RenderText: surface compose failed: " + std::string(SDL_GetError()));
+      return nullptr;
+    }
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(sdlRenderer, surface);
+    SDL_DestroySurface(surface);
+    if (texture == nullptr) {
+      Logger::Error("SDL_CreateTextureFromSurface failed: " + std::string(SDL_GetError()));
+      return nullptr;
+    }
+    outW = 0;
+    outH = 0;
+    SDL_GetTextureSize(texture, &outW, &outH);
+    return texture;
+  }
 
   // Atlas compose: build an RGBA destination surface, blit each codepoint's rect from the atlas
   // into it, color-mod the source surface to tint the white-rasterized atlas glyphs to the
