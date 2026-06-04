@@ -82,6 +82,12 @@ function(_octarine_licenses_required_from_vcpkg OUT_VAR ENGINE_ROOT)
                     set(_plat_matches FALSE)
                 elseif (_plat STREQUAL "osx" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
                     set(_plat_matches FALSE)
+                elseif (_plat STREQUAL "android" AND NOT CMAKE_SYSTEM_NAME STREQUAL "Android")
+                    set(_plat_matches FALSE)
+                elseif (_plat STREQUAL "!android" AND CMAKE_SYSTEM_NAME STREQUAL "Android")
+                    # sol2-imgui-bindings is excluded from Android (ImGui is forced off there), so
+                    # its license must not be required on the Android leg.
+                    set(_plat_matches FALSE)
                 endif ()
                 if (NOT _plat_matches)
                     continue()

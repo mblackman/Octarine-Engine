@@ -1,0 +1,25 @@
+{
+  "name": "sol2-imgui-bindings",
+  "version": "1.92.7",
+  "description": "sol2 Lua bindings for Dear ImGui, generated from ImGui metadata.",
+  "homepage": "https://github.com/mblackman/sol2_ImGui_Bindings",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "imgui",
+      "features": [
+        "docking-experimental"
+      ]
+    },
+    "sol2",
+    "lua",
+    {
+      "name": "vcpkg-cmake",
+      "host": true
+    },
+    {
+      "name": "vcpkg-cmake-config",
+      "host": true
+    }
+  ]
+}

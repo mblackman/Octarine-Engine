@@ -198,7 +198,7 @@ if (OCTARINE_WITH_IMGUI OR OCTARINE_WITH_EDITOR)
             octarine_systems
     )
     if (OCTARINE_WITH_IMGUI)
-        target_link_libraries(octarine_editor PUBLIC imgui::imgui sol2_ImGui_Bindings)
+        target_link_libraries(octarine_editor PUBLIC imgui::imgui sol2_ImGui_Bindings::sol2_ImGui_Bindings)
     endif ()
     # SecretStore backend libs. Crypt32 ships DPAPI's CryptProtectData/CryptUnprotectData on
     # Windows; Security.framework ships SecItem* on macOS. Linux backend is a stub and needs no
