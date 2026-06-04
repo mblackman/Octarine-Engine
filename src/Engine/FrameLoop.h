@@ -4,6 +4,7 @@
 
 #include <memory>
 #include <sol/sol.hpp>
+#include <string>
 
 #include "Components/BoxColliderComponent.h"
 #include "Components/GlobalTransformComponent.h"
@@ -67,4 +68,16 @@ class FrameLoop {
   Uint64 milliseconds_previous_frame_ = 0;
   std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent>> collider_query_;
   EventBus::SubscriptionHandle key_input_subscription_;
+
+#ifndef OCTARINE_SHIPPED
+  // Headless frame-capture (env-driven, dev/bench only). When OCTARINE_CAPTURE_PATH is set, the
+  // loop renders up to OCTARINE_CAPTURE_FRAME (default 180 ≈ 3s @60fps, past the stress warmup),
+  // writes that frame's scene texture to the path as BMP, then quits. Lets a headless run produce
+  // a viewable rendered frame.
+  static constexpr long kDefaultCaptureFrame = 180;  // ≈3s @60fps, past the stress warmup
+  std::string capture_path_;
+  long capture_frame_ = kDefaultCaptureFrame;
+  long frame_index_ = 0;
+  bool capture_done_ = false;
+#endif
 };

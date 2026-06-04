@@ -4,6 +4,7 @@
 #include <SDL3_mixer/SDL_mixer.h>
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "Components/ViewportInfo.h"
 #include "ECS/Registry.h"
@@ -16,6 +17,7 @@
 #include "Game/Game.h"
 #include "Game/GameConfig.h"
 #include "General/Constants.h"
+#include "General/Logger.h"
 #include "General/PerfUtils.h"
 #include "Lua/HotReload/ScriptHotReload.h"
 #include "Renderer/RenderQueue.h"
@@ -33,11 +35,40 @@
 #include "imgui_impl_sdl3.h"
 #endif
 
+#ifndef OCTARINE_SHIPPED
+namespace {
+// Portable env read. MSVC deprecates std::getenv (C4996) and the build treats warnings as errors,
+// so use _dupenv_s there — mirrors the split in Lua/LuaApiManifest.cpp. Returns "" when unset.
+std::string GetEnvVar(const char* name) {
+#ifdef _MSC_VER
+  char* value = nullptr;
+  size_t len = 0;
+  const bool ok = _dupenv_s(&value, &len, name) == 0 && value != nullptr;
+  const std::string result = ok ? std::string(value) : std::string();
+  free(value);
+  return result;
+#else
+  const char* value = std::getenv(name);
+  return value ? std::string(value) : std::string();
+#endif
+}
+}  // namespace
+#endif
+
 FrameLoop::FrameLoop(Game* game, Registry* registry, EventBus* eventBus, Renderer* renderer, EngineRuntime* runtime,
                      sol::state& lua)
     : game_(game), registry_(registry), event_bus_(eventBus), renderer_(renderer), runtime_(runtime), lua_(lua) {
   // Pre-build the debug-collider query once so we don't allocate per render frame.
   collider_query_ = registry_->CreateQuery<GlobalTransformComponent, BoxColliderComponent>();
+
+#ifndef OCTARINE_SHIPPED
+  if (const std::string path = GetEnvVar("OCTARINE_CAPTURE_PATH"); !path.empty()) {
+    capture_path_ = path;
+    if (const std::string frame = GetEnvVar("OCTARINE_CAPTURE_FRAME"); !frame.empty()) {
+      capture_frame_ = std::stol(frame);
+    }
+  }
+#endif
 }
 
 void FrameLoop::SubscribeToEvents() {
@@ -226,6 +257,20 @@ void FrameLoop::Render([[maybe_unused]] const float deltaTime) {
   // alongside TIMER lines. All systems for this frame have already written their values.
   PROFILE_COUNTERS_REPORT();
   renderQueue.Clear();
+
+#ifndef OCTARINE_SHIPPED
+  // Headless capture: once the target frame is reached, write the rendered scene to disk and quit.
+  if (!capture_path_.empty() && !capture_done_) {
+    if (frame_index_ >= capture_frame_) {
+      if (renderer_->CaptureScene(runtime_->SdlRenderer(), capture_path_)) {
+        Logger::Info("FrameLoop: captured frame " + std::to_string(frame_index_) + " to " + capture_path_);
+      }
+      capture_done_ = true;
+      Game::Quit();
+    }
+    ++frame_index_;
+  }
+#endif
 }
 
 float FrameLoop::WaitTime() {
