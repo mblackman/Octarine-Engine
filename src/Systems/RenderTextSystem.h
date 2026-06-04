@@ -16,6 +16,7 @@
 #include "Components/CameraComponents.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/TextLabelComponent.h"
+#include "ECS/Entity.h"
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
@@ -58,10 +59,16 @@ class RenderTextSystem {
 
     const auto packedColor = static_cast<Uint32>(text.color.r) << 24 | static_cast<Uint32>(text.color.g) << 16 |
                              static_cast<Uint32>(text.color.b) << 8 | static_cast<Uint32>(text.color.a);
-    const std::string cacheKey = text.fontId + "|" + text.text + "|" + std::to_string(packedColor);
 
-    auto it = text_cache_.find(cacheKey);
-    if (it == text_cache_.end()) {
+    // Entity-keyed cache (mirrors Renderer/SpriteRenderCache): one rasterized texture per text
+    // entity, re-rasterized only when its (fontId, text, color) changes. Steady-state lookups do
+    // no heap allocation, and a label that updates every frame (score/timer) frees its old texture
+    // instead of leaking a fresh one per frame.
+    const Entity entity = ctx.GetEntity();
+    auto it = text_cache_.find(entity.GetId());
+    const bool needsRaster = it == text_cache_.end() || it->second.color != packedColor ||
+                             it->second.fontId != text.fontId || it->second.text != text.text;
+    if (needsRaster) {
       // text.color is now octarine::Color (Stage 2 POD-no-SDL). Convert to SDL_Color once at the
       // render seam — both the atlas fast path and the TTF fallback take it.
       const SDL_Color sdlColor{text.color.r, text.color.g, text.color.b, text.color.a};
@@ -90,10 +97,15 @@ class RenderTextSystem {
       float w = 0;
       float h = 0;
       SDL_GetTextureSize(texture, &w, &h);
-      it = text_cache_.emplace(cacheKey, TextCacheEntry{texture, w, h}).first;
+      if (it != text_cache_.end()) {
+        if (it->second.texture != nullptr) SDL_DestroyTexture(it->second.texture);
+        it->second = {text.fontId, text.text, packedColor, texture, w, h};
+      } else {
+        it = text_cache_.emplace(entity.GetId(), TextCacheEntry{text.fontId, text.text, packedColor, texture, w, h})
+                 .first;
+      }
     }
 
-    const Entity entity = ctx.GetEntity();
     glm::vec2 origin = text.position;
     if (registry->HasComponent<GlobalTransformComponent>(entity)) {
       const auto& transform = registry->GetComponent<GlobalTransformComponent>(entity);
@@ -126,14 +138,20 @@ class RenderTextSystem {
 
  private:
   struct TextCacheEntry {
-    SDL_Texture* texture;
-    float width;
-    float height;
+    std::string fontId;
+    std::string text;
+    Uint32 color = 0;
+    SDL_Texture* texture = nullptr;
+    float width = 0.0F;
+    float height = 0.0F;
   };
 
-  // (fontId|text|packedColor) → cached SDL_Texture. Avoids re-rasterizing every frame.
-  // Invalidated wholesale on system destruction; no per-entry eviction yet.
-  mutable std::unordered_map<std::string, TextCacheEntry> text_cache_;
+  // Entity → last-rasterized label. Re-rasterized only when (fontId, text, color) changes, so a
+  // label that updates every frame holds a single texture rather than leaking one per frame. Two
+  // entities with identical text no longer share a texture (entity-keyed, not content-keyed) —
+  // fine for typical UI label counts. Entries for despawned text entities persist until the system
+  // is destroyed (its destructor frees every cached texture).
+  mutable std::unordered_map<EcsId, TextCacheEntry> text_cache_;
 
   // Atlas compose: build an RGBA destination surface, blit each codepoint's rect from the atlas
   // into it, color-mod the source surface to tint the white-rasterized atlas glyphs to the
