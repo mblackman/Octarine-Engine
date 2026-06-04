@@ -308,6 +308,8 @@ if (OCTARINE_ENABLE_BENCHMARKS)
     add_executable(OctarineBenchmarks
             tests/benchmarks/EntityPoolBenchmark.cpp
             tests/benchmarks/SpatialAudioBenchmark.cpp
+            tests/benchmarks/CollisionSystemBenchmark.cpp
+            tests/benchmarks/TextCacheBenchmark.cpp
     )
     set_target_properties(OctarineBenchmarks PROPERTIES
             CXX_STANDARD 20
