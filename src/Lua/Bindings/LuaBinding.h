@@ -56,15 +56,15 @@ inline sol::optional<sol::table> SafeGetOptionalTable(const sol::table& dataTabl
 //   static void bindUsertype(sol::state& lua);     // call lua.new_usertype<T>(kUsertypeName, ...);
 //
 // bindUsertype may include both fields and member functions in the new_usertype call,
-// e.g.  "damage", &HealthComponent::damage  alongside  "max_health", &T::maxHealth.
+// e.g.  "damage", &HealthComponent::Damage  alongside  "max_health", &T::maxHealth.
 //
 // Component-method hard rule: a component method may read/write the component's own fields
 // ONLY. No Registry&, no EventBus*, no cross-entity reads/writes, no archetype mutation, no
 // allocation, no event emission. Anything crossing those lines belongs in a system. The
 // moment a method needs side effects beyond its own fields, move it out.
 //
-// For derived read-only state (isDead, fraction), bind with sol::property so scripts get
-// field-style access:  "is_dead", sol::property(&T::isDead).
+// For derived read-only state (IsDead, Fraction), bind with sol::property so scripts get
+// field-style access:  "is_dead", sol::property(&T::IsDead).
 // For fields with invariants (currentHealth clamped to [0, maxHealth]), bind with
 // sol::property + a clamping setter so Lua can't bypass via direct field assignment.
 template <typename T>

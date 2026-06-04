@@ -191,10 +191,10 @@ the `bindUsertype` call exposes both fields and **member functions** to scripts:
 ```cpp
 lua.new_usertype<HealthComponent>(kUsertypeName,
     "max_health", &HealthComponent::maxHealth,
-    "damage",     &HealthComponent::damage,   // member function
-    "heal",       &HealthComponent::heal,
-    "is_dead",    sol::property(&HealthComponent::isDead),   // derived read-only
-    "fraction",   sol::property(&HealthComponent::fraction));
+    "damage",     &HealthComponent::Damage,   // member function
+    "heal",       &HealthComponent::Heal,
+    "is_dead",    sol::property(&HealthComponent::IsDead),   // derived read-only
+    "fraction",   sol::property(&HealthComponent::Fraction));
 ```
 
 ### Hard rule
