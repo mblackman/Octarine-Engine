@@ -232,3 +232,12 @@ Open a GitHub issue. For bugs, include:
 
 For feature proposals, describe the problem before the solution — the
 solution space is often wider than it looks.
+
+## License
+
+Octarine Engine is released under the [MIT License](LICENSE). By submitting a
+contribution (pull request, patch, or any other form), you agree that your
+contribution is licensed under the same MIT License that covers the project,
+and that you have the right to license it under those terms. This keeps the
+project unambiguously MIT-licensed for everyone downstream — no separate CLA
+to sign.
