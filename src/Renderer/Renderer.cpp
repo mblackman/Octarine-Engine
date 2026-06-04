@@ -48,6 +48,31 @@ void Renderer::CompositeSceneToWindow(SDL_Renderer* sdlRenderer) const {
 
 void Renderer::Present(SDL_Renderer* sdlRenderer) const { SDL_RenderPresent(sdlRenderer); }
 
+#ifndef OCTARINE_SHIPPED
+bool Renderer::CaptureScene(SDL_Renderer* sdlRenderer, const std::string& path) const {
+  if (scene_texture_ == nullptr) {
+    Logger::Error("Renderer::CaptureScene: no scene texture to capture");
+    return false;
+  }
+  // Read back from the scene target (the off-screen texture the frame was drawn into). In bench
+  // mode the window backbuffer is never composited, so the scene texture is the only place the
+  // rendered frame lives.
+  SDL_SetRenderTarget(sdlRenderer, scene_texture_);
+  SDL_Surface* surface = SDL_RenderReadPixels(sdlRenderer, nullptr);
+  SDL_SetRenderTarget(sdlRenderer, nullptr);
+  if (surface == nullptr) {
+    Logger::Error("Renderer::CaptureScene SDL_RenderReadPixels failed: " + std::string(SDL_GetError()));
+    return false;
+  }
+  const bool ok = SDL_SaveBMP(surface, path.c_str());
+  if (!ok) {
+    Logger::Error("Renderer::CaptureScene SDL_SaveBMP failed: " + std::string(SDL_GetError()));
+  }
+  SDL_DestroySurface(surface);
+  return ok;
+}
+#endif
+
 void Renderer::DrawQueue(const RenderQueue& renderQueue, SDL_Renderer* renderer) const {
   for (const RenderKey& key : renderQueue) {
     switch (key.type) {
