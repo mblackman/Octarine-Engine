@@ -10,7 +10,7 @@ constexpr unsigned int kEntityGenerationOffset = 32;
 
 // Used to determine which
 typedef std::bitset<kMaxEntityMasks> EntityMask;
-typedef std::uint16_t EntityGeneration;
+typedef std::uint32_t EntityGeneration;
 
 struct Entity {
   EntityID id;
@@ -20,8 +20,8 @@ struct Entity {
   explicit Entity(const EcsId t_id) : id(t_id) {}
 
   [[nodiscard]] std::uint32_t GetId() const { return static_cast<std::uint32_t>(id); }
-  [[nodiscard]] std::uint16_t GetGeneration() const {
-    return static_cast<std::uint16_t>(id >> kEntityGenerationOffset);
+  [[nodiscard]] EntityGeneration GetGeneration() const {
+    return static_cast<EntityGeneration>(id >> kEntityGenerationOffset);
   }
 
   bool operator==(const Entity& other) const { return id == other.id; }
@@ -39,7 +39,10 @@ struct Entity {
   explicit operator EntityID() const { return id; }
 };
 
-// TODO need to handle recycling entity generations
+// Recycled slots are disambiguated by a per-slot generation counter packed into the high bits of
+// the EntityID: BlamEntity bumps it on free, IsValid compares it, so a stale handle to a reused
+// slot fails validation. The generation is 32-bit, so a single slot would have to be recycled
+// 2^32 times before the counter wraps and could alias a live handle.
 class EntityManager {
  public:
   EntityManager() : living_entity_count_(kStartingEntityPoolSize) {
