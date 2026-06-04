@@ -4,6 +4,7 @@
 #include <chrono>
 #include <cmath>
 #include <future>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -17,6 +18,7 @@
 #include "EventBus/EventBus.h"
 #include "Events/CollisionEvent.h"
 #include "General/PerfUtils.h"
+#include "General/ThreadPool.h"
 
 constexpr int kMaxDimensions = 2;
 // These values can be tuned for better performance.
@@ -163,7 +165,7 @@ class CollisionSystem {
       return;
     }
 
-    collisionResult_ = start_async_collision_detection(std::move(boxes));
+    collisionResult_ = StartAsyncCollisionDetection(std::move(boxes));
   }
 
  private:
@@ -171,20 +173,26 @@ class CollisionSystem {
   std::future<CollisionResult> collisionResult_;
   std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent>> query_;
 
-  std::future<CollisionResult> start_async_collision_detection(std::vector<Box> boxes) {
-    return std::async(std::launch::async, [boxes = std::move(boxes), this]() mutable -> CollisionResult {
+  std::future<CollisionResult> StartAsyncCollisionDetection(std::vector<Box> boxes) {
+    // Run on the persistent worker pool rather than std::async(launch::async), which spawns and
+    // tears down an OS thread per cycle. The promise is shared because ThreadPool::Submit takes a
+    // copyable std::function; the future hands back to the same valid()/wait_for/get polling below.
+    auto promise = std::make_shared<std::promise<CollisionResult>>();
+    std::future<CollisionResult> result = promise->get_future();
+    ThreadPool::Instance().Submit([boxes = std::move(boxes), promise, this]() mutable {
       AGGREGATE_PROFILE_SESSION("Async Box Creation");
       std::vector<std::pair<Entity, Entity>> intersectingPairs;
 
       if (!boxes.empty()) {
-        find_intersections_recursive(boxes, 0, static_cast<int>(boxes.size()), 0, 0, intersectingPairs);
+        FindIntersectionsRecursive(boxes, 0, static_cast<int>(boxes.size()), 0, 0, intersectingPairs);
       }
-      return CollisionResult{std::move(intersectingPairs), std::move(boxes)};
+      promise->set_value(CollisionResult{std::move(intersectingPairs), std::move(boxes)});
     });
+    return result;
   }
 
-  void find_intersections_brute_force(const std::vector<Box>& boxes, const int begin, const int end,
-                                      std::vector<std::pair<Entity, Entity>>& intersectingPairs) const {
+  void FindIntersectionsBruteForce(const std::vector<Box>& boxes, const int begin, const int end,
+                                   std::vector<std::pair<Entity, Entity>>& intersectingPairs) const {
     ACCUMULATE_PROFILE_SCOPE("Brute Force Intersection");
 
     for (int i = begin; i < end; ++i) {
@@ -198,8 +206,8 @@ class CollisionSystem {
     }
   }
 
-  [[nodiscard]] Partitions partition_boxes(std::vector<Box>& boxes, const int begin, const int end, const int dimension,
-                                           const float medianValue) const {
+  [[nodiscard]] Partitions PartitionBoxes(std::vector<Box>& boxes, const int begin, const int end, const int dimension,
+                                          const float medianValue) const {
     ACCUMULATE_PROFILE_SCOPE("Partition Boxes");
     const auto first = boxes.begin() + begin;
     const auto last = boxes.begin() + end;
@@ -229,9 +237,8 @@ class CollisionSystem {
     return Partitions{leftEnd, rightStart};
   }
 
-  void find_intersections_brute_force_bipartite(std::vector<Box>& boxes, const int begin1, const int end1,
-                                                const int begin2, const int end2,
-                                                std::vector<std::pair<Entity, Entity>>& pairs) const {
+  void FindIntersectionsBruteForceBipartite(std::vector<Box>& boxes, const int begin1, const int end1, const int begin2,
+                                            const int end2, std::vector<std::pair<Entity, Entity>>& pairs) const {
     ACCUMULATE_PROFILE_SCOPE("Brute Force Bipartite");
     for (int i = begin1; i < end1; ++i) {
       for (int j = begin2; j < end2; ++j) {
@@ -244,16 +251,18 @@ class CollisionSystem {
     }
   }
 
-  // NOLINTNEXTLINE(misc-no-recursion)
-  void find_intersections_sweep_bipartite(std::vector<Box>& boxes, const int begin1, const int end1, const int begin2,
-                                          const int end2, const int dimension,
-                                          std::vector<std::pair<Entity, Entity>>& pairs) {
+  // Cognitive complexity is inherent to the two mirrored per-axis sweep branches; pre-existing and
+  // unchanged by the rename.
+  // NOLINTNEXTLINE(misc-no-recursion,readability-function-cognitive-complexity)
+  void FindIntersectionsSweepBipartite(std::vector<Box>& boxes, const int begin1, const int end1, const int begin2,
+                                       const int end2, const int dimension,
+                                       std::vector<std::pair<Entity, Entity>>& pairs) {
     ACCUMULATE_PROFILE_SCOPE("Sweep Bipartite");
 
     if (end1 - begin1 == 0 || end2 - begin2 == 0) return;
 
     if ((end1 - begin1) * (end2 - begin2) <= kBruteforceCutoff * kBruteforceCutoff) {
-      find_intersections_brute_force_bipartite(boxes, begin1, end1, begin2, end2, pairs);
+      FindIntersectionsBruteForceBipartite(boxes, begin1, end1, begin2, end2, pairs);
       return;
     }
 
@@ -262,11 +271,11 @@ class CollisionSystem {
                 [](const Box& a, const Box& b) { return a.minX < b.minX; });
       std::sort(boxes.begin() + begin2, boxes.begin() + end2,
                 [](const Box& a, const Box& b) { return a.minX < b.minX; });
-      int start_j = begin2;
+      int startJ = begin2;
       for (int i = begin1; i < end1; ++i) {
         const Box& a = boxes[static_cast<size_t>(i)];
-        while (start_j < end2 && boxes[static_cast<size_t>(start_j)].maxX < a.minX) ++start_j;
-        for (int j = start_j; j < end2; ++j) {
+        while (startJ < end2 && boxes[static_cast<size_t>(startJ)].maxX < a.minX) ++startJ;
+        for (int j = startJ; j < end2; ++j) {
           const Box& b = boxes[static_cast<size_t>(j)];
           if (b.minX > a.maxX) break;
           if (a.intersects(b)) pairs.emplace_back(a.entity, b.entity);
@@ -277,11 +286,11 @@ class CollisionSystem {
                 [](const Box& a, const Box& b) { return a.minY < b.minY; });
       std::sort(boxes.begin() + begin2, boxes.begin() + end2,
                 [](const Box& a, const Box& b) { return a.minY < b.minY; });
-      int start_j = begin2;
+      int startJ = begin2;
       for (int i = begin1; i < end1; ++i) {
         const Box& a = boxes[static_cast<size_t>(i)];
-        while (start_j < end2 && boxes[static_cast<size_t>(start_j)].maxY < a.minY) ++start_j;
-        for (int j = start_j; j < end2; ++j) {
+        while (startJ < end2 && boxes[static_cast<size_t>(startJ)].maxY < a.minY) ++startJ;
+        for (int j = startJ; j < end2; ++j) {
           const Box& b = boxes[static_cast<size_t>(j)];
           if (b.minY > a.maxY) break;
           if (a.intersects(b)) pairs.emplace_back(a.entity, b.entity);
@@ -291,8 +300,8 @@ class CollisionSystem {
   }
 
   // NOLINTNEXTLINE(misc-no-recursion)
-  void find_intersections_recursive(std::vector<Box>& boxes, const int begin, const int end, int dimension,
-                                    const int depth, std::vector<std::pair<Entity, Entity>>& intersectingPairs) {
+  void FindIntersectionsRecursive(std::vector<Box>& boxes, const int begin, const int end, int dimension,
+                                  const int depth, std::vector<std::pair<Entity, Entity>>& intersectingPairs) {
     const int count = end - begin;
     if (count <= 1) {
       return;
@@ -300,7 +309,7 @@ class CollisionSystem {
 
     if (count < kBruteforceCutoff || depth >= kMaxRecursionDepth) {
       // Perform a simple brute-force check for remaining boxes in this subproblem
-      find_intersections_brute_force(boxes, begin, end, intersectingPairs);
+      FindIntersectionsBruteForce(boxes, begin, end, intersectingPairs);
       return;
     }
 
@@ -316,18 +325,18 @@ class CollisionSystem {
                          : (boxes[static_cast<size_t>(mid)].minY + boxes[static_cast<size_t>(mid)].maxY) / 2.0f;
 
     // Divide boxes into sub-partitions: left, right, and spanning the median.
-    const auto [leftEnd, rightStart] = partition_boxes(boxes, begin, end, dimension, medianValue);
+    const auto [leftEnd, rightStart] = PartitionBoxes(boxes, begin, end, dimension, medianValue);
 
     // Recurse for intersections within left and right partitions (same dimension, narrower range)
-    find_intersections_recursive(boxes, begin, leftEnd, dimension, depth + 1, intersectingPairs);
-    find_intersections_recursive(boxes, rightStart, end, dimension, depth + 1, intersectingPairs);
+    FindIntersectionsRecursive(boxes, begin, leftEnd, dimension, depth + 1, intersectingPairs);
+    FindIntersectionsRecursive(boxes, rightStart, end, dimension, depth + 1, intersectingPairs);
 
     // Recurse for intersections within the spanning boxes (next dimension)
     const int nextDimension = (dimension + 1) % kMaxDimensions;
-    find_intersections_recursive(boxes, leftEnd, rightStart, nextDimension, depth + 1, intersectingPairs);
+    FindIntersectionsRecursive(boxes, leftEnd, rightStart, nextDimension, depth + 1, intersectingPairs);
 
     // Find intersections between spanning boxes and non-spanning boxes at the current level.
-    find_intersections_sweep_bipartite(boxes, begin, leftEnd, leftEnd, rightStart, dimension, intersectingPairs);
-    find_intersections_sweep_bipartite(boxes, leftEnd, rightStart, rightStart, end, dimension, intersectingPairs);
+    FindIntersectionsSweepBipartite(boxes, begin, leftEnd, leftEnd, rightStart, dimension, intersectingPairs);
+    FindIntersectionsSweepBipartite(boxes, leftEnd, rightStart, rightStart, end, dimension, intersectingPairs);
   }
 };
