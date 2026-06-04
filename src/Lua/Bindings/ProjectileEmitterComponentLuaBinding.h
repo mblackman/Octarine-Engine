@@ -15,7 +15,10 @@ struct LuaBinding<ProjectileEmitterComponent> {
     const auto t = data.as<sol::table>();
     using namespace LuaComponentHelpers;
     const glm::vec2 projectileVelocity = SafeGetVec2(t, "projectile_velocity");
-    const auto repeatFrequency = SafeGetOptionalValue<float>(t, "repeat_frequency", 1.0f);
+    // repeat_frequency drives the engine ProjectileEmitSystem auto-fire tick (interval in seconds).
+    // Defaults to 0 == no auto-fire, so an emitter only auto-fires when a scene opts in with a
+    // positive value; omitting it leaves firing to manual fire_projectile / scripted logic.
+    const auto repeatFrequency = SafeGetOptionalValue<float>(t, "repeat_frequency", 0.0f);
     const auto projectileDuration = SafeGetOptionalValue<float>(t, "projectile_duration", 1.0f);
     const int projectileDamage = SafeGetOptionalValue<int>(t, "hit_damage", 10);
     const auto collisionMask = SafeGetOptionalValue<int>(t, "collision_mask", Constants::kDefaultEntityMask);
