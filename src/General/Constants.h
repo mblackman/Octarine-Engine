@@ -14,6 +14,12 @@ static constexpr int kDefaultEntityMask = 1;
 
 static constexpr size_t kSystemCommandBufferSize = 1024;
 
+// Below this collision-pair count, the collision-response classify pass (DamageSystem /
+// ObstacleBounceSystem) runs serially. ThreadPool dispatch overhead outweighs the per-pair tag
+// classification until a few thousand pairs; realistic scenes (~hundreds of pairs) stay serial,
+// while pathological density (tens of thousands) takes the parallel path. Tunable.
+static constexpr size_t kCollisionResponseParallelThreshold = 2048;
+
 // Sized to comfortably hold a frame's worth of render keys per parallel render system without
 // hitting Channel<RenderKey>::overflow_buffer (which serializes on a mutex).
 static constexpr size_t kRenderCommandBufferSize = 256 * 1024;

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "Components/RigidBodyComponent.h"
 #include "Components/SpriteComponent.h"
@@ -8,7 +9,9 @@
 #include "ECS/Registry.h"
 #include "EventBus/EventBus.h"
 #include "Events/CollisionBatchEvent.h"
+#include "General/Constants.h"
 #include "General/SpriteFlip.h"
+#include "Systems/CollisionResponseParallel.h"
 
 class ObstacleBounceSystem {
  public:
@@ -20,16 +23,24 @@ class ObstacleBounceSystem {
         this, &ObstacleBounceSystem::OnCollisionBatch);
   }
 
-  // Process the whole frame's collision pairs in one call (W2.3); per-pair logic unchanged.
+  // Process the whole frame's collision pairs (W2.3), parallelising the per-pair tag classification
+  // above a density threshold. classify does registry reads only; the velocity/sprite flips run
+  // serially in apply(). See CollisionResponseParallel.h.
   void OnCollisionBatch(const CollisionBatchEvent& event) {
-    for (const auto& [a, b] : event.pairs) {
-      if (registry_->HasTag(a, enemies_) && registry_->HasTag(b, obstacles_)) {
-        OnObstacleCollision(a);
-      }
-      if (registry_->HasTag(b, enemies_) && registry_->HasTag(a, obstacles_)) {
-        OnObstacleCollision(b);
-      }
-    }
+    RunCollisionResponse<Entity>(
+        event.pairs, Constants::kCollisionResponseParallelThreshold,
+        // Record EVERY bounce occurrence — do NOT dedup. OnObstacleCollision flips velocity each
+        // call, so an enemy overlapping two obstacles must flip twice (net no-op) to match the
+        // serial behaviour; deduping here would silently change the outcome.
+        [this](const Entity a, const Entity b, std::vector<Entity>& sink) {
+          if (registry_->HasTag(a, enemies_) && registry_->HasTag(b, obstacles_)) {
+            sink.push_back(a);
+          }
+          if (registry_->HasTag(b, enemies_) && registry_->HasTag(a, obstacles_)) {
+            sink.push_back(b);
+          }
+        },
+        [this](const Entity enemy) { OnObstacleCollision(enemy); });
   }
 
  private:

@@ -56,6 +56,16 @@
       "lua_surface": false
     },
     {
+      "name": "CollisionResponseParallel",
+      "source": "src/Systems/CollisionResponseParallel.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
       "name": "CollisionSystem",
       "source": "src/Systems/CollisionSystem.h",
       "tier": "bulk",
