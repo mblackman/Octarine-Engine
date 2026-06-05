@@ -1,0 +1,10 @@
+# Engine unit/integration test code. Synthetic magic numbers (entity counts, health/damage values,
+# test geometry) and hand-rolled fixtures are expected here and are not production-code smells, so
+# they shouldn't trip the blocking changed-lines clang-tidy gate. Mirrors tests/benchmarks/.clang-tidy:
+# inherit the project's check set, then drop the ones that only add noise for test code.
+InheritParentConfig: true
+Checks: >
+  -readability-magic-numbers,
+  -cppcoreguidelines-special-member-functions,
+  -readability-function-cognitive-complexity,
+  -readability-function-size
