@@ -13,6 +13,7 @@
 #include "Components/RotationComponent.h"
 #include "Components/ScaleComponent.h"
 #include "Components/SpriteComponent.h"
+#include "ECS/Context.h"
 #include "ECS/ECS.h"
 #include "ECS/Registry.h"
 #include "EntityPoolSystem.h"
@@ -50,6 +51,32 @@ class ProjectileEmitSystem {
       velocity = glm::normalize(direction) * emitterComp.velocity;
     }
     SpawnProjectile(registry, emitter, position.value, emitterComp, velocity);
+  }
+
+  // Per-frame auto-fire tick. Registered as a serial system over
+  // <ProjectileEmitterComponent, PositionComponent>; ticks each emitter's countDownTimer and
+  // spawns a projectile (along the emitter's configured velocity) when it expires, reloading the
+  // timer. This is the C++ re-introduction of the auto-fire loop that auto_fire.lua had taken over
+  // per entity — it removes one sol2 round-trip per shooter per frame, the dominant cost at scale.
+  //
+  // Opt-in: emitters with frequency <= 0 are skipped, so manual fire_projectile-driven emitters
+  // (player, scripted/aimed firing) are untouched. countDownTimer hard-resets to frequency
+  // (matching auto_fire.lua's `timer = interval`, not a drift-free accumulate), so a per-entity
+  // countDownTimer seed staggers the first shot exactly as the Lua initial_delay did.
+  //
+  // Serial, not parallel: SpawnProjectile mutates the registry (pool spawn) — the same reason
+  // ScriptSystem's fire path runs serially. Spawned projectiles land in a different (pooled)
+  // archetype, so iterating the emitter archetype here is not invalidated by the spawn.
+  void operator()(const ContextFacade& context, ProjectileEmitterComponent& emitter,
+                  const PositionComponent& position) const {
+    if (emitter.frequency <= 0.0f) {
+      return;
+    }
+    emitter.countDownTimer -= context.GetDeltaTime();
+    if (emitter.countDownTimer <= 0.0f) {
+      SpawnProjectile(*context.GetRegistry(), context.GetEntity(), position.value, emitter, emitter.velocity);
+      emitter.countDownTimer = emitter.frequency;
+    }
   }
 
  private:

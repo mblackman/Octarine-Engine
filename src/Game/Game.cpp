@@ -70,6 +70,7 @@
 #include "Systems/InputSystem.h"
 #include "Systems/ObstacleBounceSystem.h"
 #include "Systems/OffScreenDespawnSystem.h"
+#include "Systems/ProjectileEmitSystem.h"
 #include "Systems/ProjectileLifecycleSystem.h"
 #include "Systems/RenderPrimitiveSystem.h"
 #include "Systems/RenderSpriteSystem.h"
@@ -552,10 +553,20 @@ void Game::Setup() {
   }
 
   registry_->RegisterParallelSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
-  // ProjectileEmitSystem has no per-frame system pass anymore — gameplay drives shots via
-  // fire_projectile(...) in Lua. The instance is Set + Init'd earlier in Setup so GameModule
-  // can bind fire_projectile against it during module install.
   registry_->RegisterParallelSystem<ProjectileComponent>(ProjectileLifecycleSystem());
+
+  // Engine-side auto-fire: tick emitters whose frequency > 0 and spawn a projectile on expiry.
+  // This re-introduces the fixed-interval emit that auto_fire.lua had moved into per-entity Lua;
+  // running it in C++ removes one sol2 call per shooter per frame (ScriptSystem was ~56% of Update
+  // at stress scale). fire_projectile(...) from Lua still works for scripted/aimed firing — those
+  // emitters keep frequency 0 and are skipped here, so the two paths never double-fire one emitter.
+  //
+  // Serial (RegisterSystem, not parallel): the tick spawns into the registry. It is registered
+  // here, after InstallPoolAndProjectile Set + Init'd the canonical ProjectileEmitSystem, so the
+  // copy stored by the system list carries the initialized pool id. Placed before
+  // VelocityIntegrationSystem so freshly-spawned projectiles integrate/transform/collide this same
+  // frame — matching the spawn-timing the old ScriptSystem-driven Lua path had.
+  registry_->RegisterSystem<ProjectileEmitterComponent, PositionComponent>(registry_->Get<ProjectileEmitSystem>());
 
   // Integrate velocity into local position. Must run before TransformSystem so the hierarchy
   // resolves with the latest positions, and before CollisionSystem reads the global transforms.

@@ -22,8 +22,11 @@ struct ProjectileEmitterComponent {
   // leaves the pooled projectile's existing name in place (default-constructed empty).
   std::string projectileName;
 
+  // t_frequency defaults to 0 == auto-fire OFF. The engine ProjectileEmitSystem tick only fires
+  // emitters with frequency > 0; a positive value opts an emitter into engine-driven auto-fire
+  // (interval in seconds). Scenes that drive firing manually via fire_projectile leave it at 0.
   explicit ProjectileEmitterComponent(const glm::vec2 t_velocity = glm::vec2(0, 0), const float t_duration = 1.0f,
-                                      const float t_frequency = 1.0f, const int t_damage = 10,
+                                      const float t_frequency = 0.0f, const int t_damage = 10,
                                       const EntityMask t_collisionMask = Constants::kDefaultEntityMask,
                                       const EntityMask t_projectileMask = EntityMask{},
                                       std::string t_projectileName = {})
