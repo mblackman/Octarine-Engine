@@ -37,8 +37,9 @@ reserved. FreeType is used under the terms of the FreeType License (FTL); see th
 
 - **CMake:** Version 3.15+
 - **C++ Compiler:** C++20 compliant (GCC 11+, Clang 13+, MSVC 2022+)
-- **vcpkg:** For managing dependencies.
-- **Git:** To clone the repo and submodules.
+- **vcpkg:** For managing dependencies (manifest mode — all deps, including the
+  sol2 ImGui bindings, are fetched and built by vcpkg on first configure).
+- **Git:** To clone the repository.
 
 ---
 
