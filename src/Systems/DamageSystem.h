@@ -4,7 +4,7 @@
 #include "Components/ProjectileComponent.h"
 #include "ECS/Iterable.h"
 #include "EventBus/EventBus.h"
-#include "Events/CollisionEvent.h"
+#include "Events/CollisionBatchEvent.h"
 
 class DamageSystem {
  public:
@@ -13,19 +13,20 @@ class DamageSystem {
     projectiles_ = registry_->Tag<ProjectileTag>();
     enemies_ = registry_->TagId("enemies");
     player_ = registry_->TagId("player");
-    subscription_ = eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(this, &DamageSystem::OnCollision);
+    subscription_ = eventBus->SubscribeEvent<DamageSystem, CollisionBatchEvent>(this, &DamageSystem::OnCollisionBatch);
   }
 
-  void OnCollision(const CollisionEvent& event) {
-    const auto a = event.entityA;
-    const auto b = event.entityB;
+  // Process the whole frame's collision pairs in one call (W2.3): the per-pair tag logic is
+  // unchanged, but it no longer rides the event bus once per pair.
+  void OnCollisionBatch(const CollisionBatchEvent& event) {
+    for (const auto& [a, b] : event.pairs) {
+      if (registry_->HasTag(a, projectiles_) && (registry_->HasTag(b, player_) || registry_->HasTag(b, enemies_))) {
+        OnProjectileHit(a, b);
+      }
 
-    if (registry_->HasTag(a, projectiles_) && (registry_->HasTag(b, player_) || registry_->HasTag(b, enemies_))) {
-      OnProjectileHit(a, b);
-    }
-
-    if (registry_->HasTag(b, projectiles_) && (registry_->HasTag(a, player_) || registry_->HasTag(a, enemies_))) {
-      OnProjectileHit(b, a);
+      if (registry_->HasTag(b, projectiles_) && (registry_->HasTag(a, player_) || registry_->HasTag(a, enemies_))) {
+        OnProjectileHit(b, a);
+      }
     }
   }
 

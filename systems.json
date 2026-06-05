@@ -62,7 +62,7 @@
       "setup_order": 7,
       "queried_components": [],
       "emits": [
-        "CollisionEvent"
+        "CollisionBatchEvent"
       ],
       "subscribes": [],
       "lua_surface": false
@@ -75,7 +75,7 @@
       "queried_components": [],
       "emits": [],
       "subscribes": [
-        "CollisionEvent"
+        "CollisionBatchEvent"
       ],
       "lua_surface": false
     },
@@ -136,7 +136,7 @@
       "queried_components": [],
       "emits": [],
       "subscribes": [
-        "CollisionEvent"
+        "CollisionBatchEvent"
       ],
       "lua_surface": false
     },

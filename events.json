@@ -31,23 +31,14 @@
       ]
     },
     {
-      "name": "CollisionEvent",
+      "name": "CollisionBatchEvent",
       "kind": "class",
-      "source": "src/Events/CollisionEvent.h",
-      "fields": [
-        {
-          "type": "Entity",
-          "name": "entityA"
-        },
-        {
-          "type": "Entity",
-          "name": "entityB"
-        }
-      ],
+      "source": "src/Events/CollisionBatchEvent.h",
+      "fields": [],
       "emit_sites": [
         {
           "file": "src/Systems/CollisionSystem.h",
-          "line": 108
+          "line": 109
         }
       ],
       "subscribe_sites": [
@@ -58,7 +49,7 @@
         },
         {
           "file": "src/Systems/ObstacleBounceSystem.h",
-          "line": 20,
+          "line": 19,
           "owner": "ObstacleBounceSystem"
         }
       ]

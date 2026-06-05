@@ -16,7 +16,7 @@
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
 #include "EventBus/EventBus.h"
-#include "Events/CollisionEvent.h"
+#include "Events/CollisionBatchEvent.h"
 #include "General/PerfUtils.h"
 #include "General/ThreadPool.h"
 
@@ -104,9 +104,9 @@ class CollisionSystem {
       PROFILE_NAMED_SCOPE("Emit Events");
       CollisionResult result = collisionResult_.get();
       PROFILE_COUNTER_SET("Collision: Intersecting pairs", static_cast<long long>(result.intersectingPairs.size()));
-      for (const auto& [fst, snd] : result.intersectingPairs) {
-        eventBus->EmitEvent<CollisionEvent>(fst, snd);
-      }
+      // One batched event instead of one EmitEvent per pair: subscribers iterate the vector
+      // directly, dropping a std::map lookup + std::function indirection for every pair (W2.3).
+      eventBus->EmitEvent<CollisionBatchEvent>(result.intersectingPairs);
       cachedBoxes_ = std::move(result.boxes);
       cachedBoxes_.clear();
     }
