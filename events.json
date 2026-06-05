@@ -44,12 +44,12 @@
       "subscribe_sites": [
         {
           "file": "src/Systems/DamageSystem.h",
-          "line": 16,
+          "line": 21,
           "owner": "DamageSystem"
         },
         {
           "file": "src/Systems/ObstacleBounceSystem.h",
-          "line": 19,
+          "line": 22,
           "owner": "ObstacleBounceSystem"
         }
       ]
