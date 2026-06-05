@@ -22,12 +22,12 @@ API:
 
 ```cpp
 // Subscribe (typically in a system's Init/SubscribeToEvents) — store the handle as a member:
-subscription_ = eventBus->SubscribeEvent<DamageSystem, CollisionEvent>(this, &DamageSystem::OnCollision);
+subscription_ = eventBus->SubscribeEvent<DamageSystem, CollisionBatchEvent>(this, &DamageSystem::OnCollisionBatch);
 // ...where the class declares:  EventBus::SubscriptionHandle subscription_;
 // (use a std::vector<EventBus::SubscriptionHandle> when a system subscribes to several events).
 
 // Emit (from wherever the thing happens):
-eventBus->EmitEvent<CollisionEvent>(entityA, entityB);
+eventBus->EmitEvent<CollisionBatchEvent>(intersectingPairs);
 ```
 
 Subscriptions are wired once during startup (`Game::Setup`, each system's `Init` /
@@ -45,7 +45,7 @@ Subscriptions are wired once during startup (`Game::Setup`, each system's `Init`
 | Event | Payload | Emitted by | Subscribed by |
 |-------|---------|------------|---------------|
 | `AudioPlayEvent` | `clipId: string`, `volume: float` | Lua `play_sound()` (`AudioModuleLuaBinding.cpp`) | `AudioSystem::OnAudioPlay` |
-| `CollisionEvent` | `entityA: Entity`, `entityB: Entity` | `CollisionSystem` (narrowphase) | `DamageSystem::OnCollision`, `ObstacleBounceSystem::OnCollision` |
+| `CollisionBatchEvent` | `pairs: const std::vector<std::pair<Entity, Entity>>&` (the whole frame's overlapping pairs) | `CollisionSystem` (narrowphase) | `DamageSystem::OnCollisionBatch`, `ObstacleBounceSystem::OnCollisionBatch` |
 | `KeyInputEvent` | `inputKey: SDL_Keycode`, `inputModifier: SDL_Keymod`, `isPressed: bool` | `Game::ProcessInput` (SDL key events) | `InputSystem::OnKeyInput`, `FrameLoop::OnKeyInputEvent` |
 | `MouseInputEvent` | `event: SDL_MouseButtonEvent` | `Game::ProcessInput` (SDL mouse-button events) | `InputSystem::OnMouseInput`, `UIButtonSystem::OnMouseInput` |
 | `MouseWheelEvent` | `dx: float`, `dy: float` | `Game::ProcessInput` (SDL wheel events) | `InputSystem::OnMouseWheel` |
@@ -57,8 +57,10 @@ Event types live in `src/Events/`.
 - **Input:** SDL events → `Game::ProcessInput` emits `KeyInputEvent` / `MouseInputEvent` /
   `MouseWheelEvent` → `InputSystem` folds them into per-frame state (also `FrameLoop` for engine
   hotkeys, `UIButtonSystem` for clicks).
-- **Collision:** `CollisionSystem` detects overlaps and emits `CollisionEvent` → `DamageSystem` and
-  `ObstacleBounceSystem` react.
+- **Collision:** `CollisionSystem` detects overlaps and emits a single `CollisionBatchEvent` carrying
+  the whole frame's overlapping pairs → `DamageSystem` and `ObstacleBounceSystem` iterate the batch and
+  react. (One batched event per frame rather than one event per pair keeps the per-pair dispatch cost
+  off the bus at high collision density.)
 - **Audio:** Lua `play_sound(clip, volume)` emits `AudioPlayEvent` → `AudioSystem` plays the clip.
 
 ## Adding an event

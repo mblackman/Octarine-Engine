@@ -12,7 +12,7 @@
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
 #include "EventBus/EventBus.h"
-#include "Events/CollisionEvent.h"
+#include "Events/CollisionBatchEvent.h"
 #include "Systems/CollisionSystem.h"
 
 // Micro-bench for the CollisionSystem async-dispatch path. The system hands each detection cycle
@@ -39,7 +39,9 @@ class StubContext final : public AnyContext {
 
 struct CollisionCounter {
   std::uint64_t count = 0;
-  void OnCollision(CollisionEvent& /*e*/) { ++count; }
+  // CollisionSystem emits one batched event per collect cycle; the overlapping pair guarantees
+  // pairs is non-empty, so count advances once per cycle (what the timing loop below keys on).
+  void OnCollisionBatch(const CollisionBatchEvent& e) { count += e.pairs.size(); }
 };
 
 // CollisionSystem builds its own query and ignores the Iterable argument, but the call signature
@@ -69,7 +71,8 @@ static void BM_CollisionDispatch(benchmark::State& state) {
   Registry registry;
   EventBus bus;
   CollisionCounter counter;
-  auto subscription = bus.SubscribeEvent<CollisionCounter, CollisionEvent>(&counter, &CollisionCounter::OnCollision);
+  auto subscription =
+      bus.SubscribeEvent<CollisionCounter, CollisionBatchEvent>(&counter, &CollisionCounter::OnCollisionBatch);
 
   EngineContext ec;
   ec.eventBus = &bus;

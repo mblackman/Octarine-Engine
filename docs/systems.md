@@ -37,7 +37,7 @@ sections).
 | 5 | `VelocityIntegrationSystem` | parallel · `PositionComponent, RigidBodyComponent` | Integrates velocity into local position. Runs **before** transform resolution. |
 | 6 | `OffScreenDespawnSystem` | parallel · `PositionComponent, SpriteComponent` | Despawns non-player entities that leave the playable bounds. |
 | 7 | `TransformSystem` | bulk · `GlobalTransformComponent` (+ optional position/scale/rotation) | Resolves the entity hierarchy into world-space `GlobalTransformComponent`. Fast path when no `ChildOf` relationships exist. |
-| 8 | `CollisionSystem` | bulk · `GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent` | Broadphase + OBB narrowphase; **emits `CollisionEvent`** for each overlapping pair. |
+| 8 | `CollisionSystem` | bulk · `GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent` | Broadphase + OBB narrowphase; **emits one `CollisionBatchEvent`** carrying all overlapping pairs. |
 | 9 | `UpdateListenerTransformSystem` | bulk · `GlobalTransformComponent, AudioListenerComponent` | Snapshots the active listener's position/velocity for the spatial-audio chain. |
 | 10 | `AudioCullingSystem` | serial · `GlobalTransformComponent, AudioSourceComponent` | Gates spatial sources by listener radius (adds/removes the active tag + sink). |
 | 11 | `SpatialAudioSystem` | serial · `GlobalTransformComponent, AudioSourceComponent, AudioSinkComponent` | Distance attenuation + stereo pan for active spatial sources. |
@@ -65,8 +65,8 @@ events on the [event bus](events.md):
 
 | System | Reacts to | What it does |
 |--------|-----------|--------------|
-| `DamageSystem` | `CollisionEvent` | Applies projectile damage / health deduction and despawns. |
-| `ObstacleBounceSystem` | `CollisionEvent` | Bounces an entity off an obstacle and flips its sprite. |
+| `DamageSystem` | `CollisionBatchEvent` | Applies projectile damage / health deduction and despawns. |
+| `ObstacleBounceSystem` | `CollisionBatchEvent` | Bounces an entity off an obstacle and flips its sprite. |
 | `UIButtonSystem` | `MouseInputEvent` | Hit-tests clicks against button colliders and invokes callbacks. |
 
 ## Services and on-demand systems
