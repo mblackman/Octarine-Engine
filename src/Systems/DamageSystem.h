@@ -1,10 +1,15 @@
 #pragma once
 
+#include <utility>
+#include <vector>
+
 #include "Components/HealthComponent.h"
 #include "Components/ProjectileComponent.h"
 #include "ECS/Iterable.h"
 #include "EventBus/EventBus.h"
 #include "Events/CollisionBatchEvent.h"
+#include "General/Constants.h"
+#include "Systems/CollisionResponseParallel.h"
 
 class DamageSystem {
  public:
@@ -16,18 +21,23 @@ class DamageSystem {
     subscription_ = eventBus->SubscribeEvent<DamageSystem, CollisionBatchEvent>(this, &DamageSystem::OnCollisionBatch);
   }
 
-  // Process the whole frame's collision pairs in one call (W2.3): the per-pair tag logic is
-  // unchanged, but it no longer rides the event bus once per pair.
+  // Process the whole frame's collision pairs (W2.3), parallelising the per-pair tag classification
+  // above a density threshold (parallel collision response). The classify step does registry reads
+  // only (safe to run across worker threads — the registry is structurally stable during the
+  // response); the damage/despawn mutations run serially in apply(). See CollisionResponseParallel.h.
   void OnCollisionBatch(const CollisionBatchEvent& event) {
-    for (const auto& [a, b] : event.pairs) {
-      if (registry_->HasTag(a, projectiles_) && (registry_->HasTag(b, player_) || registry_->HasTag(b, enemies_))) {
-        OnProjectileHit(a, b);
-      }
-
-      if (registry_->HasTag(b, projectiles_) && (registry_->HasTag(a, player_) || registry_->HasTag(a, enemies_))) {
-        OnProjectileHit(b, a);
-      }
-    }
+    using Hit = std::pair<Entity, Entity>;  // (projectile, target)
+    RunCollisionResponse<Hit>(
+        event.pairs, Constants::kCollisionResponseParallelThreshold,
+        [this](const Entity a, const Entity b, std::vector<Hit>& sink) {
+          if (registry_->HasTag(a, projectiles_) && (registry_->HasTag(b, player_) || registry_->HasTag(b, enemies_))) {
+            sink.emplace_back(a, b);
+          }
+          if (registry_->HasTag(b, projectiles_) && (registry_->HasTag(a, player_) || registry_->HasTag(a, enemies_))) {
+            sink.emplace_back(b, a);
+          }
+        },
+        [this](const Hit& hit) { OnProjectileHit(hit.first, hit.second); });
   }
 
   void OnProjectileHit(const Entity projectile, const Entity target) const {
