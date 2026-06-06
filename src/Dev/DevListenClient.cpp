@@ -75,7 +75,11 @@ client_sock_t Connect(const std::string& host_port) {
   ::setsockopt(s, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
 #endif
 
+#ifdef _WIN32
   if (::connect(s, res->ai_addr, static_cast<int>(res->ai_addrlen)) != 0) {
+#else
+  if (::connect(s, res->ai_addr, res->ai_addrlen) != 0) {
+#endif
     ::freeaddrinfo(res);
     ClientCloseSocket(s);
     return kClientInvalidSock;
@@ -177,7 +181,8 @@ ClientResult PushOp(const std::string& host_port, std::uint32_t op, const std::s
                     const std::vector<char>& content) {
   // Body: uint32_le path_len | path[path_len] | file_bytes[rest]
   const std::uint32_t path_len = static_cast<std::uint32_t>(relative_path.size());
-  const std::uint32_t total = sizeof(path_len) + path_len + static_cast<std::uint32_t>(content.size());
+  const std::uint32_t total =
+      static_cast<std::uint32_t>(sizeof(path_len)) + path_len + static_cast<std::uint32_t>(content.size());
 
   std::vector<char> body(total);
   std::memcpy(body.data(), &path_len, sizeof(path_len));
