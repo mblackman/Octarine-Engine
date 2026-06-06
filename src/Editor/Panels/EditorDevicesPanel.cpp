@@ -5,34 +5,16 @@
 #include <cstdint>
 #include <cstring>
 #include <deque>
+#include <filesystem>
 #include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
-// Socket includes for TCP Ping (matches DevListenServer.cpp conventions).
-#ifdef _WIN32
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#pragma comment(lib, "ws2_32.lib")
-using dev_socket_t = SOCKET;
-constexpr dev_socket_t kDevInvalidSock = INVALID_SOCKET;
-inline void DevCloseSocket(dev_socket_t s) { ::closesocket(s); }
-#else
-#include <netdb.h>
-#include <sys/socket.h>
-#include <sys/types.h>
-#include <unistd.h>
-using dev_socket_t = int;
-constexpr dev_socket_t kDevInvalidSock = -1;
-inline void DevCloseSocket(dev_socket_t s) { ::close(s); }
-#endif
-
 #include "AssetManager/AssetManager.h"
 #include "Deploy/Adb.h"
+#include "Dev/DevListenClient.h"
+#include "Editor/HotPusher.h"
 #include "Game/Game.h"
 #include "Game/GameConfig.h"
 #include "Process/Process.h"
@@ -73,6 +55,9 @@ static constexpr std::size_t kLogcatLineCap = 2000;
 // ---- APK install path (shared across adb rows) ----
 char g_apkPathBuf[512] = "";
 
+// ---- Eval popup state ----
+char g_evalBuf[4096] = "";
+
 // -------- Helpers --------
 
 void RefreshAdb() {
@@ -89,48 +74,6 @@ void RefreshAdb() {
   g_adbDevices = octarine::deploy::Adb::ListDevices();
   // Grow/shrink the selection vector without clearing existing selections.
   g_adbSelected.resize(g_adbDevices.size(), false);
-}
-
-// Synchronous TCP connect probe with a short timeout (~500 ms). Returns true when the host:port
-// accepts the connection. Brief UI stall on button press is acceptable for this action.
-bool TcpPing(const std::string& host_port) {
-  const auto colon = host_port.rfind(':');
-  if (colon == std::string::npos || colon + 1 >= host_port.size()) return false;
-  const std::string host = host_port.substr(0, colon);
-  const std::string port_str = host_port.substr(colon + 1);
-
-#ifdef _WIN32
-  WSADATA wsa{};
-  ::WSAStartup(MAKEWORD(2, 2), &wsa);
-#endif
-
-  addrinfo hints{};
-  hints.ai_family = AF_UNSPEC;
-  hints.ai_socktype = SOCK_STREAM;
-  addrinfo* res = nullptr;
-  bool reachable = false;
-
-  if (::getaddrinfo(host.c_str(), port_str.c_str(), &hints, &res) == 0 && res != nullptr) {
-    dev_socket_t s = ::socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-    if (s != kDevInvalidSock) {
-#ifdef _WIN32
-      DWORD ms = 500;
-      ::setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, reinterpret_cast<const char*>(&ms), sizeof(ms));
-#else
-      struct timeval tv {};
-      tv.tv_usec = 500 * 1000;
-      ::setsockopt(s, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-#endif
-      reachable = ::connect(s, res->ai_addr, static_cast<int>(res->ai_addrlen)) == 0;
-      DevCloseSocket(s);
-    }
-    ::freeaddrinfo(res);
-  }
-
-#ifdef _WIN32
-  ::WSACleanup();
-#endif
-  return reachable;
 }
 
 void StartLogcat(const std::string& serial) {
@@ -190,10 +133,37 @@ void DrawDevicesWindow(Game* game, bool* p_open) {
     g_logcatProcess.reset();
   }
 
+  auto* registry = game->GetRegistry();
+  auto& hotPusher = registry->Get<octarine::editor::HotPusher>();
+
   // Auto-refresh adb device list every 2 s.
   if (ImGui::GetTime() - g_lastRefreshTime >= kRefreshInterval) {
     RefreshAdb();
     g_lastRefreshTime = ImGui::GetTime();
+    // Sync HotPusher adb targets: upsert each ready device, remove stale ones.
+    for (const auto& dev : g_adbDevices) {
+      hotPusher.UpsertTarget(dev.serial, octarine::editor::PushTarget::Kind::Adb);
+    }
+    // Remove adb targets no longer in the device list.
+    std::vector<std::string> adb_serials;
+    adb_serials.reserve(g_adbDevices.size());
+    for (const auto& dev : g_adbDevices) adb_serials.push_back(dev.serial);
+    for (auto it = hotPusher.Targets().begin(); it != hotPusher.Targets().end();) {
+      if (it->kind == octarine::editor::PushTarget::Kind::Adb) {
+        bool found = false;
+        for (const auto& serial : adb_serials) {
+          if (serial == it->address) {
+            found = true;
+            break;
+          }
+        }
+        if (!found) {
+          it = hotPusher.Targets().erase(it);
+          continue;
+        }
+      }
+      ++it;
+    }
   }
 
   ImGui::SetNextWindowSize(ImVec2(740, 480), ImGuiCond_FirstUseEver);
@@ -204,7 +174,7 @@ void DrawDevicesWindow(Game* game, bool* p_open) {
 
   const std::string projectDir = GetProjectDir(game);
   const std::string packageId = GetPackageId(projectDir);
-  auto& engineOptions = game->GetRegistry()->Get<GameConfig>().GetEngineOptions();
+  auto& engineOptions = registry->Get<GameConfig>().GetEngineOptions();
 
   // ---- Toolbar row ----
   if (ImGui::Button("Refresh")) {
@@ -368,6 +338,25 @@ void DrawDevicesWindow(Game* game, bool* p_open) {
       }
       ImGui::SameLine();
 
+      // Auto-push toggle + status badge
+      {
+        auto* pt = hotPusher.FindTarget(dev.serial);
+        bool autoPush = pt ? pt->auto_push : false;
+        if (ImGui::Checkbox("Auto##adb", &autoPush)) {
+          hotPusher.UpsertTarget(dev.serial, octarine::editor::PushTarget::Kind::Adb);
+          if (auto* t = hotPusher.FindTarget(dev.serial)) t->auto_push = autoPush;
+        }
+        if (pt && pt->last_push_time >= 0.0) {
+          ImGui::SameLine();
+          if (pt->last_ok) {
+            ImGui::TextColored(ImVec4(0.4F, 1.0F, 0.4F, 1.0F), "ok (%zuB)", pt->last_bytes);
+          } else {
+            ImGui::TextColored(ImVec4(1.0F, 0.4F, 0.4F, 1.0F), "err: %s", pt->last_message.c_str());
+          }
+        }
+      }
+      ImGui::SameLine();
+
       // Launch (adb shell am start) — brief blocking call; am start exits quickly.
       if (ImGui::SmallButton("Launch")) {
         if (!packageId.empty()) {
@@ -429,18 +418,62 @@ void DrawDevicesWindow(Game* game, bool* p_open) {
 
       ImGui::TableSetColumnIndex(3);
       if (ImGui::SmallButton("Ping")) {
+        auto result = octarine::dev::DevListenClient::Ping(entry.host_port);
         entry.ping_status =
-            TcpPing(entry.host_port) ? RemoteTcpEntry::PingStatus::Reachable : RemoteTcpEntry::PingStatus::Unreachable;
+            result.ok ? RemoteTcpEntry::PingStatus::Reachable : RemoteTcpEntry::PingStatus::Unreachable;
       }
       ImGui::SameLine();
-      // Push Content and Eval require a dev-listen client (precursor to S13).
-      ImGui::BeginDisabled(true);
-      ImGui::SmallButton("Push Content");
+
+      // Auto-push toggle
+      {
+        hotPusher.UpsertTarget(entry.host_port, octarine::editor::PushTarget::Kind::DevListen);
+        auto* pt = hotPusher.FindTarget(entry.host_port);
+        bool autoPush = pt ? pt->auto_push : false;
+        if (ImGui::Checkbox("Auto##tcp", &autoPush)) {
+          if (pt) pt->auto_push = autoPush;
+        }
+        if (pt && pt->last_push_time >= 0.0) {
+          ImGui::SameLine();
+          if (pt->last_ok) {
+            ImGui::TextColored(ImVec4(0.4F, 1.0F, 0.4F, 1.0F), "ok (%zuB)", pt->last_bytes);
+          } else {
+            ImGui::TextColored(ImVec4(1.0F, 0.4F, 0.4F, 1.0F), "err: %s", pt->last_message.c_str());
+          }
+        }
+      }
       ImGui::SameLine();
-      ImGui::SmallButton("Eval");
+
+      ImGui::BeginDisabled(projectDir.empty());
+      if (ImGui::SmallButton("Push Content")) {
+        hotPusher.PushAll(entry.host_port, std::filesystem::path(projectDir));
+      }
       ImGui::EndDisabled();
       ImGui::SameLine();
+
+      if (ImGui::SmallButton("Eval")) {
+        ImGui::OpenPopup("##eval_popup");
+      }
+      if (ImGui::BeginPopup("##eval_popup")) {
+        ImGui::Text("Lua source:");
+        ImGui::SetNextItemWidth(400.0F);
+        ImGui::InputTextMultiline("##evalcode", g_evalBuf, sizeof(g_evalBuf), ImVec2(400.0F, 80.0F));
+        ImGui::BeginDisabled(g_evalBuf[0] == '\0');
+        if (ImGui::Button("Run##evalrun")) {
+          auto result = octarine::dev::DevListenClient::EvalLua(entry.host_port, g_evalBuf);
+          g_actionFeedback[feedbackKey] = result.ok ? (result.message.empty() ? "ok" : result.message) : result.message;
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel##evalcancel")) {
+          ImGui::CloseCurrentPopup();
+        }
+        ImGui::EndPopup();
+      }
+      ImGui::SameLine();
+
       if (ImGui::SmallButton("Remove")) {
+        hotPusher.RemoveTarget(entry.host_port);
         g_remoteEntries.erase(g_remoteEntries.begin() + static_cast<std::ptrdiff_t>(i));
         g_actionFeedback.erase(feedbackKey);
         ImGui::PopID();
@@ -459,7 +492,9 @@ void DrawDevicesWindow(Game* game, bool* p_open) {
     const bool canAdd = g_addBuf[0] != '\0' && std::strchr(g_addBuf, ':') != nullptr;
     ImGui::BeginDisabled(!canAdd);
     if (ImGui::SmallButton("Add")) {
-      g_remoteEntries.push_back({g_addBuf});
+      const std::string new_addr = g_addBuf;
+      g_remoteEntries.push_back({new_addr});
+      hotPusher.UpsertTarget(new_addr, octarine::editor::PushTarget::Kind::DevListen);
       std::memset(g_addBuf, 0, sizeof(g_addBuf));
     }
     ImGui::EndDisabled();

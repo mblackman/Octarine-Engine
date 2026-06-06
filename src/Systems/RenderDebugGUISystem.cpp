@@ -9,8 +9,10 @@
 #include "imgui_impl_sdlrenderer3.h"
 
 #ifdef OCTARINE_WITH_EDITOR
+#include "AssetManager/AssetManager.h"
 #include "Editor/EditorPersistence.h"
 #include "Editor/ExportBuilder.h"
+#include "Editor/HotPusher.h"
 #include "Editor/Panels/EditorPanelHost.h"
 #include "Editor/PlayerLauncher.h"
 #endif
@@ -27,6 +29,9 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_un
   playerLauncher.Pump();
   auto& exportBuilder = registry->Get<octarine::editor::ExportBuilder>();
   exportBuilder.Pump();
+  auto& hotPusher = registry->Get<octarine::editor::HotPusher>();
+  const std::string& projectBase = registry->Get<AssetManager>().GetBasePath();
+  hotPusher.Tick(ImGui::GetTime(), std::filesystem::path(projectBase));
   const bool showEditorUI = gameConfig.IsEditorMode() || !projectLoaded;
 #endif
   const bool showGameOverlays = engineOptions.showDebugGUI;

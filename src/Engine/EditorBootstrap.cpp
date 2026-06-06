@@ -8,6 +8,7 @@
 #include "Editor/EditorLayoutPresets.h"
 #include "Editor/EditorPersistence.h"
 #include "Editor/ExportBuilder.h"
+#include "Editor/HotPusher.h"
 #include "Editor/Panels/EditorImGuiBackend.h"
 #include "Editor/PlayerLauncher.h"
 #include "Game/GameConfig.h"
@@ -21,6 +22,7 @@ void InstallSingletons(Registry& registry, std::string& effectivePath) {
   editorPersistence.LoadGlobal();
   registry.Set<octarine::editor::PlayerLauncher>(octarine::editor::PlayerLauncher());
   registry.Set<octarine::editor::ExportBuilder>(octarine::editor::ExportBuilder());
+  registry.Set<octarine::editor::HotPusher>(octarine::editor::HotPusher());
   if (effectivePath.empty()) {
     effectivePath = editorPersistence.lastProjectPath;
     if (!effectivePath.empty()) {

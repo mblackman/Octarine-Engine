@@ -178,7 +178,9 @@ if (OCTARINE_WITH_IMGUI OR OCTARINE_WITH_EDITOR)
                 Editor/Panels/EditorSceneWindow.cpp
                 Editor/Panels/EditorSettingsPanels.cpp
                 Editor/Panels/EditorSigningPanel.cpp
-                Editor/Panels/EditorToolbarPanel.cpp
+                        Editor/Panels/EditorToolbarPanel.cpp
+                Dev/DevListenClient.cpp
+                Editor/HotPusher.cpp
         )
         # SecretStore: one backend per host so the OS-native API links cleanly without
         # cross-platform shims. Linux backend is a no-op stub the editor UI falls back
