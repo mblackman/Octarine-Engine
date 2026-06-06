@@ -46,12 +46,13 @@ struct EditorPersistence {
   bool showPlayerOutput = false;
   bool showExportOutput = false;
   bool showSigningSettings = false;
+  bool showDevices = false;
 
   // Single source of truth for persisted window-visibility flags. Both the project-prefs
   // serializer (EditorPersistence.cpp) and the layout-preset serializer (EditorLayoutPresets.cpp)
   // iterate this table, so a new window = one entry here.
   using FlagRef = std::pair<const char*, bool EditorPersistence::*>;
-  static constexpr std::array<FlagRef, 11> kWindowFlags = {{
+  static constexpr std::array<FlagRef, 12> kWindowFlags = {{
       {"showProfiler", &EditorPersistence::showProfiler},
       {"showHierarchy", &EditorPersistence::showHierarchy},
       {"showAssetBrowser", &EditorPersistence::showAssetBrowser},
@@ -63,6 +64,7 @@ struct EditorPersistence {
       {"showPlayerOutput", &EditorPersistence::showPlayerOutput},
       {"showExportOutput", &EditorPersistence::showExportOutput},
       {"showSigningSettings", &EditorPersistence::showSigningSettings},
+      {"showDevices", &EditorPersistence::showDevices},
   }};
 
   void LoadGlobal();

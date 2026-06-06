@@ -168,6 +168,7 @@ if (OCTARINE_WITH_IMGUI OR OCTARINE_WITH_EDITOR)
                 Editor/Panels/EditorAssetBrowserPanel.cpp
                 Editor/Panels/EditorBuildDialog.cpp
                 Editor/Panels/EditorConsolePanel.cpp
+                Editor/Panels/EditorDevicesPanel.cpp
                 Editor/Panels/EditorDialogService.cpp
                 Editor/Panels/EditorHierarchyPanel.cpp
                 Editor/Panels/EditorImGuiBackend.cpp

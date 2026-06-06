@@ -83,6 +83,7 @@ void DrawToolbar(Game* game, bool& showProjectSelector, bool& openSaveLayoutModa
       ImGui::MenuItem("Player Output", nullptr, &editorPersistence.showPlayerOutput);
       ImGui::MenuItem("Export Output", nullptr, &editorPersistence.showExportOutput);
       ImGui::MenuItem("Signing Settings", nullptr, &editorPersistence.showSigningSettings);
+      ImGui::MenuItem("Devices", nullptr, &editorPersistence.showDevices);
       ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI);
       ImGui::Separator();
       ImGui::MenuItem("FPS Counter", nullptr, &engineOptions.showFpsCounter);

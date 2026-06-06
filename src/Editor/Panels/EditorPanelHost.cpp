@@ -7,6 +7,7 @@
 #include "Editor/Panels/EditorAssetBrowserPanel.h"
 #include "Editor/Panels/EditorBuildDialog.h"
 #include "Editor/Panels/EditorConsolePanel.h"
+#include "Editor/Panels/EditorDevicesPanel.h"
 #include "Editor/Panels/EditorHierarchyPanel.h"
 #include "Editor/Panels/EditorImGuiBackend.h"
 #include "Editor/Panels/EditorOutputPanels.h"
@@ -65,6 +66,7 @@ void DrawEditorChrome(Game* game, SDL_Texture* gameTexture) {
   if (editorPersistence.showPlayerOutput) DrawPlayerOutputWindow(game, &editorPersistence.showPlayerOutput);
   if (editorPersistence.showExportOutput) DrawExportOutputWindow(game, &editorPersistence.showExportOutput);
   if (editorPersistence.showSigningSettings) DrawSigningSettingsWindow(&editorPersistence.showSigningSettings);
+  if (editorPersistence.showDevices) DrawDevicesWindow(game, &editorPersistence.showDevices);
 
   if (engineOptions.showImGuiDemoWindow) {
     ImGui::ShowDemoWindow();
