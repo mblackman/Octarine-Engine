@@ -12,6 +12,7 @@
 #include <unordered_set>
 
 #include "AssetManager/AssetCatalog.h"
+#include "AssetManager/AssetHotReload.h"
 #include "AssetManager/AssetPak.h"
 #include "AssetManager/AtlasBaker.h"
 #include "AssetManager/AudioNormalizer.h"
@@ -632,7 +633,10 @@ void Game::Setup() {
   damageSystem.Init(registry_.get(), event_bus_);
   obstacleBounceSystem.Init(registry_.get(), event_bus_);
 
-  // Hot reload owns its own ScriptWatcher + (path -> entities) discovery loop. Compiled out
+  // Hot reload owns its own FileWatcher + (path -> entities) discovery loop. Compiled out
   // under OCTARINE_SHIPPED; in dev/editor builds the runtime gate lives on EngineOptions.
   registry_->Set<ScriptHotReload>(ScriptHotReload());
+  // Asset hot reload: same FileWatcher infra, watching resident texture/font/audio source files
+  // and swapping the live SDL/MIX handles via AssetManager::ReloadByPath when they change on disk.
+  registry_->Set<AssetHotReload>(AssetHotReload());
 }

@@ -1,4 +1,4 @@
-#include "ScriptWatcher.h"
+#include "General/FileWatcher.h"
 
 #ifndef OCTARINE_SHIPPED
 
@@ -8,7 +8,7 @@
 
 namespace fs = std::filesystem;
 
-std::string ScriptWatcher::Canonical(const std::string& absPath) {
+std::string FileWatcher::Canonical(const std::string& absPath) {
   std::error_code ec;
   // weakly_canonical so partial-existent paths still resolve (caller may register before the
   // file exists in some edge cases). On error, fall back to the input.
@@ -19,7 +19,7 @@ std::string ScriptWatcher::Canonical(const std::string& absPath) {
   return canon.string();
 }
 
-void ScriptWatcher::Track(const std::string& absPath) {
+void FileWatcher::Track(const std::string& absPath) {
   const std::string key = Canonical(absPath);
   if (mtimes_.find(key) != mtimes_.end()) {
     return;
@@ -28,18 +28,18 @@ void ScriptWatcher::Track(const std::string& absPath) {
   std::error_code ec;
   const auto mtime = fs::last_write_time(key, ec);
   if (ec) {
-    Logger::Warn("ScriptWatcher: cannot stat '" + key + "': " + ec.message());
+    Logger::Warn("FileWatcher: cannot stat '" + key + "': " + ec.message());
     return;
   }
   mtimes_.emplace(key, mtime);
 }
 
-void ScriptWatcher::Untrack(const std::string& absPath) {
+void FileWatcher::Untrack(const std::string& absPath) {
   const std::string key = Canonical(absPath);
   mtimes_.erase(key);
 }
 
-std::vector<std::string> ScriptWatcher::Poll() {
+std::vector<std::string> FileWatcher::Poll() {
   std::vector<std::string> dirty;
   for (auto& [path, lastMtime] : mtimes_) {
     std::error_code ec;

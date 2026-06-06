@@ -22,6 +22,7 @@
 # -----------------------------------------------------------------------------
 set(OCTARINE_CORE_SOURCES
         General/Logger.cpp
+        General/FileWatcher.cpp
         ECS/Registry.cpp
         Game/GameConfig.cpp
         Deploy/Adb.cpp
@@ -66,6 +67,7 @@ endif ()
 # -----------------------------------------------------------------------------
 octarine_library(octarine_assets
         AssetManager/AssetCatalog.cpp
+        AssetManager/AssetHotReload.cpp
         AssetManager/AssetManager.cpp
         AssetManager/AssetPak.cpp
         AssetManager/AtlasBaker.cpp
@@ -112,7 +114,6 @@ octarine_library(octarine_lua
         Lua/Bindings/InputSystemLuaBinding.cpp
         Lua/Bindings/RegisterAllBindings.cpp
         Lua/HotReload/ScriptHotReload.cpp
-        Lua/HotReload/ScriptWatcher.cpp
         Lua/Modules/AssetsModuleLuaBinding.cpp
         Lua/Modules/AudioModuleLuaBinding.cpp
         Lua/Modules/EntityModuleLuaBinding.cpp

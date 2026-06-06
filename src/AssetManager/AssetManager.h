@@ -86,6 +86,12 @@ class AssetManager {
   // then calls this to refresh whatever ids that file backs. Returns the number of ids reloaded.
   int ReloadByPath(const std::string& absPath, SDL_Renderer* renderer, MIX_Mixer* mixer);
 
+  // Absolute source-file paths of every currently-resident asset (textures, fonts, audio clips),
+  // deduped. The local asset hot-reload watcher (AssetHotReload) watches exactly this set and
+  // calls ReloadByPath when one changes on disk. Paths come from the catalog entry behind each
+  // resident id; ids with no catalog entry (or no on-disk source) are skipped. Dev-only use.
+  [[nodiscard]] std::vector<std::string> ResidentSourcePaths() const;
+
   // Validate scene references against the catalog: an id missing from the catalog, or present but
   // whose backing file no longer exists on disk, is logged once with the referencing context.
   // Returns the number of failures (0 == clean). This is the authoritative miss check, replacing

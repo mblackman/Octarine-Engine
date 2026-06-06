@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_set>
 
-#include "ScriptWatcher.h"
+#include "General/FileWatcher.h"
 
 class Registry;
 struct ScriptComponent;
@@ -41,7 +41,7 @@ class ScriptHotReload {
   void RecordSuccess(const std::string& path);
   void RecordFailure(const std::string& path, const std::string& error);
 
-  ScriptWatcher watcher_;
+  FileWatcher watcher_;
   std::unordered_set<std::string> tracked_;  // canonical paths the watcher currently watches
   float accumulator_ = 0.0F;
   ReloadInfo last_;
