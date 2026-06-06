@@ -4,6 +4,7 @@
 #include <string>
 #include <utility>
 
+#include "ECS/Entity.h"
 #include "General/Constants.h"
 
 struct ProjectileEmitterComponent {

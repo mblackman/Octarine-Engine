@@ -77,6 +77,15 @@ struct TestScene {
     return e;
   }
 
+  // Create a 32×32 AABB with explicit entity/collision masks for mask-pruning tests.
+  Entity MakeBoxWithMasks(const float x, const float y, const EntityMask entityMask, const EntityMask collisionMask) {
+    const Entity e = reg.CreateEntity();
+    reg.AddComponent(e, GlobalTransformComponent{glm::vec2(x, y), glm::vec2(1.0f, 1.0f), 0.0});
+    reg.AddComponent(e, BoxColliderComponent{32, 32, {}, false, collisionMask});
+    reg.AddComponent(e, EntityMaskComponent{entityMask});
+    return e;
+  }
+
   void MoveTo(const Entity e, const float x, const float y) {
     reg.GetComponent<GlobalTransformComponent>(e).position = glm::vec2(x, y);
   }
@@ -179,6 +188,22 @@ int main() {
             "new pair: (a,b) on first entry, (a,c) when c enters — (a,b) not re-emitted");
     Check(scene.capture.Contains(a, b), "new pair: initial (a,b) entry was captured");
     Check(scene.capture.Contains(a, c), "new pair: (a,c) entry captured when c moved in");
+  }
+
+  // --- Incompatible masks suppress pairs (W2.1 mask-pruning gate).
+  // Two overlapping boxes whose layers do not match either entity's collision mask must produce
+  // no pairs. Box::intersects gates on canInteract before the geometric test.
+  // Both entities carry entityMask=0b01 but collisionMask=0b10: neither can "see" the other's
+  // layer, so (0b10 & 0b01) == 0 on both sides and canInteract is false.
+  {
+    TestScene scene;
+    scene.MakeBoxWithMasks(0.0f, 0.0f, EntityMask(1), EntityMask(2));   // entityMask=1, hits layer 2
+    scene.MakeBoxWithMasks(16.0f, 0.0f, EntityMask(1), EntityMask(2));  // entityMask=1, hits layer 2
+
+    scene.Tick();
+    scene.Tick();
+
+    CheckEq(scene.capture.TotalPairs(), 0, "mask pruning: overlapping boxes with incompatible masks emit no pairs");
   }
 
   return octarine::test::Result();
