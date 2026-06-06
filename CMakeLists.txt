@@ -429,6 +429,28 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
     add_test(NAME ProjectIniTest COMMAND OctarineProjectIniTest)
 
+    # adb wrapper parser test: standalone — Adb + its Process/Logger deps. Exercises the pure
+    # `adb devices -l` parser; no device or adb binary required.
+    add_executable(OctarineAdbTest
+            src/Deploy/Adb.cpp
+            src/Process/Process.cpp
+            src/General/Logger.cpp
+            tests/AdbTest.cpp
+    )
+    set_target_properties(OctarineAdbTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+    )
+    target_include_directories(OctarineAdbTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+    )
+    target_link_libraries(OctarineAdbTest PRIVATE spdlog::spdlog Threads::Threads)
+    if (MSVC)
+        target_compile_options(OctarineAdbTest PRIVATE /W4 /permissive- /MP /EHsc)
+    endif ()
+    add_test(NAME AdbTest COMMAND OctarineAdbTest)
+
     # Headless ECS / system tests. These link only the ECS core (Registry + Logger) — no SDL,
     # window, or Lua — exactly like the benchmark target, so they build and run fast. One helper
     # per target keeps the registrations DRY.

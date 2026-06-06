@@ -2,31 +2,45 @@
 
 #ifndef OCTARINE_SHIPPED
 
-// DevListenServer — Stage 6 of ai/EditorBuildAndDeployPlan.md (PR-A foundation: TCP listener +
-// hello/ping handshake; PR-B will add eval_lua / reload_scene / push_script / push_asset).
-//
-// Compile-time stripped from shipped builds (#ifndef OCTARINE_SHIPPED). When enabled, owns a
-// background listener thread bound to 127.0.0.1:<port> (or 0.0.0.0:<port> with --dev-listen-all)
-// and serves a tiny length-prefixed binary protocol:
+// DevListenServer — editor dev-iteration TCP listener (compile-time stripped from shipped builds
+// via #ifndef OCTARINE_SHIPPED). When enabled, owns a background listener thread bound to
+// 127.0.0.1:<port> (or 0.0.0.0:<port> with --dev-listen-all) and serves a tiny length-prefixed
+// binary protocol:
 //
 //     each message:  uint32 LE length | uint32 LE op | body[length-4]
 //     hello reply:   op=Hello, body = "OCTARINE_DEV_LISTEN/v1\n"
-//     ping reply:    op=Pong,  body = client nonce (8 bytes echoed back)
+//     ping reply:    op=Pong,  body = client nonce echoed back
 //
-// I/O lives on the listener thread; PR-A ops are pure I/O so they reply directly. Pump() exists
-// on the main thread as the seam PR-B will route commands-that-touch-engine-state through (Lua
-// eval, scene reload, asset/script writes) once those land. No engine state is touched off the
-// main thread today.
+// Pure-I/O ops (Hello/Ping) reply directly on the listener thread. The engine-mutating ops
+// (EvalLua / ReloadScene / PushScript / PushAsset) cannot touch the Registry / sol::state /
+// AssetManager off the main thread, so the listener parks each one on a queue and blocks until
+// the main thread drains it in Pump(); Pump runs the command and hands the reply back so the
+// listener can write it and close. See `kPush*` body layout on each opcode below.
 
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include <string>
+#include <vector>
 
 namespace octarine::dev {
 enum class OpCode : std::uint32_t {
-  Hello = 1,  // body: empty       -> reply Hello with banner
+  Hello = 1,  // body: empty        -> reply Hello with banner
   Ping = 2,   // body: u64 LE nonce -> reply Pong with same nonce
-              // Reserved by PR-B (do not reuse): 10 EvalLua, 11 ReloadScene, 12 PushScript, 13 PushAsset.
+  // Engine-mutating ops, parked by the listener and dispatched to the main thread via Pump():
+  EvalLua = 10,      // body: lua source        -> reply { u8 ok, utf8 result/error }
+  ReloadScene = 11,  // body: empty             -> re-runs the active scene; reply { u8 ok }
+  PushScript = 12,   // body: u32 path_len | path | bytes -> writes script + forces reload; reply { u8 ok }
+  PushAsset = 13,    // body: u32 path_len | path | bytes -> writes asset + reloads it; reply { u8 ok }
 };
+
+// Handler the engine installs to apply an engine-mutating op on the main thread. Invoked from
+// Pump() for each parked command; receives the op + raw body and fills reply_op/reply_body (the
+// frame written back to the client). Keeping this a std::function is what lets the transport layer
+// carry zero engine dependencies — the Registry/sol/AssetManager-touching logic lives in
+// DevListenDispatch (engine layer), installed via SetCommandHandler.
+using CommandHandler =
+    std::function<void(OpCode op, const std::vector<char>& body, std::uint32_t& reply_op, std::string& reply_body)>;
 
 struct ServerOptions {
   std::uint16_t port = 0;   // 0 = pick ephemeral (BoundPort() reads back after Start)
@@ -55,9 +69,13 @@ class DevListenServer {
   bool IsRunning() const;
   std::uint16_t BoundPort() const;
 
-  // Per-frame drain for commands that must run on the main thread. PR-A queues nothing
-  // (hello/ping reply on the listener thread); PR-B wires eval_lua / reload_scene through
-  // a SPSC ring drained here.
+  // Install the main-thread handler for engine-mutating ops. Call before Start() (or any time;
+  // commands park until a handler exists). Without one, parked ops reply with an error frame.
+  void SetCommandHandler(CommandHandler handler);
+
+  // Per-frame drain for engine-mutating commands the listener parked. Runs each queued op through
+  // the installed handler on the calling (main) thread, then unblocks the listener with its reply.
+  // Cheap when the queue is empty; call every frame. Hello/Ping never reach here.
   void Pump();
 
  private:
@@ -65,8 +83,12 @@ class DevListenServer {
   std::unique_ptr<Impl> impl_;
 };
 
-// Engine banner returned by the Hello op. Versioned so PR-B can bump and clients can gate.
+// Engine banner returned by the Hello op. Versioned so clients can gate on protocol capabilities.
 inline constexpr const char* kHelloBanner = "OCTARINE_DEV_LISTEN/v1\n";
+
+// Reply op written back for an unknown opcode or a command with no handler installed. Distinct
+// from every real OpCode so clients can detect "server refused" without parsing the body.
+inline constexpr std::uint32_t kErrorReplyOp = 0xFFFFFFFFu;
 }  // namespace octarine::dev
 
 #endif  // !OCTARINE_SHIPPED

@@ -112,9 +112,8 @@ class Game : public LuaBindingContext {
   // Initialize so the feature gate stays out of that function.
   void InitImGuiBackend();
   // Start the dev-iterate TCP listener when --dev-listen was passed. Empty in shipped builds.
-  // const: it mutates only Registry-owned state through the registry_ pointer, like the other
-  // const accessors here.
-  void StartDevListenServer() const;
+  // Non-const: installs the engine command handler capturing the non-const sol::state.
+  void StartDevListenServer();
   // Size + create the window and the off-screen scene target. Returns false (→ Initialize aborts)
   // on window or render-target creation failure.
   [[nodiscard]] bool CreateWindowAndScene(bool projectLoaded);

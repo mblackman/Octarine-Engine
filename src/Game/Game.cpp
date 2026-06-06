@@ -89,6 +89,7 @@
 #endif
 
 #ifndef OCTARINE_SHIPPED
+#include "Dev/DevListenDispatch.h"
 #include "Dev/DevListenServer.h"
 #endif
 
@@ -124,6 +125,12 @@ Game::Game() {
   event_bus_ = std::make_unique<EventBus>();
   renderer_ = std::make_unique<Renderer>();
   scene_loader_ = std::make_unique<SceneLoader>(registry_.get(), lua);
+#ifndef OCTARINE_SHIPPED
+  // Expose the scene loader as a Registry singleton so the dev-iteration listener's reload_scene
+  // op can reach it from its main-thread dispatch context. Game still owns the instance; this is a
+  // non-owning pointer handle.
+  registry_->Set<SceneLoader*>(scene_loader_.get());
+#endif
   frame_loop_ = std::make_unique<FrameLoop>(this, registry_.get(), event_bus_.get(), renderer_.get(), &runtime_, lua);
   // Generational GC collects the short-lived objects that dominate game-loop Lua allocations
   // (per-frame script tables, vectors, closures) cheaply in minor cycles, reserving full sweeps
@@ -223,12 +230,14 @@ void Game::InitImGuiBackend() {
 #endif
 }
 
-void Game::StartDevListenServer() const {
+void Game::StartDevListenServer() {
 #ifndef OCTARINE_SHIPPED
-  // DevListenServer (Stage 6): TCP listener on 127.0.0.1:<port> when --dev-listen given.
-  // Compile-stripped from shipped builds. Available in editor + player presets alike so the
-  // standalone player can host the dev-iterate loop too.
+  // DevListenServer: TCP listener on 127.0.0.1:<port> when --dev-listen given. Compile-stripped
+  // from shipped builds. Available in editor + player presets alike so the standalone player can
+  // host the dev-iterate loop too.
   auto& devListen = registry_->Set<octarine::dev::DevListenServer>(octarine::dev::DevListenServer());
+  // Install the engine handler so parked eval/reload/push ops apply on the main thread in Pump().
+  devListen.SetCommandHandler(octarine::dev::MakeEngineCommandHandler(*registry_, lua));
   if (dev_listen_port_ > 0) {
     octarine::dev::ServerOptions opts;
     opts.port = static_cast<std::uint16_t>(dev_listen_port_);

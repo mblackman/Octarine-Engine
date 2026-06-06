@@ -24,6 +24,7 @@ set(OCTARINE_CORE_SOURCES
         General/Logger.cpp
         ECS/Registry.cpp
         Game/GameConfig.cpp
+        Deploy/Adb.cpp
         Process/Process.cpp
         Project/ProjectIni.cpp
 )
@@ -232,7 +233,7 @@ set(OCTARINE_ENGINE_SOURCES
 # DevListenServer (Stage 6): TCP listener for the dev iterate loop. Available in editor + player
 # presets; compile-stripped from ship-release (OCTARINE_SHIPPED).
 if (NOT OCTARINE_SHIPPED)
-    list(APPEND OCTARINE_ENGINE_SOURCES Dev/DevListenServer.cpp)
+    list(APPEND OCTARINE_ENGINE_SOURCES Dev/DevListenServer.cpp Dev/DevListenDispatch.cpp)
 endif ()
 octarine_library(octarine_engine ${OCTARINE_ENGINE_SOURCES})
 target_link_libraries(octarine_engine PUBLIC
