@@ -38,13 +38,13 @@ struct CollisionCapture {
 
   void OnBatch(const CollisionBatchEvent& evt) { batches.emplace_back(evt.pairs); }
 
-  int TotalPairs() const {
+  [[nodiscard]] int TotalPairs() const {
     int n = 0;
     for (const auto& b : batches) n += static_cast<int>(b.size());
     return n;
   }
 
-  bool Contains(const Entity a, const Entity b) const {
+  [[nodiscard]] bool Contains(const Entity a, const Entity b) const {
     for (const auto& batch : batches) {
       for (const auto& [x, y] : batch) {
         if ((x == a && y == b) || (x == b && y == a)) return true;
@@ -86,7 +86,7 @@ struct TestScene {
     return e;
   }
 
-  void MoveTo(const Entity e, const float x, const float y) {
+  void MoveTo(const Entity e, const float x, const float y) const {
     reg.GetComponent<GlobalTransformComponent>(e).position = glm::vec2(x, y);
   }
 

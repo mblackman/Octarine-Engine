@@ -191,8 +191,11 @@ class CollisionSystem {
  private:
   struct PairHash {
     size_t operator()(const std::pair<EntityID, EntityID>& p) const noexcept {
+      // Boost-style hash_combine: golden-ratio constant spreads entropy, shifts mix bits.
+      static constexpr size_t kGoldenRatio = 0x9e3779b9ULL;
+      static constexpr int kLeftShift = 6;
       size_t h = std::hash<EntityID>{}(p.first);
-      h ^= std::hash<EntityID>{}(p.second) + 0x9e3779b9ULL + (h << 6) + (h >> 2);
+      h ^= std::hash<EntityID>{}(p.second) + kGoldenRatio + (h << kLeftShift) + (h >> 2);
       return h;
     }
   };
