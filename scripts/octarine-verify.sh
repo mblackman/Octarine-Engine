@@ -147,6 +147,9 @@ fi
 test_targets=(
   OctarineLuaApiTest OctarineAssetPipelineTest OctarineProcessTest OctarineProjectIniTest
   OctarineEcsTest OctarineEcsHierarchyTest OctarineSystemLogicTest OctarineEventBusTest
+  OctarineCollisionSystemTest OctarineCollisionResponseTest OctarineProjectileEmitSystemTest
+  OctarineAssetRefcounterTest OctarineDevListenServerTest OctarineLuaBehaviorTest
+  OctarineGameBakeTest
 )
 
 if [[ $do_build -eq 1 ]]; then
