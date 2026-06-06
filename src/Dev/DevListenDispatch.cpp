@@ -57,25 +57,18 @@ std::string WriteProjectFile(Registry& registry, const std::string& relPath, con
   return abs;
 }
 
-// Renders the first return value of an eval as text for the reply. Primitive types only; tables /
-// userdata / functions report their type name (callers that need richer output can `return tostring(x)`
-// in the snippet itself). The ok byte already signals success, so an empty string is fine here.
+// Renders the first return value of an eval as text for the reply. Primitive types only; nil /
+// tables / userdata / functions render empty (callers that need richer output can
+// `return tostring(x)` in the snippet itself). The ok byte already signals success, so empty is
+// fine. Uses is<T>() rather than the sol::type enum on purpose: `nil` is a macro on some platforms
+// (Objective-C on macOS), so `sol::type::nil` fails to compile there.
 std::string StringifyLuaResult(const sol::protected_function_result& r) {
   if (r.return_count() < 1) return {};
   const sol::object first = r.get<sol::object>(0);
-  switch (first.get_type()) {
-    case sol::type::string:
-      return first.as<std::string>();
-    case sol::type::number:
-      return std::to_string(first.as<double>());
-    case sol::type::boolean:
-      return first.as<bool>() ? "true" : "false";
-    case sol::type::nil:
-    case sol::type::none:
-      return {};
-    default:
-      return "<" + std::string(sol::type_name(first.lua_state(), first.get_type())) + ">";
-  }
+  if (first.is<std::string>()) return first.as<std::string>();
+  if (first.is<bool>()) return first.as<bool>() ? "true" : "false";
+  if (first.is<double>()) return std::to_string(first.as<double>());
+  return {};
 }
 
 void HandleEvalLua(sol::state& lua, const std::vector<char>& body, std::string& reply_body) {
