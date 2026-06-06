@@ -123,6 +123,46 @@ void AssetManager::ReleaseAll(const std::vector<std::string> &assetIds) {
   for (const auto &id : assetIds) Release(id);
 }
 
+bool AssetManager::Reload(const std::string &assetId, SDL_Renderer *renderer, MIX_Mixer *mixer) {
+  const CatalogEntry *entry = catalog_.Find(assetId);
+  if (entry == nullptr) {
+    Logger::Warn("AssetManager::Reload: id not in catalog: " + assetId);
+    return false;
+  }
+  // Only refresh assets that are actually resident — nothing to reload otherwise, and we must
+  // not pull in something no scene currently references.
+  const bool resident =
+      texture_store_.Contains(assetId) || font_store_.Contains(assetId) || audio_store_.Contains(assetId);
+  if (!resident) return false;
+
+  // Drop the live handle (refcount untouched), then re-run the catalog load so the new bytes on
+  // disk take effect. The texture store bumps its generation on Remove so cached pointers re-resolve.
+  UnloadAsset(assetId);
+  const bool loaded = LoadFromCatalog(*entry, assetId, renderer, mixer);
+  if (!loaded) {
+    Logger::Error("AssetManager::Reload: reload failed for " + assetId);
+  }
+  return loaded;
+}
+
+int AssetManager::ReloadByPath(const std::string &absPath, SDL_Renderer *renderer, MIX_Mixer *mixer) {
+  std::error_code ec;
+  const std::filesystem::path target = std::filesystem::weakly_canonical(std::filesystem::path(absPath), ec);
+  int reloaded = 0;
+  // Collect ids first: Reload mutates the stores, and the texture path can recurse into atlases,
+  // so don't reload while iterating the catalog map.
+  std::vector<std::string> ids;
+  for (const auto &[id, entry] : catalog_.Entries()) {
+    const std::filesystem::path entryPath =
+        std::filesystem::weakly_canonical(std::filesystem::path(entry.fullPath), ec);
+    if (entryPath == target) ids.push_back(id);
+  }
+  for (const auto &id : ids) {
+    if (Reload(id, renderer, mixer)) ++reloaded;
+  }
+  return reloaded;
+}
+
 int AssetManager::RefCount(const std::string &assetId) const { return refcounter_.Count(assetId); }
 
 // Mutually recursive with Release: an atlas member's unload path calls Release(atlasId).

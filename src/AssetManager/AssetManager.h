@@ -74,6 +74,18 @@ class AssetManager {
   void Release(const std::string& assetId);
   void ReleaseAll(const std::vector<std::string>& assetIds);
 
+  // Force a resident asset to reload from disk (dev hot-push). When `assetId` is currently
+  // resident its handle is destroyed and re-loaded from the catalog, preserving the acquire
+  // count so existing references keep working (the texture store bumps its generation so cached
+  // SDL_Texture* re-resolve). No-op (returns false) for unknown or non-resident ids. Dev-only:
+  // editor-driven content push, never on shipped builds.
+  bool Reload(const std::string& assetId, SDL_Renderer* renderer, MIX_Mixer* mixer);
+
+  // Reload every resident asset whose catalog source file is `absPath` (an absolute path). The
+  // hot-push path resolves a pushed project-relative file to its absolute form, writes the bytes,
+  // then calls this to refresh whatever ids that file backs. Returns the number of ids reloaded.
+  int ReloadByPath(const std::string& absPath, SDL_Renderer* renderer, MIX_Mixer* mixer);
+
   // Validate scene references against the catalog: an id missing from the catalog, or present but
   // whose backing file no longer exists on disk, is logged once with the referencing context.
   // Returns the number of failures (0 == clean). This is the authoritative miss check, replacing

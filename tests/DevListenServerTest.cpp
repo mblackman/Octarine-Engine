@@ -29,11 +29,15 @@ using io_ssize_t = ssize_t;
 constexpr socket_t kInvalidSocket = -1;
 #endif
 
+#include <atomic>
+#include <cctype>
+#include <chrono>
 #include <cstdint>
 #include <cstring>
 #include <iostream>
 #include <string>
 #include <thread>
+#include <vector>
 
 namespace {
 int g_failures = 0;
@@ -160,6 +164,43 @@ int main() {
     const std::string nonce = "OCTARINE";
     const std::string echo = RoundTrip(port, static_cast<std::uint32_t>(OpCode::Ping), nonce);
     Check(echo == nonce, "Ping echoes the client nonce");
+  }
+
+  {
+    // Engine-mutating op path: the listener parks the command and blocks; the main thread runs it
+    // via Pump() and the reply flows back. The real engine handler touches Registry/sol; here a
+    // stand-in upper-cases the body so the cross-thread park -> Pump -> reply handoff is provable
+    // without linking the engine. Mirrors how DevListenServer is driven each frame.
+    const std::thread::id pumpThreadId = std::this_thread::get_id();
+    std::atomic<bool> handlerRan{false};
+    server.SetCommandHandler(
+        [&](OpCode op, const std::vector<char>& body, std::uint32_t& replyOp, std::string& replyBody) {
+          handlerRan.store(true);
+          Check(op == OpCode::EvalLua, "handler receives the EvalLua op");
+          Check(std::this_thread::get_id() == pumpThreadId, "handler runs on the Pump (main) thread");
+          replyOp = static_cast<std::uint32_t>(op);
+          std::string out(1, '\1');  // ok = 1
+          for (const char c : body) out.push_back(static_cast<char>(std::toupper(static_cast<unsigned char>(c))));
+          replyBody = out;
+        });
+
+    std::string reply;
+    std::atomic<bool> done{false};
+    std::thread client([&]() {
+      reply = RoundTrip(port, static_cast<std::uint32_t>(OpCode::EvalLua), "ping-cmd");
+      done.store(true);
+    });
+    // Drive Pump() on this (main) thread until the parked command is serviced and the client's
+    // round-trip completes. Bounded so a regression can't hang the suite.
+    for (int i = 0; i < 400 && !done.load(); ++i) {
+      server.Pump();
+      std::this_thread::sleep_for(std::chrono::milliseconds(5));
+    }
+    client.join();
+
+    Check(handlerRan.load(), "command handler executed via Pump()");
+    Check(!reply.empty() && reply[0] == '\1', "EvalLua reply signals ok");
+    Check(reply.substr(1) == "PING-CMD", "EvalLua reply carries the handler-transformed body");
   }
 
   server.Stop();

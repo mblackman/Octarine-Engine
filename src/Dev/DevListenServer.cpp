@@ -31,8 +31,13 @@ constexpr int kSocketError = -1;
 #endif
 
 #include <atomic>
+#include <chrono>
+#include <condition_variable>
 #include <cstdint>
 #include <cstring>
+#include <deque>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <utility>
@@ -40,6 +45,14 @@ constexpr int kSocketError = -1;
 
 namespace octarine::dev {
 namespace {
+// Listener select() wait before re-checking stop_requested, and the same cadence for a parked
+// command re-checking stop while it waits on Pump(). Keeps Stop() prompt without a blocking accept.
+constexpr int kSelectTimeoutMs = 100;
+constexpr int kPumpWaitMs = 100;
+constexpr int kMicrosPerMilli = 1000;
+// Hard cap on an inbound frame body so a malformed/hostile length can't drive an enormous alloc.
+constexpr std::uint32_t kMaxFrameBytes = 1024U * 1024U;
+
 void CloseSocket(socket_t s) {
   if (s == kInvalidSocket) return;
 #ifdef _WIN32
@@ -129,6 +142,43 @@ void WsaRelease() {
 void WsaAcquire() {}
 void WsaRelease() {}
 #endif
+
+// Hand-off slot between the listener thread (which parks an engine-mutating op and waits) and
+// the main thread (which runs it in Pump and fills the reply). shared_ptr-owned so neither side
+// outlives the other if Stop() abandons a wait mid-flight.
+struct ReplySlot {
+  std::mutex m;
+  std::condition_variable cv;
+  bool done = false;
+  std::uint32_t reply_op = 0;
+  std::string reply_body;
+};
+
+struct PendingCommand {
+  OpCode op{};
+  std::vector<char> body;
+  std::shared_ptr<ReplySlot> slot;
+};
+
+// The subset of Impl the connection helpers touch, passed by reference so the free helpers need
+// not name the private DevListenServer::Impl type.
+struct ListenerContext {
+  std::mutex& queue_mutex;
+  std::deque<PendingCommand>& queue;
+  std::atomic<bool>& stop_requested;
+};
+
+bool IsMainThreadOp(OpCode op) {
+  switch (op) {
+    case OpCode::EvalLua:
+    case OpCode::ReloadScene:
+    case OpCode::PushScript:
+    case OpCode::PushAsset:
+      return true;
+    default:
+      return false;
+  }
+}
 }  // namespace
 
 struct DevListenServer::Impl {
@@ -137,7 +187,89 @@ struct DevListenServer::Impl {
   std::uint16_t bound_port{0};
   socket_t listen_sock{kInvalidSocket};
   std::thread listener;
+
+  // Engine-mutating ops parked by the listener thread, drained by Pump() on the main thread.
+  std::mutex queue_mutex;
+  std::deque<PendingCommand> queue;
+  CommandHandler handler;  // set once on the main thread before Start; read only in Pump
 };
+
+// Connection-serving helpers — kept small + free so the listener loop stays a thin
+// accept-and-dispatch (and under the complexity threshold).
+namespace {
+// Parks an engine-mutating op on the queue and blocks until Pump() services it, re-checking
+// stop_requested so Stop() can't deadlock a listener waiting on a Pump that will never come.
+void ParkAndReply(socket_t cs, ListenerContext& ctx, OpCode op, std::vector<char> body) {
+  auto slot = std::make_shared<ReplySlot>();
+  {
+    std::lock_guard<std::mutex> lk(ctx.queue_mutex);
+    ctx.queue.push_back(PendingCommand{op, std::move(body), slot});
+  }
+  std::unique_lock<std::mutex> lk(slot->m);
+  while (!slot->done && !ctx.stop_requested.load(std::memory_order_acquire)) {
+    slot->cv.wait_for(lk, std::chrono::milliseconds(kPumpWaitMs));
+  }
+  if (slot->done) {
+    WriteFrame(cs, slot->reply_op, slot->reply_body.data(), static_cast<std::uint32_t>(slot->reply_body.size()));
+  }
+}
+
+// Pure-I/O ops answered entirely on the listener thread (no engine state touched).
+void ReplyDirect(socket_t cs, OpCode op, const std::vector<char>& body) {
+  switch (op) {
+    case OpCode::Hello:
+      WriteFrame(cs, static_cast<std::uint32_t>(OpCode::Hello), kHelloBanner,
+                 static_cast<std::uint32_t>(std::strlen(kHelloBanner)));
+      break;
+    case OpCode::Ping:
+      // Echo the client nonce back (any body size; some clients ping empty).
+      WriteFrame(cs, static_cast<std::uint32_t>(OpCode::Ping), body.data(), static_cast<std::uint32_t>(body.size()));
+      break;
+    default:
+      Logger::Warn("DevListenServer: unknown op=" + std::to_string(static_cast<std::uint32_t>(op)));
+      WriteFrame(cs, kErrorReplyOp, nullptr, 0);
+      break;
+  }
+}
+
+// Reads one `length | op | body` frame off an accepted socket and dispatches it (engine-mutating
+// ops park for the main thread; pure-I/O ops reply inline). One frame per connection (v1); always
+// closes the socket.
+void ServeConnection(socket_t cs, ListenerContext& ctx) {
+  // Accepted sockets inherit the listener's non-blocking flag on Windows; force blocking so the
+  // ReadAll/WriteAll loops keep their simple >0 / <=0 semantics.
+  SetSocketBlocking(cs, true);
+  std::uint32_t length = 0;
+  if (!ReadAll(cs, &length, sizeof(length))) {
+    CloseSocket(cs);
+    return;
+  }
+  if (length < sizeof(std::uint32_t) || length > kMaxFrameBytes) {
+    Logger::Warn("DevListenServer: rejecting frame length=" + std::to_string(length));
+    CloseSocket(cs);
+    return;
+  }
+  std::uint32_t op = 0;
+  if (!ReadAll(cs, &op, sizeof(op))) {
+    CloseSocket(cs);
+    return;
+  }
+  const std::uint32_t body_len = length - static_cast<std::uint32_t>(sizeof(std::uint32_t));
+  std::vector<char> body(body_len);
+  if (body_len > 0 && !ReadAll(cs, body.data(), body_len)) {
+    CloseSocket(cs);
+    return;
+  }
+
+  const auto opcode = static_cast<OpCode>(op);
+  if (IsMainThreadOp(opcode)) {
+    ParkAndReply(cs, ctx, opcode, std::move(body));
+  } else {
+    ReplyDirect(cs, opcode, body);
+  }
+  CloseSocket(cs);
+}
+}  // namespace
 
 DevListenServer::DevListenServer() : impl_(std::make_unique<Impl>()) {}
 
@@ -150,10 +282,37 @@ bool DevListenServer::IsRunning() const { return impl_ && impl_->running.load(st
 
 std::uint16_t DevListenServer::BoundPort() const { return impl_ ? impl_->bound_port : 0; }
 
+void DevListenServer::SetCommandHandler(CommandHandler handler) {
+  if (impl_) impl_->handler = std::move(handler);
+}
+
 void DevListenServer::Pump() {
-  // PR-A reserved hook: no off-thread commands queued yet. PR-B will drain a SPSC ring of
-  // EvalLua / ReloadScene / PushScript / PushAsset requests here so they execute on the main
-  // thread (Registry / sol::state / AssetManager are not thread-safe).
+  if (!impl_) return;
+
+  std::deque<PendingCommand> batch;
+  {
+    std::lock_guard<std::mutex> lk(impl_->queue_mutex);
+    batch.swap(impl_->queue);
+  }
+
+  for (auto& cmd : batch) {
+    auto reply_op = static_cast<std::uint32_t>(cmd.op);
+    std::string reply_body;
+    if (impl_->handler) {
+      impl_->handler(cmd.op, cmd.body, reply_op, reply_body);
+    } else {
+      // No engine handler installed — refuse rather than hang the client.
+      reply_op = kErrorReplyOp;
+    }
+
+    {
+      std::lock_guard<std::mutex> lk(cmd.slot->m);
+      cmd.slot->reply_op = reply_op;
+      cmd.slot->reply_body = std::move(reply_body);
+      cmd.slot->done = true;
+    }
+    cmd.slot->cv.notify_one();
+  }
 }
 
 bool DevListenServer::Start(const ServerOptions& opts) {
@@ -217,15 +376,16 @@ bool DevListenServer::Start(const ServerOptions& opts) {
 
   impl_->listener = std::thread([this]() {
     socket_t ls = impl_->listen_sock;
+    ListenerContext ctx{impl_->queue_mutex, impl_->queue, impl_->stop_requested};
     while (!impl_->stop_requested.load(std::memory_order_acquire)) {
-      // Wait up to 100ms for a pending connection, then re-check stop_requested. This is
-      // what makes Stop() prompt and deadlock-free: no blocking accept() to interrupt.
+      // Wait up to kSelectTimeoutMs for a pending connection, then re-check stop_requested. This
+      // is what makes Stop() prompt and deadlock-free: no blocking accept() to interrupt.
       fd_set readable;
       FD_ZERO(&readable);
       FD_SET(ls, &readable);
       timeval timeout{};
       timeout.tv_sec = 0;
-      timeout.tv_usec = 100 * 1000;  // 100ms
+      timeout.tv_usec = kSelectTimeoutMs * kMicrosPerMilli;
       const int ready = ::select(static_cast<int>(ls + 1), &readable, nullptr, nullptr, &timeout);
       if (ready <= 0) {
         // 0 = timeout, <0 = interrupted/error; loop and re-test stop_requested.
@@ -236,59 +396,10 @@ bool DevListenServer::Start(const ServerOptions& opts) {
       socklen_t clen = sizeof(client);
       socket_t cs = ::accept(ls, reinterpret_cast<sockaddr*>(&client), &clen);
       if (cs == kInvalidSocket) {
-        // Connection withdrawn between select() and accept(), or a transient error;
-        // not fatal — go back to waiting.
+        // Connection withdrawn between select() and accept(), or a transient error; not fatal.
         continue;
       }
-      // The accepted socket inherits the listener's non-blocking flag on Windows; force it
-      // blocking so the ReadAll/WriteAll loops below keep their simple semantics.
-      SetSocketBlocking(cs, true);
-      // Handle one frame per connection for v1 simplicity; the matrix of
-      // op x persistent-connection-state is small enough that closing+reopening is fine.
-      std::uint32_t length = 0;
-      if (!ReadAll(cs, &length, sizeof(length))) {
-        CloseSocket(cs);
-        continue;
-      }
-      if (length < 4 || length > 1024 * 1024) {
-        Logger::Warn("DevListenServer: rejecting frame length=" + std::to_string(length));
-        CloseSocket(cs);
-        continue;
-      }
-      std::uint32_t op = 0;
-      if (!ReadAll(cs, &op, sizeof(op))) {
-        CloseSocket(cs);
-        continue;
-      }
-
-      const std::uint32_t body_len = length - 4;
-      std::vector<char> body(body_len);
-      if (body_len > 0 && !ReadAll(cs, body.data(), body_len)) {
-        CloseSocket(cs);
-        continue;
-      }
-
-      switch (static_cast<OpCode>(op)) {
-        case OpCode::Hello: {
-          WriteFrame(cs, static_cast<std::uint32_t>(OpCode::Hello), kHelloBanner,
-                     static_cast<std::uint32_t>(std::strlen(kHelloBanner)));
-          break;
-        }
-        case OpCode::Ping: {
-          // Echo the 8-byte client nonce back. Tolerate other body sizes (some clients
-          // may ping with an empty body); just echo whatever they sent.
-          WriteFrame(cs, static_cast<std::uint32_t>(OpCode::Ping), body.data(), body_len);
-          break;
-        }
-        default: {
-          Logger::Warn("DevListenServer: unknown op=" + std::to_string(op));
-          const std::uint32_t err_op = 0xFFFFFFFFu;
-          WriteFrame(cs, err_op, nullptr, 0);
-          break;
-        }
-      }
-
-      CloseSocket(cs);
+      ServeConnection(cs, ctx);
     }
   });
 
