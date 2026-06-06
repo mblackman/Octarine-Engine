@@ -45,7 +45,7 @@ Subscriptions are wired once during startup (`Game::Setup`, each system's `Init`
 | Event | Payload | Emitted by | Subscribed by |
 |-------|---------|------------|---------------|
 | `AudioPlayEvent` | `clipId: string`, `volume: float` | Lua `play_sound()` (`AudioModuleLuaBinding.cpp`) | `AudioSystem::OnAudioPlay` |
-| `CollisionBatchEvent` | `pairs: const std::vector<std::pair<Entity, Entity>>&` (the whole frame's overlapping pairs) | `CollisionSystem` (narrowphase) | `DamageSystem::OnCollisionBatch`, `ObstacleBounceSystem::OnCollisionBatch` |
+| `CollisionBatchEvent` | `pairs: const std::vector<std::pair<Entity, Entity>>&` (frame's *entering* pairs — first-contact overlaps not seen last frame) | `CollisionSystem` (narrowphase) | `DamageSystem::OnCollisionBatch`, `ObstacleBounceSystem::OnCollisionBatch` |
 | `KeyInputEvent` | `inputKey: SDL_Keycode`, `inputModifier: SDL_Keymod`, `isPressed: bool` | `Game::ProcessInput` (SDL key events) | `InputSystem::OnKeyInput`, `FrameLoop::OnKeyInputEvent` |
 | `MouseInputEvent` | `event: SDL_MouseButtonEvent` | `Game::ProcessInput` (SDL mouse-button events) | `InputSystem::OnMouseInput`, `UIButtonSystem::OnMouseInput` |
 | `MouseWheelEvent` | `dx: float`, `dy: float` | `Game::ProcessInput` (SDL wheel events) | `InputSystem::OnMouseWheel` |
@@ -58,9 +58,10 @@ Event types live in `src/Events/`.
   `MouseWheelEvent` → `InputSystem` folds them into per-frame state (also `FrameLoop` for engine
   hotkeys, `UIButtonSystem` for clicks).
 - **Collision:** `CollisionSystem` detects overlaps and emits a single `CollisionBatchEvent` carrying
-  the whole frame's overlapping pairs → `DamageSystem` and `ObstacleBounceSystem` iterate the batch and
-  react. (One batched event per frame rather than one event per pair keeps the per-pair dispatch cost
-  off the bus at high collision density.)
+  the frame's *entering* pairs (first-contact overlaps not seen last frame) → `DamageSystem` and
+  `ObstacleBounceSystem` iterate the batch and react. (One batched event per frame rather than one
+  per pair keeps dispatch cost off the bus at high density; enter-only filtering avoids re-firing on
+  every frame of sustained contact.)
 - **Audio:** Lua `play_sound(clip, volume)` emits `AudioPlayEvent` → `AudioSystem` plays the clip.
 
 ## Adding an event
