@@ -75,13 +75,13 @@
       "emit_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 103
+          "line": 105
         }
       ],
       "subscribe_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 75,
+          "line": 77,
           "owner": "FrameLoop"
         },
         {
@@ -104,7 +104,7 @@
       "emit_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 109
+          "line": 111
         }
       ],
       "subscribe_sites": [
@@ -137,7 +137,7 @@
       "emit_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 113
+          "line": 115
         }
       ],
       "subscribe_sites": [
