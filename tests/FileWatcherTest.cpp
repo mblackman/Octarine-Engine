@@ -5,13 +5,13 @@
 // mtime granularity varies by filesystem, so we drive change detection by explicitly advancing
 // last_write_time rather than relying on a real second-resolution clock between writes.
 
-#include "General/FileWatcher.h"
-#include "TestHarness.h"
-
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <string>
+
+#include "General/FileWatcher.h"
+#include "TestHarness.h"
 
 using octarine::test::Check;
 using octarine::test::CheckEq;
