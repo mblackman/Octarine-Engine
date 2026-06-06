@@ -9,11 +9,10 @@
 // gtest-free; exit code = failed-check count. Links the ECS core only.
 
 #include <chrono>
+#include <glm/glm.hpp>
 #include <thread>
 #include <utility>
 #include <vector>
-
-#include <glm/glm.hpp>
 
 #include "Components/BoxColliderComponent.h"
 #include "Components/EntityMaskComponent.h"
@@ -146,13 +145,13 @@ int main() {
     const Entity a = scene.MakeBox(0.0f, 0.0f);
     const Entity b = scene.MakeBox(16.0f, 0.0f);
 
-    scene.Tick();                      // detection_1 gathers: a-b overlap
-    scene.Tick();                      // emit (a,b) entering; detection_2 gathers: still overlap
-    scene.MoveTo(b, 64.0f, 0.0f);     // move b apart before detection_3 gathers
-    scene.Tick();                      // emit [] sustained (det_2 result); detection_3 gathers: b at 64 — no overlap
-    scene.MoveTo(b, 16.0f, 0.0f);     // move b back before detection_4 gathers
-    scene.Tick();                      // emit [] (det_3 no-overlap); detection_4 gathers: b at 16 — overlap
-    scene.Tick();                      // emit (a,b) entering again (det_4 result; prevPairSet_ was cleared)
+    scene.Tick();                  // detection_1 gathers: a-b overlap
+    scene.Tick();                  // emit (a,b) entering; detection_2 gathers: still overlap
+    scene.MoveTo(b, 64.0f, 0.0f);  // move b apart before detection_3 gathers
+    scene.Tick();                  // emit [] sustained (det_2 result); detection_3 gathers: b at 64 — no overlap
+    scene.MoveTo(b, 16.0f, 0.0f);  // move b back before detection_4 gathers
+    scene.Tick();                  // emit [] (det_3 no-overlap); detection_4 gathers: b at 16 — overlap
+    scene.Tick();                  // emit (a,b) entering again (det_4 result; prevPairSet_ was cleared)
 
     CheckEq(scene.capture.TotalPairs(), 2, "re-entry: pair emitted on first contact and again after separation");
     Check(scene.capture.Contains(a, b), "re-entry: (a, b) is in the captured batches");
@@ -170,11 +169,11 @@ int main() {
     const Entity b = scene.MakeBox(16.0f, 0.0f);
     const Entity c = scene.MakeBox(200.0f, 0.0f);
 
-    scene.Tick();                      // detection_1: a-b overlap, a-c no
-    scene.Tick();                      // emit (a,b) entering; detection_2: same positions
-    scene.MoveTo(c, -20.0f, 0.0f);    // c now overlaps a but not b
-    scene.Tick();                      // emit [] (det_2 a-b sustained); detection_3 gathers: a-b + a-c overlap
-    scene.Tick();                      // emit entering pairs from det_3: only (a,c) — (a,b) already in prevPairSet_
+    scene.Tick();                   // detection_1: a-b overlap, a-c no
+    scene.Tick();                   // emit (a,b) entering; detection_2: same positions
+    scene.MoveTo(c, -20.0f, 0.0f);  // c now overlaps a but not b
+    scene.Tick();                   // emit [] (det_2 a-b sustained); detection_3 gathers: a-b + a-c overlap
+    scene.Tick();                   // emit entering pairs from det_3: only (a,c) — (a,b) already in prevPairSet_
 
     CheckEq(scene.capture.TotalPairs(), 2,
             "new pair: (a,b) on first entry, (a,c) when c enters — (a,b) not re-emitted");
