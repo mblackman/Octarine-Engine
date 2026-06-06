@@ -41,6 +41,10 @@ class DamageSystem {
   }
 
   void OnProjectileHit(const Entity projectile, const Entity target) const {
+    if (!registry_->HasComponent<HealthComponent>(target)) {
+      registry_->QueueDespawnEntity(projectile);
+      return;
+    }
     const auto projectileComponent = registry_->GetComponent<ProjectileComponent>(projectile);
     auto& targetComponent = registry_->GetComponent<HealthComponent>(target);
 

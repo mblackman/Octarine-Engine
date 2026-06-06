@@ -67,7 +67,13 @@ def main():
         elif unit == 'ns':
             value /= 1000000
 
-        metrics[name].append(value)
+        # Game::Render (total) and EndScene are dominated by the SDL dummy-driver's
+    # SDL_RenderClear CPU memset under SDL_VIDEODRIVER=dummy and don't reflect
+    # real GPU cost. Drop them so the CI dashboard tracks actionable CPU phases only.
+    if name in ('Game::Render (total)', 'EndScene'):
+      continue
+
+    metrics[name].append(value)
 
     if discarded > 0:
         print(f"Discarded {discarded} warmup samples ({args.warmup}s)", file=sys.stderr)

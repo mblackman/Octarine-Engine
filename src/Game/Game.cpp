@@ -125,6 +125,10 @@ Game::Game() {
   renderer_ = std::make_unique<Renderer>();
   scene_loader_ = std::make_unique<SceneLoader>(registry_.get(), lua);
   frame_loop_ = std::make_unique<FrameLoop>(this, registry_.get(), event_bus_.get(), renderer_.get(), &runtime_, lua);
+  // Generational GC collects the short-lived objects that dominate game-loop Lua allocations
+  // (per-frame script tables, vectors, closures) cheaply in minor cycles, reserving full sweeps
+  // for objects that actually survive. This reduces the p99 frame spikes caused by GC pauses.
+  lua_gc(lua.lua_state(), LUA_GCGEN, 0, 0);
   Logger::Info("Game Constructor called.");
 }
 
