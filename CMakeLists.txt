@@ -455,6 +455,7 @@ if (OCTARINE_ENABLE_TESTS)
     octarine_add_core_test(OctarineEcsHierarchyTest EcsHierarchyTest tests/EcsHierarchyTest.cpp)
     octarine_add_core_test(OctarineSystemLogicTest SystemLogicTest tests/SystemLogicTest.cpp)
     octarine_add_core_test(OctarineCollisionResponseTest CollisionResponseTest tests/CollisionResponseTest.cpp)
+    octarine_add_core_test(OctarineCollisionSystemTest CollisionSystemTest tests/CollisionSystemTest.cpp)
 
     # EventBus is header-only; it needs Logger for its construction log lines, nothing else.
     add_executable(OctarineEventBusTest
