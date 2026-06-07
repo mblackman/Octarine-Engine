@@ -1,5 +1,7 @@
 #include "Engine/SceneLoader.h"
 
+#include <SDL3_mixer/SDL_mixer.h>
+
 #include <algorithm>
 #include <set>
 #include <string>
@@ -21,6 +23,36 @@
 #ifdef OCTARINE_WITH_EDITOR
 #include "Editor/EditorPersistence.h"
 #endif
+
+void SceneLoader::RequestLoadScene(const std::string& scenePath) {
+  if (scenePath.empty()) {
+    Logger::Warn("RequestLoadScene called with empty path.");
+    return;
+  }
+  // Deferred path: a UIButton on_click (or any in-frame caller) only queues the swap; the frame loop
+  // flushes it before systems run (FlushPendingSceneLoad). Last request within a frame wins. Before
+  // deferral is armed (bake + the initial startup load) the swap runs immediately. Kept separate from
+  // LoadScene so that function's body stays byte-identical to its prior form (it carries pre-existing
+  // cognitive-complexity debt the changed-lines clang-tidy gate would otherwise surface).
+  if (deferred_swaps_) {
+    pending_scene_path_ = scenePath;
+    has_pending_scene_ = true;
+    return;
+  }
+  LoadScene(scenePath);
+}
+
+void SceneLoader::FlushPendingSceneLoad() {
+  // First flush also arms deferral: the startup script's initial load ran before any frame
+  // (deferred_swaps_ still false) so it took effect immediately; from here, in-frame load_scene
+  // calls queue instead. Bake never reaches a frame loop, so its loads stay immediate.
+  deferred_swaps_ = true;
+  if (!has_pending_scene_) return;
+  has_pending_scene_ = false;
+  const std::string path = std::move(pending_scene_path_);
+  pending_scene_path_.clear();
+  LoadScene(path);
+}
 
 void SceneLoader::LoadScene(const std::string& scenePath) {
   if (scenePath.empty()) {
@@ -183,7 +215,7 @@ void SceneLoader::ReloadScene() {
 #ifdef OCTARINE_WITH_EDITOR
   if (auto* editorPersistence = registry_->TryGet<EditorPersistence>();
       editorPersistence != nullptr && !editorPersistence->currentScenePath.empty()) {
-    LoadScene(editorPersistence->currentScenePath);
+    RequestLoadScene(editorPersistence->currentScenePath);
     return;
   }
 #endif
@@ -191,6 +223,14 @@ void SceneLoader::ReloadScene() {
 }
 
 void SceneLoader::clearSceneEntities() {
+  // Stop every playing track before the emitter entities vanish. AudioTrackCache.Clear() below only
+  // drops the entity->track map — it does not halt playback, so a looping source (loop=true) would
+  // keep sounding into the next scene and, because AcquireTrack only reuses !MIX_TrackPlaying slots,
+  // its pool track would never be reclaimed. MIX_StopAllTracks frees them on both counts.
+  if (MIX_Mixer* mixer = registry_->Get<EngineContext>().mixer) {
+    MIX_StopAllTracks(mixer, 0);
+  }
+
   registry_->ClearUserEntities();
   if (auto* inputSystem = registry_->TryGet<InputSystem>()) {
     inputSystem->ResetLuaState();

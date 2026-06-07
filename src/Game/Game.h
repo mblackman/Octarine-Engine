@@ -94,7 +94,7 @@ class Game : public LuaBindingContext {
 
   // Scene lifecycle lives in SceneLoader; these LuaBindingContext overrides delegate so the
   // `scene.*` Lua module (and the editor toolbar) drive it through Game unchanged.
-  void LoadScene(const std::string& scenePath) override { scene_loader_->LoadScene(scenePath); }
+  void LoadScene(const std::string& scenePath) override { scene_loader_->RequestLoadScene(scenePath); }
   void ReloadScene() override { scene_loader_->ReloadScene(); }
   void StopScene() override { scene_loader_->StopScene(); }
   void TrackSceneAssets(const std::vector<std::string>& assetIds) override {
@@ -104,6 +104,10 @@ class Game : public LuaBindingContext {
   // True between a successful LoadScene/ReloadScene and the next StopScene. The editor toolbar
   // uses this to decide whether Play should resume a paused scene or (re)start a stopped one.
   [[nodiscard]] bool IsSceneRunning() const { return scene_loader_->IsSceneRunning(); }
+
+  // Run any scene swap queued (deferred) during this frame's input/system passes. FrameLoop calls
+  // this at the top of Update, before systems run, so the swap happens outside any ForEach.
+  void FlushPendingSceneLoad() { scene_loader_->FlushPendingSceneLoad(); }
 
  private:
   void Setup();
