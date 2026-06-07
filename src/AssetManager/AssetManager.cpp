@@ -163,6 +163,24 @@ int AssetManager::ReloadByPath(const std::string &absPath, SDL_Renderer *rendere
   return reloaded;
 }
 
+std::vector<std::string> AssetManager::ResidentSourcePaths() const {
+  // Walk the three handle stores, map each resident id back to its catalog source file, and dedupe.
+  // One file can back several ids (atlas members share a backing texture), so a set collapses them;
+  // ReloadByPath re-expands a path to every id it backs on reload.
+  std::set<std::string> paths;
+  const auto collect = [&](const auto &store) {
+    for (const auto &[id, handle] : store) {
+      if (const CatalogEntry *entry = catalog_.Find(id); entry != nullptr && !entry->fullPath.empty()) {
+        paths.insert(entry->fullPath);
+      }
+    }
+  };
+  collect(texture_store_.All());
+  collect(font_store_.All());
+  collect(audio_store_.All());
+  return {paths.begin(), paths.end()};
+}
+
 int AssetManager::RefCount(const std::string &assetId) const { return refcounter_.Count(assetId); }
 
 // Mutually recursive with Release: an atlas member's unload path calls Release(atlasId).

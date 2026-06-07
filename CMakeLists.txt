@@ -511,6 +511,25 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
     add_test(NAME AssetRefcounterTest COMMAND OctarineAssetRefcounterTest)
 
+    # FileWatcher unit test: the generic mtime watcher shared by the script + asset hot-reload
+    # paths. Pure filesystem — links only the watcher source + Logger (for its stat-warning line).
+    add_executable(OctarineFileWatcherTest
+            src/General/FileWatcher.cpp
+            src/General/Logger.cpp
+            tests/FileWatcherTest.cpp)
+    set_target_properties(OctarineFileWatcherTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF)
+    target_include_directories(OctarineFileWatcherTest PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
+            ${CMAKE_CURRENT_SOURCE_DIR}/tests)
+    target_link_libraries(OctarineFileWatcherTest PRIVATE spdlog::spdlog)
+    if (MSVC)
+        target_compile_options(OctarineFileWatcherTest PRIVATE /W4 /permissive- /MP /EHsc)
+    endif ()
+    add_test(NAME FileWatcherTest COMMAND OctarineFileWatcherTest)
+
     # DevListenServer smoke test (Stage 6 PR-A): standalone — only the server source + Logger.
     # Bound to the same OCTARINE_SHIPPED gate as the engine-side server.
     if (NOT OCTARINE_SHIPPED)

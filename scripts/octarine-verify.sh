@@ -146,10 +146,11 @@ fi
 # --- configure + build -------------------------------------------------------
 test_targets=(
   OctarineLuaApiTest OctarineAssetPipelineTest OctarineProcessTest OctarineProjectIniTest
+  OctarineAdbTest
   OctarineEcsTest OctarineEcsHierarchyTest OctarineSystemLogicTest OctarineEventBusTest
   OctarineCollisionSystemTest OctarineCollisionResponseTest OctarineProjectileEmitSystemTest
   OctarineAssetRefcounterTest OctarineDevListenServerTest OctarineLuaBehaviorTest
-  OctarineGameBakeTest
+  OctarineFileWatcherTest OctarineGameBakeTest
 )
 
 if [[ $do_build -eq 1 ]]; then

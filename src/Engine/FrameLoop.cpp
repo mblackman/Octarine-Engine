@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cstdlib>
 
+#include "AssetManager/AssetHotReload.h"
+#include "AssetManager/AssetManager.h"
 #include "Components/ViewportInfo.h"
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
@@ -162,6 +164,11 @@ void FrameLoop::Update(const float deltaTime) {
   if (options.hotReloadEnabled) {
     if (auto* hotReload = registry_->TryGet<ScriptHotReload>()) {
       hotReload->Tick(*registry_, lua_, deltaTime, options.hotReloadPollSeconds);
+    }
+    if (auto* assetReload = registry_->TryGet<AssetHotReload>()) {
+      auto& ctx = registry_->Get<EngineContext>();
+      assetReload->Tick(registry_->Get<AssetManager>(), ctx.sdlRenderer, ctx.mixer, deltaTime,
+                        options.hotReloadPollSeconds);
     }
   }
 #endif

@@ -11,9 +11,13 @@
 // about, ask Poll() periodically for the subset whose last_write_time advanced since the last
 // call. Atomic-save editors (temp + rename) are handled because we resolve the canonical path
 // at Track() time and re-stat it each Poll.
-class ScriptWatcher {
+//
+// Generic infrastructure shared by every hot-reload path: Lua script reload (ScriptHotReload)
+// and asset reload (AssetHotReload) both own one of these. It knows nothing about scripts,
+// assets, sol, or SDL — just paths and mtimes.
+class FileWatcher {
  public:
-  ScriptWatcher() = default;
+  FileWatcher() = default;
 
   // Add a file to the watch set. Path is canonicalized; duplicates and unknown files are
   // silently ignored (the second case logs and stays untracked — caller bug, not user error).
@@ -40,7 +44,7 @@ class ScriptWatcher {
 
 // Shipped builds: zero-cost stub so callers compile without #ifdef sprinkling. Track/Untrack
 // drop their args, Poll always returns empty.
-class ScriptWatcher {
+class FileWatcher {
  public:
   void Track(const std::string&) {}
   void Untrack(const std::string&) {}
