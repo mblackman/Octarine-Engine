@@ -566,6 +566,11 @@ void Game::Setup() {
     LoadGame(lua, assetManager, gameConfig);
   }
 
+  // The startup script's first load_scene ran immediately above so frame 1 has a populated scene.
+  // From here on, in-game load_scene/reload_scene (e.g. a UIButton on_click) defer to the top of
+  // the next frame so the swap never runs inside an event dispatch or system ForEach.
+  scene_loader_->EnableDeferredSwaps();
+
   registry_->RegisterParallelSystem<SpriteComponent, AnimationComponent>(AnimationSystem());
   registry_->RegisterParallelSystem<ProjectileComponent>(ProjectileLifecycleSystem());
 

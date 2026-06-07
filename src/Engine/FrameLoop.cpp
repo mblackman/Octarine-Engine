@@ -137,6 +137,12 @@ void FrameLoop::Update(const float deltaTime) {
 #endif
   PROFILE_NAMED_SCOPE("Game::Update (total)");
 
+  // Apply any scene swap requested during ProcessInput (UIButton clicks fire there) or by a script
+  // last frame. Done here — before systems run, after event dispatch finished — so the swap is
+  // outside every ForEach and the new scene's entities get their global transforms this same frame.
+  // Runs regardless of pause so menu navigation works while the editor is paused.
+  game_->FlushPendingSceneLoad();
+
 #ifndef OCTARINE_SHIPPED
   if (auto* devListen = registry_->TryGet<octarine::dev::DevListenServer>()) {
     devListen->Pump();

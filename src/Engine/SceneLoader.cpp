@@ -1,5 +1,7 @@
 #include "Engine/SceneLoader.h"
 
+#include <SDL3_mixer/SDL_mixer.h>
+
 #include <algorithm>
 #include <set>
 #include <string>
@@ -28,6 +30,26 @@ void SceneLoader::LoadScene(const std::string& scenePath) {
     return;
   }
 
+  // Deferred path: a UIButton on_click (or any in-frame caller) only queues the swap; the frame loop
+  // flushes it before systems run. Last request within a frame wins. See header for the why.
+  if (deferred_swaps_) {
+    pending_scene_path_ = scenePath;
+    has_pending_scene_ = true;
+    return;
+  }
+
+  loadSceneImmediate(scenePath);
+}
+
+void SceneLoader::FlushPendingSceneLoad() {
+  if (!has_pending_scene_) return;
+  has_pending_scene_ = false;
+  const std::string path = std::move(pending_scene_path_);
+  pending_scene_path_.clear();
+  loadSceneImmediate(path);
+}
+
+void SceneLoader::loadSceneImmediate(const std::string& scenePath) {
   auto& assetManager = registry_->Get<AssetManager>();
   SDL_Renderer* renderer = registry_->Get<EngineContext>().sdlRenderer;
 
@@ -191,6 +213,14 @@ void SceneLoader::ReloadScene() {
 }
 
 void SceneLoader::clearSceneEntities() {
+  // Stop every playing track before the emitter entities vanish. AudioTrackCache.Clear() below only
+  // drops the entity->track map — it does not halt playback, so a looping source (loop=true) would
+  // keep sounding into the next scene and, because AcquireTrack only reuses !MIX_TrackPlaying slots,
+  // its pool track would never be reclaimed. MIX_StopAllTracks frees them on both counts.
+  if (MIX_Mixer* mixer = registry_->Get<EngineContext>().mixer) {
+    MIX_StopAllTracks(mixer, 0);
+  }
+
   registry_->ClearUserEntities();
   if (auto* inputSystem = registry_->TryGet<InputSystem>()) {
     inputSystem->ResetLuaState();

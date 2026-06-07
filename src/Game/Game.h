@@ -105,6 +105,10 @@ class Game : public LuaBindingContext {
   // uses this to decide whether Play should resume a paused scene or (re)start a stopped one.
   [[nodiscard]] bool IsSceneRunning() const { return scene_loader_->IsSceneRunning(); }
 
+  // Run any scene swap queued (deferred) during this frame's input/system passes. FrameLoop calls
+  // this at the top of Update, before systems run, so the swap happens outside any ForEach.
+  void FlushPendingSceneLoad() { scene_loader_->FlushPendingSceneLoad(); }
+
  private:
   void Setup();
   // Resolve the ImGui ini path (project dir / pref dir / cwd fallback), init the backend, and hand

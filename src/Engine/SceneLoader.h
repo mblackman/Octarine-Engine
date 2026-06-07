@@ -25,9 +25,25 @@ class SceneLoader {
 
   ~SceneLoader() = default;
 
+  // Request a scene swap. Once EnableDeferredSwaps() has been called (the live frame loop does this
+  // after the startup script runs), this only records the path; the actual swap runs at the next
+  // FlushPendingSceneLoad() — i.e. the top of FrameLoop::Update, outside any event dispatch / system
+  // ForEach. That deferral is what makes it safe for a UIButton on_click handler to navigate: doing
+  // the swap inline would clear + recreate entities in the same archetype chunk UIButtonSystem is
+  // mid-iteration over, re-firing the click on a freshly created (and not-yet-transformed, so
+  // positioned at the origin) button. Before deferral is enabled (bake + the initial startup load)
+  // the swap happens immediately.
   void LoadScene(const std::string& scenePath);
   void ReloadScene();
   void StopScene();
+
+  // Switch LoadScene/ReloadScene from immediate to deferred. Called once by the live setup after the
+  // startup script's first scene load (which must stay immediate so frame 1 has a populated scene).
+  void EnableDeferredSwaps() { deferred_swaps_ = true; }
+
+  // Perform a pending deferred swap, if any. Called at the top of the frame, before systems run, so
+  // the new scene's entities get their GlobalTransformComponent populated this same frame.
+  void FlushPendingSceneLoad();
 
   // Record asset ids acquired for the current scene so StopScene/the next LoadScene releases
   // them. Deduped against ids already tracked. Called by the C++ scene loader and by the
@@ -45,9 +61,17 @@ class SceneLoader {
   // the next scene's set before releasing the previous one (acquire-before-release).
   void clearSceneEntities();
 
+  // The real swap. LoadScene routes here immediately (pre-deferral) or via FlushPendingSceneLoad.
+  void loadSceneImmediate(const std::string& scenePath);
+
   Registry* registry_;
   sol::state& lua_;
   bool scene_running_ = false;
+  // Deferred-swap state. deferred_swaps_ flips on once the live loop is running; while set, LoadScene
+  // only stashes pending_scene_path_ (last request wins) and FlushPendingSceneLoad does the work.
+  bool deferred_swaps_ = false;
+  bool has_pending_scene_ = false;
+  std::string pending_scene_path_;
   // Asset ids acquired for the currently loaded scene. StopScene releases these; LoadScene
   // acquires the next scene's set first (acquire-before-release) so shared assets never churn.
   std::vector<std::string> current_scene_assets_;
