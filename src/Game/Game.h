@@ -94,7 +94,7 @@ class Game : public LuaBindingContext {
 
   // Scene lifecycle lives in SceneLoader; these LuaBindingContext overrides delegate so the
   // `scene.*` Lua module (and the editor toolbar) drive it through Game unchanged.
-  void LoadScene(const std::string& scenePath) override { scene_loader_->LoadScene(scenePath); }
+  void LoadScene(const std::string& scenePath) override { scene_loader_->RequestLoadScene(scenePath); }
   void ReloadScene() override { scene_loader_->ReloadScene(); }
   void StopScene() override { scene_loader_->StopScene(); }
   void TrackSceneAssets(const std::vector<std::string>& assetIds) override {

@@ -32,6 +32,11 @@ class SceneLoader {
   // clear + recreate entities in the same archetype chunk UIButtonSystem is mid-iteration over,
   // re-firing the click on a freshly created (and not-yet-transformed, so positioned at the origin)
   // button. Before deferral is armed (bake + the initial startup load) the swap happens immediately.
+  // This is the entry the Lua `load_scene` global and the editor toolbar drive through.
+  void RequestLoadScene(const std::string& scenePath);
+
+  // Immediate, unconditional scene swap. RequestLoadScene/FlushPendingSceneLoad call this; external
+  // callers should prefer RequestLoadScene so in-frame navigation defers safely.
   void LoadScene(const std::string& scenePath);
   void ReloadScene();
   void StopScene();
