@@ -24,6 +24,22 @@
 #include "Editor/EditorPersistence.h"
 #endif
 
+void SceneLoader::FlushPendingSceneLoad() {
+  // First flush also arms deferral: the startup script's initial load ran before any frame
+  // (deferred_swaps_ still false) so it took effect immediately; from here, in-frame load_scene
+  // calls queue instead. Bake never reaches a frame loop, so its loads stay immediate.
+  deferred_swaps_ = true;
+  if (!has_pending_scene_) return;
+  has_pending_scene_ = false;
+  const std::string path = std::move(pending_scene_path_);
+  pending_scene_path_.clear();
+  // Drop deferral for the duration of the swap so LoadScene runs its body instead of re-queuing,
+  // then re-arm for subsequent in-frame callers.
+  deferred_swaps_ = false;
+  LoadScene(path);
+  deferred_swaps_ = true;
+}
+
 void SceneLoader::LoadScene(const std::string& scenePath) {
   if (scenePath.empty()) {
     Logger::Warn("LoadScene called with empty path.");
@@ -31,25 +47,14 @@ void SceneLoader::LoadScene(const std::string& scenePath) {
   }
 
   // Deferred path: a UIButton on_click (or any in-frame caller) only queues the swap; the frame loop
-  // flushes it before systems run. Last request within a frame wins. See header for the why.
+  // flushes it before systems run (FlushPendingSceneLoad). Last request within a frame wins. See
+  // header for the why.
   if (deferred_swaps_) {
     pending_scene_path_ = scenePath;
     has_pending_scene_ = true;
     return;
   }
 
-  loadSceneImmediate(scenePath);
-}
-
-void SceneLoader::FlushPendingSceneLoad() {
-  if (!has_pending_scene_) return;
-  has_pending_scene_ = false;
-  const std::string path = std::move(pending_scene_path_);
-  pending_scene_path_.clear();
-  loadSceneImmediate(path);
-}
-
-void SceneLoader::loadSceneImmediate(const std::string& scenePath) {
   auto& assetManager = registry_->Get<AssetManager>();
   SDL_Renderer* renderer = registry_->Get<EngineContext>().sdlRenderer;
 

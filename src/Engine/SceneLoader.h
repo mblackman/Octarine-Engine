@@ -25,24 +25,20 @@ class SceneLoader {
 
   ~SceneLoader() = default;
 
-  // Request a scene swap. Once EnableDeferredSwaps() has been called (the live frame loop does this
-  // after the startup script runs), this only records the path; the actual swap runs at the next
-  // FlushPendingSceneLoad() — i.e. the top of FrameLoop::Update, outside any event dispatch / system
-  // ForEach. That deferral is what makes it safe for a UIButton on_click handler to navigate: doing
-  // the swap inline would clear + recreate entities in the same archetype chunk UIButtonSystem is
-  // mid-iteration over, re-firing the click on a freshly created (and not-yet-transformed, so
-  // positioned at the origin) button. Before deferral is enabled (bake + the initial startup load)
-  // the swap happens immediately.
+  // Request a scene swap. Once the frame loop is running (its first FlushPendingSceneLoad arms
+  // deferral), this only records the path; the actual swap runs at the next FlushPendingSceneLoad()
+  // — i.e. the top of FrameLoop::Update, outside any event dispatch / system ForEach. That deferral
+  // is what makes it safe for a UIButton on_click handler to navigate: doing the swap inline would
+  // clear + recreate entities in the same archetype chunk UIButtonSystem is mid-iteration over,
+  // re-firing the click on a freshly created (and not-yet-transformed, so positioned at the origin)
+  // button. Before deferral is armed (bake + the initial startup load) the swap happens immediately.
   void LoadScene(const std::string& scenePath);
   void ReloadScene();
   void StopScene();
 
-  // Switch LoadScene/ReloadScene from immediate to deferred. Called once by the live setup after the
-  // startup script's first scene load (which must stay immediate so frame 1 has a populated scene).
-  void EnableDeferredSwaps() { deferred_swaps_ = true; }
-
-  // Perform a pending deferred swap, if any. Called at the top of the frame, before systems run, so
-  // the new scene's entities get their GlobalTransformComponent populated this same frame.
+  // Arm deferral (first call) and perform a pending deferred swap, if any. Called at the top of the
+  // frame, before systems run, so the new scene's entities get their GlobalTransformComponent
+  // populated this same frame. Never reached under bake (no frame loop), so bake loads stay immediate.
   void FlushPendingSceneLoad();
 
   // Record asset ids acquired for the current scene so StopScene/the next LoadScene releases
@@ -60,9 +56,6 @@ class SceneLoader {
   // touching acquired assets. Asset release is sequenced separately so a scene swap can acquire
   // the next scene's set before releasing the previous one (acquire-before-release).
   void clearSceneEntities();
-
-  // The real swap. LoadScene routes here immediately (pre-deferral) or via FlushPendingSceneLoad.
-  void loadSceneImmediate(const std::string& scenePath);
 
   Registry* registry_;
   sol::state& lua_;
