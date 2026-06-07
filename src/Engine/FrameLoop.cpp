@@ -10,6 +10,7 @@
 #include "AssetManager/AssetManager.h"
 #include "Components/ViewportInfo.h"
 #include "ECS/Registry.h"
+#include "Engine/EditorExceptionGuard.h"
 #include "Engine/EngineContext.h"
 #include "Engine/EngineRuntime.h"
 #include "EventBus/EventBus.h"
@@ -83,6 +84,11 @@ void FrameLoop::ProcessInput() {
   PROFILE_NAMED_SCOPE("Game::ProcessInput");
   SDL_Event event;
 
+  // Mouse/key event emission fans out to game code (Lua input handlers, UIButtonSystem callbacks),
+  // so it is guarded the same way as the per-frame Update — a throwing handler pauses rather than
+  // crashes the editor. See FrameLoop::Update / EditorExceptionGuard.h.
+  auto& gameConfig = registry_->Get<GameConfig>();
+
   while (SDL_PollEvent(&event)) {
 #ifdef OCTARINE_WITH_IMGUI
     ImGui_ImplSDL3_ProcessEvent(&event);
@@ -102,17 +108,20 @@ void FrameLoop::ProcessInput() {
       case SDL_EVENT_KEY_DOWN:
       case SDL_EVENT_KEY_UP: {
         KeyInputEvent keyInputEvent = GetKeyInputEvent(&event.key);
-        event_bus_->EmitEvent<KeyInputEvent>(keyInputEvent);
+        octarine::editor::RunEditorGuarded(gameConfig, "Input",
+                                           [&] { event_bus_->EmitEvent<KeyInputEvent>(keyInputEvent); });
         break;
       }
       case SDL_EVENT_MOUSE_BUTTON_DOWN:
       case SDL_EVENT_MOUSE_BUTTON_UP: {
         SDL_MouseButtonEvent mouseButtonEvent = event.button;
-        event_bus_->EmitEvent<MouseInputEvent>(mouseButtonEvent);
+        octarine::editor::RunEditorGuarded(gameConfig, "Input",
+                                           [&] { event_bus_->EmitEvent<MouseInputEvent>(mouseButtonEvent); });
         break;
       }
       case SDL_EVENT_MOUSE_WHEEL: {
-        event_bus_->EmitEvent<MouseWheelEvent>(event.wheel.x, event.wheel.y);
+        octarine::editor::RunEditorGuarded(
+            gameConfig, "Input", [&] { event_bus_->EmitEvent<MouseWheelEvent>(event.wheel.x, event.wheel.y); });
         break;
       }
       case SDL_EVENT_WINDOW_RESIZED:
@@ -143,7 +152,8 @@ void FrameLoop::Update(const float deltaTime) {
   }
 #endif
 
-  auto& options = registry_->Get<GameConfig>().GetEngineOptions();
+  auto& gameConfig = registry_->Get<GameConfig>();
+  auto& options = gameConfig.GetEngineOptions();
 
   // Master volume + mute live at the mixer level so they apply to every track (including loops
   // already playing). Synced every frame — and outside the pause gate — so toggling mute reacts
@@ -174,7 +184,11 @@ void FrameLoop::Update(const float deltaTime) {
 #endif
 
   if (!options.isPaused || options.stepFrame) {
-    registry_->Update(deltaTime * options.timeScale);
+    // The per-frame tick runs every game system, including ScriptSystem's Lua calls. In an editor
+    // session an uncaught exception here is caught + paused instead of crashing the editor; in the
+    // player/headless paths it propagates unchanged. See EditorExceptionGuard.h.
+    const float scaledDelta = deltaTime * options.timeScale;
+    octarine::editor::RunEditorGuarded(gameConfig, "Update", [&] { registry_->Update(scaledDelta); });
     options.stepFrame = false;
   } else {
     // If paused, we might still want to clear some per-frame signals so they don't get stuck.
