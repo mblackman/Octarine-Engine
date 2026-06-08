@@ -1,8 +1,11 @@
 # Lua Scripting Guide
 
-Octarine Engine is designed to be driven by Lua scripts. This guide explains how to structure your game project and use the engine's Lua API.
+Octarine Engine is designed to be driven by Lua scripts. This guide covers the
+`script` component, the update loop, reading and writing components at runtime,
+the full input API, and the ImGui debug UI surface.
 
-For a complete working example, refer to the sibling `Octarine-Engine-Example/` directory.
+For a complete working example, refer to the sibling `Octarine-Engine-Example/`
+directory.
 
 ---
 
@@ -39,151 +42,236 @@ DefaultScalingMode=nearest # 'nearest' or 'linear'
 
 ---
 
-## 3. Loading Assets
+## 3. The Script Component
 
-Assets must be loaded before they can be used by entities. The recommended
-flow is `acquire_scene_assets(scene)` — the scene table's references drive
-the load. The full asset model (catalog, `.meta` sidecars, bake, atlases,
-audio normalize) lives in [`docs/asset-pipeline.md`](asset-pipeline.md).
-The explicit `load_asset` form below is the legacy path.
+Attach a `script` table to any entity to give it per-frame Lua behaviour. The
+engine calls two callbacks on it each frame:
+
+| Callback | When called |
+|---|---|
+| `on_update(self, entity, dt)` | Every frame, in system order |
+| `on_debug_gui(self, entity)` | Every frame, but only when editor debug UI is visible |
+| `on_click(self, entity)` | When the entity has a `ui_button` component and is clicked |
+
+- **`self`** is the script table itself — store per-entity state here.
+- **`entity`** is the numeric entity ID — pass it to `registry.*` and helper globals.
+- **`dt`** is delta time in seconds since the last frame.
 
 ```lua
--- Load a texture
-load_asset({ 
-    type = "texture", 
-    id = "player-texture", 
-    file = "images/player.png" 
+load_entity({
+    components = {
+        transform = { position = { x = 100, y = 100 } },
+        sprite    = { texture_asset_id = "player", width = 32, height = 32, layer = 2 },
+        rigidbody = { velocity = { x = 0, y = 0 } },
+        script    = {
+            speed    = 80,
+            cooldown = 0,
+            on_update = function(self, entity, dt)
+                self.cooldown = self.cooldown - dt
+                -- movement and actions handled here each frame
+            end,
+        },
+    }
 })
+```
 
--- Load a font
-load_asset({ 
-    type = "font", 
-    id = "main-font", 
-    file = "fonts/arial.ttf", 
-    font_size = 12 
+Scripts are plain Lua tables — any key you add to the table persists across
+frames and is accessible through `self`.
+
+---
+
+## 4. Reading and Writing Components
+
+### `registry.get_*` / `registry.has_*`
+
+The `registry` table exposes a getter and a presence check for every component.
+The pattern is `registry.get_<key>` / `registry.has_<key>`, where the key for
+each component is listed in [`docs/ecs-components.md`](ecs-components.md).
+
+```lua
+-- Read and mutate a component (get returns a mutable proxy)
+local pos = registry.get_position(entity)
+pos.x = pos.x + 10
+
+-- Guard before accessing an optional component
+if registry.has_health(entity) then
+    local hp = registry.get_health(entity)
+    hp.current_health = hp.current_health - 1
+end
+
+-- Rigidbody velocity
+local rb = registry.get_rigidbody(entity)
+rb.velocity.x = 150
+rb.velocity.y = 0
+```
+
+### Convenience helpers
+
+These globals are shorthand for the most common reads and writes:
+
+| Function | Description |
+|---|---|
+| `get_position(entity)` | Returns `{x, y}` |
+| `set_position(entity, x, y)` | Teleports the entity |
+| `get_name(entity)` | Returns the entity's name string |
+| `set_name(entity, name)` | Sets the name |
+| `set_sprite_src_rect(entity, x, y)` | Sets the sprite source-rect origin |
+| `find_entity_by_name(name)` | Returns the entity ID, or `nil` |
+| `blam(entity)` | Destroys the entity |
+
+### Other Lua globals
+
+| Function | Description |
+|---|---|
+| `log(message)` | Print to the engine console |
+| `load_asset(table)` | Load a texture, font, or sound |
+| `load_entity(table)` | Spawn a new entity |
+| `get_asset_path(path)` | Resolve a project-relative path to an absolute path |
+| `fire_projectile(entity, dx, dy)` | Spawn a projectile from the entity's emitter |
+| `play_sound(asset_id)` | Play a sound or music track |
+| `get_camera_position()` | Returns `{x, y}` of the camera viewport origin |
+| `get_game_map_dimensions()` | Returns `{w, h}` of the playable area |
+| `set_game_map_dimensions(w, h)` | Set the world bounds for camera clamping |
+| `read_file_lines(path)` | Read a file and return its lines as a table |
+| `quit_game()` | Gracefully exit the engine |
+
+---
+
+## 5. Input
+
+The `input` table handles action binding, polling, and event callbacks.
+
+### Binding actions
+
+Bind named logical actions to physical keys once at startup (typically in
+`game.lua`). Bindings persist across the session unless explicitly removed.
+
+```lua
+input.bind("move_up",    "up")
+input.bind("move_up",    "w")       -- multiple keys per action
+input.bind("move_down",  "down")
+input.bind("move_down",  "s")
+input.bind("move_left",  "left")
+input.bind("move_left",  "a")
+input.bind("move_right", "right")
+input.bind("move_right", "d")
+input.bind("fire",       "space")
+
+input.unbind("fire", "space")       -- remove one key
+input.unbind("fire")                -- remove all keys for the action
+```
+
+> **Note:** action bindings and callbacks are cleared on `load_scene` /
+> `reload_scene`. Re-install them in the new scene's startup or use a guard for
+> idempotency. See [`docs/scenes.md`](scenes.md) for the full scene lifecycle.
+
+### Polling
+
+```lua
+-- Actions (fires for any key bound to the action)
+input.is_action_down("fire")        -- held this frame
+input.is_action_pressed("fire")     -- just went down this frame
+input.is_action_released("fire")    -- just came up this frame
+
+-- Raw keys
+input.is_key_down("escape")
+input.is_key_pressed("f5")
+input.is_key_released("space")
+
+-- Mouse
+local pos   = input.mouse_position()   -- returns {x, y}, viewport-aware
+local wheel = input.mouse_wheel()      -- returns {x, y} per-frame delta
+input.is_mouse_down(1)                 -- 1 = left, 2 = right, 3 = middle
+input.is_mouse_pressed(1)
+input.is_mouse_released(1)
+```
+
+### Callbacks
+
+```lua
+input.on_key_down(function(key_name) ... end)
+input.on_key_up(function(key_name) ... end)
+input.on_mouse_down(function(btn, x, y) ... end)
+input.on_mouse_up(function(btn, x, y) ... end)
+input.on_mouse_wheel(function(dx, dy) ... end)
+```
+
+### Example: 8-way movement
+
+```lua
+local function movement_update(self, entity, dt)
+    local dx, dy = 0, 0
+    if input.is_action_down("move_up")    then dy = dy - 1 end
+    if input.is_action_down("move_down")  then dy = dy + 1 end
+    if input.is_action_down("move_left")  then dx = dx - 1 end
+    if input.is_action_down("move_right") then dx = dx + 1 end
+
+    local rb = registry.get_rigidbody(entity)
+    if dx ~= 0 or dy ~= 0 then
+        local len = math.sqrt(dx * dx + dy * dy)
+        rb.velocity.x = (dx / len) * self.speed
+        rb.velocity.y = (dy / len) * self.speed
+    else
+        rb.velocity.x = 0
+        rb.velocity.y = 0
+    end
+end
+
+load_entity({
+    components = {
+        transform = { position = { x = 200, y = 200 } },
+        sprite    = { texture_asset_id = "player", width = 32, height = 32, layer = 2 },
+        rigidbody = { velocity = { x = 0, y = 0 } },
+        script    = { speed = 120, on_update = movement_update },
+    }
 })
 ```
 
 ---
 
-### 4. Creating Entities
+## 6. ImGui Debug UI
 
-Entities are created by passing a table to `load_entity`. They are composed of a `tag` (optional) and several `components`.
-
-For a full list of available components and their fields, see
-**[ECS Component Reference](ecs-components.md)**.
+The engine exposes full [Dear ImGui](https://github.com/ocornut/imgui) bindings
+to Lua. Wire debug windows through the `on_debug_gui` callback — it only fires
+when the editor's debug UI is visible, so release builds pay zero cost.
 
 ```lua
-local player = {
-
-    tag = "player",
+load_entity({
     components = {
-        transform = {
-            position = { x = 100, y = 100 },
-            scale = { x = 1.0, y = 1.0 },
-            rotation = 0.0,
-        },
-        sprite = {
-            texture_asset_id = "player-texture",
-            width = 32,
-            height = 32,
-            layer = 1
-        },
-        rigidbody = {
-            velocity = { x = 0, y = 0 }
-        },
         script = {
-            speed = 100,
-            on_update = function(self, entity, delta_time)
-                -- Movement via the global `input` table. See lib/player_controller.lua
-                -- in the example project for a clamped + normalized version.
-                local pos = get_position(entity)
-                local dx, dy = 0, 0
-                if input.is_key_down("left")  then dx = dx - 1 end
-                if input.is_key_down("right") then dx = dx + 1 end
-                if input.is_key_down("up")    then dy = dy - 1 end
-                if input.is_key_down("down")  then dy = dy + 1 end
-                set_position(entity, pos.x + dx * self.speed * delta_time,
-                                     pos.y + dy * self.speed * delta_time)
-                if input.is_key_pressed("space") then log("Jump!") end
-            end
+            spawn_x = 100,
+            spawn_y = 100,
+            on_debug_gui = function(self, entity)
+                if ImGui.Begin("Spawn Tool") then
+                    self.spawn_x = ImGui.InputInt("X", self.spawn_x)
+                    self.spawn_y = ImGui.InputInt("Y", self.spawn_y)
+
+                    if ImGui.Button("Spawn Enemy") then
+                        load_entity({
+                            components = {
+                                transform = { position = { x = self.spawn_x, y = self.spawn_y } },
+                                sprite    = { texture_asset_id = "enemy", width = 32, height = 32, layer = 2 },
+                                health    = { max_health = 50 },
+                            }
+                        })
+                    end
+                end
+                ImGui.End()
+            end,
         }
     }
-}
-
-load_entity(player)
+})
 ```
 
----
-
-## 5. Lua API Reference
-
-| Function | Description |
-| --- | --- |
-| `log(message)` | Logs a message to the console. |
-| `load_asset(table)` | Loads a texture or font. |
-| `load_entity(table)` | Spawns a new entity with components. |
-| `blam(entity)` | Destroys the specified entity. |
-| `get_asset_path(path)` | Returns the absolute path for a relative asset path. |
-| `set_position(entity, x, y)` | Manually updates an entity's position. |
-| `get_position(entity)` | Returns the entity's position as a `vec2`. |
-| `get_camera_position()` | Returns the current camera viewport origin as `vec2`. |
-| `get_game_map_dimensions()` | Returns playable area as `vec2(width, height)`. |
-| `set_game_map_dimensions(w, h)` | Sets the playable area used by off-screen despawn. |
-| `set_sprite_src_rect(entity, x, y)` | Sets the sprite's source-rect origin (animation row/col). |
-| `fire_projectile(entity, dx, dy)` | Spawns a projectile from `entity`'s `projectile_emitter`, aimed at `(dx, dy)` (zero = emitter default). |
-| `read_file_lines(path)` | Reads a file and returns its lines as a table. |
-| `quit_game()` | Gracefully exits the engine. |
-
-### `input` table
-
-Polling, action map, and callbacks. Action bindings + callbacks are cleared on `load_scene`/`reload_scene` — re-install in the new scene's `setup` (use a guard for idempotency). Full scene lifecycle in [`docs/scenes.md`](scenes.md).
-
-| Function | Description |
-| --- | --- |
-| `input.is_key_down(name)` / `is_key_pressed(name)` / `is_key_released(name)` | Held / went-down-this-frame / went-up-this-frame. |
-| `input.is_mouse_down(btn)` / `is_mouse_pressed(btn)` / `is_mouse_released(btn)` | `btn` is `"left"`, `"middle"`, `"right"`, `"x1"`, `"x2"`, or an SDL button id. |
-| `input.mouse_position()` | Cursor position as `vec2`. Mapped to game resolution, viewport-aware (works in Editor). |
-| `input.mouse_wheel()` | Per-frame wheel delta as `vec2`. |
-| `input.bind(action, key)` / `unbind(action, key?)` | Register / remove key for action; nil key removes all. |
-| `input.is_action_down(name)` / `is_action_pressed(name)` / `is_action_released(name)` | As above, OR over all keys bound to the action. |
-| `input.on_key_down(fn)` / `on_key_up(fn)` | `fn(key_name)`. |
-| `input.on_mouse_down(fn)` / `on_mouse_up(fn)` | `fn(btn, x, y)`. |
-| `input.on_mouse_wheel(fn)` | `fn(dx, dy)`. |
+The full ImGui API is documented in the
+[Dear ImGui wiki](https://github.com/ocornut/imgui/wiki) and the engine's
+generated Lua stub at
+[`lua_api.smoke.lua`](https://github.com/mblackman/Octarine-Engine/blob/main/lua_api.smoke.lua)
+(search for `ImGui.`).
 
 ---
 
-## 6. ImGui Integration
-
-The engine exposes ImGui to Lua, allowing you to create debug tools and UI directly in script.
-Wire it via the `script` component's `on_debug_gui` callback:
-
-```lua
-script = {
-    on_debug_gui = function(self, entity)
-        if ImGui.Begin("Tools") then
-            if ImGui.Button("Spawn Enemy") then
-                -- Logic to spawn an enemy
-            end
-        end
-        ImGui.End()
-    end
-}
-```
-
----
-
-## 7. Global Callbacks
-
-The engine looks for specific functions in your scripts:
-
-- `on_update(self, entity, delta_time)`: Called every frame.
-- `on_debug_gui(self, entity)`: Called during the ImGui rendering pass.
-- `on_click(self, entity)`: Called if the entity has a `ui_button` component and is clicked.
-
----
-
-## 8. Adding component methods
+## 7. Adding Component Methods (engine contributors)
 
 When you add a Lua binding for a component (`src/Lua/Bindings/<X>ComponentLuaBinding.h`),
 the `bindUsertype` call exposes both fields and **member functions** to scripts:
@@ -191,9 +279,9 @@ the `bindUsertype` call exposes both fields and **member functions** to scripts:
 ```cpp
 lua.new_usertype<HealthComponent>(kUsertypeName,
     "max_health", &HealthComponent::maxHealth,
-    "damage",     &HealthComponent::Damage,   // member function
+    "damage",     &HealthComponent::Damage,
     "heal",       &HealthComponent::Heal,
-    "is_dead",    sol::property(&HealthComponent::IsDead),   // derived read-only
+    "is_dead",    sol::property(&HealthComponent::IsDead),
     "fraction",   sol::property(&HealthComponent::Fraction));
 ```
 
@@ -225,10 +313,9 @@ them anywhere safely.
 
 ### Patterns
 
-- **Mutators with invariants** — bind the field with `sol::property` and a
-  clamping setter so Lua can't bypass the invariant by direct field assignment.
-  `HealthComponent::currentHealth` is the canonical example: writes clamp to
-  `[0, maxHealth]`.
+- **Mutators with invariants** — bind with `sol::property` and a clamping
+  setter so Lua can't bypass the invariant by direct field assignment.
+  `HealthComponent::currentHealth` is the canonical example.
 - **Derived read-only state** — bind with `sol::property(&T::accessor)` so
   scripts get field-style access (`health.is_dead`) without exposing a setter.
 - **Plain getters/setters** — bind the member function directly.
