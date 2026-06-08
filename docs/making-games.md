@@ -34,13 +34,34 @@ it alongside this guide whenever an example would help.
 
 Before writing game code you need a built copy of the engine.
 
-**System requirements**
+### Option A — Download a pre-built binary (recommended)
 
-- CMake 3.15+
-- A C++20-capable compiler (MSVC 2022, GCC 12+, or Clang 14+)
-- vcpkg (the engine uses manifest mode; it manages its own dependencies)
+CI builds the engine for Windows, macOS, and Linux on every push to `main`.
+Download the artifact for your platform from the
+[Actions tab](https://github.com/mblackman/Octarine-Engine/actions) on GitHub:
 
-**Build the engine**
+1. Open the latest successful **Build** workflow run.
+2. Scroll to **Artifacts** at the bottom.
+3. Download `OctarineEngine-<platform>-editor-release` for day-to-day development
+   or `OctarineEngine-<platform>-player-release` for a runtime-only build with no
+   editor tools.
+4. Unzip and run the binary directly — no install step required.
+
+Available artifact names:
+
+| Artifact | Contents |
+|---|---|
+| `OctarineEngine-windows-editor-release` | Windows editor build |
+| `OctarineEngine-windows-player-release` | Windows player-only build |
+| `OctarineEngine-macos-editor-release` | macOS editor build |
+| `OctarineEngine-macos-player-release` | macOS player-only build |
+| `OctarineEngine-linux-editor-release` | Linux editor build |
+| `OctarineEngine-linux-player-release` | Linux player-only build |
+
+### Option B — Build from source
+
+Requires CMake 3.15+, a C++20-capable compiler (MSVC 2022, GCC 12+, or Clang 14+),
+and vcpkg (the engine uses manifest mode and manages its own dependencies).
 
 ```bash
 git clone https://github.com/mblackman/Octarine-Engine
