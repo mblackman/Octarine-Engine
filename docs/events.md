@@ -3,6 +3,15 @@
 The engine has a small, type-erased publish/subscribe bus for decoupled communication — input,
 collisions, and audio triggers flow through it rather than through direct calls between systems.
 
+> **Lua game devs:** you do not call `SubscribeEvent` or `EmitEvent` from Lua. The event bus is an
+> internal C++ mechanism. Its results surface to scripts automatically:
+> - **Collision damage** — handled by `DamageSystem`; just add `box_collider` + `health` to your
+>   entities and damage applies without any script code.
+> - **Input** — folded into the `input.*` table each frame; use `input.is_action_pressed` etc.
+> - **Audio** — triggered by `play_sound()`, which emits an `AudioPlayEvent` internally.
+>
+> This document is for engine contributors adding new C++ systems.
+
 ## The bus
 
 `EventBus` (`src/EventBus/EventBus.h`) keys subscriptions by `std::type_index`, so any C++ type can be
