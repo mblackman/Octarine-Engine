@@ -129,6 +129,23 @@ Tracks an entity's health.
 Forces the main camera to follow this entity. Has no fields.
 Example: `camera_follow = {}`
 
+### `audio_listener`
+
+Marks an entity as the spatial audio listener. Attenuation is computed relative
+to this entity's position. Has no fields — only one listener should exist per scene.
+Example: `audio_listener = {}`
+
+### `audio_source`
+
+Attaches a looping or triggered sound to an entity. The engine spatializes it
+relative to the `audio_listener`.
+
+| Field      | Type      | Default | Description                                        |
+|------------|-----------|---------|----------------------------------------------------|
+| `asset_id` | `string`  | `""`    | The ID of the loaded sound asset.                  |
+| `loop`     | `boolean` | `false` | If true, the sound loops continuously.             |
+| `volume`   | `number`  | `1.0`   | Playback volume (0.0–1.0).                         |
+
 ### `ui_button`
 
 Makes an entity clickable.
@@ -137,6 +154,105 @@ Makes an entity clickable.
 |-------------|------------|---------|-----------------------------------------------------|
 | `is_active` | `boolean`  | `true`  | Whether the button is interactive.                  |
 | `on_click`  | `function` | `nil`   | Function called on click: `function(self, entity)`. |
+
+---
+
+## Common Entity Patterns
+
+Components compose naturally. These combinations cover most game object archetypes.
+
+### Player
+
+```lua
+{
+    tag  = "player",
+    name = "Player",
+    components = {
+        transform      = { position = { x = 200, y = 300 } },
+        sprite         = { texture_asset_id = "player", width = 32, height = 32, layer = 2 },
+        rigidbody      = { velocity = { x = 0, y = 0 } },
+        box_collider   = { width = 32, height = 32 },
+        health         = { max_health = 100, current_health = 100 },
+        camera_follow  = {},
+        audio_listener = {},
+        script         = { speed = 100, on_update = player_update },
+    }
+}
+```
+
+### Enemy
+
+```lua
+{
+    tag  = "enemy",
+    name = "Enemy",
+    components = {
+        transform          = { position = { x = 600, y = 300 } },
+        sprite             = { texture_asset_id = "enemy", width = 32, height = 32, layer = 2 },
+        rigidbody          = { velocity = { x = 0, y = 0 } },
+        box_collider       = { width = 32, height = 32 },
+        health             = { max_health = 50, current_health = 50 },
+        projectile_emitter = {
+            projectile_velocity = { x = -150, y = 0 },
+            projectile_duration = 4.0,
+            repeat_frequency    = 2.0,
+            hit_damage          = 10,
+            friendly            = false,
+        },
+    }
+}
+```
+
+### Ambient sound source
+
+```lua
+{
+    components = {
+        transform    = { position = { x = 400, y = 400 } },
+        audio_source = { asset_id = "ambient-wind", loop = true, volume = 0.6 },
+    }
+}
+```
+
+### HUD overlay
+
+Text and shapes with `fixed = true` / `is_fixed = true` stay in screen space,
+unaffected by the camera. Layer them high so they always draw on top.
+
+```lua
+-- Score label
+{
+    components = {
+        transform  = { position = { x = 20, y = 20 } },
+        text_label = {
+            text     = "Score: 0",
+            font_id  = "hud-font",
+            color    = { r = 255, g = 255, b = 255, a = 255 },
+            layer    = 10,
+            is_fixed = true,
+        },
+        script = {
+            on_update = function(self, entity, dt)
+                -- update text via registry when score changes
+            end,
+        },
+    }
+}
+
+-- Semi-transparent health bar background
+{
+    components = {
+        transform = { position = { x = 20, y = 50 } },
+        square    = {
+            width  = 200,
+            height = 16,
+            color  = { r = 60, g = 0, b = 0, a = 180 },
+            layer  = 9,
+            fixed  = true,
+        },
+    }
+}
+```
 
 ---
 

@@ -17,13 +17,14 @@ it alongside this guide whenever an example would help.
 3. [Configuration](#3-configuration)
 4. [Core Concepts](#4-core-concepts)
 5. [Your First Entity](#5-your-first-entity)
-6. [Scripting Entities](#6-scripting-entities)
-7. [Scenes](#7-scenes)
-8. [Assets](#8-assets)
-9. [Audio](#9-audio)
-10. [Camera](#10-camera)
-11. [Using the Editor](#11-using-the-editor)
-12. [Further Reading](#12-further-reading)
+6. [Collision and Damage](#6-collision-and-damage)
+7. [Scripting Entities](#7-scripting-entities)
+8. [Scenes](#8-scenes)
+9. [Assets](#9-assets)
+10. [Audio](#10-audio)
+11. [Camera](#11-camera)
+12. [Using the Editor](#12-using-the-editor)
+13. [Further Reading](#13-further-reading)
 
 ---
 
@@ -199,7 +200,83 @@ For the full list of available components and their fields see
 
 ---
 
-## 6. Scripting Entities
+## 6. Collision and Damage
+
+Add `box_collider` to any entity that should participate in collision detection.
+The engine resolves overlaps every frame and dispatches damage automatically —
+no script code required for the common case.
+
+### How damage works
+
+When a projectile hits an entity, the engine compares collision masks to decide
+whether the hit registers, then subtracts the projectile's `hit_damage` from the
+target's `health.current_health`. All three components must be present for the
+full chain:
+
+```lua
+-- Shooter — emits projectiles
+load_entity({
+    components = {
+        transform          = { position = { x = 50, y = 300 } },
+        sprite             = { texture_asset_id = "tank", width = 32, height = 32, layer = 2 },
+        box_collider       = { width = 32, height = 32 },
+        projectile_emitter = {
+            projectile_velocity = { x = 200, y = 0 },
+            projectile_duration = 4.0,
+            repeat_frequency    = 0,       -- 0 = manual; call fire_projectile() from a script
+            hit_damage          = 25,
+            friendly            = false,   -- can hurt the player
+        },
+    }
+})
+
+-- Target — takes damage automatically when hit
+load_entity({
+    components = {
+        transform    = { position = { x = 500, y = 300 } },
+        sprite       = { texture_asset_id = "enemy", width = 32, height = 32, layer = 2 },
+        box_collider = { width = 32, height = 32 },
+        health       = { max_health = 100, current_health = 100 },
+    }
+})
+```
+
+### Collision masks
+
+Masks let you control which entity groups can collide with each other. The engine
+performs a bitwise AND between the projectile's `collision_mask` and the target
+entity's `entity_mask`; a non-zero result means the hit registers.
+
+```lua
+-- entity_mask groups the entity into one or more collision layers
+entity_mask = { value = 2 }     -- layer 2 = "enemies"
+
+-- box_collider and projectile_emitter filter which layers they react to
+box_collider       = { width = 32, height = 32, collision_mask = 1 }  -- reacts to layer 1
+projectile_emitter = { ..., collision_mask = 2 }                       -- hits layer 2 only
+```
+
+### Checking health in a script
+
+If you need to react to damage (play a sound, spawn particles, change behaviour
+when low on health), poll the health component in `on_update`:
+
+```lua
+on_update = function(self, entity, dt)
+    if registry.has_health(entity) then
+        local hp = registry.get_health(entity)
+        if hp.current_health <= 0 then
+            blam(entity)    -- destroy when dead
+        elseif hp.current_health < hp.max_health * 0.25 then
+            play_sound("warning-beep")
+        end
+    end
+end
+```
+
+---
+
+## 7. Scripting Entities
 
 Attach a `script` component to give an entity per-frame Lua behaviour. The
 engine calls `on_update(self, entity, dt)` every frame and `on_debug_gui(self,
@@ -212,9 +289,7 @@ binding, and ImGui debug UI.
 
 ---
 
----
-
-## 7. Scenes
+## 8. Scenes
 
 `load_scene(path)` replaces the current scene. Scene transitions are
 synchronous — `load_scene` does not return to the caller.
@@ -242,7 +317,7 @@ preload flow.
 
 ---
 
-## 8. Assets
+## 9. Assets
 
 Assets must be loaded before any entity references them. The recommended
 approach is `acquire_scene_assets` — it accepts `preload` lists and scans
@@ -273,7 +348,7 @@ packing, audio normalisation, and the full bake/manifest workflow.
 
 ---
 
-## 9. Audio
+## 10. Audio
 
 ```lua
 play_sound("jump-sfx")          -- one-shot
@@ -296,7 +371,7 @@ audio_source = {
 
 ---
 
-## 10. Camera
+## 11. Camera
 
 The camera follows whichever entity carries a `camera_follow` component. Only
 one should be active at a time.
@@ -316,7 +391,7 @@ elements.
 
 ---
 
-## 11. Using the Editor
+## 12. Using the Editor
 
 Launch an editor build against your project:
 
@@ -330,7 +405,7 @@ reference and keyboard shortcuts.
 
 ---
 
-## 12. Further Reading
+## 13. Further Reading
 
 ### Engine documentation
 
