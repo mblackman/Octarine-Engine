@@ -17,16 +17,15 @@ it alongside this guide whenever an example would help.
 3. [Configuration](#3-configuration)
 4. [Core Concepts](#4-core-concepts)
 5. [Your First Entity](#5-your-first-entity)
-6. [Components Reference](#6-components-reference)
-7. [Scripting Entities](#7-scripting-entities)
-8. [Input](#8-input)
-9. [Scenes](#9-scenes)
-10. [Assets](#10-assets)
-11. [Audio](#11-audio)
-12. [Camera](#12-camera)
-13. [Debug UI with ImGui](#13-debug-ui-with-imgui)
-14. [Using the Editor](#14-using-the-editor)
-15. [Further Reading](#15-further-reading)
+6. [Scripting Entities](#6-scripting-entities)
+7. [Input](#7-input)
+8. [Scenes](#8-scenes)
+9. [Assets](#9-assets)
+10. [Audio](#10-audio)
+11. [Camera](#11-camera)
+12. [Debug UI with ImGui](#12-debug-ui-with-imgui)
+13. [Using the Editor](#13-using-the-editor)
+14. [Further Reading](#14-further-reading)
 
 ---
 
@@ -162,7 +161,7 @@ You do not need to touch C++ to make a game.
 
 A scene is a Lua file. `load_scene("scenes/gameplay.lua")` replaces the current
 scene with a new one. Scenes can be declarative (return a table the engine
-processes) or procedural (build the scene themselves). See [Scenes](#9-scenes).
+processes) or procedural (build the scene themselves). See [Scenes](#8-scenes).
 
 ---
 
@@ -197,153 +196,12 @@ load_entity({
 })
 ```
 
-Every field shown is optional except where noted in
-[Components Reference](#6-components-reference). Omitted fields take their
-defaults.
-
----
-
-## 6. Components Reference
-
-Quick summary. Full field tables are in
+For the full list of available components and their fields see
 [`docs/ecs-components.md`](ecs-components.md).
 
-### Transform
-
-```lua
-transform = {
-    position = { x = 0, y = 0 },   -- world position in pixels
-    scale    = { x = 1, y = 1 },   -- multiplicative scale
-    rotation = 0.0,                 -- degrees
-}
-```
-
-### Sprite
-
-Renders a loaded texture.
-
-```lua
-sprite = {
-    texture_asset_id = "my-texture",    -- required; must be loaded first
-    width  = 32,
-    height = 32,
-    layer  = 1,         -- higher layers draw on top
-    fixed  = false,     -- true = screen-space (UI), false = world-space
-    src_rect_x = 0,     -- pixel offset into the source texture
-    src_rect_y = 0,
-}
-```
-
-### Animation
-
-Drives frame-strip animation on a `sprite`.
-
-```lua
-animation = {
-    num_frames = 4,     -- frames laid out horizontally in the sprite sheet
-    speed_rate = 10,    -- frames per second
-}
-```
-
-### Square
-
-Colored rectangle — no texture required.
-
-```lua
-square = {
-    width  = 200,
-    height = 50,
-    color  = { r = 255, g = 80, b = 80, a = 255 },
-    layer  = 0,
-    fixed  = false,
-}
-```
-
-### Text Label
-
-```lua
-text_label = {
-    text    = "Score: 0",
-    font_id = "main-font",
-    color   = { r = 255, g = 255, b = 255, a = 255 },
-    layer   = 5,
-    is_fixed = true,    -- true keeps it in screen-space
-}
-```
-
-### Rigidbody
-
-Gives an entity a velocity the physics system integrates each frame.
-
-```lua
-rigidbody = {
-    velocity = { x = 0, y = 0 },   -- pixels per second
-}
-```
-
-### Box Collider
-
-Axis-aligned bounding box for collision detection.
-
-```lua
-box_collider = {
-    width  = 32,
-    height = 32,
-    offset = { x = 0, y = 0 },  -- offset from the transform position
-}
-```
-
-### Health
-
-```lua
-health = {
-    max_health     = 100,
-    current_health = 100,
-}
-```
-
-### Projectile Emitter
-
-Spawns projectile entities automatically.
-
-```lua
-projectile_emitter = {
-    projectile_velocity = { x = 200, y = 0 },
-    projectile_duration = 3.0,   -- seconds before the projectile despawns
-    repeat_frequency    = 0,     -- 0 = fire only on explicit call; >0 = auto-fire interval in seconds
-    hit_damage          = 10,
-    friendly            = true,  -- true = won't damage entities tagged "player"
-}
-```
-
-To fire a projectile on demand from Lua (e.g. on a key press):
-
-```lua
-fire_projectile(entity, direction_x, direction_y)
-```
-
-### Camera Follow
-
-Attaches the camera to this entity.
-
-```lua
-camera_follow = {}
-```
-
-### Script
-
-Attach Lua callbacks. See [Scripting Entities](#7-scripting-entities).
-
-```lua
-script = {
-    on_update    = function(self, entity, dt) ... end,
-    on_debug_gui = function(self, entity)     ... end,
-}
-```
-
 ---
 
-## 7. Scripting Entities
+## 6. Scripting Entities
 
 The `script` component is how entities get custom behaviour. It supports two
 callbacks:
@@ -353,26 +211,23 @@ callbacks:
 | `on_update(self, entity, dt)` | Every frame, in update order |
 | `on_debug_gui(self, entity)` | Every frame, but only when editor debug UI is visible |
 
-`self` is the script table itself (useful for storing state). `entity` is the
-entity ID. `dt` is delta time in seconds.
+`self` is the script table itself — store per-entity state there. `entity` is
+the entity ID. `dt` is delta time in seconds.
 
 ```lua
-local function make_spinner(speed)
-    return {
-        angle = 0,
-        on_update = function(self, entity, dt)
-            self.angle = self.angle + speed * dt
-            -- set_rotation doesn't exist yet; rotate via rigidbody or
-            -- by updating the transform through registry accessors.
-        end,
-    }
-end
-
 load_entity({
     components = {
         transform = { position = { x = 400, y = 300 } },
         sprite    = { texture_asset_id = "gem", width = 16, height = 16, layer = 3 },
-        script    = make_spinner(90),
+        script    = {
+            speed = 80,
+            on_update = function(self, entity, dt)
+                if input.is_action_down("move_right") then
+                    local pos = registry.get_position(entity)
+                    pos.x = pos.x + self.speed * dt
+                end
+            end,
+        },
     }
 })
 ```
@@ -380,56 +235,38 @@ load_entity({
 **Reading and writing components from a script**
 
 ```lua
--- Get a component reference (returns a mutable proxy)
+-- Get a mutable component reference
 local pos = registry.get_position(entity)
 pos.x = pos.x + 10
 
--- Check whether a component exists
+-- Check whether a component exists before touching it
 if registry.has_health(entity) then
     local hp = registry.get_health(entity)
     hp.current_health = hp.current_health - 1
 end
 ```
 
-The pattern is `registry.get_<component_key>` / `registry.has_<component_key>`.
-The key for each component is listed in
-[`docs/ecs-components.md`](ecs-components.md).
+The pattern is `registry.get_<key>` / `registry.has_<key>`. Component keys are
+listed in [`docs/ecs-components.md`](ecs-components.md).
 
 **Convenience helpers**
 
-These globals are shorthand for common component reads/writes:
-
 ```lua
-local pos = get_position(entity)          -- returns {x, y}
+local pos = get_position(entity)      -- returns {x, y}
 set_position(entity, new_x, new_y)
 local name = get_name(entity)
 set_name(entity, "New Name")
-
--- Destroy an entity
-blam(entity)
+blam(entity)                          -- destroy an entity
 ```
 
-**Sharing state between scripts**
-
-Scripts are plain Lua tables. Store anything you need in `self`:
-
-```lua
-script = {
-    cooldown  = 0,
-    max_speed = 120,
-    on_update = function(self, entity, dt)
-        self.cooldown = self.cooldown - dt
-        ...
-    end,
-}
-```
+For the full Lua scripting guide see [`docs/lua-scripting.md`](lua-scripting.md).
 
 ---
 
-## 8. Input
+## 7. Input
 
-The `input` table is available globally. Bind named actions to keys or buttons
-once (typically in `game.lua`), then query them anywhere.
+The `input` table is available globally. Bind named actions to keys once
+(typically in `game.lua`), then query them anywhere.
 
 ### Binding actions
 
@@ -474,7 +311,6 @@ local function update(self, entity, dt)
     if input.is_action_down("move_right") then dx = dx + 1 end
 
     if dx ~= 0 or dy ~= 0 then
-        -- Normalise diagonal movement
         local len = math.sqrt(dx * dx + dy * dy)
         local rb  = registry.get_rigidbody(entity)
         rb.velocity.x = (dx / len) * self.speed
@@ -489,106 +325,35 @@ end
 
 ---
 
-## 9. Scenes
+## 8. Scenes
 
-### Loading a scene
+`load_scene(path)` replaces the current scene. Scene transitions are
+synchronous — `load_scene` does not return to the caller.
 
 ```lua
 load_scene("scenes/gameplay.lua")
+reload_scene()      -- hot-reload the current scene (useful during development)
 ```
 
-This unloads all current entities and assets, then runs the target script.
-Scene transitions are synchronous — `load_scene` does not return to the caller.
-
-To hot-reload the current scene without a full engine restart (useful in the
-editor):
-
-```lua
-reload_scene()
-```
-
-### Declarative scene (recommended)
-
-Return a table from your scene file. The engine processes `preload`, `tilemap`,
-and `entities` in order.
-
-```lua
--- scenes/gameplay.lua
-return {
-    preload = { "explosion-sfx", "music-gameplay" },
-
-    tilemap = {
-        texture_asset_id = "tileset-forest",
-        map = "tilemaps/forest.map",
-    },
-
-    entities = {
-        {
-            tag  = "player",
-            name = "Player",
-            components = {
-                transform = { position = { x = 100, y = 100 } },
-                sprite    = { texture_asset_id = "player", width = 32, height = 32, layer = 2 },
-                rigidbody = { velocity = { x = 0, y = 0 } },
-                health    = { max_health = 100, current_health = 100 },
-                camera_follow = {},
-                script = { on_update = player_update },
-            },
-        },
-    },
-
-    -- Optional hook called after entities are spawned
-    run = function()
-        play_sound("music-gameplay")
-    end,
-}
-```
-
-### Procedural scene
-
-Return a function (or nothing — run the setup at top level). Useful when entity
-definitions are data-driven or generated at runtime.
-
-```lua
--- scenes/procedural.lua
-return function()
-    acquire_scene_assets({ preload = { "rock", "enemy-sfx" } })
-    for i = 1, 20 do
-        load_entity({
-            components = {
-                transform = { position = { x = math.random(50, 900), y = math.random(50, 500) } },
-                sprite    = { texture_asset_id = "rock", width = 16, height = 16, layer = 1 },
-            }
-        })
-    end
-end
-```
-
-### Stopping / clearing the scene
-
-```lua
-clear_scene()   -- remove all entities; typically called before rebuilding
-stop_scene()    -- signals the engine to end the current scene lifecycle
-```
-
-### Switching scenes from a script
+Switching scenes from inside a script:
 
 ```lua
 script = {
     on_update = function(self, entity, dt)
-        if input.is_key_pressed("r") then
-            load_scene("scenes/gameplay.lua")
-        end
-        if input.is_key_pressed("escape") then
-            load_scene("scenes/title.lua")
-        end
+        if input.is_key_pressed("r")      then load_scene("scenes/gameplay.lua") end
+        if input.is_key_pressed("escape") then load_scene("scenes/title.lua")    end
     end,
 }
 ```
 
+Scene files can be declarative (return a table), procedural (return a function),
+or side-effect style (build the scene at top level as the file executes). See
+[`docs/scenes.md`](scenes.md) for the full lifecycle, file shape, and asset
+preload flow.
+
 ---
 
-## 10. Assets
+## 9. Assets
 
 Assets must be loaded before any entity references them. The recommended
 approach is `acquire_scene_assets` — it accepts `preload` lists and scans
@@ -596,20 +361,10 @@ entity definitions for asset references automatically. Explicit `load_asset`
 calls are also supported.
 
 ```lua
--- Texture
-load_asset({ type = "texture", id = "player", file = "images/player.png" })
-
--- Sprite sheet / atlas (individual frames are addressed by id in sprites)
-load_asset({ type = "texture", id = "explosion", file = "images/explosion.png" })
-
--- Font
-load_asset({ type = "font", id = "main-font", file = "fonts/arial.ttf", font_size = 16 })
-
--- Sound
-load_asset({ type = "sound", id = "jump-sfx", file = "sounds/jump.wav" })
+load_asset({ type = "texture", id = "player",    file = "images/player.png" })
+load_asset({ type = "font",    id = "main-font", file = "fonts/arial.ttf", font_size = 16 })
+load_asset({ type = "sound",   id = "jump-sfx",  file = "sounds/jump.wav" })
 ```
-
-**Resolving paths**
 
 All asset paths are relative to the project root. Use `get_asset_path` when
 building paths dynamically:
@@ -618,40 +373,31 @@ building paths dynamically:
 local path = get_asset_path("images/player.png")
 ```
 
-**Asset pipeline and baking**
-
-For shipping builds the engine can bake assets into a manifest. Run the bake
-step headlessly:
+For shipping builds, bake assets into a manifest with:
 
 ```bash
 ./OctarineEngine path/to/MyGame -m bake
 ```
 
-This writes `asset_manifest.lua` beside your project and packs assets for
-distribution. See [`docs/asset-pipeline.md`](asset-pipeline.md) for full detail
-on `.meta` sidecars, atlas packing, and audio normalisation.
+See [`docs/asset-pipeline.md`](asset-pipeline.md) for `.meta` sidecars, atlas
+packing, audio normalisation, and the full bake/manifest workflow.
 
 ---
 
-## 11. Audio
+## 10. Audio
 
 ```lua
--- Play a one-shot sound
-play_sound("jump-sfx")
-
--- Play music (typically looped; pass the asset id)
-play_sound("music-gameplay")
+play_sound("jump-sfx")          -- one-shot
+play_sound("music-gameplay")    -- looped music
 ```
 
-For spatial / 3D audio, add an `audio_listener` component to the camera or
-player entity and `audio_source` to the emitting entity. The engine computes
-attenuation based on the listener–source distance automatically.
+For spatial audio, add `audio_listener` to the player/camera entity and
+`audio_source` to emitting entities. The engine handles attenuation
+automatically.
 
 ```lua
--- Listener (usually on the player or camera)
 audio_listener = {}
 
--- Source (on enemies, pickups, etc.)
 audio_source = {
     asset_id = "enemy-growl",
     loop     = true,
@@ -661,27 +407,27 @@ audio_source = {
 
 ---
 
-## 12. Camera
+## 11. Camera
 
 The camera follows whichever entity carries a `camera_follow` component. Only
-one camera follower should be active at a time.
+one should be active at a time.
 
 ```lua
--- Query the camera's current world position
-local cam = get_camera_position()   -- returns {x, y}
+camera_follow = {}
+```
 
--- World bounds (the camera won't scroll past these)
-set_game_map_dimensions(width_px, height_px)
-local dims = get_game_map_dimensions()   -- returns {w, h}
+```lua
+local cam = get_camera_position()            -- returns {x, y}
+set_game_map_dimensions(width_px, height_px) -- clamp scrolling to world bounds
 ```
 
 Entities with `fixed = true` on their `sprite`, `square`, or `text_label`
-render in screen space and are unaffected by camera movement — use this for HUD
+render in screen space, unaffected by camera movement — use this for HUD
 elements.
 
 ---
 
-## 13. Debug UI with ImGui
+## 12. Debug UI with ImGui
 
 The engine ships full [Dear ImGui](https://github.com/ocornut/imgui) bindings.
 Use them inside `on_debug_gui` callbacks — they only fire when the editor's
@@ -716,7 +462,7 @@ load_entity({
 })
 ```
 
-The full ImGui API — over 200 functions — is documented in the
+The full ImGui API is documented in the
 [Dear ImGui wiki](https://github.com/ocornut/imgui/wiki) and the engine's
 generated Lua stub at
 [`lua_api.smoke.lua`](https://github.com/mblackman/Octarine-Engine/blob/main/lua_api.smoke.lua)
@@ -724,35 +470,29 @@ generated Lua stub at
 
 ---
 
-## 14. Using the Editor
+## 13. Using the Editor
 
 Launch an editor build against your project:
 
 ```bash
-./build/editor-debug/bin/debug/OctarineEngine path/to/MyGame
+./OctarineEngine path/to/MyGame
 ```
 
-The editor adds:
-- A toolbar with **Run** (launch a player window) and **Export** (package for distribution).
-- An entity inspector and scene hierarchy panel.
-- Your `on_debug_gui` windows, rendered into the editor layout.
-- Hot-reload: save a Lua file, press the reload button (or call `reload_scene()` from a script).
-
-See [`docs/editor.md`](editor.md) for the full panel reference and keyboard shortcuts.
+The editor adds a toolbar, entity inspector, scene hierarchy, and your
+`on_debug_gui` windows. See [`docs/editor.md`](editor.md) for the full panel
+reference and keyboard shortcuts.
 
 ---
 
-## 15. Further Reading
+## 14. Further Reading
 
 ### Engine documentation
-
-These live in `docs/` inside the engine repository:
 
 | Doc | What's in it |
 |---|---|
 | [`docs/ecs-components.md`](ecs-components.md) | Every component — all fields, types, and defaults |
-| [`docs/lua-scripting.md`](lua-scripting.md) | Detailed Lua scripting guide with more examples |
-| [`docs/scenes.md`](scenes.md) | Full scene lifecycle, declarative vs. procedural forms |
+| [`docs/lua-scripting.md`](lua-scripting.md) | Full Lua scripting guide |
+| [`docs/scenes.md`](scenes.md) | Scene lifecycle, declarative vs. procedural forms |
 | [`docs/asset-pipeline.md`](asset-pipeline.md) | `.meta` sidecars, baking, atlases, audio normalisation |
 | [`docs/systems.md`](systems.md) | Built-in systems and the order they run |
 | [`docs/events.md`](events.md) | The event bus — every event type and how to use them |
@@ -764,17 +504,13 @@ These live in `docs/` inside the engine repository:
 
 [`lua_api.smoke.lua`](https://github.com/mblackman/Octarine-Engine/blob/main/lua_api.smoke.lua)
 is the authoritative, auto-generated EmmyLua stub of the entire Lua surface.
-Every global, namespace table, and component accessor is listed there with type
-annotations. Load it into your editor (VS Code + the Lua Language Server
-extension is recommended) for autocomplete and inline docs.
+Load it into your editor (VS Code + the Lua Language Server extension is
+recommended) for autocomplete and inline docs.
 
 ### Example project
 
 [Octarine-Engine-Example](https://github.com/mblackman/Octarine-Engine-Example)
-is a complete, runnable game that shows every engine feature in practice:
-physics, animation, audio, projectile systems, scene transitions, debug UI, and
-more. It is the fastest way to see working patterns for anything not covered
-here.
+is a complete, runnable game showing every engine feature in practice.
 
 ### Engine repository
 
@@ -783,12 +519,11 @@ Source, issue tracker, and releases:
 
 ### Lua 5.4
 
-The engine embeds Lua 5.4. The official reference manual is the ground truth
-for the language itself: [lua.org/manual/5.4](https://www.lua.org/manual/5.4/)
+The engine embeds Lua 5.4. Reference manual: [lua.org/manual/5.4](https://www.lua.org/manual/5.4/)
 
 ### Dear ImGui
 
 The UI binding closely mirrors the C++ API. The
-[ImGui wiki](https://github.com/ocornut/imgui/wiki) and the header comments in
+[ImGui wiki](https://github.com/ocornut/imgui/wiki) and header comments in
 [`imgui.h`](https://github.com/ocornut/imgui/blob/master/imgui.h) are the best
-references for functions not yet documented in the engine's Lua stub.
+references for functions not yet in the engine's Lua stub.
