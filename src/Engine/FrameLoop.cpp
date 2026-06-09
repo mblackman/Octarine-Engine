@@ -26,6 +26,7 @@
 #include "Renderer/Renderer.h"
 #include "Systems/DrawColliderSystem.h"
 #include "Systems/InputSystem.h"
+#include "Systems/PerfOverlaySystem.h"
 
 #ifndef OCTARINE_SHIPPED
 #include "Dev/DevListenServer.h"
@@ -193,7 +194,7 @@ void FrameLoop::Update(const float deltaTime) {
   }
 }
 
-void FrameLoop::Render([[maybe_unused]] const float deltaTime) {
+void FrameLoop::Render(const float deltaTime) {
   PROFILE_NAMED_SCOPE("Game::Render (total)");
   auto& renderQueue = registry_->Get<RenderQueue>();
   auto& gameConfig = registry_->Get<GameConfig>();
@@ -221,6 +222,12 @@ void FrameLoop::Render([[maybe_unused]] const float deltaTime) {
     collider_query_->Update();
     DrawColliderSystem drawColliderSystem;
     collider_query_->ForEach(drawColliderSystem);
+  }
+
+  // Built-in perf overlay (no ImGui). Drawn into the scene texture so it composites for both the
+  // player (CompositeSceneToWindow) and the editor Scene panel, and rides along in --capture dumps.
+  if (gameConfig.GetEngineOptions().showPerfOverlay) {
+    perf_overlay_.Draw(*registry_, runtime_->SdlRenderer(), deltaTime);
   }
 
   renderer_->EndScene(runtime_->SdlRenderer());

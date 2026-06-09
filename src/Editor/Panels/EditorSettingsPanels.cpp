@@ -15,6 +15,7 @@ void DrawEngineOptionsWindow(EngineOptions& options, bool* p_open) {
   ImGui::Begin("Engine Options", p_open);
   ImGui::Checkbox("Show ImGui Demo Window", &options.showImGuiDemoWindow);
   ImGui::Checkbox("Show FPS Counter", &options.showFpsCounter);
+  ImGui::Checkbox("Show Perf Overlay", &options.showPerfOverlay);
   ImGui::Checkbox("Show Entity Info", &options.showEntityInfo);
   ImGui::Checkbox("Draw Colliders", &options.drawColliders);
   ImGui::Checkbox("Log Input Events", &options.logInputEvents);

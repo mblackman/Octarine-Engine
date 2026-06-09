@@ -10,6 +10,7 @@
 #include "Components/GlobalTransformComponent.h"
 #include "ECS/Query.h"
 #include "EventBus/EventBus.h"
+#include "Systems/PerfOverlaySystem.h"
 
 class Game;
 class Registry;
@@ -68,6 +69,9 @@ class FrameLoop {
   Uint64 milliseconds_previous_frame_ = 0;
   std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent>> collider_query_;
   EventBus::SubscriptionHandle key_input_subscription_;
+  // Built-in (no-ImGui) FPS + frame-time overlay. Holds a small per-line text-texture cache, so it
+  // is a long-lived member rather than reconstructed each frame.
+  PerfOverlaySystem perf_overlay_;
 
 #ifndef OCTARINE_SHIPPED
   // Headless frame-capture (env-driven, dev/bench only). When OCTARINE_CAPTURE_PATH is set, the

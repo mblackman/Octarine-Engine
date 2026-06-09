@@ -11,6 +11,13 @@
 void LuaModuleBinding<GameModule>::install(sol::state& lua, LuaBindingContext& ctx) {
   lua.set_function("quit_game", [&ctx]() { ctx.RequestQuit(); });
 
+  // Toggle the built-in performance overlay (FPS + frame time) at runtime. Placement and which
+  // metrics show are config.ini knobs (PerfOverlayCorner / PerfOverlayMetrics); this just flips it on
+  // or off so scripts can gate it behind a debug menu or key.
+  lua.set_function("set_perf_overlay", [&ctx](const bool enabled) {
+    ctx.GetRegistry()->Get<GameConfig>().GetEngineOptions().showPerfOverlay = enabled;
+  });
+
   lua.set_function("set_game_map_dimensions", [&ctx](const double width, const double height) {
     auto& gameConfig = ctx.GetRegistry()->Get<GameConfig>();
     gameConfig.playableAreaHeight = static_cast<float>(height);

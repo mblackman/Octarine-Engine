@@ -1771,6 +1771,8 @@ function set_game_map_dimensions(...) end
 
 function set_name(...) end
 
+function set_perf_overlay(...) end
+
 function set_position(...) end
 
 function set_sprite_src_rect(...) end

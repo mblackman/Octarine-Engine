@@ -129,6 +129,10 @@ void GameConfig::SaveUserPreferences() {
   file << "drawColliders=" << (engine_options_.drawColliders ? "true" : "false") << "\n";
   file << "showFpsCounter=" << (engine_options_.showFpsCounter ? "true" : "false") << "\n";
   file << "showEntityInfo=" << (engine_options_.showEntityInfo ? "true" : "false") << "\n";
+  // showPerfOverlay is intentionally NOT persisted here: it is a project config.ini knob
+  // (PerfOverlay=) and config.ini is its single source of truth. Persisting it to preferences (which
+  // loads after config.ini) would let a stale prefs value silently shadow the config the dev edits.
+  // The editor's "Show Perf Overlay" checkbox is therefore a live, session-only toggle.
   file << "masterVolume=" << engine_options_.masterVolume << "\n";
 
   file.close();
@@ -158,6 +162,9 @@ void GameConfig::LoadUserPreferences() {
       engine_options_.showFpsCounter = (value == "true");
     else if (key == "showEntityInfo")
       engine_options_.showEntityInfo = (value == "true");
+    // showPerfOverlay deliberately not read here — config.ini's PerfOverlay= is authoritative, so a
+    // legacy line left in preferences.ini (from before this knob was config-only) is ignored rather
+    // than shadowing config.
     else if (key == "masterVolume")
       engine_options_.masterVolume = std::stof(value);
   }
@@ -175,6 +182,9 @@ bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string> &
   success &= SetValue(settings, "DefaultWindowHeight", &GameConfig::SetDefaultHeight, false);
   success &= SetValue(settings, "HotReload", &GameConfig::SetHotReloadEnabled, false);
   success &= SetValue(settings, "HotReloadPollSeconds", &GameConfig::SetHotReloadPollSeconds, false);
+  success &= SetValue(settings, "PerfOverlay", &GameConfig::SetPerfOverlay, false);
+  success &= SetValue(settings, "PerfOverlayCorner", &GameConfig::SetPerfOverlayCorner, false);
+  success &= SetValue(settings, "PerfOverlayMetrics", &GameConfig::SetPerfOverlayMetrics, false);
 
   return success;
 }
@@ -254,6 +264,42 @@ void GameConfig::SetDefaultHeight(const int defaultHeight) { default_height_ = d
 void GameConfig::SetHotReloadEnabled(const bool enabled) {
   engine_options_.hotReloadEnabled = enabled;
   Logger::Info(std::string("Hot reload ") + (enabled ? "enabled" : "disabled"));
+}
+
+void GameConfig::SetPerfOverlay(const bool enabled) {
+  engine_options_.showPerfOverlay = enabled;
+  Logger::Info(std::string("Perf overlay ") + (enabled ? "enabled" : "disabled"));
+}
+
+void GameConfig::SetPerfOverlayCorner(const std::string &corner) {
+  if (corner == "top-left") {
+    engine_options_.perfOverlayCorner = PerfOverlayCorner::TopLeft;
+  } else if (corner == "top-right") {
+    engine_options_.perfOverlayCorner = PerfOverlayCorner::TopRight;
+  } else if (corner == "bottom-left") {
+    engine_options_.perfOverlayCorner = PerfOverlayCorner::BottomLeft;
+  } else if (corner == "bottom-right") {
+    engine_options_.perfOverlayCorner = PerfOverlayCorner::BottomRight;
+  } else {
+    Logger::Warn("Unknown PerfOverlayCorner '" + corner +
+                 "' (expected top-left|top-right|bottom-left|bottom-right); keeping current.");
+    return;
+  }
+  Logger::Info("Perf overlay corner: " + corner);
+}
+
+void GameConfig::SetPerfOverlayMetrics(const std::string &metrics) {
+  if (metrics == "fps") {
+    engine_options_.perfOverlayMetrics = PerfOverlayMetrics::Fps;
+  } else if (metrics == "frametime" || metrics == "frame-time" || metrics == "ms") {
+    engine_options_.perfOverlayMetrics = PerfOverlayMetrics::FrameTime;
+  } else if (metrics == "both") {
+    engine_options_.perfOverlayMetrics = PerfOverlayMetrics::Both;
+  } else {
+    Logger::Warn("Unknown PerfOverlayMetrics '" + metrics + "' (expected fps|frametime|both); keeping current.");
+    return;
+  }
+  Logger::Info("Perf overlay metrics: " + metrics);
 }
 
 void GameConfig::SetHotReloadPollSeconds(const float seconds) {
