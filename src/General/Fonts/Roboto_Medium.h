@@ -2,7 +2,7 @@
 // Generated from Roboto-Medium.ttf via xxd. See LICENSE.txt.
 #pragma once
 
-namespace octarine::editor::fonts {
+namespace octarine::fonts {
 
 inline constexpr unsigned char kRobotoMediumData[] = {
     0x00, 0x01, 0x00, 0x00, 0x00, 0x11, 0x01, 0x00, 0x00, 0x04, 0x00, 0x10, 0x47, 0x50, 0x4f, 0x53, 0x7d, 0xaa, 0x71,
@@ -8565,4 +8565,4 @@ inline constexpr unsigned char kRobotoMediumData[] = {
     0x9a, 0x03, 0x9c, 0x04, 0x19};
 inline constexpr unsigned int kRobotoMediumSize = 162588;
 
-}  // namespace octarine::editor::fonts
+}  // namespace octarine::fonts

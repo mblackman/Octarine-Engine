@@ -164,6 +164,16 @@
       "lua_surface": false
     },
     {
+      "name": "PerfOverlaySystem",
+      "source": "src/Systems/PerfOverlaySystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
       "name": "ProjectileEmitSystem",
       "source": "src/Systems/ProjectileEmitSystem.h",
       "tier": null,

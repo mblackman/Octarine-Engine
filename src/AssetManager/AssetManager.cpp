@@ -286,6 +286,24 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
   font_store_.Add(assetId, io, fontSize, base_path_);
 }
 
+void AssetManager::AddFontFromMemory(const std::string &assetId, const unsigned char *data, const std::size_t len,
+                                     const float fontSize) {
+  if (data == nullptr || len == 0) {
+    Logger::Error("AddFontFromMemory: empty buffer for font " + assetId);
+    return;
+  }
+  // SDL_IOFromConstMem does not copy; the buffer must outlive the stream. TTF_OpenFontIO (inside
+  // FontStore::Add) parses the face eagerly, but the intended callers pass compiled-in .rodata that
+  // lives for the whole process anyway.
+  SDL_IOStream *io = SDL_IOFromConstMem(data, len);
+  if (io == nullptr) {
+    Logger::Error("AddFontFromMemory: SDL_IOFromConstMem failed for " + assetId + ": " + std::string(SDL_GetError()));
+    return;
+  }
+  // Empty base path: no atlas sidecar probe (the embedded debug font ships no baked atlas).
+  font_store_.Add(assetId, io, fontSize, /*basePath=*/"");
+}
+
 const GlyphAtlas *AssetManager::GetGlyphAtlas(const std::string &fontAssetId) const {
   return font_store_.GetGlyphAtlas(fontAssetId);
 }

@@ -2,7 +2,7 @@
 
 #ifdef OCTARINE_WITH_EDITOR
 
-#include "Editor/Fonts/Roboto_Medium.h"
+#include "General/Fonts/Roboto_Medium.h"
 #include "imgui.h"
 #include "imgui_impl_sdlrenderer3.h"
 
@@ -48,8 +48,8 @@ void RebuildEditorFont(const float sizePx) {
   // Tell ImGui not to free our static data — it lives in .rodata.
   fontConfig.FontDataOwnedByAtlas = false;
 
-  ImFont* font = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(octarine::editor::fonts::kRobotoMediumData),
-                                                static_cast<int>(octarine::editor::fonts::kRobotoMediumSize),
+  ImFont* font = io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(octarine::fonts::kRobotoMediumData),
+                                                static_cast<int>(octarine::fonts::kRobotoMediumSize),
                                                 fontConfig.SizePixels, &fontConfig);
   if (font == nullptr) {
     // Fallback so the editor still boots if the embedded load fails for any reason.

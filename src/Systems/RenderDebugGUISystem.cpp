@@ -41,7 +41,10 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_un
     return;
   }
 #else
-  if (!showGameOverlays && !engineOptions.showFpsCounter) {
+  // Player-with-ImGui build: the ImGui FPS window is editor-only (showFpsCounter is ignored here);
+  // the player-facing FPS readout is the renderer perf overlay (PerfOverlay config). So nothing
+  // ImGui draws unless the in-game debug overlays are toggled on.
+  if (!showGameOverlays) {
     return;
   }
 #endif
@@ -69,10 +72,15 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_un
       query->ForEach(system);
     }
     EntityInfoWindow(registry);
+#ifdef OCTARINE_WITH_EDITOR
     FPSWindow(deltaTime);
-  } else if (engineOptions.showFpsCounter) {
+#endif
+  }
+#ifdef OCTARINE_WITH_EDITOR
+  else if (engineOptions.showFpsCounter) {
     FPSWindow(deltaTime);
   }
+#endif
 
 #ifdef OCTARINE_WITH_EDITOR
   octarine::editor::panels::DrawProjectSelectorIfNeeded(game, projectLoaded);

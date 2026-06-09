@@ -108,6 +108,11 @@ class AssetManager {
   // src_rect to compose the final source rect into the atlas.
   [[nodiscard]] std::optional<SDL_FRect> GetAtlasSlice(const std::string& assetId) const;
   void AddFont(const std::string& assetId, const std::string& path, float fontSize);
+  // Register a font from an in-memory TTF buffer (e.g. the embedded debug font) rather than a
+  // catalog file. Non-owning over `data` — the buffer must outlive the font (compiled-in .rodata
+  // is fine). Skips the glyph-atlas sidecar probe (no project base path involved). Used by the
+  // renderer perf overlay so it has a usable font even when the project supplies none.
+  void AddFontFromMemory(const std::string& assetId, const unsigned char* data, std::size_t len, float fontSize);
   [[nodiscard]] TTF_Font* GetFont(const std::string& assetId) const;
   // `stream` plumbs the catalog's `meta.stream` flag into SDL_mixer's predecode toggle: false for
   // SFX (eager decode = predictable play latency), true for long music + ambient beds (lazy decode

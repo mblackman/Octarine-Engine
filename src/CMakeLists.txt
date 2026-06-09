@@ -136,6 +136,7 @@ target_link_libraries(octarine_lua PUBLIC
 octarine_library(octarine_systems
         Systems/AudioSystem.cpp
         Systems/InputSystem.cpp
+        Systems/PerfOverlaySystem.cpp
 )
 target_link_libraries(octarine_systems PUBLIC
         octarine_core
