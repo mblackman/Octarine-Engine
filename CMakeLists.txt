@@ -56,6 +56,29 @@ if (OCTARINE_IPO_SUPPORTED)
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL ON)
 endif ()
 
+# Sanitizer instrumentation (GCC/Clang only — MSVC's ASan needs different flags and has no UBSan).
+# `asan` layers AddressSanitizer + UBSan (they combine cleanly and share one CI job); `tsan` is a
+# separate value because ThreadSanitizer cannot be combined with ASan. Flags must reach both
+# compile and link lines, and apply to every target (engine, tests) so the interceptors see all
+# allocations.
+set(OCTARINE_SANITIZE "OFF" CACHE STRING "Sanitizer instrumentation: OFF, asan (ASan+UBSan), or tsan")
+set_property(CACHE OCTARINE_SANITIZE PROPERTY STRINGS OFF asan tsan)
+if (NOT OCTARINE_SANITIZE STREQUAL "OFF")
+    if (NOT (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang"))
+        message(FATAL_ERROR "OCTARINE_SANITIZE requires GCC or Clang (got ${CMAKE_CXX_COMPILER_ID})")
+    endif ()
+    if (OCTARINE_SANITIZE STREQUAL "asan")
+        set(OCTARINE_SANITIZE_FLAGS -fsanitize=address,undefined -fno-omit-frame-pointer)
+    elseif (OCTARINE_SANITIZE STREQUAL "tsan")
+        set(OCTARINE_SANITIZE_FLAGS -fsanitize=thread -fno-omit-frame-pointer)
+    else ()
+        message(FATAL_ERROR "OCTARINE_SANITIZE must be OFF, asan, or tsan (got ${OCTARINE_SANITIZE})")
+    endif ()
+    add_compile_options(${OCTARINE_SANITIZE_FLAGS})
+    add_link_options(${OCTARINE_SANITIZE_FLAGS})
+    message(STATUS "Octarine: sanitizers ENABLED (${OCTARINE_SANITIZE})")
+endif ()
+
 # Profiling option — when ON, enables TIMER/ACCUM logging in PerfUtils.h.
 # OFF by default so Debug and Release builds have zero profiling overhead.
 option(OCTARINE_ENABLE_PROFILING "Enable per-system performance instrumentation" OFF)
