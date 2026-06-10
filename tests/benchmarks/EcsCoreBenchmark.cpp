@@ -211,7 +211,8 @@ static void BM_TransformSmallHierarchy(benchmark::State& state) {
   constexpr int kHierarchySize = 16;
   Entity parent = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{glm::vec2(1.0f, 1.0f)});
   for (int i = 1; i < kHierarchySize; ++i) {
-    Entity child = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{glm::vec2(1.0f, 1.0f)});
+    Entity child =
+        registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{glm::vec2(1.0f, 1.0f)});
     registry.SetParent(child, parent);
     parent = child;
   }

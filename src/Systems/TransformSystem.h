@@ -120,8 +120,8 @@ class TransformSystem {
 
       WriteGlobal(archetype, chunkIdx, indexInChunk, global);
 
-      registry->ForEachChild(job.entity,
-                             [&](const Entity child) { jobs.push({child, global.position, global.scale, global.rotation}); });
+      registry->ForEachChild(
+          job.entity, [&](const Entity child) { jobs.push({child, global.position, global.scale, global.rotation}); });
     }
   }
 

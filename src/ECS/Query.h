@@ -199,10 +199,10 @@ class ComponentQuery final : public Query {
   }
 
   Registry* registry_;
-  ArchetypeType type_;            // user-pack order — used by ArchetypeQuery::Iterator
-  ArchetypeType sorted_type_;     // sorted ascending — used for archetype matching
-  ArchetypeType extra_required_;  // additional ComponentIDs required (e.g., tag filters)
-  ArchetypeType excluded_;        // ComponentIDs that disqualify an archetype
+  ArchetypeType type_;               // user-pack order — used by ArchetypeQuery::Iterator
+  ArchetypeType sorted_type_;        // sorted ascending — used for archetype matching
+  ArchetypeType extra_required_;     // additional ComponentIDs required (e.g., tag filters)
+  ArchetypeType excluded_;           // ComponentIDs that disqualify an archetype
   std::vector<Archetype*> matched_;  // Persistent match list, appended to incrementally.
   ArchetypeQuery<TComponents...> archetype_query_;
   uint64_t cached_generation_{UINT64_MAX};  // Forces first Update to always match.
