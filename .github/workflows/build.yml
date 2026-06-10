@@ -80,13 +80,15 @@ jobs:
 
       - name: Configure CMake
         shell: bash
-        run: cmake --preset ${{ matrix.preset }} ${{ (matrix.platform == 'linux' && matrix.preset == 'editor-release') && '-DOCTARINE_ENABLE_TESTS=ON' || '' }}
+        run: cmake --preset ${{ matrix.preset }} ${{ matrix.preset == 'editor-release' && '-DOCTARINE_ENABLE_TESTS=ON' || '' }}
 
       - name: Build
         run: cmake --build build/${{ matrix.preset }} --config Release --parallel
 
+      # All three OSes, not just linux: MSVC-specific breakage (AVX2 chunk alignment) and
+      # macOS-specific behavior otherwise ship untested.
       - name: Run engine tests (ctest)
-        if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
+        if: matrix.preset == 'editor-release'
         run: ctest --test-dir build/${{ matrix.preset }} --output-on-failure
 
       # Headless bake against the example project. Catches unresolved-asset regressions and
