@@ -1,49 +1,50 @@
 -- AUTO-GENERATED Octarine Lua API surface. Do not edit by hand.
 -- Introspected from the live sol::state after all bindings install.
--- Regenerate by setting OCTARINE_DUMP_LUA_API=<path> and launching the engine.
+-- Refreshed automatically on every editor-mode launch (types/octarine_api.lua);
+-- OCTARINE_DUMP_LUA_API=<path> overrides the destination.
 ---@meta
 ---@diagnostic disable: lowercase-global, missing-return
 
 ---@class ImDrawFlags
+---@field Closed any
+---@field None any
+---@field RoundCornersAll any
+---@field RoundCornersBottom any
+---@field RoundCornersBottomLeft any
+---@field RoundCornersBottomRight any
+---@field RoundCornersLeft any
+---@field RoundCornersNone any
+---@field RoundCornersRight any
+---@field RoundCornersTop any
+---@field RoundCornersTopLeft any
+---@field RoundCornersTopRight any
 ImDrawFlags = {}
 
----@field Closed any   -- on ImDrawFlags
----@field None any   -- on ImDrawFlags
----@field RoundCornersAll any   -- on ImDrawFlags
----@field RoundCornersBottom any   -- on ImDrawFlags
----@field RoundCornersBottomLeft any   -- on ImDrawFlags
----@field RoundCornersBottomRight any   -- on ImDrawFlags
----@field RoundCornersLeft any   -- on ImDrawFlags
----@field RoundCornersNone any   -- on ImDrawFlags
----@field RoundCornersRight any   -- on ImDrawFlags
----@field RoundCornersTop any   -- on ImDrawFlags
----@field RoundCornersTopLeft any   -- on ImDrawFlags
----@field RoundCornersTopRight any   -- on ImDrawFlags
 
 ---@class ImDrawListFlags
+---@field AllowVtxOffset any
+---@field AntiAliasedFill any
+---@field AntiAliasedLines any
+---@field AntiAliasedLinesUseTex any
+---@field None any
 ImDrawListFlags = {}
 
----@field AllowVtxOffset any   -- on ImDrawListFlags
----@field AntiAliasedFill any   -- on ImDrawListFlags
----@field AntiAliasedLines any   -- on ImDrawListFlags
----@field AntiAliasedLinesUseTex any   -- on ImDrawListFlags
----@field None any   -- on ImDrawListFlags
 
 ---@class ImFontAtlasFlags
+---@field NoBakedLines any
+---@field NoMouseCursors any
+---@field NoPowerOfTwoHeight any
+---@field None any
 ImFontAtlasFlags = {}
 
----@field NoBakedLines any   -- on ImFontAtlasFlags
----@field NoMouseCursors any   -- on ImFontAtlasFlags
----@field NoPowerOfTwoHeight any   -- on ImFontAtlasFlags
----@field None any   -- on ImFontAtlasFlags
 
 ---@class ImFontFlags
+---@field LockBakedSizes any
+---@field NoLoadError any
+---@field NoLoadGlyphs any
+---@field None any
 ImFontFlags = {}
 
----@field LockBakedSizes any   -- on ImFontFlags
----@field NoLoadError any   -- on ImFontFlags
----@field NoLoadGlyphs any   -- on ImFontFlags
----@field None any   -- on ImFontFlags
 
 ---@class ImGui
 ImGui = {}
@@ -676,868 +677,868 @@ function ImGui.VSliderInt(...) end
 
 
 ---@class ImGuiBackendFlags
+---@field HasGamepad any
+---@field HasMouseCursors any
+---@field HasMouseHoveredViewport any
+---@field HasParentViewport any
+---@field HasSetMousePos any
+---@field None any
+---@field PlatformHasViewports any
+---@field RendererHasTextures any
+---@field RendererHasViewports any
+---@field RendererHasVtxOffset any
 ImGuiBackendFlags = {}
 
----@field HasGamepad any   -- on ImGuiBackendFlags
----@field HasMouseCursors any   -- on ImGuiBackendFlags
----@field HasMouseHoveredViewport any   -- on ImGuiBackendFlags
----@field HasParentViewport any   -- on ImGuiBackendFlags
----@field HasSetMousePos any   -- on ImGuiBackendFlags
----@field None any   -- on ImGuiBackendFlags
----@field PlatformHasViewports any   -- on ImGuiBackendFlags
----@field RendererHasTextures any   -- on ImGuiBackendFlags
----@field RendererHasViewports any   -- on ImGuiBackendFlags
----@field RendererHasVtxOffset any   -- on ImGuiBackendFlags
 
 ---@class ImGuiButtonFlags
+---@field AllowOverlap any
+---@field EnableNav any
+---@field MouseButtonLeft any
+---@field MouseButtonMiddle any
+---@field MouseButtonRight any
+---@field None any
 ImGuiButtonFlags = {}
 
----@field AllowOverlap any   -- on ImGuiButtonFlags
----@field EnableNav any   -- on ImGuiButtonFlags
----@field MouseButtonLeft any   -- on ImGuiButtonFlags
----@field MouseButtonMiddle any   -- on ImGuiButtonFlags
----@field MouseButtonRight any   -- on ImGuiButtonFlags
----@field None any   -- on ImGuiButtonFlags
 
 ---@class ImGuiChildFlags
+---@field AlwaysAutoResize any
+---@field AlwaysUseWindowPadding any
+---@field AutoResizeX any
+---@field AutoResizeY any
+---@field Borders any
+---@field FrameStyle any
+---@field NavFlattened any
+---@field None any
+---@field ResizeX any
+---@field ResizeY any
 ImGuiChildFlags = {}
 
----@field AlwaysAutoResize any   -- on ImGuiChildFlags
----@field AlwaysUseWindowPadding any   -- on ImGuiChildFlags
----@field AutoResizeX any   -- on ImGuiChildFlags
----@field AutoResizeY any   -- on ImGuiChildFlags
----@field Borders any   -- on ImGuiChildFlags
----@field FrameStyle any   -- on ImGuiChildFlags
----@field NavFlattened any   -- on ImGuiChildFlags
----@field None any   -- on ImGuiChildFlags
----@field ResizeX any   -- on ImGuiChildFlags
----@field ResizeY any   -- on ImGuiChildFlags
 
 ---@class ImGuiCol
+---@field Border any
+---@field BorderShadow any
+---@field Button any
+---@field ButtonActive any
+---@field ButtonHovered any
+---@field COUNT any
+---@field CheckMark any
+---@field ChildBg any
+---@field DockingEmptyBg any
+---@field DockingPreview any
+---@field DragDropTarget any
+---@field DragDropTargetBg any
+---@field FrameBg any
+---@field FrameBgActive any
+---@field FrameBgHovered any
+---@field Header any
+---@field HeaderActive any
+---@field HeaderHovered any
+---@field InputTextCursor any
+---@field MenuBarBg any
+---@field ModalWindowDimBg any
+---@field NavCursor any
+---@field NavHighlight any
+---@field NavWindowingDimBg any
+---@field NavWindowingHighlight any
+---@field PlotHistogram any
+---@field PlotHistogramHovered any
+---@field PlotLines any
+---@field PlotLinesHovered any
+---@field PopupBg any
+---@field ResizeGrip any
+---@field ResizeGripActive any
+---@field ResizeGripHovered any
+---@field ScrollbarBg any
+---@field ScrollbarGrab any
+---@field ScrollbarGrabActive any
+---@field ScrollbarGrabHovered any
+---@field Separator any
+---@field SeparatorActive any
+---@field SeparatorHovered any
+---@field SliderGrab any
+---@field SliderGrabActive any
+---@field Tab any
+---@field TabActive any
+---@field TabDimmed any
+---@field TabDimmedSelected any
+---@field TabDimmedSelectedOverline any
+---@field TabHovered any
+---@field TabSelected any
+---@field TabSelectedOverline any
+---@field TabUnfocused any
+---@field TabUnfocusedActive any
+---@field TableBorderLight any
+---@field TableBorderStrong any
+---@field TableHeaderBg any
+---@field TableRowBg any
+---@field TableRowBgAlt any
+---@field Text any
+---@field TextDisabled any
+---@field TextLink any
+---@field TextSelectedBg any
+---@field TitleBg any
+---@field TitleBgActive any
+---@field TitleBgCollapsed any
+---@field TreeLines any
+---@field UnsavedMarker any
+---@field WindowBg any
 ImGuiCol = {}
 
----@field Border any   -- on ImGuiCol
----@field BorderShadow any   -- on ImGuiCol
----@field Button any   -- on ImGuiCol
----@field ButtonActive any   -- on ImGuiCol
----@field ButtonHovered any   -- on ImGuiCol
----@field COUNT any   -- on ImGuiCol
----@field CheckMark any   -- on ImGuiCol
----@field ChildBg any   -- on ImGuiCol
----@field DockingEmptyBg any   -- on ImGuiCol
----@field DockingPreview any   -- on ImGuiCol
----@field DragDropTarget any   -- on ImGuiCol
----@field DragDropTargetBg any   -- on ImGuiCol
----@field FrameBg any   -- on ImGuiCol
----@field FrameBgActive any   -- on ImGuiCol
----@field FrameBgHovered any   -- on ImGuiCol
----@field Header any   -- on ImGuiCol
----@field HeaderActive any   -- on ImGuiCol
----@field HeaderHovered any   -- on ImGuiCol
----@field InputTextCursor any   -- on ImGuiCol
----@field MenuBarBg any   -- on ImGuiCol
----@field ModalWindowDimBg any   -- on ImGuiCol
----@field NavCursor any   -- on ImGuiCol
----@field NavHighlight any   -- on ImGuiCol
----@field NavWindowingDimBg any   -- on ImGuiCol
----@field NavWindowingHighlight any   -- on ImGuiCol
----@field PlotHistogram any   -- on ImGuiCol
----@field PlotHistogramHovered any   -- on ImGuiCol
----@field PlotLines any   -- on ImGuiCol
----@field PlotLinesHovered any   -- on ImGuiCol
----@field PopupBg any   -- on ImGuiCol
----@field ResizeGrip any   -- on ImGuiCol
----@field ResizeGripActive any   -- on ImGuiCol
----@field ResizeGripHovered any   -- on ImGuiCol
----@field ScrollbarBg any   -- on ImGuiCol
----@field ScrollbarGrab any   -- on ImGuiCol
----@field ScrollbarGrabActive any   -- on ImGuiCol
----@field ScrollbarGrabHovered any   -- on ImGuiCol
----@field Separator any   -- on ImGuiCol
----@field SeparatorActive any   -- on ImGuiCol
----@field SeparatorHovered any   -- on ImGuiCol
----@field SliderGrab any   -- on ImGuiCol
----@field SliderGrabActive any   -- on ImGuiCol
----@field Tab any   -- on ImGuiCol
----@field TabActive any   -- on ImGuiCol
----@field TabDimmed any   -- on ImGuiCol
----@field TabDimmedSelected any   -- on ImGuiCol
----@field TabDimmedSelectedOverline any   -- on ImGuiCol
----@field TabHovered any   -- on ImGuiCol
----@field TabSelected any   -- on ImGuiCol
----@field TabSelectedOverline any   -- on ImGuiCol
----@field TabUnfocused any   -- on ImGuiCol
----@field TabUnfocusedActive any   -- on ImGuiCol
----@field TableBorderLight any   -- on ImGuiCol
----@field TableBorderStrong any   -- on ImGuiCol
----@field TableHeaderBg any   -- on ImGuiCol
----@field TableRowBg any   -- on ImGuiCol
----@field TableRowBgAlt any   -- on ImGuiCol
----@field Text any   -- on ImGuiCol
----@field TextDisabled any   -- on ImGuiCol
----@field TextLink any   -- on ImGuiCol
----@field TextSelectedBg any   -- on ImGuiCol
----@field TitleBg any   -- on ImGuiCol
----@field TitleBgActive any   -- on ImGuiCol
----@field TitleBgCollapsed any   -- on ImGuiCol
----@field TreeLines any   -- on ImGuiCol
----@field UnsavedMarker any   -- on ImGuiCol
----@field WindowBg any   -- on ImGuiCol
 
 ---@class ImGuiColorEditFlags
+---@field AlphaBar any
+---@field AlphaNoBg any
+---@field AlphaOpaque any
+---@field AlphaPreview any
+---@field AlphaPreviewHalf any
+---@field DisplayHSV any
+---@field DisplayHex any
+---@field DisplayRGB any
+---@field Float any
+---@field HDR any
+---@field InputHSV any
+---@field InputRGB any
+---@field NoAlpha any
+---@field NoBorder any
+---@field NoColorMarkers any
+---@field NoDragDrop any
+---@field NoInputs any
+---@field NoLabel any
+---@field NoOptions any
+---@field NoPicker any
+---@field NoSidePreview any
+---@field NoSmallPreview any
+---@field NoTooltip any
+---@field None any
+---@field PickerHueBar any
+---@field PickerHueWheel any
+---@field Uint8 any
 ImGuiColorEditFlags = {}
 
----@field AlphaBar any   -- on ImGuiColorEditFlags
----@field AlphaNoBg any   -- on ImGuiColorEditFlags
----@field AlphaOpaque any   -- on ImGuiColorEditFlags
----@field AlphaPreview any   -- on ImGuiColorEditFlags
----@field AlphaPreviewHalf any   -- on ImGuiColorEditFlags
----@field DisplayHSV any   -- on ImGuiColorEditFlags
----@field DisplayHex any   -- on ImGuiColorEditFlags
----@field DisplayRGB any   -- on ImGuiColorEditFlags
----@field Float any   -- on ImGuiColorEditFlags
----@field HDR any   -- on ImGuiColorEditFlags
----@field InputHSV any   -- on ImGuiColorEditFlags
----@field InputRGB any   -- on ImGuiColorEditFlags
----@field NoAlpha any   -- on ImGuiColorEditFlags
----@field NoBorder any   -- on ImGuiColorEditFlags
----@field NoColorMarkers any   -- on ImGuiColorEditFlags
----@field NoDragDrop any   -- on ImGuiColorEditFlags
----@field NoInputs any   -- on ImGuiColorEditFlags
----@field NoLabel any   -- on ImGuiColorEditFlags
----@field NoOptions any   -- on ImGuiColorEditFlags
----@field NoPicker any   -- on ImGuiColorEditFlags
----@field NoSidePreview any   -- on ImGuiColorEditFlags
----@field NoSmallPreview any   -- on ImGuiColorEditFlags
----@field NoTooltip any   -- on ImGuiColorEditFlags
----@field None any   -- on ImGuiColorEditFlags
----@field PickerHueBar any   -- on ImGuiColorEditFlags
----@field PickerHueWheel any   -- on ImGuiColorEditFlags
----@field Uint8 any   -- on ImGuiColorEditFlags
 
 ---@class ImGuiComboFlags
+---@field HeightLarge any
+---@field HeightLargest any
+---@field HeightRegular any
+---@field HeightSmall any
+---@field NoArrowButton any
+---@field NoPreview any
+---@field None any
+---@field PopupAlignLeft any
+---@field WidthFitPreview any
 ImGuiComboFlags = {}
 
----@field HeightLarge any   -- on ImGuiComboFlags
----@field HeightLargest any   -- on ImGuiComboFlags
----@field HeightRegular any   -- on ImGuiComboFlags
----@field HeightSmall any   -- on ImGuiComboFlags
----@field NoArrowButton any   -- on ImGuiComboFlags
----@field NoPreview any   -- on ImGuiComboFlags
----@field None any   -- on ImGuiComboFlags
----@field PopupAlignLeft any   -- on ImGuiComboFlags
----@field WidthFitPreview any   -- on ImGuiComboFlags
 
 ---@class ImGuiCond
+---@field Always any
+---@field Appearing any
+---@field FirstUseEver any
+---@field None any
+---@field Once any
 ImGuiCond = {}
 
----@field Always any   -- on ImGuiCond
----@field Appearing any   -- on ImGuiCond
----@field FirstUseEver any   -- on ImGuiCond
----@field None any   -- on ImGuiCond
----@field Once any   -- on ImGuiCond
 
 ---@class ImGuiConfigFlags
+---@field DockingEnable any
+---@field DpiEnableScaleFonts any
+---@field DpiEnableScaleViewports any
+---@field IsSRGB any
+---@field IsTouchScreen any
+---@field NavEnableGamepad any
+---@field NavEnableKeyboard any
+---@field NavEnableSetMousePos any
+---@field NavNoCaptureKeyboard any
+---@field NoKeyboard any
+---@field NoMouse any
+---@field NoMouseCursorChange any
+---@field None any
+---@field ViewportsEnable any
 ImGuiConfigFlags = {}
 
----@field DockingEnable any   -- on ImGuiConfigFlags
----@field DpiEnableScaleFonts any   -- on ImGuiConfigFlags
----@field DpiEnableScaleViewports any   -- on ImGuiConfigFlags
----@field IsSRGB any   -- on ImGuiConfigFlags
----@field IsTouchScreen any   -- on ImGuiConfigFlags
----@field NavEnableGamepad any   -- on ImGuiConfigFlags
----@field NavEnableKeyboard any   -- on ImGuiConfigFlags
----@field NavEnableSetMousePos any   -- on ImGuiConfigFlags
----@field NavNoCaptureKeyboard any   -- on ImGuiConfigFlags
----@field NoKeyboard any   -- on ImGuiConfigFlags
----@field NoMouse any   -- on ImGuiConfigFlags
----@field NoMouseCursorChange any   -- on ImGuiConfigFlags
----@field None any   -- on ImGuiConfigFlags
----@field ViewportsEnable any   -- on ImGuiConfigFlags
 
 ---@class ImGuiDataType
+---@field Bool any
+---@field COUNT any
+---@field Double any
+---@field Float any
+---@field S16 any
+---@field S32 any
+---@field S64 any
+---@field S8 any
+---@field String any
+---@field U16 any
+---@field U32 any
+---@field U64 any
+---@field U8 any
 ImGuiDataType = {}
 
----@field Bool any   -- on ImGuiDataType
----@field COUNT any   -- on ImGuiDataType
----@field Double any   -- on ImGuiDataType
----@field Float any   -- on ImGuiDataType
----@field S16 any   -- on ImGuiDataType
----@field S32 any   -- on ImGuiDataType
----@field S64 any   -- on ImGuiDataType
----@field S8 any   -- on ImGuiDataType
----@field String any   -- on ImGuiDataType
----@field U16 any   -- on ImGuiDataType
----@field U32 any   -- on ImGuiDataType
----@field U64 any   -- on ImGuiDataType
----@field U8 any   -- on ImGuiDataType
 
 ---@class ImGuiDir
+---@field _COUNT any
+---@field _Down any
+---@field _Left any
+---@field _None any
+---@field _Right any
+---@field _Up any
 ImGuiDir = {}
 
----@field _COUNT any   -- on ImGuiDir
----@field _Down any   -- on ImGuiDir
----@field _Left any   -- on ImGuiDir
----@field _None any   -- on ImGuiDir
----@field _Right any   -- on ImGuiDir
----@field _Up any   -- on ImGuiDir
 
 ---@class ImGuiDockNodeFlags
+---@field AutoHideTabBar any
+---@field KeepAliveOnly any
+---@field NoDockingInCentralNode any
+---@field NoDockingOverCentralNode any
+---@field NoDockingSplit any
+---@field NoResize any
+---@field NoSplit any
+---@field NoUndocking any
+---@field None any
+---@field PassthruCentralNode any
 ImGuiDockNodeFlags = {}
 
----@field AutoHideTabBar any   -- on ImGuiDockNodeFlags
----@field KeepAliveOnly any   -- on ImGuiDockNodeFlags
----@field NoDockingInCentralNode any   -- on ImGuiDockNodeFlags
----@field NoDockingOverCentralNode any   -- on ImGuiDockNodeFlags
----@field NoDockingSplit any   -- on ImGuiDockNodeFlags
----@field NoResize any   -- on ImGuiDockNodeFlags
----@field NoSplit any   -- on ImGuiDockNodeFlags
----@field NoUndocking any   -- on ImGuiDockNodeFlags
----@field None any   -- on ImGuiDockNodeFlags
----@field PassthruCentralNode any   -- on ImGuiDockNodeFlags
 
 ---@class ImGuiDragDropFlags
+---@field AcceptBeforeDelivery any
+---@field AcceptDrawAsHovered any
+---@field AcceptNoDrawDefaultRect any
+---@field AcceptNoPreviewTooltip any
+---@field AcceptPeekOnly any
+---@field None any
+---@field PayloadAutoExpire any
+---@field PayloadNoCrossContext any
+---@field PayloadNoCrossProcess any
+---@field SourceAllowNullID any
+---@field SourceAutoExpirePayload any
+---@field SourceExtern any
+---@field SourceNoDisableHover any
+---@field SourceNoHoldToOpenOthers any
+---@field SourceNoPreviewTooltip any
 ImGuiDragDropFlags = {}
 
----@field AcceptBeforeDelivery any   -- on ImGuiDragDropFlags
----@field AcceptDrawAsHovered any   -- on ImGuiDragDropFlags
----@field AcceptNoDrawDefaultRect any   -- on ImGuiDragDropFlags
----@field AcceptNoPreviewTooltip any   -- on ImGuiDragDropFlags
----@field AcceptPeekOnly any   -- on ImGuiDragDropFlags
----@field None any   -- on ImGuiDragDropFlags
----@field PayloadAutoExpire any   -- on ImGuiDragDropFlags
----@field PayloadNoCrossContext any   -- on ImGuiDragDropFlags
----@field PayloadNoCrossProcess any   -- on ImGuiDragDropFlags
----@field SourceAllowNullID any   -- on ImGuiDragDropFlags
----@field SourceAutoExpirePayload any   -- on ImGuiDragDropFlags
----@field SourceExtern any   -- on ImGuiDragDropFlags
----@field SourceNoDisableHover any   -- on ImGuiDragDropFlags
----@field SourceNoHoldToOpenOthers any   -- on ImGuiDragDropFlags
----@field SourceNoPreviewTooltip any   -- on ImGuiDragDropFlags
 
 ---@class ImGuiFocusedFlags
+---@field AnyWindow any
+---@field ChildWindows any
+---@field DockHierarchy any
+---@field NoPopupHierarchy any
+---@field None any
+---@field RootAndChildWindows any
+---@field RootWindow any
 ImGuiFocusedFlags = {}
 
----@field AnyWindow any   -- on ImGuiFocusedFlags
----@field ChildWindows any   -- on ImGuiFocusedFlags
----@field DockHierarchy any   -- on ImGuiFocusedFlags
----@field NoPopupHierarchy any   -- on ImGuiFocusedFlags
----@field None any   -- on ImGuiFocusedFlags
----@field RootAndChildWindows any   -- on ImGuiFocusedFlags
----@field RootWindow any   -- on ImGuiFocusedFlags
 
 ---@class ImGuiHoveredFlags
+---@field AllowWhenBlockedByActiveItem any
+---@field AllowWhenBlockedByPopup any
+---@field AllowWhenDisabled any
+---@field AllowWhenOverlapped any
+---@field AllowWhenOverlappedByItem any
+---@field AllowWhenOverlappedByWindow any
+---@field AnyWindow any
+---@field ChildWindows any
+---@field DelayNone any
+---@field DelayNormal any
+---@field DelayShort any
+---@field DockHierarchy any
+---@field ForTooltip any
+---@field NoNavOverride any
+---@field NoPopupHierarchy any
+---@field NoSharedDelay any
+---@field None any
+---@field RectOnly any
+---@field RootAndChildWindows any
+---@field RootWindow any
+---@field Stationary any
 ImGuiHoveredFlags = {}
 
----@field AllowWhenBlockedByActiveItem any   -- on ImGuiHoveredFlags
----@field AllowWhenBlockedByPopup any   -- on ImGuiHoveredFlags
----@field AllowWhenDisabled any   -- on ImGuiHoveredFlags
----@field AllowWhenOverlapped any   -- on ImGuiHoveredFlags
----@field AllowWhenOverlappedByItem any   -- on ImGuiHoveredFlags
----@field AllowWhenOverlappedByWindow any   -- on ImGuiHoveredFlags
----@field AnyWindow any   -- on ImGuiHoveredFlags
----@field ChildWindows any   -- on ImGuiHoveredFlags
----@field DelayNone any   -- on ImGuiHoveredFlags
----@field DelayNormal any   -- on ImGuiHoveredFlags
----@field DelayShort any   -- on ImGuiHoveredFlags
----@field DockHierarchy any   -- on ImGuiHoveredFlags
----@field ForTooltip any   -- on ImGuiHoveredFlags
----@field NoNavOverride any   -- on ImGuiHoveredFlags
----@field NoPopupHierarchy any   -- on ImGuiHoveredFlags
----@field NoSharedDelay any   -- on ImGuiHoveredFlags
----@field None any   -- on ImGuiHoveredFlags
----@field RectOnly any   -- on ImGuiHoveredFlags
----@field RootAndChildWindows any   -- on ImGuiHoveredFlags
----@field RootWindow any   -- on ImGuiHoveredFlags
----@field Stationary any   -- on ImGuiHoveredFlags
 
 ---@class ImGuiInputFlags
+---@field None any
+---@field Repeat any
+---@field RouteActive any
+---@field RouteAlways any
+---@field RouteFocused any
+---@field RouteFromRootWindow any
+---@field RouteGlobal any
+---@field RouteOverActive any
+---@field RouteOverFocused any
+---@field RouteUnlessBgFocused any
+---@field Tooltip any
 ImGuiInputFlags = {}
 
----@field None any   -- on ImGuiInputFlags
----@field Repeat any   -- on ImGuiInputFlags
----@field RouteActive any   -- on ImGuiInputFlags
----@field RouteAlways any   -- on ImGuiInputFlags
----@field RouteFocused any   -- on ImGuiInputFlags
----@field RouteFromRootWindow any   -- on ImGuiInputFlags
----@field RouteGlobal any   -- on ImGuiInputFlags
----@field RouteOverActive any   -- on ImGuiInputFlags
----@field RouteOverFocused any   -- on ImGuiInputFlags
----@field RouteUnlessBgFocused any   -- on ImGuiInputFlags
----@field Tooltip any   -- on ImGuiInputFlags
 
 ---@class ImGuiInputTextFlags
+---@field AllowTabInput any
+---@field AlwaysOverwrite any
+---@field AutoSelectAll any
+---@field CallbackAlways any
+---@field CallbackCharFilter any
+---@field CallbackCompletion any
+---@field CallbackEdit any
+---@field CallbackHistory any
+---@field CallbackResize any
+---@field CharsDecimal any
+---@field CharsHexadecimal any
+---@field CharsNoBlank any
+---@field CharsScientific any
+---@field CharsUppercase any
+---@field CtrlEnterForNewLine any
+---@field DisplayEmptyRefVal any
+---@field ElideLeft any
+---@field EnterReturnsTrue any
+---@field EscapeClearsAll any
+---@field NoHorizontalScroll any
+---@field NoUndoRedo any
+---@field None any
+---@field ParseEmptyRefVal any
+---@field Password any
+---@field ReadOnly any
+---@field WordWrap any
 ImGuiInputTextFlags = {}
 
----@field AllowTabInput any   -- on ImGuiInputTextFlags
----@field AlwaysOverwrite any   -- on ImGuiInputTextFlags
----@field AutoSelectAll any   -- on ImGuiInputTextFlags
----@field CallbackAlways any   -- on ImGuiInputTextFlags
----@field CallbackCharFilter any   -- on ImGuiInputTextFlags
----@field CallbackCompletion any   -- on ImGuiInputTextFlags
----@field CallbackEdit any   -- on ImGuiInputTextFlags
----@field CallbackHistory any   -- on ImGuiInputTextFlags
----@field CallbackResize any   -- on ImGuiInputTextFlags
----@field CharsDecimal any   -- on ImGuiInputTextFlags
----@field CharsHexadecimal any   -- on ImGuiInputTextFlags
----@field CharsNoBlank any   -- on ImGuiInputTextFlags
----@field CharsScientific any   -- on ImGuiInputTextFlags
----@field CharsUppercase any   -- on ImGuiInputTextFlags
----@field CtrlEnterForNewLine any   -- on ImGuiInputTextFlags
----@field DisplayEmptyRefVal any   -- on ImGuiInputTextFlags
----@field ElideLeft any   -- on ImGuiInputTextFlags
----@field EnterReturnsTrue any   -- on ImGuiInputTextFlags
----@field EscapeClearsAll any   -- on ImGuiInputTextFlags
----@field NoHorizontalScroll any   -- on ImGuiInputTextFlags
----@field NoUndoRedo any   -- on ImGuiInputTextFlags
----@field None any   -- on ImGuiInputTextFlags
----@field ParseEmptyRefVal any   -- on ImGuiInputTextFlags
----@field Password any   -- on ImGuiInputTextFlags
----@field ReadOnly any   -- on ImGuiInputTextFlags
----@field WordWrap any   -- on ImGuiInputTextFlags
 
 ---@class ImGuiItemFlags
+---@field AllowDuplicateId any
+---@field AutoClosePopups any
+---@field ButtonRepeat any
+---@field Disabled any
+---@field NoNav any
+---@field NoNavDefaultFocus any
+---@field NoTabStop any
+---@field None any
 ImGuiItemFlags = {}
 
----@field AllowDuplicateId any   -- on ImGuiItemFlags
----@field AutoClosePopups any   -- on ImGuiItemFlags
----@field ButtonRepeat any   -- on ImGuiItemFlags
----@field Disabled any   -- on ImGuiItemFlags
----@field NoNav any   -- on ImGuiItemFlags
----@field NoNavDefaultFocus any   -- on ImGuiItemFlags
----@field NoTabStop any   -- on ImGuiItemFlags
----@field None any   -- on ImGuiItemFlags
 
 ---@class ImGuiKey
+---@field ImGuiMod_Alt any
+---@field ImGuiMod_Ctrl any
+---@field ImGuiMod_None any
+---@field ImGuiMod_Shift any
+---@field ImGuiMod_Shortcut any
+---@field ImGuiMod_Super any
+---@field _0 any
+---@field _1 any
+---@field _2 any
+---@field _3 any
+---@field _4 any
+---@field _5 any
+---@field _6 any
+---@field _7 any
+---@field _8 any
+---@field _9 any
+---@field _A any
+---@field _Apostrophe any
+---@field _AppBack any
+---@field _AppForward any
+---@field _B any
+---@field _Backslash any
+---@field _Backspace any
+---@field _C any
+---@field _COUNT any
+---@field _CapsLock any
+---@field _Comma any
+---@field _D any
+---@field _Delete any
+---@field _DownArrow any
+---@field _E any
+---@field _End any
+---@field _Enter any
+---@field _Equal any
+---@field _Escape any
+---@field _F any
+---@field _F1 any
+---@field _F10 any
+---@field _F11 any
+---@field _F12 any
+---@field _F13 any
+---@field _F14 any
+---@field _F15 any
+---@field _F16 any
+---@field _F17 any
+---@field _F18 any
+---@field _F19 any
+---@field _F2 any
+---@field _F20 any
+---@field _F21 any
+---@field _F22 any
+---@field _F23 any
+---@field _F24 any
+---@field _F3 any
+---@field _F4 any
+---@field _F5 any
+---@field _F6 any
+---@field _F7 any
+---@field _F8 any
+---@field _F9 any
+---@field _G any
+---@field _GamepadBack any
+---@field _GamepadDpadDown any
+---@field _GamepadDpadLeft any
+---@field _GamepadDpadRight any
+---@field _GamepadDpadUp any
+---@field _GamepadFaceDown any
+---@field _GamepadFaceLeft any
+---@field _GamepadFaceRight any
+---@field _GamepadFaceUp any
+---@field _GamepadL1 any
+---@field _GamepadL2 any
+---@field _GamepadL3 any
+---@field _GamepadLStickDown any
+---@field _GamepadLStickLeft any
+---@field _GamepadLStickRight any
+---@field _GamepadLStickUp any
+---@field _GamepadR1 any
+---@field _GamepadR2 any
+---@field _GamepadR3 any
+---@field _GamepadRStickDown any
+---@field _GamepadRStickLeft any
+---@field _GamepadRStickRight any
+---@field _GamepadRStickUp any
+---@field _GamepadStart any
+---@field _GraveAccent any
+---@field _H any
+---@field _Home any
+---@field _I any
+---@field _Insert any
+---@field _J any
+---@field _K any
+---@field _Keypad0 any
+---@field _Keypad1 any
+---@field _Keypad2 any
+---@field _Keypad3 any
+---@field _Keypad4 any
+---@field _Keypad5 any
+---@field _Keypad6 any
+---@field _Keypad7 any
+---@field _Keypad8 any
+---@field _Keypad9 any
+---@field _KeypadAdd any
+---@field _KeypadDecimal any
+---@field _KeypadDivide any
+---@field _KeypadEnter any
+---@field _KeypadEqual any
+---@field _KeypadMultiply any
+---@field _KeypadSubtract any
+---@field _L any
+---@field _LeftAlt any
+---@field _LeftArrow any
+---@field _LeftBracket any
+---@field _LeftCtrl any
+---@field _LeftShift any
+---@field _LeftSuper any
+---@field _M any
+---@field _Menu any
+---@field _Minus any
+---@field _MouseLeft any
+---@field _MouseMiddle any
+---@field _MouseRight any
+---@field _MouseWheelX any
+---@field _MouseWheelY any
+---@field _MouseX1 any
+---@field _MouseX2 any
+---@field _N any
+---@field _NamedKey_BEGIN any
+---@field _None any
+---@field _NumLock any
+---@field _O any
+---@field _Oem102 any
+---@field _P any
+---@field _PageDown any
+---@field _PageUp any
+---@field _Pause any
+---@field _Period any
+---@field _PrintScreen any
+---@field _Q any
+---@field _R any
+---@field _RightAlt any
+---@field _RightArrow any
+---@field _RightBracket any
+---@field _RightCtrl any
+---@field _RightShift any
+---@field _RightSuper any
+---@field _S any
+---@field _ScrollLock any
+---@field _Semicolon any
+---@field _Slash any
+---@field _Space any
+---@field _T any
+---@field _Tab any
+---@field _U any
+---@field _UpArrow any
+---@field _V any
+---@field _W any
+---@field _X any
+---@field _Y any
+---@field _Z any
 ImGuiKey = {}
 
----@field ImGuiMod_Alt any   -- on ImGuiKey
----@field ImGuiMod_Ctrl any   -- on ImGuiKey
----@field ImGuiMod_None any   -- on ImGuiKey
----@field ImGuiMod_Shift any   -- on ImGuiKey
----@field ImGuiMod_Shortcut any   -- on ImGuiKey
----@field ImGuiMod_Super any   -- on ImGuiKey
----@field _0 any   -- on ImGuiKey
----@field _1 any   -- on ImGuiKey
----@field _2 any   -- on ImGuiKey
----@field _3 any   -- on ImGuiKey
----@field _4 any   -- on ImGuiKey
----@field _5 any   -- on ImGuiKey
----@field _6 any   -- on ImGuiKey
----@field _7 any   -- on ImGuiKey
----@field _8 any   -- on ImGuiKey
----@field _9 any   -- on ImGuiKey
----@field _A any   -- on ImGuiKey
----@field _Apostrophe any   -- on ImGuiKey
----@field _AppBack any   -- on ImGuiKey
----@field _AppForward any   -- on ImGuiKey
----@field _B any   -- on ImGuiKey
----@field _Backslash any   -- on ImGuiKey
----@field _Backspace any   -- on ImGuiKey
----@field _C any   -- on ImGuiKey
----@field _COUNT any   -- on ImGuiKey
----@field _CapsLock any   -- on ImGuiKey
----@field _Comma any   -- on ImGuiKey
----@field _D any   -- on ImGuiKey
----@field _Delete any   -- on ImGuiKey
----@field _DownArrow any   -- on ImGuiKey
----@field _E any   -- on ImGuiKey
----@field _End any   -- on ImGuiKey
----@field _Enter any   -- on ImGuiKey
----@field _Equal any   -- on ImGuiKey
----@field _Escape any   -- on ImGuiKey
----@field _F any   -- on ImGuiKey
----@field _F1 any   -- on ImGuiKey
----@field _F10 any   -- on ImGuiKey
----@field _F11 any   -- on ImGuiKey
----@field _F12 any   -- on ImGuiKey
----@field _F13 any   -- on ImGuiKey
----@field _F14 any   -- on ImGuiKey
----@field _F15 any   -- on ImGuiKey
----@field _F16 any   -- on ImGuiKey
----@field _F17 any   -- on ImGuiKey
----@field _F18 any   -- on ImGuiKey
----@field _F19 any   -- on ImGuiKey
----@field _F2 any   -- on ImGuiKey
----@field _F20 any   -- on ImGuiKey
----@field _F21 any   -- on ImGuiKey
----@field _F22 any   -- on ImGuiKey
----@field _F23 any   -- on ImGuiKey
----@field _F24 any   -- on ImGuiKey
----@field _F3 any   -- on ImGuiKey
----@field _F4 any   -- on ImGuiKey
----@field _F5 any   -- on ImGuiKey
----@field _F6 any   -- on ImGuiKey
----@field _F7 any   -- on ImGuiKey
----@field _F8 any   -- on ImGuiKey
----@field _F9 any   -- on ImGuiKey
----@field _G any   -- on ImGuiKey
----@field _GamepadBack any   -- on ImGuiKey
----@field _GamepadDpadDown any   -- on ImGuiKey
----@field _GamepadDpadLeft any   -- on ImGuiKey
----@field _GamepadDpadRight any   -- on ImGuiKey
----@field _GamepadDpadUp any   -- on ImGuiKey
----@field _GamepadFaceDown any   -- on ImGuiKey
----@field _GamepadFaceLeft any   -- on ImGuiKey
----@field _GamepadFaceRight any   -- on ImGuiKey
----@field _GamepadFaceUp any   -- on ImGuiKey
----@field _GamepadL1 any   -- on ImGuiKey
----@field _GamepadL2 any   -- on ImGuiKey
----@field _GamepadL3 any   -- on ImGuiKey
----@field _GamepadLStickDown any   -- on ImGuiKey
----@field _GamepadLStickLeft any   -- on ImGuiKey
----@field _GamepadLStickRight any   -- on ImGuiKey
----@field _GamepadLStickUp any   -- on ImGuiKey
----@field _GamepadR1 any   -- on ImGuiKey
----@field _GamepadR2 any   -- on ImGuiKey
----@field _GamepadR3 any   -- on ImGuiKey
----@field _GamepadRStickDown any   -- on ImGuiKey
----@field _GamepadRStickLeft any   -- on ImGuiKey
----@field _GamepadRStickRight any   -- on ImGuiKey
----@field _GamepadRStickUp any   -- on ImGuiKey
----@field _GamepadStart any   -- on ImGuiKey
----@field _GraveAccent any   -- on ImGuiKey
----@field _H any   -- on ImGuiKey
----@field _Home any   -- on ImGuiKey
----@field _I any   -- on ImGuiKey
----@field _Insert any   -- on ImGuiKey
----@field _J any   -- on ImGuiKey
----@field _K any   -- on ImGuiKey
----@field _Keypad0 any   -- on ImGuiKey
----@field _Keypad1 any   -- on ImGuiKey
----@field _Keypad2 any   -- on ImGuiKey
----@field _Keypad3 any   -- on ImGuiKey
----@field _Keypad4 any   -- on ImGuiKey
----@field _Keypad5 any   -- on ImGuiKey
----@field _Keypad6 any   -- on ImGuiKey
----@field _Keypad7 any   -- on ImGuiKey
----@field _Keypad8 any   -- on ImGuiKey
----@field _Keypad9 any   -- on ImGuiKey
----@field _KeypadAdd any   -- on ImGuiKey
----@field _KeypadDecimal any   -- on ImGuiKey
----@field _KeypadDivide any   -- on ImGuiKey
----@field _KeypadEnter any   -- on ImGuiKey
----@field _KeypadEqual any   -- on ImGuiKey
----@field _KeypadMultiply any   -- on ImGuiKey
----@field _KeypadSubtract any   -- on ImGuiKey
----@field _L any   -- on ImGuiKey
----@field _LeftAlt any   -- on ImGuiKey
----@field _LeftArrow any   -- on ImGuiKey
----@field _LeftBracket any   -- on ImGuiKey
----@field _LeftCtrl any   -- on ImGuiKey
----@field _LeftShift any   -- on ImGuiKey
----@field _LeftSuper any   -- on ImGuiKey
----@field _M any   -- on ImGuiKey
----@field _Menu any   -- on ImGuiKey
----@field _Minus any   -- on ImGuiKey
----@field _MouseLeft any   -- on ImGuiKey
----@field _MouseMiddle any   -- on ImGuiKey
----@field _MouseRight any   -- on ImGuiKey
----@field _MouseWheelX any   -- on ImGuiKey
----@field _MouseWheelY any   -- on ImGuiKey
----@field _MouseX1 any   -- on ImGuiKey
----@field _MouseX2 any   -- on ImGuiKey
----@field _N any   -- on ImGuiKey
----@field _NamedKey_BEGIN any   -- on ImGuiKey
----@field _None any   -- on ImGuiKey
----@field _NumLock any   -- on ImGuiKey
----@field _O any   -- on ImGuiKey
----@field _Oem102 any   -- on ImGuiKey
----@field _P any   -- on ImGuiKey
----@field _PageDown any   -- on ImGuiKey
----@field _PageUp any   -- on ImGuiKey
----@field _Pause any   -- on ImGuiKey
----@field _Period any   -- on ImGuiKey
----@field _PrintScreen any   -- on ImGuiKey
----@field _Q any   -- on ImGuiKey
----@field _R any   -- on ImGuiKey
----@field _RightAlt any   -- on ImGuiKey
----@field _RightArrow any   -- on ImGuiKey
----@field _RightBracket any   -- on ImGuiKey
----@field _RightCtrl any   -- on ImGuiKey
----@field _RightShift any   -- on ImGuiKey
----@field _RightSuper any   -- on ImGuiKey
----@field _S any   -- on ImGuiKey
----@field _ScrollLock any   -- on ImGuiKey
----@field _Semicolon any   -- on ImGuiKey
----@field _Slash any   -- on ImGuiKey
----@field _Space any   -- on ImGuiKey
----@field _T any   -- on ImGuiKey
----@field _Tab any   -- on ImGuiKey
----@field _U any   -- on ImGuiKey
----@field _UpArrow any   -- on ImGuiKey
----@field _V any   -- on ImGuiKey
----@field _W any   -- on ImGuiKey
----@field _X any   -- on ImGuiKey
----@field _Y any   -- on ImGuiKey
----@field _Z any   -- on ImGuiKey
 
 ---@class ImGuiListClipperFlags
+---@field NoSetTableRowCounters any
+---@field None any
 ImGuiListClipperFlags = {}
 
----@field NoSetTableRowCounters any   -- on ImGuiListClipperFlags
----@field None any   -- on ImGuiListClipperFlags
 
 ---@class ImGuiMouseButton
+---@field COUNT any
+---@field Left any
+---@field Middle any
+---@field Right any
 ImGuiMouseButton = {}
 
----@field COUNT any   -- on ImGuiMouseButton
----@field Left any   -- on ImGuiMouseButton
----@field Middle any   -- on ImGuiMouseButton
----@field Right any   -- on ImGuiMouseButton
 
 ---@class ImGuiMouseCursor
+---@field Arrow any
+---@field COUNT any
+---@field Hand any
+---@field None any
+---@field NotAllowed any
+---@field Progress any
+---@field ResizeAll any
+---@field ResizeEW any
+---@field ResizeNESW any
+---@field ResizeNS any
+---@field ResizeNWSE any
+---@field TextInput any
+---@field Wait any
 ImGuiMouseCursor = {}
 
----@field Arrow any   -- on ImGuiMouseCursor
----@field COUNT any   -- on ImGuiMouseCursor
----@field Hand any   -- on ImGuiMouseCursor
----@field None any   -- on ImGuiMouseCursor
----@field NotAllowed any   -- on ImGuiMouseCursor
----@field Progress any   -- on ImGuiMouseCursor
----@field ResizeAll any   -- on ImGuiMouseCursor
----@field ResizeEW any   -- on ImGuiMouseCursor
----@field ResizeNESW any   -- on ImGuiMouseCursor
----@field ResizeNS any   -- on ImGuiMouseCursor
----@field ResizeNWSE any   -- on ImGuiMouseCursor
----@field TextInput any   -- on ImGuiMouseCursor
----@field Wait any   -- on ImGuiMouseCursor
 
 ---@class ImGuiMouseSource
+---@field _COUNT any
+---@field _Mouse any
+---@field _Pen any
+---@field _TouchScreen any
 ImGuiMouseSource = {}
 
----@field _COUNT any   -- on ImGuiMouseSource
----@field _Mouse any   -- on ImGuiMouseSource
----@field _Pen any   -- on ImGuiMouseSource
----@field _TouchScreen any   -- on ImGuiMouseSource
 
 ---@class ImGuiMultiSelectFlags
+---@field BoxSelect1d any
+---@field BoxSelect2d any
+---@field BoxSelectNoScroll any
+---@field ClearOnClickVoid any
+---@field ClearOnEscape any
+---@field NavWrapX any
+---@field NoAutoClear any
+---@field NoAutoClearOnReselect any
+---@field NoAutoSelect any
+---@field NoRangeSelect any
+---@field NoSelectAll any
+---@field NoSelectOnRightClick any
+---@field None any
+---@field ScopeRect any
+---@field ScopeWindow any
+---@field SelectOnAuto any
+---@field SelectOnClick any
+---@field SelectOnClickAlways any
+---@field SelectOnClickRelease any
+---@field SingleSelect any
 ImGuiMultiSelectFlags = {}
 
----@field BoxSelect1d any   -- on ImGuiMultiSelectFlags
----@field BoxSelect2d any   -- on ImGuiMultiSelectFlags
----@field BoxSelectNoScroll any   -- on ImGuiMultiSelectFlags
----@field ClearOnClickVoid any   -- on ImGuiMultiSelectFlags
----@field ClearOnEscape any   -- on ImGuiMultiSelectFlags
----@field NavWrapX any   -- on ImGuiMultiSelectFlags
----@field NoAutoClear any   -- on ImGuiMultiSelectFlags
----@field NoAutoClearOnReselect any   -- on ImGuiMultiSelectFlags
----@field NoAutoSelect any   -- on ImGuiMultiSelectFlags
----@field NoRangeSelect any   -- on ImGuiMultiSelectFlags
----@field NoSelectAll any   -- on ImGuiMultiSelectFlags
----@field NoSelectOnRightClick any   -- on ImGuiMultiSelectFlags
----@field None any   -- on ImGuiMultiSelectFlags
----@field ScopeRect any   -- on ImGuiMultiSelectFlags
----@field ScopeWindow any   -- on ImGuiMultiSelectFlags
----@field SelectOnAuto any   -- on ImGuiMultiSelectFlags
----@field SelectOnClick any   -- on ImGuiMultiSelectFlags
----@field SelectOnClickAlways any   -- on ImGuiMultiSelectFlags
----@field SelectOnClickRelease any   -- on ImGuiMultiSelectFlags
----@field SingleSelect any   -- on ImGuiMultiSelectFlags
 
 ---@class ImGuiPopupFlags
+---@field AnyPopup any
+---@field AnyPopupId any
+---@field AnyPopupLevel any
+---@field MouseButtonLeft any
+---@field MouseButtonMiddle any
+---@field MouseButtonRight any
+---@field NoOpenOverExistingPopup any
+---@field NoOpenOverItems any
+---@field NoReopen any
+---@field None any
 ImGuiPopupFlags = {}
 
----@field AnyPopup any   -- on ImGuiPopupFlags
----@field AnyPopupId any   -- on ImGuiPopupFlags
----@field AnyPopupLevel any   -- on ImGuiPopupFlags
----@field MouseButtonLeft any   -- on ImGuiPopupFlags
----@field MouseButtonMiddle any   -- on ImGuiPopupFlags
----@field MouseButtonRight any   -- on ImGuiPopupFlags
----@field NoOpenOverExistingPopup any   -- on ImGuiPopupFlags
----@field NoOpenOverItems any   -- on ImGuiPopupFlags
----@field NoReopen any   -- on ImGuiPopupFlags
----@field None any   -- on ImGuiPopupFlags
 
 ---@class ImGuiSelectableFlags
+---@field AllowDoubleClick any
+---@field AllowOverlap any
+---@field Disabled any
+---@field DontClosePopups any
+---@field Highlight any
+---@field NoAutoClosePopups any
+---@field None any
+---@field SelectOnNav any
+---@field SpanAllColumns any
 ImGuiSelectableFlags = {}
 
----@field AllowDoubleClick any   -- on ImGuiSelectableFlags
----@field AllowOverlap any   -- on ImGuiSelectableFlags
----@field Disabled any   -- on ImGuiSelectableFlags
----@field DontClosePopups any   -- on ImGuiSelectableFlags
----@field Highlight any   -- on ImGuiSelectableFlags
----@field NoAutoClosePopups any   -- on ImGuiSelectableFlags
----@field None any   -- on ImGuiSelectableFlags
----@field SelectOnNav any   -- on ImGuiSelectableFlags
----@field SpanAllColumns any   -- on ImGuiSelectableFlags
 
 ---@class ImGuiSelectionRequestType
+---@field _None any
+---@field _SetAll any
+---@field _SetRange any
 ImGuiSelectionRequestType = {}
 
----@field _None any   -- on ImGuiSelectionRequestType
----@field _SetAll any   -- on ImGuiSelectionRequestType
----@field _SetRange any   -- on ImGuiSelectionRequestType
 
 ---@class ImGuiSliderFlags
+---@field AlwaysClamp any
+---@field ClampOnInput any
+---@field ClampZeroRange any
+---@field ColorMarkers any
+---@field Logarithmic any
+---@field NoInput any
+---@field NoRoundToFormat any
+---@field NoSpeedTweaks any
+---@field None any
+---@field WrapAround any
 ImGuiSliderFlags = {}
 
----@field AlwaysClamp any   -- on ImGuiSliderFlags
----@field ClampOnInput any   -- on ImGuiSliderFlags
----@field ClampZeroRange any   -- on ImGuiSliderFlags
----@field ColorMarkers any   -- on ImGuiSliderFlags
----@field Logarithmic any   -- on ImGuiSliderFlags
----@field NoInput any   -- on ImGuiSliderFlags
----@field NoRoundToFormat any   -- on ImGuiSliderFlags
----@field NoSpeedTweaks any   -- on ImGuiSliderFlags
----@field None any   -- on ImGuiSliderFlags
----@field WrapAround any   -- on ImGuiSliderFlags
 
 ---@class ImGuiSortDirection
+---@field _Ascending any
+---@field _Descending any
+---@field _None any
 ImGuiSortDirection = {}
 
----@field _Ascending any   -- on ImGuiSortDirection
----@field _Descending any   -- on ImGuiSortDirection
----@field _None any   -- on ImGuiSortDirection
 
 ---@class ImGuiStyleVar
+---@field Alpha any
+---@field ButtonTextAlign any
+---@field COUNT any
+---@field CellPadding any
+---@field ChildBorderSize any
+---@field ChildRounding any
+---@field DisabledAlpha any
+---@field DockingSeparatorSize any
+---@field FrameBorderSize any
+---@field FramePadding any
+---@field FrameRounding any
+---@field GrabMinSize any
+---@field GrabRounding any
+---@field ImageBorderSize any
+---@field ImageRounding any
+---@field IndentSpacing any
+---@field ItemInnerSpacing any
+---@field ItemSpacing any
+---@field PopupBorderSize any
+---@field PopupRounding any
+---@field ScrollbarPadding any
+---@field ScrollbarRounding any
+---@field ScrollbarSize any
+---@field SelectableTextAlign any
+---@field SeparatorSize any
+---@field SeparatorTextAlign any
+---@field SeparatorTextBorderSize any
+---@field SeparatorTextPadding any
+---@field TabBarBorderSize any
+---@field TabBarOverlineSize any
+---@field TabBorderSize any
+---@field TabMinWidthBase any
+---@field TabMinWidthShrink any
+---@field TabRounding any
+---@field TableAngledHeadersAngle any
+---@field TableAngledHeadersTextAlign any
+---@field TreeLinesRounding any
+---@field TreeLinesSize any
+---@field WindowBorderSize any
+---@field WindowMinSize any
+---@field WindowPadding any
+---@field WindowRounding any
+---@field WindowTitleAlign any
 ImGuiStyleVar = {}
 
----@field Alpha any   -- on ImGuiStyleVar
----@field ButtonTextAlign any   -- on ImGuiStyleVar
----@field COUNT any   -- on ImGuiStyleVar
----@field CellPadding any   -- on ImGuiStyleVar
----@field ChildBorderSize any   -- on ImGuiStyleVar
----@field ChildRounding any   -- on ImGuiStyleVar
----@field DisabledAlpha any   -- on ImGuiStyleVar
----@field DockingSeparatorSize any   -- on ImGuiStyleVar
----@field FrameBorderSize any   -- on ImGuiStyleVar
----@field FramePadding any   -- on ImGuiStyleVar
----@field FrameRounding any   -- on ImGuiStyleVar
----@field GrabMinSize any   -- on ImGuiStyleVar
----@field GrabRounding any   -- on ImGuiStyleVar
----@field ImageBorderSize any   -- on ImGuiStyleVar
----@field ImageRounding any   -- on ImGuiStyleVar
----@field IndentSpacing any   -- on ImGuiStyleVar
----@field ItemInnerSpacing any   -- on ImGuiStyleVar
----@field ItemSpacing any   -- on ImGuiStyleVar
----@field PopupBorderSize any   -- on ImGuiStyleVar
----@field PopupRounding any   -- on ImGuiStyleVar
----@field ScrollbarPadding any   -- on ImGuiStyleVar
----@field ScrollbarRounding any   -- on ImGuiStyleVar
----@field ScrollbarSize any   -- on ImGuiStyleVar
----@field SelectableTextAlign any   -- on ImGuiStyleVar
----@field SeparatorSize any   -- on ImGuiStyleVar
----@field SeparatorTextAlign any   -- on ImGuiStyleVar
----@field SeparatorTextBorderSize any   -- on ImGuiStyleVar
----@field SeparatorTextPadding any   -- on ImGuiStyleVar
----@field TabBarBorderSize any   -- on ImGuiStyleVar
----@field TabBarOverlineSize any   -- on ImGuiStyleVar
----@field TabBorderSize any   -- on ImGuiStyleVar
----@field TabMinWidthBase any   -- on ImGuiStyleVar
----@field TabMinWidthShrink any   -- on ImGuiStyleVar
----@field TabRounding any   -- on ImGuiStyleVar
----@field TableAngledHeadersAngle any   -- on ImGuiStyleVar
----@field TableAngledHeadersTextAlign any   -- on ImGuiStyleVar
----@field TreeLinesRounding any   -- on ImGuiStyleVar
----@field TreeLinesSize any   -- on ImGuiStyleVar
----@field WindowBorderSize any   -- on ImGuiStyleVar
----@field WindowMinSize any   -- on ImGuiStyleVar
----@field WindowPadding any   -- on ImGuiStyleVar
----@field WindowRounding any   -- on ImGuiStyleVar
----@field WindowTitleAlign any   -- on ImGuiStyleVar
 
 ---@class ImGuiTabBarFlags
+---@field AutoSelectNewTabs any
+---@field DrawSelectedOverline any
+---@field FittingPolicyMixed any
+---@field FittingPolicyResizeDown any
+---@field FittingPolicyScroll any
+---@field FittingPolicyShrink any
+---@field NoCloseWithMiddleMouseButton any
+---@field NoTabListScrollingButtons any
+---@field NoTooltip any
+---@field None any
+---@field Reorderable any
+---@field TabListPopupButton any
 ImGuiTabBarFlags = {}
 
----@field AutoSelectNewTabs any   -- on ImGuiTabBarFlags
----@field DrawSelectedOverline any   -- on ImGuiTabBarFlags
----@field FittingPolicyMixed any   -- on ImGuiTabBarFlags
----@field FittingPolicyResizeDown any   -- on ImGuiTabBarFlags
----@field FittingPolicyScroll any   -- on ImGuiTabBarFlags
----@field FittingPolicyShrink any   -- on ImGuiTabBarFlags
----@field NoCloseWithMiddleMouseButton any   -- on ImGuiTabBarFlags
----@field NoTabListScrollingButtons any   -- on ImGuiTabBarFlags
----@field NoTooltip any   -- on ImGuiTabBarFlags
----@field None any   -- on ImGuiTabBarFlags
----@field Reorderable any   -- on ImGuiTabBarFlags
----@field TabListPopupButton any   -- on ImGuiTabBarFlags
 
 ---@class ImGuiTabItemFlags
+---@field Leading any
+---@field NoAssumedClosure any
+---@field NoCloseWithMiddleMouseButton any
+---@field NoPushId any
+---@field NoReorder any
+---@field NoTooltip any
+---@field None any
+---@field SetSelected any
+---@field Trailing any
+---@field UnsavedDocument any
 ImGuiTabItemFlags = {}
 
----@field Leading any   -- on ImGuiTabItemFlags
----@field NoAssumedClosure any   -- on ImGuiTabItemFlags
----@field NoCloseWithMiddleMouseButton any   -- on ImGuiTabItemFlags
----@field NoPushId any   -- on ImGuiTabItemFlags
----@field NoReorder any   -- on ImGuiTabItemFlags
----@field NoTooltip any   -- on ImGuiTabItemFlags
----@field None any   -- on ImGuiTabItemFlags
----@field SetSelected any   -- on ImGuiTabItemFlags
----@field Trailing any   -- on ImGuiTabItemFlags
----@field UnsavedDocument any   -- on ImGuiTabItemFlags
 
 ---@class ImGuiTableBgTarget
+---@field CellBg any
+---@field None any
+---@field RowBg0 any
+---@field RowBg1 any
 ImGuiTableBgTarget = {}
 
----@field CellBg any   -- on ImGuiTableBgTarget
----@field None any   -- on ImGuiTableBgTarget
----@field RowBg0 any   -- on ImGuiTableBgTarget
----@field RowBg1 any   -- on ImGuiTableBgTarget
 
 ---@class ImGuiTableColumnFlags
+---@field AngledHeader any
+---@field DefaultHide any
+---@field DefaultSort any
+---@field Disabled any
+---@field IndentDisable any
+---@field IndentEnable any
+---@field IsEnabled any
+---@field IsHovered any
+---@field IsSorted any
+---@field IsVisible any
+---@field NoClip any
+---@field NoHeaderLabel any
+---@field NoHeaderWidth any
+---@field NoHide any
+---@field NoReorder any
+---@field NoResize any
+---@field NoSort any
+---@field NoSortAscending any
+---@field NoSortDescending any
+---@field None any
+---@field PreferSortAscending any
+---@field PreferSortDescending any
+---@field WidthFixed any
+---@field WidthStretch any
 ImGuiTableColumnFlags = {}
 
----@field AngledHeader any   -- on ImGuiTableColumnFlags
----@field DefaultHide any   -- on ImGuiTableColumnFlags
----@field DefaultSort any   -- on ImGuiTableColumnFlags
----@field Disabled any   -- on ImGuiTableColumnFlags
----@field IndentDisable any   -- on ImGuiTableColumnFlags
----@field IndentEnable any   -- on ImGuiTableColumnFlags
----@field IsEnabled any   -- on ImGuiTableColumnFlags
----@field IsHovered any   -- on ImGuiTableColumnFlags
----@field IsSorted any   -- on ImGuiTableColumnFlags
----@field IsVisible any   -- on ImGuiTableColumnFlags
----@field NoClip any   -- on ImGuiTableColumnFlags
----@field NoHeaderLabel any   -- on ImGuiTableColumnFlags
----@field NoHeaderWidth any   -- on ImGuiTableColumnFlags
----@field NoHide any   -- on ImGuiTableColumnFlags
----@field NoReorder any   -- on ImGuiTableColumnFlags
----@field NoResize any   -- on ImGuiTableColumnFlags
----@field NoSort any   -- on ImGuiTableColumnFlags
----@field NoSortAscending any   -- on ImGuiTableColumnFlags
----@field NoSortDescending any   -- on ImGuiTableColumnFlags
----@field None any   -- on ImGuiTableColumnFlags
----@field PreferSortAscending any   -- on ImGuiTableColumnFlags
----@field PreferSortDescending any   -- on ImGuiTableColumnFlags
----@field WidthFixed any   -- on ImGuiTableColumnFlags
----@field WidthStretch any   -- on ImGuiTableColumnFlags
 
 ---@class ImGuiTableFlags
+---@field Borders any
+---@field BordersH any
+---@field BordersInner any
+---@field BordersInnerH any
+---@field BordersInnerV any
+---@field BordersOuter any
+---@field BordersOuterH any
+---@field BordersOuterV any
+---@field BordersV any
+---@field ContextMenuInBody any
+---@field Hideable any
+---@field HighlightHoveredColumn any
+---@field NoBordersInBody any
+---@field NoBordersInBodyUntilResize any
+---@field NoClip any
+---@field NoHostExtendX any
+---@field NoHostExtendY any
+---@field NoKeepColumnsVisible any
+---@field NoPadInnerX any
+---@field NoPadOuterX any
+---@field NoSavedSettings any
+---@field None any
+---@field PadOuterX any
+---@field PreciseWidths any
+---@field Reorderable any
+---@field Resizable any
+---@field RowBg any
+---@field ScrollX any
+---@field ScrollY any
+---@field SizingFixedFit any
+---@field SizingFixedSame any
+---@field SizingStretchProp any
+---@field SizingStretchSame any
+---@field SortMulti any
+---@field SortTristate any
+---@field Sortable any
 ImGuiTableFlags = {}
 
----@field Borders any   -- on ImGuiTableFlags
----@field BordersH any   -- on ImGuiTableFlags
----@field BordersInner any   -- on ImGuiTableFlags
----@field BordersInnerH any   -- on ImGuiTableFlags
----@field BordersInnerV any   -- on ImGuiTableFlags
----@field BordersOuter any   -- on ImGuiTableFlags
----@field BordersOuterH any   -- on ImGuiTableFlags
----@field BordersOuterV any   -- on ImGuiTableFlags
----@field BordersV any   -- on ImGuiTableFlags
----@field ContextMenuInBody any   -- on ImGuiTableFlags
----@field Hideable any   -- on ImGuiTableFlags
----@field HighlightHoveredColumn any   -- on ImGuiTableFlags
----@field NoBordersInBody any   -- on ImGuiTableFlags
----@field NoBordersInBodyUntilResize any   -- on ImGuiTableFlags
----@field NoClip any   -- on ImGuiTableFlags
----@field NoHostExtendX any   -- on ImGuiTableFlags
----@field NoHostExtendY any   -- on ImGuiTableFlags
----@field NoKeepColumnsVisible any   -- on ImGuiTableFlags
----@field NoPadInnerX any   -- on ImGuiTableFlags
----@field NoPadOuterX any   -- on ImGuiTableFlags
----@field NoSavedSettings any   -- on ImGuiTableFlags
----@field None any   -- on ImGuiTableFlags
----@field PadOuterX any   -- on ImGuiTableFlags
----@field PreciseWidths any   -- on ImGuiTableFlags
----@field Reorderable any   -- on ImGuiTableFlags
----@field Resizable any   -- on ImGuiTableFlags
----@field RowBg any   -- on ImGuiTableFlags
----@field ScrollX any   -- on ImGuiTableFlags
----@field ScrollY any   -- on ImGuiTableFlags
----@field SizingFixedFit any   -- on ImGuiTableFlags
----@field SizingFixedSame any   -- on ImGuiTableFlags
----@field SizingStretchProp any   -- on ImGuiTableFlags
----@field SizingStretchSame any   -- on ImGuiTableFlags
----@field SortMulti any   -- on ImGuiTableFlags
----@field SortTristate any   -- on ImGuiTableFlags
----@field Sortable any   -- on ImGuiTableFlags
 
 ---@class ImGuiTableRowFlags
+---@field Headers any
+---@field None any
 ImGuiTableRowFlags = {}
 
----@field Headers any   -- on ImGuiTableRowFlags
----@field None any   -- on ImGuiTableRowFlags
 
 ---@class ImGuiTreeNodeFlags
+---@field AllowOverlap any
+---@field Bullet any
+---@field CollapsingHeader any
+---@field DefaultOpen any
+---@field DrawLinesFull any
+---@field DrawLinesNone any
+---@field DrawLinesToNodes any
+---@field FramePadding any
+---@field Framed any
+---@field LabelSpanAllColumns any
+---@field Leaf any
+---@field NavLeftJumpsBackHere any
+---@field NavLeftJumpsToParent any
+---@field NoAutoOpenOnLog any
+---@field NoTreePushOnOpen any
+---@field None any
+---@field OpenOnArrow any
+---@field OpenOnDoubleClick any
+---@field Selected any
+---@field SpanAllColumns any
+---@field SpanAvailWidth any
+---@field SpanFullWidth any
+---@field SpanLabelWidth any
+---@field SpanTextWidth any
 ImGuiTreeNodeFlags = {}
 
----@field AllowOverlap any   -- on ImGuiTreeNodeFlags
----@field Bullet any   -- on ImGuiTreeNodeFlags
----@field CollapsingHeader any   -- on ImGuiTreeNodeFlags
----@field DefaultOpen any   -- on ImGuiTreeNodeFlags
----@field DrawLinesFull any   -- on ImGuiTreeNodeFlags
----@field DrawLinesNone any   -- on ImGuiTreeNodeFlags
----@field DrawLinesToNodes any   -- on ImGuiTreeNodeFlags
----@field FramePadding any   -- on ImGuiTreeNodeFlags
----@field Framed any   -- on ImGuiTreeNodeFlags
----@field LabelSpanAllColumns any   -- on ImGuiTreeNodeFlags
----@field Leaf any   -- on ImGuiTreeNodeFlags
----@field NavLeftJumpsBackHere any   -- on ImGuiTreeNodeFlags
----@field NavLeftJumpsToParent any   -- on ImGuiTreeNodeFlags
----@field NoAutoOpenOnLog any   -- on ImGuiTreeNodeFlags
----@field NoTreePushOnOpen any   -- on ImGuiTreeNodeFlags
----@field None any   -- on ImGuiTreeNodeFlags
----@field OpenOnArrow any   -- on ImGuiTreeNodeFlags
----@field OpenOnDoubleClick any   -- on ImGuiTreeNodeFlags
----@field Selected any   -- on ImGuiTreeNodeFlags
----@field SpanAllColumns any   -- on ImGuiTreeNodeFlags
----@field SpanAvailWidth any   -- on ImGuiTreeNodeFlags
----@field SpanFullWidth any   -- on ImGuiTreeNodeFlags
----@field SpanLabelWidth any   -- on ImGuiTreeNodeFlags
----@field SpanTextWidth any   -- on ImGuiTreeNodeFlags
 
 ---@class ImGuiViewportFlags
+---@field CanHostOtherWindows any
+---@field IsFocused any
+---@field IsMinimized any
+---@field IsPlatformMonitor any
+---@field IsPlatformWindow any
+---@field NoAutoMerge any
+---@field NoDecoration any
+---@field NoFocusOnAppearing any
+---@field NoFocusOnClick any
+---@field NoInputs any
+---@field NoRendererClear any
+---@field NoTaskBarIcon any
+---@field None any
+---@field OwnedByApp any
+---@field TopMost any
 ImGuiViewportFlags = {}
 
----@field CanHostOtherWindows any   -- on ImGuiViewportFlags
----@field IsFocused any   -- on ImGuiViewportFlags
----@field IsMinimized any   -- on ImGuiViewportFlags
----@field IsPlatformMonitor any   -- on ImGuiViewportFlags
----@field IsPlatformWindow any   -- on ImGuiViewportFlags
----@field NoAutoMerge any   -- on ImGuiViewportFlags
----@field NoDecoration any   -- on ImGuiViewportFlags
----@field NoFocusOnAppearing any   -- on ImGuiViewportFlags
----@field NoFocusOnClick any   -- on ImGuiViewportFlags
----@field NoInputs any   -- on ImGuiViewportFlags
----@field NoRendererClear any   -- on ImGuiViewportFlags
----@field NoTaskBarIcon any   -- on ImGuiViewportFlags
----@field None any   -- on ImGuiViewportFlags
----@field OwnedByApp any   -- on ImGuiViewportFlags
----@field TopMost any   -- on ImGuiViewportFlags
 
 ---@class ImGuiWindowFlags
+---@field AlwaysAutoResize any
+---@field AlwaysHorizontalScrollbar any
+---@field AlwaysVerticalScrollbar any
+---@field HorizontalScrollbar any
+---@field MenuBar any
+---@field NoBackground any
+---@field NoBringToFrontOnFocus any
+---@field NoCollapse any
+---@field NoDecoration any
+---@field NoDocking any
+---@field NoFocusOnAppearing any
+---@field NoInputs any
+---@field NoMouseInputs any
+---@field NoMove any
+---@field NoNav any
+---@field NoNavFocus any
+---@field NoNavInputs any
+---@field NoResize any
+---@field NoSavedSettings any
+---@field NoScrollWithMouse any
+---@field NoScrollbar any
+---@field NoTitleBar any
+---@field None any
+---@field UnsavedDocument any
 ImGuiWindowFlags = {}
 
----@field AlwaysAutoResize any   -- on ImGuiWindowFlags
----@field AlwaysHorizontalScrollbar any   -- on ImGuiWindowFlags
----@field AlwaysVerticalScrollbar any   -- on ImGuiWindowFlags
----@field HorizontalScrollbar any   -- on ImGuiWindowFlags
----@field MenuBar any   -- on ImGuiWindowFlags
----@field NoBackground any   -- on ImGuiWindowFlags
----@field NoBringToFrontOnFocus any   -- on ImGuiWindowFlags
----@field NoCollapse any   -- on ImGuiWindowFlags
----@field NoDecoration any   -- on ImGuiWindowFlags
----@field NoDocking any   -- on ImGuiWindowFlags
----@field NoFocusOnAppearing any   -- on ImGuiWindowFlags
----@field NoInputs any   -- on ImGuiWindowFlags
----@field NoMouseInputs any   -- on ImGuiWindowFlags
----@field NoMove any   -- on ImGuiWindowFlags
----@field NoNav any   -- on ImGuiWindowFlags
----@field NoNavFocus any   -- on ImGuiWindowFlags
----@field NoNavInputs any   -- on ImGuiWindowFlags
----@field NoResize any   -- on ImGuiWindowFlags
----@field NoSavedSettings any   -- on ImGuiWindowFlags
----@field NoScrollWithMouse any   -- on ImGuiWindowFlags
----@field NoScrollbar any   -- on ImGuiWindowFlags
----@field NoTitleBar any   -- on ImGuiWindowFlags
----@field None any   -- on ImGuiWindowFlags
----@field UnsavedDocument any   -- on ImGuiWindowFlags
 
 ---@class ImTextureFormat
+---@field _Alpha8 any
+---@field _RGBA32 any
 ImTextureFormat = {}
 
----@field _Alpha8 any   -- on ImTextureFormat
----@field _RGBA32 any   -- on ImTextureFormat
 
 ---@class ImTextureStatus
+---@field _Destroyed any
+---@field _OK any
+---@field _WantCreate any
+---@field _WantDestroy any
+---@field _WantUpdates any
 ImTextureStatus = {}
 
----@field _Destroyed any   -- on ImTextureStatus
----@field _OK any   -- on ImTextureStatus
----@field _WantCreate any   -- on ImTextureStatus
----@field _WantDestroy any   -- on ImTextureStatus
----@field _WantUpdates any   -- on ImTextureStatus
 
 ---@class ImVec2
 ImVec2 = {}
