@@ -60,7 +60,10 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: false
           alert-threshold: '200%'
-          comment-on-alert: false
+          # Alerts were silenced in b14d80e while stabilizing the action itself; the workflow is
+          # nightly-only now, so a >200% regression posts a commit comment instead of vanishing
+          # into the dashboard. fail-on-alert stays off until comment noise proves low.
+          comment-on-alert: true
           fail-on-alert: false
           alert-comment-cc-users: '@mblackman'
 
@@ -86,6 +89,6 @@ jobs:
           skip-fetch-gh-pages: true
           auto-push: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
           alert-threshold: '200%'
-          comment-on-alert: false
+          comment-on-alert: true
           fail-on-alert: false
           alert-comment-cc-users: '@mblackman'
