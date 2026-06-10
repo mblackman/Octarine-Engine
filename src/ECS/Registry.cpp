@@ -1,6 +1,8 @@
 #include "Registry.h"
 
 #include <algorithm>
+#include <set>
+#include <stdexcept>
 
 #include "CommandBuffer.h"
 #include "General/Logger.h"
@@ -8,41 +10,110 @@
 #include "Query.h"
 #include "Systems/EntityPoolSystem.h"
 
+namespace {
+// Names of the systems still blocked (indegree > 0) when Kahn's algorithm stalls — i.e. the
+// members of the constraint cycle, for the error message.
+std::string CollectBlockedSystemNames(const std::vector<std::unique_ptr<ISystem>>& systems,
+                                      const std::vector<size_t>& indegree) {
+  std::string names;
+  for (size_t i = 0; i < systems.size(); ++i) {
+    if (indegree[i] > 0) {
+      if (!names.empty()) names += ", ";
+      names += systems[i]->GetName();
+    }
+  }
+  return names;
+}
+}  // namespace
+
+void Registry::AddOrderEdge(const SystemId before, const SystemId after) {
+  if (before >= systems_.size() || after >= systems_.size() || before == after) {
+    Logger::Error("Registry::Order: invalid system ordering edge (" + std::to_string(before) + " -> " +
+                  std::to_string(after) + ")");
+    return;
+  }
+  system_order_edges_.emplace_back(before, after);
+  system_order_dirty_ = true;
+}
+
+void Registry::RebuildExecutionOrder() {
+  const size_t count = systems_.size();
+  std::vector<std::vector<SystemId>> adjacency(count);
+  std::vector<size_t> indegree(count, 0);
+  for (const auto& [before, after] : system_order_edges_) {
+    adjacency[before].push_back(after);
+    ++indegree[after];
+  }
+
+  // Kahn's algorithm. The ready set is ordered ascending by SystemId, so the lowest-registered
+  // ready system always runs next — unconstrained systems keep exact registration order.
+  std::set<SystemId> ready;
+  for (SystemId i = 0; i < count; ++i) {
+    if (indegree[i] == 0) ready.insert(i);
+  }
+
+  system_execution_order_.clear();
+  system_execution_order_.reserve(count);
+  while (!ready.empty()) {
+    const SystemId id = *ready.begin();
+    ready.erase(ready.begin());
+    system_execution_order_.push_back(id);
+    for (const SystemId next : adjacency[id]) {
+      if (--indegree[next] == 0) ready.insert(next);
+    }
+  }
+
+  if (system_execution_order_.size() != count) {
+    const std::string names = CollectBlockedSystemNames(systems_, indegree);
+    Logger::Error("Registry: system ordering constraints form a cycle between: " + names);
+    throw std::runtime_error("Registry: system ordering cycle between: " + names);
+  }
+  system_order_dirty_ = false;
+}
+
 void Registry::Update(const float deltaTime) {
   PROFILE_NAMED_SCOPE("Registry::Update (total)");
   delta_time_ = deltaTime;
-  for (size_t i = 0; i < systems_.size(); ++i) {
-#ifdef OCTARINE_PROFILING
-    ACCUMULATE_PROFILE_SCOPE(systems_[i]->GetName());
-    PROFILE_NAMED_SCOPE(systems_[i]->GetName());
-#endif
-    systems_[i]->Update(*this);
+  if (system_order_dirty_ || system_execution_order_.size() != systems_.size()) {
+    RebuildExecutionOrder();
   }
-  if (!pending_blams_.empty() || !pending_despawns_.empty()) {
-    PROFILE_NAMED_SCOPE("Registry::Update (pending blam/despawn)");
-    auto pending = std::move(pending_blams_);
-    auto despawns = std::move(pending_despawns_);
-    pending_blams_.clear();
-    pending_blam_ids_.clear();
-    pending_despawns_.clear();
-    pending_despawn_ids_.clear();
+  for (const SystemId id : system_execution_order_) {
+#ifdef OCTARINE_PROFILING
+    ACCUMULATE_PROFILE_SCOPE(systems_[id]->GetName());
+    PROFILE_NAMED_SCOPE(systems_[id]->GetName());
+#endif
+    systems_[id]->Update(*this);
+  }
+  FlushPendingDestruction();
+}
 
-    for (const Entity entity : pending) {
-      BlamEntity(entity);
-    }
+void Registry::FlushPendingDestruction() {
+  if (pending_blams_.empty() && pending_despawns_.empty()) {
+    return;
+  }
+  PROFILE_NAMED_SCOPE("Registry::Update (pending blam/despawn)");
+  auto pending = std::move(pending_blams_);
+  auto despawns = std::move(pending_despawns_);
+  pending_blams_.clear();
+  pending_blam_ids_.clear();
+  pending_despawns_.clear();
+  pending_despawn_ids_.clear();
 
-    // PoolableTag-bearing entities are routed straight into the pool's free list — Deactivate
-    // collapses them into the chunk's inactive tail without crossing archetypes. Non-pooled
-    // entities are blammed outright.
-    if (!despawns.empty()) {
-      auto* pool = TryGet<EntityPoolManager>();
-      for (const Entity entity : despawns) {
-        if (!IsAlive(entity)) continue;
-        if (pool && HasTag<PoolableTag>(entity)) {
-          pool->Park(*this, entity);
-        } else {
-          BlamEntity(entity);
-        }
+  for (const Entity entity : pending) {
+    BlamEntity(entity);
+  }
+
+  // PoolableTag-bearing entities are routed straight into the pool's free list — Deactivate
+  // collapses them into the chunk's inactive tail without crossing archetypes. Non-pooled
+  // entities are blammed outright.
+  if (!despawns.empty()) {
+    auto* pool = TryGet<EntityPoolManager>();
+    for (const Entity entity : despawns) {
+      if (!IsAlive(entity)) continue;
+      if (pool && HasTag<PoolableTag>(entity)) {
+        pool->Park(*this, entity);
+      } else {
+        BlamEntity(entity);
       }
     }
   }
