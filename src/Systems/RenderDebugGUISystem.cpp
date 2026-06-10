@@ -134,8 +134,8 @@ namespace {
 constexpr double kScriptErrorToastSeconds = 10.0;
 
 bool IsToastFresh(const Logger::ScriptError& error) {
-  const auto age = std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() -
-                                                                             error.when);
+  const auto age =
+      std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - error.when);
   return age.count() < kScriptErrorToastSeconds;
 }
 }  // namespace
