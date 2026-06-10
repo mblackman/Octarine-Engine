@@ -10,6 +10,22 @@
 #include "Query.h"
 #include "Systems/EntityPoolSystem.h"
 
+namespace {
+// Names of the systems still blocked (indegree > 0) when Kahn's algorithm stalls — i.e. the
+// members of the constraint cycle, for the error message.
+std::string CollectBlockedSystemNames(const std::vector<std::unique_ptr<ISystem>>& systems,
+                                      const std::vector<size_t>& indegree) {
+  std::string names;
+  for (size_t i = 0; i < systems.size(); ++i) {
+    if (indegree[i] > 0) {
+      if (!names.empty()) names += ", ";
+      names += systems[i]->GetName();
+    }
+  }
+  return names;
+}
+}  // namespace
+
 void Registry::AddOrderEdge(const SystemId before, const SystemId after) {
   if (before >= systems_.size() || after >= systems_.size() || before == after) {
     Logger::Error("Registry::Order: invalid system ordering edge (" + std::to_string(before) + " -> " +
@@ -48,13 +64,7 @@ void Registry::RebuildExecutionOrder() {
   }
 
   if (system_execution_order_.size() != count) {
-    std::string names;
-    for (SystemId i = 0; i < count; ++i) {
-      if (indegree[i] > 0) {
-        if (!names.empty()) names += ", ";
-        names += systems_[i]->GetName();
-      }
-    }
+    const std::string names = CollectBlockedSystemNames(systems_, indegree);
     Logger::Error("Registry: system ordering constraints form a cycle between: " + names);
     throw std::runtime_error("Registry: system ordering cycle between: " + names);
   }
@@ -74,31 +84,36 @@ void Registry::Update(const float deltaTime) {
 #endif
     systems_[id]->Update(*this);
   }
-  if (!pending_blams_.empty() || !pending_despawns_.empty()) {
-    PROFILE_NAMED_SCOPE("Registry::Update (pending blam/despawn)");
-    auto pending = std::move(pending_blams_);
-    auto despawns = std::move(pending_despawns_);
-    pending_blams_.clear();
-    pending_blam_ids_.clear();
-    pending_despawns_.clear();
-    pending_despawn_ids_.clear();
+  FlushPendingDestruction();
+}
 
-    for (const Entity entity : pending) {
-      BlamEntity(entity);
-    }
+void Registry::FlushPendingDestruction() {
+  if (pending_blams_.empty() && pending_despawns_.empty()) {
+    return;
+  }
+  PROFILE_NAMED_SCOPE("Registry::Update (pending blam/despawn)");
+  auto pending = std::move(pending_blams_);
+  auto despawns = std::move(pending_despawns_);
+  pending_blams_.clear();
+  pending_blam_ids_.clear();
+  pending_despawns_.clear();
+  pending_despawn_ids_.clear();
 
-    // PoolableTag-bearing entities are routed straight into the pool's free list — Deactivate
-    // collapses them into the chunk's inactive tail without crossing archetypes. Non-pooled
-    // entities are blammed outright.
-    if (!despawns.empty()) {
-      auto* pool = TryGet<EntityPoolManager>();
-      for (const Entity entity : despawns) {
-        if (!IsAlive(entity)) continue;
-        if (pool && HasTag<PoolableTag>(entity)) {
-          pool->Park(*this, entity);
-        } else {
-          BlamEntity(entity);
-        }
+  for (const Entity entity : pending) {
+    BlamEntity(entity);
+  }
+
+  // PoolableTag-bearing entities are routed straight into the pool's free list — Deactivate
+  // collapses them into the chunk's inactive tail without crossing archetypes. Non-pooled
+  // entities are blammed outright.
+  if (!despawns.empty()) {
+    auto* pool = TryGet<EntityPoolManager>();
+    for (const Entity entity : despawns) {
+      if (!IsAlive(entity)) continue;
+      if (pool && HasTag<PoolableTag>(entity)) {
+        pool->Park(*this, entity);
+      } else {
+        BlamEntity(entity);
       }
     }
   }

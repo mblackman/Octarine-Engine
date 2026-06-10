@@ -331,6 +331,9 @@ class Registry {
   // responsible for thread-safety: expose an EntityCommandBuffer on your system to handle requests for registry state
   // changes so they resolve on the calling thread all at once.
   template <typename... TArgs, typename Func>
+  // Complexity is pre-existing: the wrapper's if-constexpr dispatch over the four supported
+  // callback shapes reads linearly; splitting it would obscure the signature table.
+  // NOLINTNEXTLINE(readability-function-cognitive-complexity)
   SystemHandle<std::decay_t<Func>> RegisterParallelSystem(Func&& func) {
     using StoredFunc = std::decay_t<Func>;
     static_assert(std::is_invocable_v<StoredFunc, Entity, float, TArgs&...> ||
@@ -650,6 +653,9 @@ class Registry {
   // execute in registration order.
   void AddOrderEdge(SystemId before, SystemId after);
   void RebuildExecutionOrder();
+
+  // Deferred blam/despawn processing at the end of Update, once all systems have run.
+  void FlushPendingDestruction();
 
   // Helper for CreateEntityWithBundle: index-pack expansion to dispatch each component to
   // Archetype::AddComponent at its corresponding location slot.
