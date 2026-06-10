@@ -1,12 +1,15 @@
 #pragma once
 #include <algorithm>
 #include <atomic>
+#include <cassert>
 #include <chrono>
+#include <cstddef>
 #include <map>
 #include <mutex>
 #include <source_location>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "Logger.h"
 
@@ -18,13 +21,16 @@ inline std::string DurationToMs(std::chrono::time_point<std::chrono::high_resolu
   return std::to_string(ms);
 }
 
-inline float GetPercentileAverage(const std::vector<float>& percentiles, const float percentile) {
+// Returns the value at the given percentile (0..1) of `samples`, or 0 if empty.
+inline float GetPercentile(const std::vector<float>& samples, const float percentile) {
   assert(percentile >= 0 && percentile <= 1);
-  const size_t count = percentiles.size();
-  std::vector<float> scratchpad(count, 0.0f);
-  std::copy(percentiles.begin(), percentiles.begin() + count, scratchpad.begin());
-  const auto elementNum = static_cast<size_t>(count * percentile);
-  std::ranges::nth_element(scratchpad.begin(), scratchpad.begin() + elementNum, scratchpad.begin() + count);
+  if (samples.empty()) {
+    return 0.0f;
+  }
+  std::vector<float> scratchpad(samples);
+  const auto elementNum =
+      std::min(static_cast<size_t>(static_cast<float>(scratchpad.size()) * percentile), scratchpad.size() - 1);
+  std::ranges::nth_element(scratchpad, scratchpad.begin() + static_cast<std::ptrdiff_t>(elementNum));
   return scratchpad[elementNum];
 }
 

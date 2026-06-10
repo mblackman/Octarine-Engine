@@ -4,6 +4,7 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <array>
+#include <cstddef>
 #include <string>
 #include <vector>
 
@@ -44,14 +45,14 @@ class PerfOverlaySystem {
   // nullptr (latched, no retry) if registration fails.
   TTF_Font* EnsureFont(AssetManager& assetManager);
 
-  static constexpr int kLineCount = 5;
+  static constexpr int kLineCount = 5;  // [0] FPS, [1] avg FPS, [2] p95 FPS, [3] p99 FPS, [4] frame time (ms)
   std::array<Line, kLineCount> lines_{};
   // The embedded debug font is registered lazily on first Draw. Latched so a registration failure
   // isn't retried (and re-logged) every frame.
   bool font_init_attempted_ = false;
 
-  // FPS buffer to track FPS trends.
-  static constexpr int kFpsBuffer = 1000;
+  // Ring buffer of recent per-frame FPS samples backing the avg/p95/p99 readouts.
+  static constexpr std::size_t kFpsBuffer = 1000;
   std::vector<float> fps_metrics_;
-  int fps_metric_index_ = 0;
+  std::size_t fps_metric_index_ = 0;
 };

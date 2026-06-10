@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
+#include <cstdio>
 #include <string>
 
 #include "AssetManager/AssetManager.h"
@@ -138,33 +140,16 @@ void PerfOverlaySystem::Draw(Registry& registry, SDL_Renderer* sdlRenderer, cons
   const float fps = deltaTime > 0.0F ? 1.0F / deltaTime : 0.0F;
   const float frameMs = deltaTime * 1000.0F;
 
-  if (fps_metric_index_ > kFpsBuffer - 1) {
-    fps_metric_index_ = 0;
-  }
-
+  // Ring buffer of recent FPS samples: fill first, then overwrite oldest.
   if (fps_metrics_.size() < kFpsBuffer) {
     fps_metrics_.push_back(fps);
   } else {
     fps_metrics_[fps_metric_index_] = fps;
+    fps_metric_index_ = (fps_metric_index_ + 1) % kFpsBuffer;
   }
 
-  const float avgFps = get_average(fps_metrics_);
-  const float fps95 = PerfUtils::GetPercentileAverage(fps_metrics_, 0.95f);
-  const float fps99 = PerfUtils::GetPercentileAverage(fps_metrics_, 0.99f);
-
-  char fpsBuf[kTextBufSize];
-  char avgFpsBuf[kTextBufSize];
-  char fpsBufP95[kTextBufSize];
-  char fpsBufP99[kTextBufSize];
-  char msBuf[kTextBufSize];
-  std::snprintf(fpsBuf, sizeof(fpsBuf), "FPS %5.1f", static_cast<double>(fps));
-  std::snprintf(avgFpsBuf, sizeof(avgFpsBuf), "AVG FPS %5.1f", static_cast<double>(avgFps));
-  std::snprintf(fpsBufP95, sizeof(fpsBufP95), "95P FPS %5.1f", static_cast<double>(fps95));
-  std::snprintf(fpsBufP99, sizeof(fpsBufP99), "99P FPS %5.1f", static_cast<double>(fps99));
-  std::snprintf(msBuf, sizeof(msBuf), "%5.2f ms", static_cast<double>(frameMs));
-
-  // Gather the active lines in draw order (slot 0 = FPS, slot 1 = frame time). Inactive metrics keep
-  // their cached texture but aren't rastered/drawn this frame.
+  // Gather the active lines in draw order (slots 0-3 = FPS/avg/p95/p99, slot 4 = frame time).
+  // Inactive metrics keep their cached texture but aren't rastered/drawn this frame.
   struct ActiveLine {
     std::size_t slot;
     Rgb color;
@@ -172,6 +157,19 @@ void PerfOverlaySystem::Draw(Registry& registry, SDL_Renderer* sdlRenderer, cons
   std::array<ActiveLine, kLineCount> active{};
   std::size_t count = 0;
   if (showFps) {
+    const float avgFps = GetAverage(fps_metrics_);
+    const float fps95 = PerfUtils::GetPercentile(fps_metrics_, 0.95F);
+    const float fps99 = PerfUtils::GetPercentile(fps_metrics_, 0.99F);
+
+    char fpsBuf[kTextBufSize];
+    char avgFpsBuf[kTextBufSize];
+    char fpsBufP95[kTextBufSize];
+    char fpsBufP99[kTextBufSize];
+    std::snprintf(fpsBuf, sizeof(fpsBuf), "FPS %5.1f", static_cast<double>(fps));
+    std::snprintf(avgFpsBuf, sizeof(avgFpsBuf), "AVG FPS %5.1f", static_cast<double>(avgFps));
+    std::snprintf(fpsBufP95, sizeof(fpsBufP95), "95P FPS %5.1f", static_cast<double>(fps95));
+    std::snprintf(fpsBufP99, sizeof(fpsBufP99), "99P FPS %5.1f", static_cast<double>(fps99));
+
     if (!UpdateLine(lines_[0], font, sdlRenderer, fpsBuf)) return;
     if (!UpdateLine(lines_[1], font, sdlRenderer, avgFpsBuf)) return;
     if (!UpdateLine(lines_[2], font, sdlRenderer, fpsBufP95)) return;
@@ -182,6 +180,8 @@ void PerfOverlaySystem::Draw(Registry& registry, SDL_Renderer* sdlRenderer, cons
     active[count++] = {3, FpsColor(fps99)};
   }
   if (showMs) {
+    char msBuf[kTextBufSize];
+    std::snprintf(msBuf, sizeof(msBuf), "%5.2f ms", static_cast<double>(frameMs));
     if (!UpdateLine(lines_[4], font, sdlRenderer, msBuf)) return;
     active[count++] = {4, FrameMsColor(frameMs)};
   }

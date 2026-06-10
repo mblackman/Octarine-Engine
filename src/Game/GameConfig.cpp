@@ -9,7 +9,6 @@
 #include <SDL3/SDL_timer.h>
 
 #include <fstream>
-#include <ranges>
 #include <sstream>
 #include <unordered_map>
 
@@ -293,18 +292,18 @@ void GameConfig::SetPerfOverlayCorner(const std::string& corner) {
 }
 
 void GameConfig::SetPerfOverlayMetrics(const std::string& metrics) {
-  const auto parts = split_string(metrics, ',');
+  const auto parts = SplitString(metrics, ',');
   PerfOverlayMetrics perfOverlayMetrics = {};
 
   for (const auto& metric : parts) {
     if (metric == "fps") {
       perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::Fps;
-    } else if (metrics == "frametime" || metrics == "frame-time" || metrics == "ms") {
+    } else if (metric == "frametime" || metric == "frame-time" || metric == "ms") {
       perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::FrameTime;
-    } else if (metrics == "all") {
+    } else if (metric == "all" || metric == "both") {
       perfOverlayMetrics = PerfOverlayMetrics::All;
     } else {
-      Logger::Warn("Unknown PerfOverlayMetrics '" + metrics + "' (expected fps|frametime|all); keeping current.");
+      Logger::Warn("Unknown PerfOverlayMetrics '" + metric + "' (expected fps|frametime|all); keeping current.");
       return;
     }
   }

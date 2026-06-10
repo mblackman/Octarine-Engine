@@ -6,7 +6,8 @@
 // bottom-left|bottom-right.
 enum class PerfOverlayCorner : std::uint8_t { TopLeft, TopRight, BottomLeft, BottomRight };
 
-// Which metrics the perf overlay draws. config.ini: PerfOverlayMetrics=fps|frametime|both.
+// Which metrics the perf overlay draws. config.ini: PerfOverlayMetrics takes a comma-separated
+// list of fps|frametime, or all ("both" accepted as a legacy alias).
 enum class PerfOverlayMetrics : std::uint8_t { Fps = 1 << 0, FrameTime = 1 << 1, All = Fps | FrameTime };
 
 inline PerfOverlayMetrics operator|(PerfOverlayMetrics lhs, PerfOverlayMetrics rhs) {

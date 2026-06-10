@@ -122,6 +122,7 @@ class LuaEntityLoader {
    *
    * @param registry A pointer to the game's entity-component-system registry->
    * @param entityData The top-level sol::table containing the entity definition.
+   * @return The root entity created from the definition, or nullopt if the table was invalid.
    */
   static std::optional<Entity> LoadEntityFromLua(Registry* registry, const sol::table& entityData) {
     if (!entityData.valid()) {
@@ -129,6 +130,7 @@ class LuaEntityLoader {
       return {};
     }
 
+    std::optional<Entity> rootEntity;
     std::stack<std::pair<sol::table, std::optional<Entity>>> nodesToProcess;
     nodesToProcess.emplace(entityData, std::nullopt);
 
@@ -140,6 +142,8 @@ class LuaEntityLoader {
       const Entity entity = registry->CreateEntity();
       if (parentEntity) {
         registry->SetParent(entity, *parentEntity);
+      } else {
+        rootEntity = entity;
       }
 
       ApplyName(currentData, registry, entity);
@@ -164,6 +168,8 @@ class LuaEntityLoader {
         }
       }
     }
+
+    return rootEntity;
   }
 
  private:
