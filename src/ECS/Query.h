@@ -112,7 +112,9 @@ class ComponentQuery final : public Query {
         }
       }
     } else {
-      for (auto it = archetype_query_.begin(); it != archetype_query_.end(); ++it) {
+      // end() is hoisted out of the condition — constructing an Iterator per loop pass is a
+      // per-entity cost on the hot path.
+      for (auto it = archetype_query_.begin(), endIt = archetype_query_.end(); it != endIt; ++it) {
         std::apply(
             [&](Entity e, auto&&... comps) {
               if constexpr (std::is_invocable_v<Func, Entity, decltype(comps)...>) {
