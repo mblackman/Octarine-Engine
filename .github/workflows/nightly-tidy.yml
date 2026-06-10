@@ -1,0 +1,84 @@
+name: Nightly clang-tidy
+
+# Whole-tree clang-tidy sweep. The per-PR gate in build.yml only checks lines a PR touches, so
+# pre-existing debt and cross-file drift accumulate invisibly; this job walks every src/ + tests/
+# translation unit nightly and publishes the full report as an artifact. Non-blocking by design —
+# findings never fail the job (only infrastructure errors do), so it is a trend report, not a gate.
+# Same pinned clang-tidy major (18) as the PR gate so the two never disagree on check behavior.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC nightly
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  tidy:
+    name: linux (clang-tidy, whole tree)
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: ./.github/actions/vcpkg-cache-env
+
+      - name: Install Linux build deps (SDL3 / X11 / Wayland)
+        uses: ./.github/actions/linux-build-deps
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: linux-editor-release-tidy
+          max-size: 500M
+
+      # Build first so every generated header exists when clang-tidy parses the tree. The
+      # compile_commands.json this emits is what run-clang-tidy consumes.
+      - name: Configure CMake
+        run: cmake --preset editor-release -DOCTARINE_ENABLE_TESTS=ON
+
+      - name: Build
+        run: cmake --build build/editor-release --parallel
+
+      # Full-tree sweep over src/ + tests/. clang-diagnostic-* lines are dropped from the
+      # finding count for the same reason as the PR gate: the GCC-built compile_commands carries
+      # flags clang rejects (-fno-fat-lto-objects) and a few sol2+glm instantiations clang
+      # frontends choke on — the GCC -Werror build is the compiler gate, this job is for lint
+      # checks, whose names never start with clang-diagnostic-.
+      - name: clang-tidy (whole tree, non-blocking)
+        shell: bash
+        run: |
+          sudo apt-get update && sudo apt-get install -y clang-tidy-18
+          runner="$(command -v run-clang-tidy-18 || find /usr/lib/llvm-18 -name 'run-clang-tidy*' | head -1)"
+          # || true: run-clang-tidy exits non-zero on any diagnostic; findings must not fail the
+          # job, and the file-level clang-diagnostic errors described above are expected noise.
+          "$runner" -p build/editor-release -quiet "^$GITHUB_WORKSPACE/(src|tests)/" \
+            > tidy-report.txt 2>&1 || true
+
+          findings="$(grep -E '^[^ ]+:[0-9]+:[0-9]+: (warning|error):' tidy-report.txt \
+            | grep -v '\[clang-diagnostic-' | sort -u || true)"
+          count="$(printf '%s' "$findings" | grep -c . || true)"
+
+          {
+            echo "clang-tidy whole-tree findings: $count"
+            echo
+            echo "By check:"
+            printf '%s\n' "$findings" | grep -oE '\[[a-z0-9.,-]+\]$' | sort | uniq -c | sort -rn
+          } > tidy-summary.txt || true
+
+          cat tidy-summary.txt
+          echo "::notice::clang-tidy whole-tree findings: $count (report in artifact)"
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: clang-tidy-report
+          path: |
+            tidy-report.txt
+            tidy-summary.txt
+          if-no-files-found: error
+          retention-days: 30
