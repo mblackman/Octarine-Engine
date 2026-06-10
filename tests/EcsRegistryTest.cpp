@@ -6,6 +6,10 @@
 // benchmark target. Uses local POD component structs (same approach as EntityPoolBenchmark.cpp)
 // so the test is independent of the real Components/ headers.
 
+#include <stdexcept>
+#include <string>
+#include <vector>
+
 #include "ECS/Query.h"  // full ComponentQuery definition for CreateQuery / ForEach
 #include "ECS/Registry.h"
 #include "TestHarness.h"
@@ -174,6 +178,62 @@ int main() {
     const Entity b = registry.CreateEntity();
     registry.AddComponent(b, Position{0.0f, 0.0f});  // same shape — no new archetype
     Check(registry.ArchetypeGeneration() == gen1, "ArchetypeGeneration stable for a repeated shape");
+  }
+
+  // System ordering: unconstrained registration order, After edges, lazy re-sort.
+  {
+    Registry registry;
+    const Entity e = registry.CreateEntity();
+    registry.AddComponent(e, Position{0.0f, 0.0f});
+
+    std::string order;
+    auto a = registry.RegisterSystem<Position>([&order](Position&) { order += 'a'; });
+    auto b = registry.RegisterSystem<Position>([&order](Position&) { order += 'b'; });
+    auto c = registry.RegisterSystem<Position>([&order](Position&) { order += 'c'; });
+
+    registry.Update(1.0f / 60.0f);
+    octarine::test::CheckEq(order, "abc", "unconstrained systems run in registration order");
+
+    // Edge added after the first Update must trigger a re-sort: a now runs after c, while the
+    // unconstrained b keeps its registration position via the SystemId tiebreak.
+    order.clear();
+    registry.Order(a).After(c);
+    registry.Update(1.0f / 60.0f);
+    octarine::test::CheckEq(order, "bca", "After edge respected; tiebreak keeps registration order");
+    (void)b;
+  }
+
+  // System ordering: Before edge flips an order that registration alone would produce.
+  {
+    Registry registry;
+    const Entity e = registry.CreateEntity();
+    registry.AddComponent(e, Position{0.0f, 0.0f});
+
+    std::string order;
+    auto first = registry.RegisterSystem<Position>([&order](Position&) { order += '1'; });
+    auto second = registry.RegisterSystem<Position>([&order](Position&) { order += '2'; });
+    registry.Order(second).Before(first);
+    registry.Update(1.0f / 60.0f);
+    octarine::test::CheckEq(order, "21", "Before edge respected regardless of registration order");
+  }
+
+  // System ordering: a constraint cycle throws on Update instead of running a bogus order.
+  {
+    Registry registry;
+    const Entity e = registry.CreateEntity();
+    registry.AddComponent(e, Position{0.0f, 0.0f});
+
+    auto a = registry.RegisterSystem<Position>([](Position&) {});
+    auto b = registry.RegisterSystem<Position>([](Position&) {});
+    registry.Order(a).After(b);
+    registry.Order(b).After(a);
+    bool threw = false;
+    try {
+      registry.Update(1.0f / 60.0f);
+    } catch (const std::runtime_error&) {
+      threw = true;
+    }
+    Check(threw, "ordering cycle detected and thrown on Update");
   }
 
   return octarine::test::Result();
