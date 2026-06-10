@@ -20,6 +20,9 @@ jobs:
   benchmark:
     name: Run Benchmarks
     runs-on: self-hosted
+    # A wedged benchmark (infinite spin, leak-into-swap) should fail the run, not squat the
+    # self-hosted runner until someone notices. A healthy full run takes well under an hour.
+    timeout-minutes: 60
 
     steps:
       - name: Checkout
@@ -48,8 +51,12 @@ jobs:
       - name: Build Benchmarks
         run: cmake --build build/player-profile --target OctarineBenchmarks --parallel
 
+      # Write the JSON via --benchmark_out rather than piping stdout through tee: the profiling
+      # build logs TIMER/ACCUM lines to stdout, which both pollutes a stdout-captured JSON and,
+      # through the pipe, makes the step's exit code tee's (always 0) instead of the benchmark's —
+      # a crashed benchmark exe then "passes" and only the store step fails on the bad file.
       - name: Run Micro-Benchmarks
-        run: ./build/player-profile/bin/relwithdebinfo/OctarineBenchmarks --benchmark_format=json | tee benchmark_result.json
+        run: ./build/player-profile/bin/relwithdebinfo/OctarineBenchmarks --benchmark_out=benchmark_result.json --benchmark_out_format=json > /dev/null
 
       - name: Store micro-benchmark result
         uses: benchmark-action/github-action-benchmark@v1

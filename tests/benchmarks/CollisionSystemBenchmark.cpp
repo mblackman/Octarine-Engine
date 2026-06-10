@@ -39,9 +39,11 @@ class StubContext final : public AnyContext {
 
 struct CollisionCounter {
   std::uint64_t count = 0;
-  // CollisionSystem emits one batched event per collect cycle; the overlapping pair guarantees
-  // pairs is non-empty, so count advances once per cycle (what the timing loop below keys on).
-  void OnCollisionBatch(const CollisionBatchEvent& e) { count += e.pairs.size(); }
+  // CollisionSystem emits exactly one batched event per collect cycle, so counting events (not
+  // pairs) advances once per cycle — what the timing loop below keys on. Counting pairs would
+  // hang: only *entering* pairs are emitted, so a sustained overlap reports its pair on the
+  // first cycle and every later batch is empty.
+  void OnCollisionBatch(const CollisionBatchEvent& /*e*/) { ++count; }
 };
 
 // CollisionSystem builds its own query and ignores the Iterable argument, but the call signature
@@ -51,9 +53,10 @@ Iterable MakeUnusedIterable() {
           []() -> AnyIterator { throw std::logic_error("unused"); }};
 }
 
-// Two boxes overlap at the origin (guaranteeing >=1 collision per cycle, so every collect emits an
-// event we can count); the rest sit on a wide diagonal grid, non-overlapping, to keep narrowphase
-// cheap and the dispatch overhead visible.
+// Two boxes overlap at the origin so the narrowphase has at least one hit to process; the rest sit
+// on a wide diagonal grid, non-overlapping, to keep narrowphase cheap and the dispatch overhead
+// visible. (The overlap is sustained, so after the first cycle it is deduplicated out of the
+// entering-pairs batches — the timing loop counts batch events, not pairs.)
 void BuildBoxes(Registry& registry, int n) {
   EntityMask mask;
   mask.set(0);

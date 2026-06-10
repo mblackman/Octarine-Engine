@@ -27,6 +27,11 @@ class Logger {
   static std::vector<ScriptError> script_errors_;
   static std::uint64_t script_error_sequence_;
 
+  // Appends to history_ under history_mutex_ and trims to the cap. Every log path must go
+  // through this: instrumented builds emit per-frame TIMER/ACCUM lines, and an uncapped
+  // history grows without bound over a session.
+  static void PushHistory(std::string entry);
+
  public:
   static void Init();
   // Apply a runtime log level override (trace|debug|info|warn|error|critical|off). Case-insensitive;
