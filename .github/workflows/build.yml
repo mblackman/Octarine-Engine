@@ -214,6 +214,47 @@ jobs:
           path: build/${{ matrix.preset }}/bin/release
           if-no-files-found: error
 
+  # ASan+UBSan over the full unit-test suite. Catches the memory-bug class (chunk over-alignment,
+  # archetype-move use-after-free) that plain builds only surface as crashes, plus UB like
+  # misaligned loads and signed overflow. Debug preset so asserts stay live. The TSan counterpart
+  # (ThreadPool/parallel-system races ASan cannot see) is nightly-only in sanitize-tsan.yml —
+  # the two sanitizers cannot be combined in one binary.
+  sanitize:
+    name: linux (asan+ubsan, editor-debug)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: ./.github/actions/vcpkg-cache-env
+
+      - name: Install Linux build deps (SDL3 / X11 / Wayland)
+        uses: ./.github/actions/linux-build-deps
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: linux-editor-debug-asan
+          max-size: 500M
+
+      - name: Configure CMake
+        run: cmake --preset editor-debug -DOCTARINE_SANITIZE=asan -DOCTARINE_ENABLE_TESTS=ON
+
+      - name: Build
+        run: cmake --build build/editor-debug --parallel
+
+      - name: Run engine tests (ctest under ASan+UBSan)
+        env:
+          # halt_on_error makes the first finding fail the test instead of logging past it.
+          # Leak checking stays off for now: exit-time leaks in non-instrumented third-party
+          # libs (SDL/Lua via vcpkg) would drown real findings — revisit once a baseline exists.
+          ASAN_OPTIONS: halt_on_error=1:detect_leaks=0
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: ctest --test-dir build/editor-debug --output-on-failure
+
   # Style gate. Lightweight (no vcpkg/SDL): formats only the files a PR actually changed, so the
   # large pre-existing tree never blocks on legacy style. Auto-fixable via the CMake `format` target.
   # clang-tidy runs as a blocking changed-lines gate in the editor-release build leg above, which
