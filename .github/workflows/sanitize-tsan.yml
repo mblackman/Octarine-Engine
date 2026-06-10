@@ -1,0 +1,48 @@
+name: Sanitize (TSan)
+
+# ThreadSanitizer leg of the sanitizer coverage. Targets the ThreadPool parallel paths
+# (parallel collision response, RegisterParallelSystem chunk fan-out) whose data races ASan
+# cannot see. TSan and ASan cannot be combined in one binary, and TSan's slowdown is too large
+# for every PR, so this runs nightly + on dispatch — same gating rationale as android-emulator.yml.
+# The per-PR ASan+UBSan job lives in build.yml.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 5 * * *'   # 05:00 UTC nightly
+
+env:
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  tsan:
+    name: linux (tsan, editor-debug)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Export GitHub Actions cache env (vcpkg binary cache)
+        uses: ./.github/actions/vcpkg-cache-env
+
+      - name: Install Linux build deps (SDL3 / X11 / Wayland)
+        uses: ./.github/actions/linux-build-deps
+
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1
+        with:
+          key: linux-editor-debug-tsan
+          max-size: 500M
+
+      - name: Configure CMake
+        run: cmake --preset editor-debug -DOCTARINE_SANITIZE=tsan -DOCTARINE_ENABLE_TESTS=ON
+
+      - name: Build
+        run: cmake --build build/editor-debug --parallel
+
+      - name: Run engine tests (ctest under TSan)
+        env:
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+        run: ctest --test-dir build/editor-debug --output-on-failure
