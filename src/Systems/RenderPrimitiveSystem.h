@@ -42,10 +42,12 @@ class RenderPrimitiveSystem {
     const float x = square.isFixed ? origin.x : origin.x - camera_.x;
     const float y = square.isFixed ? origin.y : origin.y - camera_.y;
 
-    auto& cmd = renderQueue_->EmplaceSquare(static_cast<unsigned int>(square.layer), square.position.y);
+    auto& cmd = renderQueue_->EmplaceSquare(static_cast<unsigned int>(square.layer), square.position.y, nullptr,
+                                            square.blendMode);
     cmd.destRect = {x, y, square.width, square.height};
     cmd.color = SDL_Color{square.color.r, square.color.g, square.color.b, square.color.a};
     cmd.rotation = transform.rotation;
+    cmd.blendMode = octarine::ToSdlBlendMode(square.blendMode);
   }
 
  private:

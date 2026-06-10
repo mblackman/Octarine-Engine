@@ -1,8 +1,11 @@
 #pragma once
 
 #include <sol/sol.hpp>
+#include <string>
+#include <string_view>
 
 #include "Components/SquarePrimitiveComponent.h"
+#include "General/BlendMode.h"
 #include "Lua/Bindings/LuaBinding.h"
 
 template <>
@@ -19,13 +22,19 @@ struct LuaBinding<SquarePrimitiveComponent> {
     const auto height = SafeGetOptionalValue<float>(t, "height", 0.0f);
     const octarine::Color color = SafeGetColor(t, "color");
     const auto fixed = SafeGetOptionalValue<bool>(t, "fixed", false);
-    return SquarePrimitiveComponent(position, layer, width, height, color, fixed);
+    SquarePrimitiveComponent square(position, layer, width, height, color, fixed);
+    square.blendMode = octarine::BlendModeFromString(SafeGetOptionalValue<std::string>(t, "blend_mode", "blend"));
+    return square;
   }
 
   static void bindUsertype(sol::state& lua) {
     lua.new_usertype<SquarePrimitiveComponent>(
         kUsertypeName, "width", &SquarePrimitiveComponent::width, "height", &SquarePrimitiveComponent::height, "color",
         &SquarePrimitiveComponent::color, "position", &SquarePrimitiveComponent::position, "layer",
-        &SquarePrimitiveComponent::layer, "is_fixed", &SquarePrimitiveComponent::isFixed);
+        &SquarePrimitiveComponent::layer, "is_fixed", &SquarePrimitiveComponent::isFixed, "blend_mode",
+        sol::property([](const SquarePrimitiveComponent& s) { return octarine::ToString(s.blendMode); },
+                      [](SquarePrimitiveComponent& s, const std::string_view mode) {
+                        s.blendMode = octarine::BlendModeFromString(mode, s.blendMode);
+                      }));
   }
 };

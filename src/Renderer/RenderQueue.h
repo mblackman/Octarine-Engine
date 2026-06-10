@@ -47,16 +47,19 @@ class RenderQueue {
     return *this;
   }
 
-  SpriteCommand& EmplaceSprite(unsigned int layer, float depth, const void* batchKey = nullptr) {
+  SpriteCommand& EmplaceSprite(unsigned int layer, float depth, const void* batchKey = nullptr,
+                               octarine::BlendMode blendMode = octarine::BlendMode::Blend) {
     auto& key = ClaimSlot();
-    key.sortKey = RenderKey::ComputeSortKey(layer, depth, SPRITE, batchKey);
+    key.sortKey = RenderKey::ComputeSortKey(layer, depth, SPRITE, batchKey, static_cast<std::uint8_t>(blendMode));
     key.type = SPRITE;
     return key.payload.sprite;
   }
 
-  SquareCommand& EmplaceSquare(unsigned int layer, float depth, const void* batchKey = nullptr) {
+  SquareCommand& EmplaceSquare(unsigned int layer, float depth, const void* batchKey = nullptr,
+                               octarine::BlendMode blendMode = octarine::BlendMode::Blend) {
     auto& key = ClaimSlot();
-    key.sortKey = RenderKey::ComputeSortKey(layer, depth, SQUARE_PRIMITIVE, batchKey);
+    key.sortKey =
+        RenderKey::ComputeSortKey(layer, depth, SQUARE_PRIMITIVE, batchKey, static_cast<std::uint8_t>(blendMode));
     key.type = SQUARE_PRIMITIVE;
     return key.payload.square;
   }

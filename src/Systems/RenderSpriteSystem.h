@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "AssetManager/AssetManager.h"
+#include "Components/CameraComponents.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/SpriteComponent.h"
 #include "ECS/Query.h"
@@ -73,7 +74,8 @@ class RenderSpriteSystem {
     const float x = sprite.isFixed ? transform.position.x : transform.position.x - camera_.x;
     const float y = sprite.isFixed ? transform.position.y : transform.position.y - camera_.y;
 
-    auto& cmd = renderQueue_->EmplaceSprite(static_cast<unsigned int>(sprite.layer), transform.position.y, texture);
+    auto& cmd = renderQueue_->EmplaceSprite(static_cast<unsigned int>(sprite.layer), transform.position.y, texture,
+                                            sprite.blendMode);
     cmd.destX = x;
     cmd.destY = y;
     cmd.destW = sprite.width * transform.scale.x;
@@ -89,6 +91,8 @@ class RenderSpriteSystem {
     cmd.pivot = {cmd.destW * 0.5f, cmd.destH * 0.5f};
     cmd.flip = static_cast<SDL_FlipMode>(sprite.flip);
     cmd.texture = texture;
+    cmd.colorMod = SDL_Color{sprite.colorMod.r, sprite.colorMod.g, sprite.colorMod.b, sprite.colorMod.a};
+    cmd.blendMode = octarine::ToSdlBlendMode(sprite.blendMode);
   }
 
  private:
