@@ -607,5 +607,34 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
     add_test(NAME GameBakeTest COMMAND OctarineGameBakeTest)
 
+    # RenderQueue / RenderKey sort + batching invariants. Header-only code under test, but it
+    # speaks SDL types — linking octarine_engine keeps the include/link surface identical to the
+    # other engine-facing tests with one TU.
+    add_executable(OctarineRenderQueueTest tests/RenderQueueTest.cpp)
+    set_target_properties(OctarineRenderQueueTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF)
+    target_link_libraries(OctarineRenderQueueTest PRIVATE octarine_engine)
+    if (MSVC)
+        target_compile_options(OctarineRenderQueueTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
+    endif ()
+    add_test(NAME RenderQueueTest COMMAND OctarineRenderQueueTest)
+
+    # Typed asset-store lifecycle: TextureStore generation/ownership plus AssetManager
+    # acquire/release, hot-reload swap, and missing-asset paths against a headless software
+    # renderer and a temp-dir catalog (the checked-in fixture images are placeholder bytes that
+    # don't decode, so the test writes real PNGs at runtime).
+    add_executable(OctarineAssetStoreTest tests/AssetStoreTest.cpp)
+    set_target_properties(OctarineAssetStoreTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF)
+    target_link_libraries(OctarineAssetStoreTest PRIVATE octarine_engine)
+    if (MSVC)
+        target_compile_options(OctarineAssetStoreTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
+    endif ()
+    add_test(NAME AssetStoreTest COMMAND OctarineAssetStoreTest)
+
     message(STATUS "Octarine: Tests ENABLED")
 endif ()
