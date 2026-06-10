@@ -1,4 +1,5 @@
 #pragma once
+#include <optional>
 #include <stack>
 
 #include "Components/BoxColliderComponent.h"
@@ -122,12 +123,12 @@ class LuaEntityLoader {
    *
    * @param registry A pointer to the game's entity-component-system registry->
    * @param entityData The top-level sol::table containing the entity definition.
-   * @return The root entity created from the definition, or nullopt if the table was invalid.
+   * @return The root entity created from the table, or std::nullopt when the table is invalid.
    */
   static std::optional<Entity> LoadEntityFromLua(Registry* registry, const sol::table& entityData) {
     if (!entityData.valid()) {
       Logger::Error("LoadEntityFromLua: Invalid root entity data table.");
-      return {};
+      return std::nullopt;
     }
 
     std::optional<Entity> rootEntity;

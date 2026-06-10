@@ -125,7 +125,7 @@ These globals are shorthand for the most common reads and writes:
 |---|---|
 | `log(message)` | Print to the engine console |
 | `load_asset(table)` | Load a texture, font, or sound |
-| `load_entity(table)` | Spawn a new entity |
+| `load_entity(table)` | Spawn a new entity; returns the root entity handle (or `nil` on an invalid table) |
 | `get_asset_path(path)` | Resolve a project-relative path to an absolute path |
 | `fire_projectile(entity, dx, dy)` | Spawn a projectile from the entity's emitter |
 | `play_sound(asset_id)` | Play a sound or music track |
