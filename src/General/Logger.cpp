@@ -81,40 +81,44 @@ void Logger::SetLevel(const std::string& level) {
   }
 }
 
-void Logger::Error(const std::string& message) {
-  spdlog::error(message);
+void Logger::PushHistory(std::string entry) {
+  // Capped, not unbounded: instrumented builds log per-frame TIMER/ACCUM lines, so an uncapped
+  // history grows by gigabytes over a long run. The console only ever shows the tail.
+  constexpr size_t kMaxHistory = 1000;
   std::lock_guard<std::mutex> lock(history_mutex_);
-  history_.push_back("[Error] " + message);
-}
-
-void Logger::Warn(const std::string& message) {
-  spdlog::warn(message);
-  std::lock_guard<std::mutex> lock(history_mutex_);
-  history_.push_back("[Warn] " + message);
-}
-
-void Logger::Info(const std::string& message) {
-  spdlog::info(message);
-  std::lock_guard<std::mutex> lock(history_mutex_);
-  history_.push_back("[Info] " + message);
-}
-
-void Logger::LogLua(const std::string& message) {
-  lua_logger_->info(message);
-  std::lock_guard<std::mutex> lock(history_mutex_);
-  history_.push_back(message);
-  if (history_.size() > 1000) {
+  history_.push_back(std::move(entry));
+  if (history_.size() > kMaxHistory) {
     history_.erase(history_.begin());
   }
 }
 
+void Logger::Error(const std::string& message) {
+  spdlog::error(message);
+  PushHistory("[Error] " + message);
+}
+
+void Logger::Warn(const std::string& message) {
+  spdlog::warn(message);
+  PushHistory("[Warn] " + message);
+}
+
+void Logger::Info(const std::string& message) {
+  spdlog::info(message);
+  PushHistory("[Info] " + message);
+}
+
+void Logger::LogLua(const std::string& message) {
+  lua_logger_->info(message);
+  PushHistory(message);
+}
+
 void Logger::ErrorLua(const std::string& message) {
   lua_logger_->error(message);
-  std::lock_guard<std::mutex> lock(history_mutex_);
-  history_.push_back("[Error] [Lua] " + message);
+  PushHistory("[Error] [Lua] " + message);
   // Small ring, not full history: the toast only ever shows the tail, and capping here keeps a
   // misbehaving per-frame error loop from growing memory.
   constexpr size_t kMaxScriptErrors = 8;
+  std::lock_guard<std::mutex> lock(history_mutex_);
   script_errors_.push_back({++script_error_sequence_, message, std::chrono::steady_clock::now()});
   if (script_errors_.size() > kMaxScriptErrors) {
     script_errors_.erase(script_errors_.begin());
@@ -123,14 +127,12 @@ void Logger::ErrorLua(const std::string& message) {
 
 void Logger::WarnLua(const std::string& message) {
   lua_logger_->warn(message);
-  std::lock_guard<std::mutex> lock(history_mutex_);
-  history_.push_back("[Warn] [Lua] " + message);
+  PushHistory("[Warn] [Lua] " + message);
 }
 
 void Logger::InfoLua(const std::string& message) {
   lua_logger_->info(message);
-  std::lock_guard<std::mutex> lock(history_mutex_);
-  history_.push_back("[Info] [Lua] " + message);
+  PushHistory("[Info] [Lua] " + message);
 }
 
 std::vector<std::string> Logger::GetHistory() {
