@@ -1,6 +1,10 @@
 #include "RenderDebugGUISystem.h"
 
 #ifdef OCTARINE_WITH_IMGUI
+#include <algorithm>
+#include <chrono>
+#include <vector>
+
 #include "Game/Game.h"
 #include "Game/GameConfig.h"
 #include "General/PerfUtils.h"
@@ -36,15 +40,20 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_un
 #endif
   const bool showGameOverlays = engineOptions.showDebugGUI;
 
+  // The toast must survive every "nothing else to draw" early-out below, otherwise a script
+  // error in a from-editor play session (editor chrome hidden, overlays off) stays invisible —
+  // the exact failure mode it exists to surface.
+  const bool toastActive = HasActiveScriptErrorToast();
+
 #ifdef OCTARINE_WITH_EDITOR
-  if (!showEditorUI && !showGameOverlays && !engineOptions.showFpsCounter) {
+  if (!showEditorUI && !showGameOverlays && !engineOptions.showFpsCounter && !toastActive) {
     return;
   }
 #else
   // Player-with-ImGui build: the ImGui FPS window is editor-only (showFpsCounter is ignored here);
   // the player-facing FPS readout is the renderer perf overlay (PerfOverlay config). So nothing
-  // ImGui draws unless the in-game debug overlays are toggled on.
-  if (!showGameOverlays) {
+  // ImGui draws unless the in-game debug overlays are toggled on or a script error is toasting.
+  if (!showGameOverlays && !toastActive) {
     return;
   }
 #endif
@@ -86,6 +95,10 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_un
   octarine::editor::panels::DrawProjectSelectorIfNeeded(game, projectLoaded);
 #endif
 
+  if (toastActive) {
+    ScriptErrorToastWindow();
+  }
+
   ImGui::Render();
   ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 
@@ -112,6 +125,57 @@ void RenderDebugGUISystem::EntityInfoWindow(const Registry* registry) {
   const auto count = registry->GetUserEntityCount();
   ImGui::Begin("Entity Info");
   ImGui::Text("Entity Count: %llu", static_cast<unsigned long long>(count));
+  ImGui::End();
+}
+
+namespace {
+// How long one script error stays on screen. Each new error restarts the clock for itself only,
+// so a burst shows its tail and quiet errors age out individually.
+constexpr double kScriptErrorToastSeconds = 10.0;
+constexpr float kToastBgAlpha = 0.85f;
+constexpr float kToastWrapWidthPx = 420.0f;
+constexpr ImVec4 kToastHeaderColor{1.0f, 0.35f, 0.35f, 1.0f};
+
+bool IsToastFresh(const Logger::ScriptError& error) {
+  const auto age =
+      std::chrono::duration_cast<std::chrono::duration<double>>(std::chrono::steady_clock::now() - error.when);
+  return age.count() < kScriptErrorToastSeconds;
+}
+}  // namespace
+
+bool RenderDebugGUISystem::HasActiveScriptErrorToast() {
+  const auto errors = Logger::RecentScriptErrors();
+  return std::any_of(errors.begin(), errors.end(), [](const Logger::ScriptError& e) { return IsToastFresh(e); });
+}
+
+void RenderDebugGUISystem::ScriptErrorToastWindow() {
+  const auto errors = Logger::RecentScriptErrors();
+  std::vector<const Logger::ScriptError*> fresh;
+  for (const auto& error : errors) {
+    if (IsToastFresh(error)) fresh.push_back(&error);
+  }
+  if (fresh.empty()) return;
+
+  // Bottom-right overlay: no decoration, no focus steal, no input capture — purely informative.
+  const ImGuiViewport* viewport = ImGui::GetMainViewport();
+  constexpr float kMargin = 12.0f;
+  ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x - kMargin,
+                                 viewport->WorkPos.y + viewport->WorkSize.y - kMargin),
+                          ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+  ImGui::SetNextWindowBgAlpha(kToastBgAlpha);
+  constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
+                                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                      ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs |
+                                      ImGuiWindowFlags_AlwaysAutoResize;
+  ImGui::Begin("##script-error-toast", nullptr, kFlags);
+  ImGui::TextColored(kToastHeaderColor, "Script error%s (%d)", fresh.size() == 1 ? "" : "s",
+                     static_cast<int>(fresh.size()));
+  ImGui::Separator();
+  ImGui::PushTextWrapPos(kToastWrapWidthPx);
+  for (const auto* error : fresh) {
+    ImGui::TextWrapped("%s", error->message.c_str());
+  }
+  ImGui::PopTextWrapPos();
   ImGui::End();
 }
 #endif
