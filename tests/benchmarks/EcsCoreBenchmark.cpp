@@ -162,6 +162,7 @@ BENCHMARK(BM_ArchetypeTransitionAddRemove)->Range(64, 8192);
 static void BM_GetComponentRandomAccess(benchmark::State& state) {
   Registry registry;
   auto entities = PopulateSpread(registry, static_cast<int>(state.range(0)), 8);
+  // NOLINTNEXTLINE(cert-msc51-cpp) — fixed seed keeps the access pattern identical across runs
   std::mt19937 rng(42);
   std::shuffle(entities.begin(), entities.end(), rng);
 

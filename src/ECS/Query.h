@@ -108,18 +108,7 @@ class ComponentQuery final : public Query {
   void ForEach(Func&& func) {
     if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...> ||
                   std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
-      // ContextFacade-based iteration doesn't easily support optional components yet (requires
-      // updating ContextFacade and IteratorImpl). For now, systems using Opt<T> must use the
-      // simpler void(Entity, T&, U*...) or void(T&, U*...) signatures.
-      static_assert(!(... || Internal::is_optional_v<TComponents>),
-                    "Optional components are not yet supported in ContextFacade-based ForEach.");
-      for (const auto iterable = CreateIterable(); auto&& context : iterable) {
-        if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...>) {
-          func(context, context.GetEntity(), context.template Component<TComponents>()...);
-        } else {
-          func(context, context.template Component<TComponents>()...);
-        }
-      }
+      ForEachWithFacade(std::forward<Func>(func));
     } else {
       // end() is hoisted out of the condition — constructing an Iterator per loop pass is a
       // per-entity cost on the hot path.
@@ -158,11 +147,24 @@ class ComponentQuery final : public Query {
   [[nodiscard]] size_t GetCount() const { return archetype_query_.GetTotalEntityCount(); }
 
  private:
-  [[nodiscard]] bool IsExcluded(const Archetype& arch) const {
-    for (const ComponentID id : excluded_) {
-      if (arch.HasComponent(id)) return true;
+  // ContextFacade-based iteration doesn't easily support optional components yet (requires
+  // updating ContextFacade and IteratorImpl). For now, systems using Opt<T> must use the
+  // simpler void(Entity, T&, U*...) or void(T&, U*...) signatures.
+  template <typename Func>
+  void ForEachWithFacade(Func&& func) {
+    static_assert(!(... || Internal::is_optional_v<TComponents>),
+                  "Optional components are not yet supported in ContextFacade-based ForEach.");
+    for (const auto iterable = CreateIterable(); auto&& context : iterable) {
+      if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...>) {
+        func(context, context.GetEntity(), context.template Component<TComponents>()...);
+      } else {
+        func(context, context.template Component<TComponents>()...);
+      }
     }
-    return false;
+  }
+
+  [[nodiscard]] bool IsExcluded(const Archetype& arch) const {
+    return std::ranges::any_of(excluded_, [&](const ComponentID id) { return arch.HasComponent(id); });
   }
 
   void RebuildSorted() {
