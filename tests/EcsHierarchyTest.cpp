@@ -3,8 +3,10 @@
 // failed-check count. Registered with ctest as EcsHierarchyTest. Links the ECS core only.
 
 #include <algorithm>
+#include <cmath>
 
 #include "ECS/Registry.h"
+#include "Systems/TransformSystem.h"
 #include "TestHarness.h"
 
 using octarine::test::Check;
@@ -77,6 +79,47 @@ int main() {
     Check(!registry.IsAlive(child), "child is cascade-destroyed with its parent");
     Check(registry.HierarchyGeneration() > genBeforeBlam, "HierarchyGeneration bumps on cascade blam");
     Check(!registry.GetParent(child).has_value(), "no dangling parent link after cascade blam");
+  }
+
+  // TransformSystem hierarchy composition: child globals compose from the parent chain while
+  // flat entities resolve global = local in the same frame.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    const Entity flat = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{5.0f, 6.0f}});
+    const Entity parent = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{10.0f, 0.0f}},
+                                                          ScaleComponent{{2.0f, 2.0f}});
+    const Entity child = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{1.0f, 2.0f}});
+    const Entity grandchild =
+        registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{1.0f, 0.0f}});
+    registry.SetParent(child, parent);
+    registry.SetParent(grandchild, child);
+
+    registry.Update(1.0f / 60.0f);
+
+    const auto& flatGlobal = registry.GetComponent<GlobalTransformComponent>(flat);
+    Check(flatGlobal.position == glm::vec2(5.0f, 6.0f), "flat entity resolves global = local alongside a hierarchy");
+
+    const auto& parentGlobal = registry.GetComponent<GlobalTransformComponent>(parent);
+    Check(parentGlobal.position == glm::vec2(10.0f, 0.0f) && parentGlobal.scale == glm::vec2(2.0f, 2.0f),
+          "root resolves global = local");
+
+    // child local (1,2) scaled by parent (2,2) then offset by parent position (10,0) -> (12,4).
+    const auto& childGlobal = registry.GetComponent<GlobalTransformComponent>(child);
+    Check(childGlobal.position == glm::vec2(12.0f, 4.0f), "child global composes parent position and scale");
+    Check(childGlobal.scale == glm::vec2(2.0f, 2.0f), "child inherits parent scale (identity local scale)");
+
+    // grandchild local (1,0) scaled by child global scale (2,2) offset by child global (12,4) -> (14,4).
+    const auto& grandchildGlobal = registry.GetComponent<GlobalTransformComponent>(grandchild);
+    Check(grandchildGlobal.position == glm::vec2(14.0f, 4.0f), "grandchild composes through two levels");
+
+    // An entity created into an existing archetype after the first Update still gets resolved
+    // next frame (the pool-growth case that forbids root caching).
+    const Entity late = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{7.0f, 7.0f}});
+    registry.Update(1.0f / 60.0f);
+    Check(registry.GetComponent<GlobalTransformComponent>(late).position == glm::vec2(7.0f, 7.0f),
+          "entity created after first frame is resolved on the next frame");
   }
 
   return octarine::test::Result();

@@ -274,27 +274,31 @@ std::vector<Archetype*> Registry::GetMatchingArchetypes(const ArchetypeType& typ
     if (archIt == archetypes_.end()) {
       continue;
     }
-    const auto& archetypeType = archIt->second->type();
-
-    // Both `type` and `archetypeType` are sorted ascending; two-pointer superset check.
-    size_t i = 0;
-    size_t j = 0;
-    while (i < type.size() && j < archetypeType.size()) {
-      if (type[i] == archetypeType[j]) {
-        ++i;
-        ++j;
-      } else if (archetypeType[j] < type[i]) {
-        ++j;
-      } else {
-        break;
-      }
-    }
-    if (i == type.size()) {
+    if (MatchesType(*archIt->second, type)) {
       matching_archetypes.push_back(archIt->second.get());
     }
   }
 
   return matching_archetypes;
+}
+
+bool Registry::MatchesType(const Archetype& archetype, const ArchetypeType& type) {
+  const auto& archetypeType = archetype.type();
+
+  // Both `type` and `archetypeType` are sorted ascending; two-pointer superset check.
+  size_t i = 0;
+  size_t j = 0;
+  while (i < type.size() && j < archetypeType.size()) {
+    if (type[i] == archetypeType[j]) {
+      ++i;
+      ++j;
+    } else if (archetypeType[j] < type[i]) {
+      ++j;
+    } else {
+      break;
+    }
+  }
+  return i == type.size();
 }
 
 EntityLocation Registry::TransitionAddComponent(const Entity entity, const ComponentID componentId) {
@@ -434,31 +438,31 @@ bool Registry::IsActive(const Entity entity) const {
   return loc.indexInChunk < loc.archetype->GetActiveCountInChunk(loc.chunkIndex);
 }
 
-Archetype* Registry::GetOrCreateArchetype(std::vector<ComponentID> componentIDs, const ComponentID newComponentId) {
-  componentIDs.push_back(newComponentId);
-  std::ranges::sort(componentIDs);
-
-  if (const auto it = component_index_.find(newComponentId); it != component_index_.end()) {
-    for (const auto archetypeId : it->second) {
-      const auto archetype = archetypes_.find(archetypeId);
-      if (archetype->second->type().size() != componentIDs.size()) {
-        continue;
-      }
-
-      bool match = true;
-      for (size_t i = 0; i < componentIDs.size(); i++) {
-        if (archetype->second->type()[i] != componentIDs[i]) {
-          match = false;
-          break;
-        }
-      }
-
-      if (match) {
-        return archetype->second.get();
-      }
+Archetype* Registry::FindExactArchetype(const std::vector<ComponentID>& componentIDs) const {
+  // Scan the candidate list of the rarest component: an exact match must appear in every
+  // component's index list, and rare components (fresh tags especially) keep this list near
+  // zero where a common component's list holds every archetype in the world.
+  const ArchetypeList* smallest = nullptr;
+  for (const ComponentID id : componentIDs) {
+    const auto it = component_index_.find(id);
+    if (it == component_index_.end()) {
+      return nullptr;  // Component never seen in any archetype — no exact match possible.
+    }
+    if (smallest == nullptr || it->second.size() < smallest->size()) {
+      smallest = &it->second;
     }
   }
 
+  for (const auto archetypeId : *smallest) {
+    const auto archetype = archetypes_.find(archetypeId);
+    if (archetype->second->type() == componentIDs) {
+      return archetype->second.get();
+    }
+  }
+  return nullptr;
+}
+
+Archetype* Registry::RegisterNewArchetype(const std::vector<ComponentID>& componentIDs) {
   std::vector<ComponentInfo> componentInfos;
   componentInfos.reserve(componentIDs.size());
   for (const auto& id : componentIDs) {
@@ -469,7 +473,10 @@ Archetype* Registry::GetOrCreateArchetype(std::vector<ComponentID> componentIDs,
   Archetype* newArchetypePtr = newArchetype.get();
   const auto newArchetypeId = newArchetype->GetID();
   archetypes_.emplace(newArchetypeId, std::move(newArchetype));
+  // Generation bump and log append stay in lockstep: archetype_log_[G] is the archetype whose
+  // creation moved the generation from G to G+1, which is what incremental query matching relies on.
   ++archetype_generation_;
+  archetype_log_.push_back(newArchetypePtr);
 
   // Centralized component_index_ population — every archetype is registered here.
   for (const ComponentID id : newArchetypePtr->type()) {
@@ -482,6 +489,16 @@ Archetype* Registry::GetOrCreateArchetype(std::vector<ComponentID> componentIDs,
   return newArchetypePtr;
 }
 
+Archetype* Registry::GetOrCreateArchetype(std::vector<ComponentID> componentIDs, const ComponentID newComponentId) {
+  componentIDs.push_back(newComponentId);
+  std::ranges::sort(componentIDs);
+
+  if (Archetype* existing = FindExactArchetype(componentIDs)) {
+    return existing;
+  }
+  return RegisterNewArchetype(componentIDs);
+}
+
 Archetype* Registry::GetOrCreateArchetypeRemove(std::vector<ComponentID> componentIDs,
                                                 const ComponentID removeComponentId) {
   std::erase(componentIDs, removeComponentId);
@@ -490,48 +507,10 @@ Archetype* Registry::GetOrCreateArchetypeRemove(std::vector<ComponentID> compone
   if (componentIDs.empty()) {
     return root_archetype_.get();
   }
-
-  if (const auto it = component_index_.find(componentIDs.front()); it != component_index_.end()) {
-    for (const auto archetypeId : it->second) {
-      const auto archetype = archetypes_.find(archetypeId);
-      if (archetype->second->type().size() != componentIDs.size()) {
-        continue;
-      }
-
-      bool match = true;
-      for (size_t i = 0; i < componentIDs.size(); ++i) {
-        if (archetype->second->type()[i] != componentIDs[i]) {
-          match = false;
-          break;
-        }
-      }
-
-      if (match) {
-        return archetype->second.get();
-      }
-    }
+  if (Archetype* existing = FindExactArchetype(componentIDs)) {
+    return existing;
   }
-
-  std::vector<ComponentInfo> componentInfos;
-  componentInfos.reserve(componentIDs.size());
-  for (const auto& id : componentIDs) {
-    componentInfos.push_back(component_registry_->GetInfo(id));
-  }
-
-  auto newArchetype = std::make_unique<Archetype>(std::move(componentInfos));
-  Archetype* newArchetypePtr = newArchetype.get();
-  const auto newArchetypeId = newArchetype->GetID();
-  archetypes_.emplace(newArchetypeId, std::move(newArchetype));
-  ++archetype_generation_;
-
-  for (const ComponentID id : newArchetypePtr->type()) {
-    auto& list = component_index_[id];
-    if (std::ranges::find(list, newArchetypeId) == list.end()) {
-      list.push_back(newArchetypeId);
-    }
-  }
-
-  return newArchetypePtr;
+  return RegisterNewArchetype(componentIDs);
 }
 
 Archetype* Registry::GetOrCreateArchetypeFromSet(std::vector<ComponentID> componentIDs) {
@@ -541,46 +520,10 @@ Archetype* Registry::GetOrCreateArchetypeFromSet(std::vector<ComponentID> compon
   if (componentIDs.empty()) {
     return root_archetype_.get();
   }
-
-  if (const auto it = component_index_.find(componentIDs.front()); it != component_index_.end()) {
-    for (const auto archetypeId : it->second) {
-      const auto archetype = archetypes_.find(archetypeId);
-      if (archetype->second->type().size() != componentIDs.size()) {
-        continue;
-      }
-      bool match = true;
-      for (size_t i = 0; i < componentIDs.size(); ++i) {
-        if (archetype->second->type()[i] != componentIDs[i]) {
-          match = false;
-          break;
-        }
-      }
-      if (match) {
-        return archetype->second.get();
-      }
-    }
+  if (Archetype* existing = FindExactArchetype(componentIDs)) {
+    return existing;
   }
-
-  std::vector<ComponentInfo> componentInfos;
-  componentInfos.reserve(componentIDs.size());
-  for (const auto& cid : componentIDs) {
-    componentInfos.push_back(component_registry_->GetInfo(cid));
-  }
-
-  auto newArchetype = std::make_unique<Archetype>(std::move(componentInfos));
-  Archetype* newArchetypePtr = newArchetype.get();
-  const auto newArchetypeId = newArchetype->GetID();
-  archetypes_.emplace(newArchetypeId, std::move(newArchetype));
-  ++archetype_generation_;
-
-  for (const ComponentID id : newArchetypePtr->type()) {
-    auto& list = component_index_[id];
-    if (std::ranges::find(list, newArchetypeId) == list.end()) {
-      list.push_back(newArchetypeId);
-    }
-  }
-
-  return newArchetypePtr;
+  return RegisterNewArchetype(componentIDs);
 }
 
 void Registry::AddPair(const Entity entity, const Entity relationship, const Entity target) {
