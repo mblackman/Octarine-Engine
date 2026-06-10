@@ -478,7 +478,7 @@ void Game::Setup() {
 
   // ScriptSystem is registered as a per-frame system (vs. Bake's stack instance) so its
   // operator() runs each tick. CreateLuaBindings still happens below in the bootstrap spine.
-  auto& scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
+  auto scriptSystem = registry_->RegisterSystem<ScriptComponent>(ScriptSystem());
 
   auto& inputSystem = engine_bootstrap::InstallInputSystem(*registry_, event_bus_);
   engine_bootstrap::RegisterAllComponentBindings();
@@ -489,7 +489,7 @@ void Game::Setup() {
   // engine adds. Cheap; the actual dump below only fires in editor mode or via env override.
   const auto preBindingGlobals = LuaApiManifest::SnapshotGlobals(lua);
   engine_bootstrap::InstallPoolAndProjectile(*registry_);
-  scriptSystem.CreateLuaBindings(lua);
+  scriptSystem.Func().CreateLuaBindings(lua);
   engine_bootstrap::InstallLuaModules(lua, *this);
   LuaSystemRegistry::bindAll(lua);
   engine_bootstrap::SetCommonLuaGlobals(lua, gameConfig, startup_mode_);
@@ -559,13 +559,13 @@ void Game::Setup() {
   // entries, which need the mixer. RegisterSystem owns the single AudioSystem instance — Init
   // runs against that instance so the EventBus subscription, cmd buffer, and per-frame Update
   // all share state.
-  auto& audioSystem = registry_->RegisterSystem<AudioSourceComponent>(AudioSystem());
-  if (!audioSystem.Init(registry_.get(), event_bus_)) {
+  auto audioSystem = registry_->RegisterSystem<AudioSourceComponent>(AudioSystem());
+  if (!audioSystem.Func().Init(registry_.get(), event_bus_)) {
     Logger::Error("AudioSystem failed to initialize; audio disabled this session.");
   }
   // Mixer is owned by AudioSystem; publish it on the context so asset loads + the master-
   // volume sync (in Game::Update) can reach it without going through the Registry's typed slot.
-  registry_->Get<EngineContext>().mixer = audioSystem.Mixer();
+  registry_->Get<EngineContext>().mixer = audioSystem.Func().Mixer();
 
   if (gameConfig.HasLoadedConfig()) {
     LoadGame(lua, assetManager, gameConfig);
@@ -582,50 +582,68 @@ void Game::Setup() {
   //
   // Serial (RegisterSystem, not parallel): the tick spawns into the registry. It is registered
   // here, after InstallPoolAndProjectile Set + Init'd the canonical ProjectileEmitSystem, so the
-  // copy stored by the system list carries the initialized pool id. Placed before
-  // VelocityIntegrationSystem so freshly-spawned projectiles integrate/transform/collide this same
-  // frame — matching the spawn-timing the old ScriptSystem-driven Lua path had.
-  registry_->RegisterSystem<ProjectileEmitterComponent, PositionComponent>(registry_->Get<ProjectileEmitSystem>());
+  // copy stored by the system list carries the initialized pool id.
+  auto projectileEmit =
+      registry_->RegisterSystem<ProjectileEmitterComponent, PositionComponent>(registry_->Get<ProjectileEmitSystem>());
 
-  // Integrate velocity into local position. Must run before TransformSystem so the hierarchy
-  // resolves with the latest positions, and before CollisionSystem reads the global transforms.
-  registry_->RegisterParallelSystem<PositionComponent, RigidBodyComponent>(VelocityIntegrationSystem());
+  // Integrate velocity into local position.
+  auto velocityIntegration =
+      registry_->RegisterParallelSystem<PositionComponent, RigidBodyComponent>(VelocityIntegrationSystem());
 
   // Despawn entities (except the player) once they leave the playable area.
   registry_->RegisterParallelSystem<PositionComponent, SpriteComponent>(OffScreenDespawnSystem());
 
-  // Resolve hierarchy after Movement mutates local positions, before Collision reads globals.
-  registry_->RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+  // Resolve the transform hierarchy into global positions/scales.
+  auto transform = registry_->RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
 
-  // Collision reads transform.globalPosition / globalScale — must run after TransformSystem.
-  registry_->RegisterBulkSystem(CollisionSystem());
+  auto collision = registry_->RegisterBulkSystem(CollisionSystem());
 
   // Spatial audio: snapshot the listener entity (UpdateListenerTransformSystem) then mutate
-  // gain + stereo pan on live spatial tracks (SpatialAudioSystem). Both must run AFTER
-  // TransformSystem so emitter + listener globals are this-frame values; AudioSystem (above)
-  // is the one that adds the AudioSinkComponent and caches its MIX_Track in AudioTrackCache,
-  // which these resolve per entity.
+  // gain + stereo pan on live spatial tracks (SpatialAudioSystem). AudioSystem (above) is the
+  // one that adds the AudioSinkComponent and caches its MIX_Track in AudioTrackCache, which
+  // these resolve per entity.
   registry_->Set<AudioListenerCache>(AudioListenerCache{});
-  registry_->RegisterBulkSystem<GlobalTransformComponent>(UpdateListenerTransformSystem());
+  auto listenerTransform = registry_->RegisterBulkSystem<GlobalTransformComponent>(UpdateListenerTransformSystem());
   // Phase 5 culling: pre-register the AudioActiveTag so its component entity exists
   // before any HasTag query fires (Tag<T>() is lazy otherwise). CullingSystem then gates
   // SpatialAudioSystem / DopplerSystem implicitly — culled emitters lose their sink, and
   // both downstream systems short-circuit on the missing sink.
   registry_->Tag<AudioActiveTag>();
-  registry_->RegisterSystem<GlobalTransformComponent, AudioSourceComponent>(AudioCullingSystem());
-  registry_->RegisterSystem<GlobalTransformComponent, AudioSourceComponent, AudioSinkComponent>(SpatialAudioSystem());
+  auto audioCulling = registry_->RegisterSystem<GlobalTransformComponent, AudioSourceComponent>(AudioCullingSystem());
+  auto spatialAudio = registry_->RegisterSystem<GlobalTransformComponent, AudioSourceComponent, AudioSinkComponent>(
+      SpatialAudioSystem());
   // Doppler is independent of spatial: governs frequency ratio via MIX_SetTrackFrequencyRatio.
   // Requires RigidBodyComponent on the emitter (no body → no velocity → no shift).
-  registry_->RegisterSystem<GlobalTransformComponent, RigidBodyComponent, AudioSourceComponent, AudioSinkComponent>(
-      DopplerSystem());
+  auto doppler =
+      registry_->RegisterSystem<GlobalTransformComponent, RigidBodyComponent, AudioSourceComponent, AudioSinkComponent>(
+          DopplerSystem());
 
-  // Camera follows after gameplay-driven transform updates
-  registry_->RegisterSystem<PositionComponent, CameraFollowComponent>(CameraFollowSystem());
+  auto cameraFollow = registry_->RegisterSystem<PositionComponent, CameraFollowComponent>(CameraFollowSystem());
 
   // Render queue producers
   registry_->RegisterParallelSystem<GlobalTransformComponent, SpriteComponent>(RenderSpriteSystem());
   registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
   registry_->RegisterParallelSystem<SquarePrimitiveComponent, GlobalTransformComponent>(RenderPrimitiveSystem());
+
+  // Execution-order edges (topo-sorted in Registry::Update; registration order breaks ties).
+  // Emit before integration so freshly-spawned projectiles integrate/transform/collide the same
+  // frame — matching the spawn-timing the old ScriptSystem-driven Lua path had.
+  registry_->Order(velocityIntegration).After(projectileEmit);
+  // Transforms resolve after velocity integration mutates local positions; collision reads
+  // transform.globalPosition / globalScale, so it runs after both.
+  registry_->Order(transform).After(velocityIntegration);
+  registry_->Order(collision).After(transform).After(velocityIntegration);
+  // Listener snapshot + spatial gain/pan need this-frame globals; spatial reads the listener
+  // snapshot and is gated by culling (culled emitters lose their sink); both resolve tracks the
+  // AudioSystem update cached.
+  registry_->Order(listenerTransform).After(transform);
+  registry_->Order(audioCulling).After(audioSystem);
+  registry_->Order(spatialAudio).After(transform).After(listenerTransform).After(audioCulling).After(audioSystem);
+  // Doppler needs this-frame emitter globals + listener snapshot, and sits behind the same
+  // culling gate and AudioSystem-cached tracks as spatial.
+  registry_->Order(doppler).After(transform).After(listenerTransform).After(audioCulling).After(audioSystem);
+  // Camera follows after gameplay-driven transform updates.
+  registry_->Order(cameraFollow).After(transform);
 
   // Event subscriptions (one-time). FrameLoop holds its own RAII subscription handle.
   frame_loop_->SubscribeToEvents();
