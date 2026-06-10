@@ -633,6 +633,16 @@ class Registry {
   // when the archetype set hasn't changed since their last Update.
   [[nodiscard]] uint64_t ArchetypeGeneration() const { return archetype_generation_; }
 
+  // Insertion-ordered log of every archetype ever created. Invariant:
+  // archetype_log_.size() == archetype_generation_, so a query that last matched at
+  // generation G only needs to test archetype_log_[G..current) to stay current.
+  // Archetypes are never destroyed, so the pointers stay valid for the Registry's lifetime.
+  [[nodiscard]] const std::vector<Archetype*>& ArchetypeLog() const { return archetype_log_; }
+
+  // Sorted-ascending two-pointer superset check: true iff the archetype's type contains every
+  // id in `type`. Shared by the full GetMatchingArchetypes scan and incremental query matching.
+  [[nodiscard]] static bool MatchesType(const Archetype& archetype, const ArchetypeType& type);
+
  private:
   // Internal entities back component-type and tag registrations. They live in
   // entity_locations_ but should not show up in GetUserEntityCount.
@@ -647,6 +657,13 @@ class Registry {
   Archetype* GetOrCreateArchetype(std::vector<ComponentID> componentIDs, ComponentID newComponentId);
   Archetype* GetOrCreateArchetypeRemove(std::vector<ComponentID> componentIDs, ComponentID removeComponentId);
   Archetype* GetOrCreateArchetypeFromSet(std::vector<ComponentID> componentIDs);
+  // Exact-match lookup over the component_index_ list of componentIDs.front(). Expects
+  // componentIDs sorted ascending and non-empty. Returns nullptr when no archetype has
+  // exactly this signature.
+  [[nodiscard]] Archetype* FindExactArchetype(const std::vector<ComponentID>& componentIDs) const;
+  // Create + register a new archetype for the given sorted signature: archetypes_ map,
+  // generation bump, component_index_ entries, and the archetype_log_ append all happen here.
+  Archetype* RegisterNewArchetype(const std::vector<ComponentID>& componentIDs);
 
   // System-ordering graph (fed by Order().After()/.Before()). RebuildExecutionOrder runs Kahn's
   // algorithm over the edges; the ready set is kept ordered by SystemId so unconstrained systems
@@ -686,6 +703,8 @@ class Registry {
   std::unordered_map<std::string, Entity> tag_to_entity_;
   // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
   std::unordered_map<ComponentID, ArchetypeList> component_index_;
+  // Creation-ordered archetype pointers; see ArchetypeLog().
+  std::vector<Archetype*> archetype_log_;
   std::unordered_map<EntityID, std::unordered_set<EcsId>> pairs_;
   // Reverse index for pairs: maps a target ID (32-bit) to all author EntityIDs (64-bit) pointing to it.
   std::unordered_map<std::uint32_t, std::unordered_set<EntityID>> target_to_pair_authors_;

@@ -236,5 +236,48 @@ int main() {
     Check(threw, "ordering cycle detected and thrown on Update");
   }
 
+  // Incremental query matching: a long-lived query updated across archetype churn must see
+  // exactly the same entities as a freshly-built query (which takes the full-rebuild path).
+  {
+    Registry registry;
+    auto incremental = registry.CreateQuery<Position>();
+    incremental->Update();  // matches nothing yet; caches the current generation
+
+    // Churn: mint several new archetypes after the query's last Update — some matching
+    // (Position-bearing) and some not (Velocity-only / tag-only shapes).
+    for (int i = 0; i < 5; ++i) {
+      const Entity e = registry.CreateEntityWithBundle(Position{static_cast<float>(i), 0.0f});
+      registry.AddTag(e, "shape_" + std::to_string(i));  // unique tag → unique archetype
+    }
+    const Entity v = registry.CreateEntity();
+    registry.AddComponent(v, Velocity{1.0f, 1.0f});  // non-matching archetype
+
+    incremental->Update();  // incremental append path
+    auto fresh = registry.CreateQuery<Position>();
+    fresh->Update();  // full-rebuild path
+
+    int incrementalCount = 0;
+    int freshCount = 0;
+    incremental->ForEach([&](Position&) { ++incrementalCount; });
+    fresh->ForEach([&](Position&) { ++freshCount; });
+    Check(incrementalCount == 5, "incrementally-updated query sees all post-creation archetypes");
+    Check(incrementalCount == freshCount, "incremental match equals a fresh full-scan match");
+
+    // Filter change after churn forces a full re-match that honours the exclusion everywhere.
+    incremental->WithoutTag("shape_0");
+    incremental->Update();
+    int excludedCount = 0;
+    incremental->ForEach([&](Position&) { ++excludedCount; });
+    Check(excludedCount == 4, "WithoutTag after churn full-rebuilds with the exclusion applied");
+
+    // New archetypes carrying the excluded tag must not leak in through the incremental path.
+    const Entity later = registry.CreateEntityWithBundle(Position{9.0f, 9.0f}, Velocity{0.0f, 0.0f});
+    registry.AddTag(later, "shape_0");
+    incremental->Update();
+    int afterLeakCheck = 0;
+    incremental->ForEach([&](Position&) { ++afterLeakCheck; });
+    Check(afterLeakCheck == 4, "incremental append still applies WithoutTag exclusions");
+  }
+
   return octarine::test::Result();
 }
