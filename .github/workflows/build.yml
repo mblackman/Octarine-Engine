@@ -80,13 +80,15 @@ jobs:
 
       - name: Configure CMake
         shell: bash
-        run: cmake --preset ${{ matrix.preset }} ${{ (matrix.platform == 'linux' && matrix.preset == 'editor-release') && '-DOCTARINE_ENABLE_TESTS=ON' || '' }}
+        run: cmake --preset ${{ matrix.preset }} ${{ matrix.preset == 'editor-release' && '-DOCTARINE_ENABLE_TESTS=ON' || '' }}
 
       - name: Build
         run: cmake --build build/${{ matrix.preset }} --config Release --parallel
 
+      # All three OSes, not just linux: MSVC-specific breakage (AVX2 chunk alignment) and
+      # macOS-specific behavior otherwise ship untested.
       - name: Run engine tests (ctest)
-        if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
+        if: matrix.preset == 'editor-release'
         run: ctest --test-dir build/${{ matrix.preset }} --output-on-failure
 
       # Headless bake against the example project. Catches unresolved-asset regressions and
@@ -99,6 +101,30 @@ jobs:
         run: |
           ./build/${{ matrix.preset }}/bin/release/OctarineEngine "$GITHUB_WORKSPACE/example_repo" -m bake
           test -s "$GITHUB_WORKSPACE/example_repo/asset_manifest.lua"
+
+      # Runtime boot smoke: actually run the engine against the example project, headless. The
+      # bake smoke above never enters the frame loop, so setup-order bugs, Lua binding
+      # regressions, and asset-load failures ship invisibly past unit tests without this. The
+      # frame-capture env vars bound the run — FrameLoop quits right after writing frame 120
+      # (~2s of simulation). Gates: engine exit code, the capture file existing (proves the
+      # render path produced frames), and zero error/critical log lines (runtime Lua errors
+      # log-and-continue, so the exit code alone can't catch them).
+      - name: Runtime boot smoke (example project)
+        if: matrix.platform == 'linux' && matrix.preset == 'editor-release'
+        shell: bash
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+          OCTARINE_CAPTURE_FRAME: "120"
+        run: |
+          export OCTARINE_CAPTURE_PATH="$RUNNER_TEMP/boot-smoke.bmp"
+          log="$RUNNER_TEMP/boot-smoke.log"
+          ./build/${{ matrix.preset }}/bin/release/OctarineEngine "$GITHUB_WORKSPACE/example_repo" | tee "$log"
+          test -s "$OCTARINE_CAPTURE_PATH"
+          if grep -E '\[(error|critical)\]' "$log"; then
+            echo "::error::Runtime boot smoke logged error/critical lines (see log above)."
+            exit 1
+          fi
 
       - name: Check Lua API artifact drift
         id: lua_drift
