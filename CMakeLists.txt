@@ -331,6 +331,7 @@ if (OCTARINE_ENABLE_BENCHMARKS)
     # standard compile flags. The spatial-audio systems benchmarked here are header-only, so no
     # other engine lib is needed — bench runs are microbenchmarks, not full-engine timings.
     add_executable(OctarineBenchmarks
+            tests/benchmarks/EcsCoreBenchmark.cpp
             tests/benchmarks/EntityPoolBenchmark.cpp
             tests/benchmarks/SpatialAudioBenchmark.cpp
             tests/benchmarks/CollisionSystemBenchmark.cpp

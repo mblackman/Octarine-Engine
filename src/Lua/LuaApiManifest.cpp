@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <utility>
 #include <vector>
@@ -62,16 +63,24 @@ void EmitFunction(std::ofstream& out, const std::string& qualifiedName) {
 
 // A table or usertype: emit it as a namespace, then its function members as `table.fn`.
 // One level deep — engine tables (registry, input) and usertypes are flat.
+// LuaLS requires every ---@field to sit between the ---@class line and the table
+// statement; a field after any statement triggers doc-field-no-class. So: class line,
+// all fields, `name = {}`, then the functions.
 void EmitTable(std::ofstream& out, const std::string& name, const sol::table& table) {
-  out << "---@class " << name << "\n" << name << " = {}\n\n";
-  for (const auto& member : SortedEntries(table)) {
-    if (member.name.rfind("__", 0) == 0) continue;  // skip metamethods (__index, ...)
-    if (IsSolInternalName(member.name)) continue;
-    if (member.value.get_type() == sol::type::function) {
-      EmitFunction(out, name + "." + member.name);
-    } else {
-      out << "---@field " << member.name << " any   -- on " << name << "\n";
-    }
+  const auto entries = SortedEntries(table);
+  const auto skip = [](const NamedObject& member) {
+    return member.name.rfind("__", 0) == 0  // skip metamethods (__index, ...)
+           || IsSolInternalName(member.name);
+  };
+  out << "---@class " << name << "\n";
+  for (const auto& member : entries) {
+    if (skip(member) || member.value.get_type() == sol::type::function) continue;
+    out << "---@field " << member.name << " any\n";
+  }
+  out << name << " = {}\n\n";
+  for (const auto& member : entries) {
+    if (skip(member) || member.value.get_type() != sol::type::function) continue;
+    EmitFunction(out, name + "." + member.name);
   }
   out << "\n";
 }
@@ -108,7 +117,8 @@ bool Write(sol::state& lua, const std::unordered_set<std::string>& before, const
 
   out << "-- AUTO-GENERATED Octarine Lua API surface. Do not edit by hand.\n"
       << "-- Introspected from the live sol::state after all bindings install.\n"
-      << "-- Regenerate by setting OCTARINE_DUMP_LUA_API=<path> and launching the engine.\n"
+      << "-- Refreshed automatically on every editor-mode launch (types/octarine_api.lua);\n"
+      << "-- OCTARINE_DUMP_LUA_API=<path> overrides the destination.\n"
       << "---@meta\n"
       << "---@diagnostic disable: lowercase-global, missing-return\n\n";
 
@@ -150,6 +160,17 @@ bool MaybeDumpFromEnv(sol::state& lua, const std::unordered_set<std::string>& be
 #endif
   const std::string outPath = (value == "1") ? "lua_api.lua" : value;
   return Write(lua, before, outPath);
+}
+
+bool WriteProjectStub(sol::state& lua, const std::unordered_set<std::string>& before, const std::string& assetPath) {
+  const std::filesystem::path dir = std::filesystem::path(assetPath) / "types";
+  std::error_code ec;
+  std::filesystem::create_directories(dir, ec);
+  if (ec) {
+    Logger::Error("LuaApiManifest: could not create '" + dir.string() + "': " + ec.message());
+    return false;
+  }
+  return Write(lua, before, (dir / "octarine_api.lua").string());
 }
 
 namespace {

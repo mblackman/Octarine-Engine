@@ -23,6 +23,12 @@ bool Write(sol::state& lua, const std::unordered_set<std::string>& before, const
 // No-op (returns false) when the var is unset. Called from Game::Setup.
 bool MaybeDumpFromEnv(sol::state& lua, const std::unordered_set<std::string>& before);
 
+// Editor-mode default: write the stub to <assetPath>/types/octarine_api.lua, creating the
+// directory if needed. Lets a project's LuaLS setup (workspace.library = ["types"]) track the
+// live engine surface with zero per-project wiring. Called from Game::Setup when the env var
+// is unset.
+bool WriteProjectStub(sol::state& lua, const std::unordered_set<std::string>& before, const std::string& assetPath);
+
 // Emit a machine-readable JSON index of every component registered with LuaComponentRegistry:
 // lua_key, usertype name, and accessor function names exposed on the `registry` table. Agents
 // grep this instead of crawling src/Lua/Bindings/. Returns false if the file cannot be opened.
