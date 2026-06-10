@@ -486,7 +486,7 @@ void Game::Setup() {
   LuaSystemRegistry::registerSystem(inputSystem);
   engine_bootstrap::InstallLuaLibraries(lua);
   // Snapshot stdlib globals before binding so the API manifest can diff out everything the
-  // engine adds. Cheap; the actual dump only fires when OCTARINE_DUMP_LUA_API is set.
+  // engine adds. Cheap; the actual dump below only fires in editor mode or via env override.
   const auto preBindingGlobals = LuaApiManifest::SnapshotGlobals(lua);
   engine_bootstrap::InstallPoolAndProjectile(*registry_);
   scriptSystem.Func().CreateLuaBindings(lua);
@@ -494,9 +494,14 @@ void Game::Setup() {
   LuaSystemRegistry::bindAll(lua);
   engine_bootstrap::SetCommonLuaGlobals(lua, gameConfig, startup_mode_);
 
-  // Emit the EmmyLua API stub when requested (no-op otherwise). Runs once per Setup, after the
-  // full surface — globals, modules, system tables — is installed.
-  LuaApiManifest::MaybeDumpFromEnv(lua, preBindingGlobals);
+  // Emit the EmmyLua API stub once per Setup, after the full surface — globals, modules,
+  // system tables — is installed. OCTARINE_DUMP_LUA_API overrides the destination; otherwise
+  // editor sessions refresh <project>/types/octarine_api.lua so IDE autocomplete (LuaLS
+  // workspace.library) tracks the live engine surface. Player builds never write it.
+  if (!LuaApiManifest::MaybeDumpFromEnv(lua, preBindingGlobals) &&
+      (gameConfig.IsEditorMode() || startup_mode_ == "editor")) {
+    LuaApiManifest::WriteProjectStub(lua, preBindingGlobals, gameConfig.GetAssetPath());
+  }
 
   if (startup_mode_ == "editor") {
     gameConfig.SetIsEditorMode(true);

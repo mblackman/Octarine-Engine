@@ -39,19 +39,28 @@ class ComponentQuery final : public Query {
       return;  // Archetype set unchanged — skip the re-match.
     }
     ACCUMULATE_PROFILE_SCOPE("Query::Update (rematch)");
-    cached_generation_ = current_gen;
-    auto matching_archetypes = registry_->GetMatchingArchetypes(sorted_type_);
 
-    if (!excluded_.empty()) {
-      std::erase_if(matching_archetypes, [&](Archetype* arch) {
-        for (const ComponentID id : excluded_) {
-          if (arch->HasComponent(id)) return true;
+    if (cached_generation_ == UINT64_MAX) {
+      // First Update, or a filter changed (WithTag/WithoutTag/IncludeInactive): full rebuild.
+      matched_ = registry_->GetMatchingArchetypes(sorted_type_);
+      if (!excluded_.empty()) {
+        std::erase_if(matched_, [&](Archetype* arch) { return IsExcluded(*arch); });
+      }
+    } else if (!sorted_type_.empty()) {
+      // Incremental: archetypes are never destroyed, so the previous match list stays valid —
+      // only archetypes created since the cached generation need testing. This keeps a burst of
+      // new archetypes O(new) per query instead of a full re-scan of every archetype.
+      const auto& log = registry_->ArchetypeLog();
+      for (uint64_t gen = cached_generation_; gen < current_gen; ++gen) {
+        Archetype* arch = log[gen];
+        if (Registry::MatchesType(*arch, sorted_type_) && !IsExcluded(*arch)) {
+          matched_.push_back(arch);
         }
-        return false;
-      });
+      }
     }
 
-    archetype_query_ = ArchetypeQuery<TComponents...>(type_, matching_archetypes, include_inactive_);
+    cached_generation_ = current_gen;
+    archetype_query_ = ArchetypeQuery<TComponents...>(type_, matched_, include_inactive_);
   }
 
   // Add a tag/label as a query filter. Filtered tags are required for archetype matching but are
@@ -99,20 +108,11 @@ class ComponentQuery final : public Query {
   void ForEach(Func&& func) {
     if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...> ||
                   std::is_invocable_v<Func, ContextFacade&, TComponents&...>) {
-      // ContextFacade-based iteration doesn't easily support optional components yet (requires
-      // updating ContextFacade and IteratorImpl). For now, systems using Opt<T> must use the
-      // simpler void(Entity, T&, U*...) or void(T&, U*...) signatures.
-      static_assert(!(... || Internal::is_optional_v<TComponents>),
-                    "Optional components are not yet supported in ContextFacade-based ForEach.");
-      for (const auto iterable = CreateIterable(); auto&& context : iterable) {
-        if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...>) {
-          func(context, context.GetEntity(), context.template Component<TComponents>()...);
-        } else {
-          func(context, context.template Component<TComponents>()...);
-        }
-      }
+      ForEachWithFacade(std::forward<Func>(func));
     } else {
-      for (auto it = archetype_query_.begin(); it != archetype_query_.end(); ++it) {
+      // end() is hoisted out of the condition — constructing an Iterator per loop pass is a
+      // per-entity cost on the hot path.
+      for (auto it = archetype_query_.begin(), endIt = archetype_query_.end(); it != endIt; ++it) {
         std::apply(
             [&](Entity e, auto&&... comps) {
               if constexpr (std::is_invocable_v<Func, Entity, decltype(comps)...>) {
@@ -147,6 +147,26 @@ class ComponentQuery final : public Query {
   [[nodiscard]] size_t GetCount() const { return archetype_query_.GetTotalEntityCount(); }
 
  private:
+  // ContextFacade-based iteration doesn't easily support optional components yet (requires
+  // updating ContextFacade and IteratorImpl). For now, systems using Opt<T> must use the
+  // simpler void(Entity, T&, U*...) or void(T&, U*...) signatures.
+  template <typename Func>
+  void ForEachWithFacade(Func&& func) {
+    static_assert(!(... || Internal::is_optional_v<TComponents>),
+                  "Optional components are not yet supported in ContextFacade-based ForEach.");
+    for (const auto iterable = CreateIterable(); auto&& context : iterable) {
+      if constexpr (std::is_invocable_v<Func, ContextFacade&, Entity, TComponents&...>) {
+        func(context, context.GetEntity(), context.template Component<TComponents>()...);
+      } else {
+        func(context, context.template Component<TComponents>()...);
+      }
+    }
+  }
+
+  [[nodiscard]] bool IsExcluded(const Archetype& arch) const {
+    return std::ranges::any_of(excluded_, [&](const ComponentID id) { return arch.HasComponent(id); });
+  }
+
   void RebuildSorted() {
     sorted_type_.clear();
     // Only components NOT wrapped in Opt<T> drive matching.
@@ -181,10 +201,11 @@ class ComponentQuery final : public Query {
   }
 
   Registry* registry_;
-  ArchetypeType type_;            // user-pack order — used by ArchetypeQuery::Iterator
-  ArchetypeType sorted_type_;     // sorted ascending — used for archetype matching
-  ArchetypeType extra_required_;  // additional ComponentIDs required (e.g., tag filters)
-  ArchetypeType excluded_;        // ComponentIDs that disqualify an archetype
+  ArchetypeType type_;               // user-pack order — used by ArchetypeQuery::Iterator
+  ArchetypeType sorted_type_;        // sorted ascending — used for archetype matching
+  ArchetypeType extra_required_;     // additional ComponentIDs required (e.g., tag filters)
+  ArchetypeType excluded_;           // ComponentIDs that disqualify an archetype
+  std::vector<Archetype*> matched_;  // Persistent match list, appended to incrementally.
   ArchetypeQuery<TComponents...> archetype_query_;
   uint64_t cached_generation_{UINT64_MAX};  // Forces first Update to always match.
   bool include_inactive_ = false;

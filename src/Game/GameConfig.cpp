@@ -13,24 +13,25 @@
 #include <unordered_map>
 
 #include "General/Logger.h"
+#include "General/Utils.h"
 
 inline constexpr auto kConfigFileName = "config.ini";
 inline constexpr auto kPreferencesFileName = "preferences.ini";
 inline constexpr auto kWhiteSpaceSymbols = " \t\n\r\f\v";
 
-std::string TrimRight(const std::string &s) {
+std::string TrimRight(const std::string& s) {
   const size_t end = s.find_last_not_of(kWhiteSpaceSymbols);
   return end == std::string::npos ? "" : s.substr(0, end + 1);
 }
 
-inline auto ReadConfigFile(void *dst, const Uint64 dstLen) -> std::unordered_map<std::string, std::string> {
+inline auto ReadConfigFile(void* dst, const Uint64 dstLen) -> std::unordered_map<std::string, std::string> {
   if (dst == nullptr || dstLen == 0) {
     Logger::Warn("Attempted to read an empty or null config file buffer.");
     return {};
   }
 
   auto config = std::unordered_map<std::string, std::string>();
-  const auto content = std::string(static_cast<char *>(dst), dstLen);
+  const auto content = std::string(static_cast<char*>(dst), dstLen);
   if (content.empty()) {
     Logger::Warn("Config file content is empty after conversion.");
     return {};
@@ -65,7 +66,7 @@ inline auto ReadConfigFile(void *dst, const Uint64 dstLen) -> std::unordered_map
   return config;
 }
 
-bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
+bool GameConfig::LoadConfigFromFile(const std::string& assetPath) {
   const auto storage = SDL_OpenTitleStorage(assetPath.c_str(), 0);
 
   if (storage == nullptr) {
@@ -90,7 +91,7 @@ bool GameConfig::LoadConfigFromFile(const std::string &assetPath) {
     return false;
   }
 
-  void *dst = SDL_malloc(dstLen);
+  void* dst = SDL_malloc(dstLen);
   if (!dst) {
     Logger::Error("SDL_malloc failed for config buffer: " + std::string(SDL_GetError()));
     return false;
@@ -170,7 +171,7 @@ void GameConfig::LoadUserPreferences() {
   }
 }
 
-bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string> &settings) {
+bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string>& settings) {
   bool success = true;
 
   // LogLevel is parsed first so subsequent config-loading Logger::Info calls already honor it.
@@ -189,9 +190,9 @@ bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string> &
   return success;
 }
 
-const EngineOptions &GameConfig::GetEngineOptions() const { return engine_options_; }
+const EngineOptions& GameConfig::GetEngineOptions() const { return engine_options_; }
 
-EngineOptions &GameConfig::GetEngineOptions() { return engine_options_; }
+EngineOptions& GameConfig::GetEngineOptions() { return engine_options_; }
 
 std::string GameConfig::GetAssetPath() const {
   assert(has_loaded_config_);
@@ -217,12 +218,13 @@ int GameConfig::GetDefaultWidth() const {
   assert(has_loaded_config_);
   return default_width_;
 }
+
 int GameConfig::GetDefaultHeight() const {
   assert(has_loaded_config_);
   return default_height_;
 }
 
-void GameConfig::SetAssetPath(const std::string &assetPath) {
+void GameConfig::SetAssetPath(const std::string& assetPath) {
   if (assetPath.empty()) {
     Logger::Warn("Attempted to set empty asset path. Keeping current if any.");
     return;
@@ -231,7 +233,7 @@ void GameConfig::SetAssetPath(const std::string &assetPath) {
   Logger::Info("Asset path set to: " + asset_path_);
 }
 
-void GameConfig::SetGameTitle(const std::string &gameTitle) {
+void GameConfig::SetGameTitle(const std::string& gameTitle) {
   if (gameTitle.empty()) {
     Logger::Warn("Attempted to set empty game title. Keeping current if any.");
     return;
@@ -240,7 +242,7 @@ void GameConfig::SetGameTitle(const std::string &gameTitle) {
   Logger::Info("Game title set to: " + game_title_);
 }
 
-void GameConfig::SetStartupScript(const std::string &startupScript) {
+void GameConfig::SetStartupScript(const std::string& startupScript) {
   if (startupScript.empty()) {
     Logger::Warn("Attempted to set empty startup script. Keeping current if any.");
     return;
@@ -249,7 +251,7 @@ void GameConfig::SetStartupScript(const std::string &startupScript) {
   Logger::Info("Startup script set to: " + startup_script_);
 }
 
-void GameConfig::SetDefaultScaleMode(const std::string &defaultScaleMode) {
+void GameConfig::SetDefaultScaleMode(const std::string& defaultScaleMode) {
   if (defaultScaleMode.empty()) {
     default_scaling_mode_ = std::nullopt;
     Logger::Info("Default scaling mode set to not present (empty string provided).");
@@ -258,6 +260,7 @@ void GameConfig::SetDefaultScaleMode(const std::string &defaultScaleMode) {
     Logger::Info("Default scaling mode set to: " + *default_scaling_mode_);
   }
 }
+
 void GameConfig::SetDefaultWidth(const int defaultWidth) { default_width_ = defaultWidth; }
 void GameConfig::SetDefaultHeight(const int defaultHeight) { default_height_ = defaultHeight; }
 
@@ -271,7 +274,7 @@ void GameConfig::SetPerfOverlay(const bool enabled) {
   Logger::Info(std::string("Perf overlay ") + (enabled ? "enabled" : "disabled"));
 }
 
-void GameConfig::SetPerfOverlayCorner(const std::string &corner) {
+void GameConfig::SetPerfOverlayCorner(const std::string& corner) {
   if (corner == "top-left") {
     engine_options_.perfOverlayCorner = PerfOverlayCorner::TopLeft;
   } else if (corner == "top-right") {
@@ -288,17 +291,24 @@ void GameConfig::SetPerfOverlayCorner(const std::string &corner) {
   Logger::Info("Perf overlay corner: " + corner);
 }
 
-void GameConfig::SetPerfOverlayMetrics(const std::string &metrics) {
-  if (metrics == "fps") {
-    engine_options_.perfOverlayMetrics = PerfOverlayMetrics::Fps;
-  } else if (metrics == "frametime" || metrics == "frame-time" || metrics == "ms") {
-    engine_options_.perfOverlayMetrics = PerfOverlayMetrics::FrameTime;
-  } else if (metrics == "both") {
-    engine_options_.perfOverlayMetrics = PerfOverlayMetrics::Both;
-  } else {
-    Logger::Warn("Unknown PerfOverlayMetrics '" + metrics + "' (expected fps|frametime|both); keeping current.");
-    return;
+void GameConfig::SetPerfOverlayMetrics(const std::string& metrics) {
+  const auto parts = SplitString(metrics, ',');
+  PerfOverlayMetrics perfOverlayMetrics = {};
+
+  for (const auto& metric : parts) {
+    if (metric == "fps") {
+      perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::Fps;
+    } else if (metric == "frametime" || metric == "frame-time" || metric == "ms") {
+      perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::FrameTime;
+    } else if (metric == "all" || metric == "both") {
+      perfOverlayMetrics = PerfOverlayMetrics::All;
+    } else {
+      Logger::Warn("Unknown PerfOverlayMetrics '" + metric + "' (expected fps|frametime|all); keeping current.");
+      return;
+    }
   }
+
+  engine_options_.perfOverlayMetrics = perfOverlayMetrics;
   Logger::Info("Perf overlay metrics: " + metrics);
 }
 
@@ -310,7 +320,7 @@ void GameConfig::SetHotReloadPollSeconds(const float seconds) {
   engine_options_.hotReloadPollSeconds = seconds;
 }
 
-void GameConfig::SetLogLevel(const std::string &logLevel) {
+void GameConfig::SetLogLevel(const std::string& logLevel) {
   if (logLevel.empty()) return;
   Logger::SetLevel(logLevel);
   Logger::Info("Log level set to: " + logLevel);

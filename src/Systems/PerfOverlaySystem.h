@@ -4,7 +4,9 @@
 #include <SDL3_ttf/SDL_ttf.h>
 
 #include <array>
+#include <cstddef>
 #include <string>
+#include <vector>
 
 class Registry;
 class AssetManager;
@@ -16,7 +18,7 @@ class AssetManager;
 // threshold via SDL_SetTextureColorMod at draw time, so a color change never forces a re-raster.
 class PerfOverlaySystem {
  public:
-  PerfOverlaySystem() = default;
+  PerfOverlaySystem();
   PerfOverlaySystem(const PerfOverlaySystem&) = delete;
   PerfOverlaySystem& operator=(const PerfOverlaySystem&) = delete;
   PerfOverlaySystem(PerfOverlaySystem&&) = delete;
@@ -43,9 +45,21 @@ class PerfOverlaySystem {
   // nullptr (latched, no retry) if registration fails.
   TTF_Font* EnsureFont(AssetManager& assetManager);
 
-  static constexpr int kLineCount = 2;  // [0] FPS, [1] frame time (ms)
+  // Format + rasterize the FPS lines (current/avg/p95/p99) into slots 0-3 of lines_. Returns false
+  // if any raster fails.
+  bool UpdateFpsLines(TTF_Font* font, SDL_Renderer* sdlRenderer, float fps, float avgFps, float fps95, float fps99);
+
+  // Push an FPS sample into the fixed-size ring buffer backing the avg/p95/p99 readouts.
+  void RecordFpsSample(float fps);
+
+  static constexpr int kLineCount = 5;  // [0] FPS, [1] avg FPS, [2] p95 FPS, [3] p99 FPS, [4] frame time (ms)
   std::array<Line, kLineCount> lines_{};
   // The embedded debug font is registered lazily on first Draw. Latched so a registration failure
   // isn't retried (and re-logged) every frame.
   bool font_init_attempted_ = false;
+
+  // Ring buffer of recent per-frame FPS samples backing the avg/p95/p99 readouts.
+  static constexpr std::size_t kFpsBuffer = 1000;
+  std::vector<float> fps_metrics_;
+  std::size_t fps_metric_index_ = 0;
 };

@@ -68,21 +68,23 @@ class ArchetypeQuery {
     using Pointer = void;
     using DifferenceType = std::ptrdiff_t;
 
-    Iterator(ArchetypeType type, std::vector<Archetype*>::iterator archetype_it,
+    // Holds a pointer to the owning ArchetypeQuery's type_ — copying the vector here would
+    // heap-allocate on every begin()/end() construction, which sits on the per-frame hot path.
+    Iterator(const ArchetypeType& type, std::vector<Archetype*>::iterator archetype_it,
              std::vector<Archetype*>::iterator archetype_end_it, bool include_inactive = false)
-        : type_(std::move(type)),
+        : type_(&type),
           archetype_it_(std::move(archetype_it)),
           archetype_end_it_(std::move(archetype_end_it)),
           chunk_idx_(0),
           entity_idx_(0),
           current_entities_(nullptr),
           include_inactive_(include_inactive) {
-      assert(sizeof...(TComponents) == type_.size());
+      assert(sizeof...(TComponents) == type_->size());
       AdvanceToValid();
     }
 
     Reference operator*() const {
-      assert(sizeof...(TComponents) == type_.size());
+      assert(sizeof...(TComponents) == type_->size());
       return [&]<std::size_t... Is>(std::index_sequence<Is...>) {
         return Reference(current_entities_[entity_idx_], [&]() -> Internal::resolve_yield_t<TComponents> {
           auto* array = std::get<Is>(current_arrays_);
@@ -114,9 +116,9 @@ class ArchetypeQuery {
         return std::make_tuple([&]() -> Internal::resolve_pointer_t<TComponents> {
           using RawT = Internal::unwrap_opt_t<std::tuple_element_t<Is, std::tuple<TComponents...>>>;
           if constexpr (Internal::is_optional_v<std::tuple_element_t<Is, std::tuple<TComponents...>>>) {
-            if (!current_archetype->HasComponent(type_[Is])) return nullptr;
+            if (!current_archetype->HasComponent((*type_)[Is])) return nullptr;
           }
-          return current_archetype->template GetComponentArray<RawT>(chunk_idx_, type_[Is]);
+          return current_archetype->template GetComponentArray<RawT>(chunk_idx_, (*type_)[Is]);
         }()...);
       }(std::index_sequence_for<TComponents...>{});
       current_entities_ = current_archetype->chunks_[chunk_idx_].GetEntityArray();
@@ -146,7 +148,7 @@ class ArchetypeQuery {
       }
     }
 
-    ArchetypeType type_;
+    const ArchetypeType* type_;
     std::vector<Archetype*>::iterator archetype_it_;
     std::vector<Archetype*>::iterator archetype_end_it_;
     size_t chunk_idx_;
