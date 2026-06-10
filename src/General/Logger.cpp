@@ -16,6 +16,8 @@
 std::shared_ptr<spdlog::logger> Logger::lua_logger_;
 std::vector<std::string> Logger::history_;
 std::mutex Logger::history_mutex_;
+std::vector<Logger::ScriptError> Logger::script_errors_;
+std::uint64_t Logger::script_error_sequence_ = 0;
 
 namespace {
 
@@ -110,6 +112,13 @@ void Logger::ErrorLua(const std::string& message) {
   lua_logger_->error(message);
   std::lock_guard<std::mutex> lock(history_mutex_);
   history_.push_back("[Error] [Lua] " + message);
+  // Small ring, not full history: the toast only ever shows the tail, and capping here keeps a
+  // misbehaving per-frame error loop from growing memory.
+  constexpr size_t kMaxScriptErrors = 8;
+  script_errors_.push_back({++script_error_sequence_, message, std::chrono::steady_clock::now()});
+  if (script_errors_.size() > kMaxScriptErrors) {
+    script_errors_.erase(script_errors_.begin());
+  }
 }
 
 void Logger::WarnLua(const std::string& message) {
@@ -139,4 +148,9 @@ void Logger::ForEachHistory(const std::function<void(const std::string&)>& callb
 void Logger::ClearHistory() {
   std::lock_guard<std::mutex> lock(history_mutex_);
   history_.clear();
+}
+
+std::vector<Logger::ScriptError> Logger::RecentScriptErrors() {
+  std::lock_guard<std::mutex> lock(history_mutex_);
+  return script_errors_;
 }

@@ -32,5 +32,9 @@ class RenderDebugGUISystem {
  private:
   static void FPSWindow(float deltaTime);
   static void EntityInfoWindow(const Registry* registry);
+  // True while any recent script error is inside its toast window — used both to draw the toast
+  // and to keep the ImGui frame alive when nothing else would render it.
+  static bool HasActiveScriptErrorToast();
+  static void ScriptErrorToastWindow();
 };
 #endif
