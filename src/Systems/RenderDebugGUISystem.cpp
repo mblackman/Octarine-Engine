@@ -132,6 +132,9 @@ namespace {
 // How long one script error stays on screen. Each new error restarts the clock for itself only,
 // so a burst shows its tail and quiet errors age out individually.
 constexpr double kScriptErrorToastSeconds = 10.0;
+constexpr float kToastBgAlpha = 0.85f;
+constexpr float kToastWrapWidthPx = 420.0f;
+constexpr ImVec4 kToastHeaderColor{1.0f, 0.35f, 0.35f, 1.0f};
 
 bool IsToastFresh(const Logger::ScriptError& error) {
   const auto age =
@@ -159,16 +162,16 @@ void RenderDebugGUISystem::ScriptErrorToastWindow() {
   ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x - kMargin,
                                  viewport->WorkPos.y + viewport->WorkSize.y - kMargin),
                           ImGuiCond_Always, ImVec2(1.0f, 1.0f));
-  ImGui::SetNextWindowBgAlpha(0.85f);
+  ImGui::SetNextWindowBgAlpha(kToastBgAlpha);
   constexpr ImGuiWindowFlags kFlags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                       ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs |
                                       ImGuiWindowFlags_AlwaysAutoResize;
   ImGui::Begin("##script-error-toast", nullptr, kFlags);
-  ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.35f, 1.0f), "Script error%s (%d)", fresh.size() == 1 ? "" : "s",
+  ImGui::TextColored(kToastHeaderColor, "Script error%s (%d)", fresh.size() == 1 ? "" : "s",
                      static_cast<int>(fresh.size()));
   ImGui::Separator();
-  ImGui::PushTextWrapPos(420.0f);
+  ImGui::PushTextWrapPos(kToastWrapWidthPx);
   for (const auto* error : fresh) {
     ImGui::TextWrapped("%s", error->message.c_str());
   }
