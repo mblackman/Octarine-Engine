@@ -111,6 +111,27 @@ int main() {
     Check(RunLua(lua, "assert(not registry.has_health(without_health))"), "registry.has_health false for non-owner");
   }
 
+  std::cout << "[blam: single entity and table of entities]\n";
+  {
+    const Entity single = reg->CreateEntity();
+    lua["blam_single"] = single;
+    Check(RunLua(lua, "blam(blam_single)"), "Lua: blam(entity) call succeeds");
+    Check(!reg->IsAlive(single), "blam(entity) destroyed the entity");
+
+    const Entity first = reg->CreateEntity();
+    const Entity second = reg->CreateEntity();
+    const Entity survivor = reg->CreateEntity();
+    lua["blam_first"] = first;
+    lua["blam_second"] = second;
+    Check(RunLua(lua, "blam({ blam_first, blam_second })"), "Lua: blam(table) call succeeds");
+    Check(!reg->IsAlive(first), "blam(table) destroyed the first entity");
+    Check(!reg->IsAlive(second), "blam(table) destroyed the second entity");
+    Check(reg->IsAlive(survivor), "blam(table) left unrelated entities alone");
+
+    // Non-entity entries are skipped with an error log, not a Lua error.
+    Check(RunLua(lua, "blam({ 42, 'nope' })"), "Lua: blam(table) tolerates non-entity entries");
+  }
+
   std::cout << "[fromLua: defaults applied when fields omitted]\n";
   {
     // HealthComponent has no default-constructor (deleted); fromLua must synthesize one

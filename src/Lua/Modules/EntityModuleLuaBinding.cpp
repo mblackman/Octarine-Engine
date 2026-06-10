@@ -56,10 +56,22 @@ void SetEntitySpriteSrcRect(Registry* registry, const Entity entity, const float
   sprite.srcRect.x = srcRectX;
   sprite.srcRect.y = srcRectY;
 }
+
+void BlamEntities(Registry* registry, const sol::table& entities) {
+  for (const auto& [key, value] : entities) {
+    if (!value.is<Entity>()) {
+      Logger::Error("blam: table entry is not an entity; skipping.");
+      continue;
+    }
+    registry->BlamEntity(value.as<Entity>());
+  }
+}
 }  // namespace
 
 void LuaModuleBinding<EntityModule>::install(sol::state& lua, LuaBindingContext& ctx) {
-  lua.set_function("blam", [&ctx](const Entity entity) { ctx.GetRegistry()->BlamEntity(entity); });
+  lua.set_function("blam",
+                   sol::overload([&ctx](const Entity entity) { ctx.GetRegistry()->BlamEntity(entity); },
+                                 [&ctx](const sol::table& entities) { BlamEntities(ctx.GetRegistry(), entities); }));
   lua.set_function("get_name", [&ctx](const Entity entity) { return GetEntityName(ctx.GetRegistry(), entity); });
   lua.set_function("set_name", [&ctx](const Entity entity, const std::string& name) {
     SetEntityName(ctx.GetRegistry(), entity, name);

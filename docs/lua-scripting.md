@@ -117,7 +117,7 @@ These globals are shorthand for the most common reads and writes:
 | `set_name(entity, name)` | Sets the name |
 | `set_sprite_src_rect(entity, x, y)` | Sets the sprite source-rect origin |
 | `find_entity_by_name(name)` | Returns the entity ID, or `nil` |
-| `blam(entity)` | Destroys the entity |
+| `blam(entity_or_table)` | Destroys an entity, or every entity in a table |
 
 ### Other Lua globals
 
