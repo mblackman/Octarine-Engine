@@ -158,8 +158,10 @@ void PerfOverlaySystem::Draw(Registry& registry, SDL_Renderer* sdlRenderer, cons
   std::size_t count = 0;
   if (showFps) {
     const float avgFps = GetAverage(fps_metrics_);
-    const float fps95 = PerfUtils::GetPercentile(fps_metrics_, 0.95F);
-    const float fps99 = PerfUtils::GetPercentile(fps_metrics_, 0.99F);
+    // Percentile lows: "95P" is the FPS exceeded 95% of the time (5th percentile of the samples),
+    // matching the 1%/5% low convention of game perf overlays.
+    const float fps95 = PerfUtils::GetPercentile(fps_metrics_, 0.05F);
+    const float fps99 = PerfUtils::GetPercentile(fps_metrics_, 0.01F);
 
     char fpsBuf[kTextBufSize];
     char avgFpsBuf[kTextBufSize];
