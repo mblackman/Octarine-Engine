@@ -4,6 +4,7 @@
 #include <SDL3_mixer/SDL_mixer.h>
 
 #include <filesystem>
+#include <optional>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -99,8 +100,10 @@ void LuaModuleBinding<SceneModule>::install(sol::state& lua, LuaBindingContext& 
     Logger::Info("acquire_scene_assets: acquired " + std::to_string(acquired) + " asset(s).");
     return acquired;
   });
-  lua.set_function("load_entity", [&ctx](const sol::table& assetTable) {
-    LuaEntityLoader::LoadEntityFromLua(ctx.GetRegistry(), assetTable);
+  // Returns the root entity handle so scripts can track what they spawned, or nil when the
+  // table is invalid.
+  lua.set_function("load_entity", [&ctx](const sol::table& assetTable) -> std::optional<Entity> {
+    return LuaEntityLoader::LoadEntityFromLua(ctx.GetRegistry(), assetTable);
   });
   lua.set_function("clear_scene", [&ctx]() { ctx.StopScene(); });
   lua.set_function("load_scene", [&ctx](const std::string& path) { ctx.LoadScene(path); });

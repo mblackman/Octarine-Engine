@@ -111,6 +111,21 @@ int main() {
     Check(RunLua(lua, "assert(not registry.has_health(without_health))"), "registry.has_health false for non-owner");
   }
 
+  std::cout << "[load_entity: returns the root entity handle]\n";
+  {
+    Check(RunLua(lua,
+                 "spawned = load_entity({ name = 'HandleTest', components = { transform = { position = { x = 3, y = "
+                 "4 } } } })"),
+          "Lua: load_entity call succeeds");
+    Check(RunLua(lua, "assert(spawned ~= nil)"), "load_entity returned a non-nil handle");
+    Check(RunLua(lua, "assert(type(spawned:get_id()) == 'number')"), "handle exposes get_id()");
+    Check(RunLua(lua, "assert(registry.has_position(spawned))"), "handle works with registry accessors");
+
+    const Entity spawned = lua["spawned"].get<Entity>();
+    CheckEq(reg->GetComponent<PositionComponent>(spawned).value.x, 3.0F,
+            "handle resolves to the entity built from the table");
+  }
+
   std::cout << "[fromLua: defaults applied when fields omitted]\n";
   {
     // HealthComponent has no default-constructor (deleted); fromLua must synthesize one
