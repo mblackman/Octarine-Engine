@@ -71,8 +71,7 @@ struct RenderKey {
     constexpr int kBandShift = 28;
     constexpr int kTypeShift = 24;
     constexpr int kBlendShift = 21;
-    return (layer16 << kLayerShift) | (band20 << kBandShift) | (type4 << kTypeShift) | (blend3 << kBlendShift) |
-           hash21;
+    return (layer16 << kLayerShift) | (band20 << kBandShift) | (type4 << kTypeShift) | (blend3 << kBlendShift) | hash21;
   }
 
   // Kept for completeness; not used by Sort (radix sort uses sortKey directly).
