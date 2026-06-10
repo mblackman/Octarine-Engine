@@ -39,8 +39,7 @@ int main() {
 
   std::cout << "[sortkey] field precedence\n";
   {
-    Check(Key(1, 0.0f, SPRITE, nullptr) > Key(0, 1000000.0f, SPRITE, nullptr),
-          "layer outranks any depth difference");
+    Check(Key(1, 0.0f, SPRITE, nullptr) > Key(0, 1000000.0f, SPRITE, nullptr), "layer outranks any depth difference");
     Check(Key(0, 2.0f * Constants::kRenderBatchYBandPx, SPRITE, nullptr) > Key(0, 0.0f, SPRITE, nullptr),
           "deeper band sorts later within a layer");
     CheckEq(Key(0, 0.0f, SPRITE, nullptr), Key(0, Constants::kRenderBatchYBandPx - 1.0f, SPRITE, nullptr),

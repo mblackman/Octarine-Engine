@@ -7,14 +7,13 @@
 
 #include <SDL3/SDL.h>
 
-#include <sol/sol.hpp>
-
 #include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <optional>
+#include <sol/sol.hpp>
 #include <string>
 #include <vector>
 
@@ -166,8 +165,7 @@ int main() {
             "ReloadByPath of an untracked path reloads nothing");
 
     const std::vector<std::string> resident = manager.ResidentSourcePaths();
-    Check(std::find(resident.begin(), resident.end(),
-                    manager.GetCatalog().Find("swap")->fullPath) != resident.end(),
+    Check(std::find(resident.begin(), resident.end(), manager.GetCatalog().Find("swap")->fullPath) != resident.end(),
           "ResidentSourcePaths reports the resident texture's source file");
 
     manager.ReleaseAll({"swap", "swap"});
