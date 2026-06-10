@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "AssetManager/AssetManager.h"
+#include "Components/CameraComponents.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/SpriteComponent.h"
 #include "ECS/Query.h"

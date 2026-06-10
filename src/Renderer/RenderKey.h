@@ -66,7 +66,13 @@ struct RenderKey {
     const std::uint64_t hash21 = static_cast<std::uint64_t>((ptr >> 4) ^ (ptr >> 25)) & 0x1FFFFFu;
     const std::uint64_t blend3 = static_cast<std::uint64_t>(blendBits) & 0x7u;
 
-    return (layer16 << 48) | (band20 << 28) | (type4 << 24) | (blend3 << 21) | hash21;
+    // Field offsets of the packed layout documented at the top of this header.
+    constexpr int kLayerShift = 48;
+    constexpr int kBandShift = 28;
+    constexpr int kTypeShift = 24;
+    constexpr int kBlendShift = 21;
+    return (layer16 << kLayerShift) | (band20 << kBandShift) | (type4 << kTypeShift) | (blend3 << kBlendShift) |
+           hash21;
   }
 
   // Kept for completeness; not used by Sort (radix sort uses sortKey directly).

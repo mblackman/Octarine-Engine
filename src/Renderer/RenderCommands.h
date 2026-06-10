@@ -3,6 +3,7 @@
 #include <SDL3/SDL.h>
 
 #include "General/BlendMode.h"
+#include "General/Constants.h"
 
 namespace octarine {
 
@@ -33,7 +34,7 @@ struct SpriteCommand {
   SDL_FlipMode flip{};
   SDL_Texture* texture{};
   // Per-draw modulation: rgb tints (multiplies) the texture, alpha fades it. 255 = no-op.
-  SDL_Color colorMod{255, 255, 255, 255};
+  SDL_Color colorMod{Constants::kUint8Max, Constants::kUint8Max, Constants::kUint8Max, Constants::kUint8Max};
   SDL_BlendMode blendMode{SDL_BLENDMODE_BLEND};
 };
 
