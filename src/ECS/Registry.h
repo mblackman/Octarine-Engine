@@ -289,7 +289,7 @@ class Registry {
 
   // System Management
   template <typename... TArgs, typename Func>
-  std::decay_t<Func>& RegisterSystem(Func&& func) {
+  SystemHandle<std::decay_t<Func>> RegisterSystem(Func&& func) {
     using StoredFunc = std::decay_t<Func>;
     class SystemWrapper final : public ISystem {
      public:
@@ -319,8 +319,9 @@ class Registry {
 
     auto wrapper = std::make_unique<SystemWrapper>(this, std::forward<Func>(func));
     StoredFunc& ref = wrapper->GetFunc();
+    const SystemId id = systems_.size();
     systems_.push_back(std::move(wrapper));
-    return ref;
+    return SystemHandle<StoredFunc>(id, &ref);
   }
 
   // Parallel per-entity system. Same shape as RegisterSystem but the per-entity callback runs
@@ -330,7 +331,7 @@ class Registry {
   // responsible for thread-safety: expose an EntityCommandBuffer on your system to handle requests for registry state
   // changes so they resolve on the calling thread all at once.
   template <typename... TArgs, typename Func>
-  std::decay_t<Func>& RegisterParallelSystem(Func&& func) {
+  SystemHandle<std::decay_t<Func>> RegisterParallelSystem(Func&& func) {
     using StoredFunc = std::decay_t<Func>;
     static_assert(std::is_invocable_v<StoredFunc, Entity, float, TArgs&...> ||
                       std::is_invocable_v<StoredFunc, Entity, TArgs&...> ||
@@ -404,8 +405,9 @@ class Registry {
 
     auto wrapper = std::make_unique<ParallelSystemWrapper>(this, std::forward<Func>(func));
     StoredFunc& ref = wrapper->GetFunc();
+    const SystemId id = systems_.size();
     systems_.push_back(std::move(wrapper));
-    return ref;
+    return SystemHandle<StoredFunc>(id, &ref);
   }
 
   // Bulk system: wrapper invokes Func once per Update with the matching Iterable.
@@ -413,7 +415,7 @@ class Registry {
   // exposes Registry/DeltaTime and a sentinel Entity (Entity{}); per-entity component
   // access goes through iterating the Iterable.
   template <typename... TArgs, typename Func>
-  std::decay_t<Func>& RegisterBulkSystem(Func&& func) {
+  SystemHandle<std::decay_t<Func>> RegisterBulkSystem(Func&& func) {
     using StoredFunc = std::decay_t<Func>;
     class BulkSystemWrapper final : public ISystem {
      public:
@@ -442,8 +444,41 @@ class Registry {
 
     auto wrapper = std::make_unique<BulkSystemWrapper>(this, std::forward<Func>(func));
     StoredFunc& ref = wrapper->GetFunc();
+    const SystemId id = systems_.size();
     systems_.push_back(std::move(wrapper));
-    return ref;
+    return SystemHandle<StoredFunc>(id, &ref);
+  }
+
+  // Execution-order constraints between registered systems, declared after registration:
+  //   registry.Order(collision).After(transform);
+  //   registry.Order(producer).Before(consumer);
+  // Update topo-sorts (Kahn's algorithm) with registration order breaking ties, so systems
+  // without constraints keep exact registration order. A constraint cycle throws
+  // std::runtime_error naming the systems involved.
+  class OrderBuilder {
+   public:
+    OrderBuilder(Registry* registry, const SystemId id) : registry_(registry), id_(id) {}
+
+    template <typename T>
+    OrderBuilder& After(const SystemHandle<T>& other) {
+      registry_->AddOrderEdge(other.Id(), id_);
+      return *this;
+    }
+
+    template <typename T>
+    OrderBuilder& Before(const SystemHandle<T>& other) {
+      registry_->AddOrderEdge(id_, other.Id());
+      return *this;
+    }
+
+   private:
+    Registry* registry_;
+    SystemId id_;
+  };
+
+  template <typename T>
+  OrderBuilder Order(const SystemHandle<T>& handle) {
+    return OrderBuilder(this, handle.Id());
   }
 
   // Singleton components. Stored as std::shared_ptr<T> inside std::any so that
@@ -610,6 +645,12 @@ class Registry {
   Archetype* GetOrCreateArchetypeRemove(std::vector<ComponentID> componentIDs, ComponentID removeComponentId);
   Archetype* GetOrCreateArchetypeFromSet(std::vector<ComponentID> componentIDs);
 
+  // System-ordering graph (fed by Order().After()/.Before()). RebuildExecutionOrder runs Kahn's
+  // algorithm over the edges; the ready set is kept ordered by SystemId so unconstrained systems
+  // execute in registration order.
+  void AddOrderEdge(SystemId before, SystemId after);
+  void RebuildExecutionOrder();
+
   // Helper for CreateEntityWithBundle: index-pack expansion to dispatch each component to
   // Archetype::AddComponent at its corresponding location slot.
   template <typename Tuple, size_t N, size_t... Is>
@@ -624,6 +665,10 @@ class Registry {
   std::unordered_map<ArchetypeID, std::unique_ptr<Archetype>> archetypes_;
   std::unique_ptr<Archetype> root_archetype_;  // The root of the archetype graph. Empty signature.
   std::vector<std::unique_ptr<ISystem>> systems_;
+  // Ordering edges (before, after) between systems_ indices; consumed by RebuildExecutionOrder.
+  std::vector<std::pair<SystemId, SystemId>> system_order_edges_;
+  std::vector<SystemId> system_execution_order_;
+  bool system_order_dirty_ = false;
   // Singleton storage keyed by typeid(T).name() (string_view into static storage). Was
   // ComponentID-keyed via Component<T>(), but on Android NDK with -fvisibility=hidden, opaque-type
   // pointers like MIX_Mixer* get TU-local typeinfo; std::type_index in type_to_entity_ produces
