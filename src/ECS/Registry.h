@@ -615,6 +615,29 @@ class Registry {
 
   [[nodiscard]] std::vector<Entity> GetChildren(Entity parent) const;
 
+  // Allocation-free traversal of a parent's children — the per-frame alternative to
+  // GetChildren's vector-by-value. func receives each child as Entity.
+  template <typename F>
+  void ForEachChild(const Entity parent, F&& func) const {
+    const auto it = parent_to_children_.find(parent.id);
+    if (it == parent_to_children_.end()) return;
+    for (const EntityID id : it->second) {
+      func(Entity{id});
+    }
+  }
+
+  // Visit every hierarchy root: an entity that has children but no parent of its own.
+  // O(number of parents), independent of total entity count — lets TransformSystem seed its
+  // descent without scanning the whole world for parentless entities.
+  template <typename F>
+  void ForEachHierarchyRoot(F&& func) const {
+    for (const auto& [parentId, children] : parent_to_children_) {
+      if (!child_to_parent_.contains(parentId)) {
+        func(Entity{parentId});
+      }
+    }
+  }
+
   [[nodiscard]] float DeltaTime() const { return delta_time_; }
 
   // Returns true if any entity has relationship pairs (e.g. ChildOf hierarchy).

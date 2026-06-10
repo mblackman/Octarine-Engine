@@ -63,38 +63,44 @@ class TransformSystem {
     });
   }
 
-  // Slow path: walk top-down from roots. Rebuild the roots list every frame — caching by
-  // ArchetypeGeneration misses entities created in an existing archetype (e.g. pool factory
-  // growth that reuses a registered projectile archetype), leaving their globals stuck at (0,0).
+  // Hierarchy path, two phases. Phase 1 runs the parallel flat pass over every transform
+  // entity (global = local) — final for the non-hierarchy majority, and exactly what the old
+  // serial roots pass wrote for parentless entities. Phase 2 then re-composes only hierarchy
+  // members, seeded from the parent index rather than a full-world scan, so a small hierarchy
+  // no longer drags every entity onto a serial walk with per-entity hash lookups. No root
+  // caching across frames: entities created into an existing archetype (e.g. pool factory
+  // growth) are picked up because phase 1 iterates the live query every frame.
   void UpdateHierarchical(Registry* registry) {
     PROFILE_NAMED_SCOPE("TransformSystem: Slow");
     LogPathOnce("TransformSystem: SLOW path (hierarchy detected)");
 
+    UpdateFlat();
+
     std::stack<TransformUpdateJob> jobs;
-    SeedRoots(registry, jobs);
+    SeedRootJobs(registry, jobs);
     WalkDescendants(registry, jobs);
   }
 
-  // Iterate every entity; write each root's global directly from its local and queue its
-  // children for the descendants walk. Optional pointers come from the query's per-chunk
-  // cache so no per-entity HasComponent/GetComponent lookups happen here.
-  void SeedRoots(Registry* registry, std::stack<TransformUpdateJob>& jobs) const {
-    PROFILE_NAMED_SCOPE("TransformSystem: Slow (roots rebuild + walk start)");
-    optionalQuery_->ForEach([&](const Entity entity, GlobalTransformComponent& global, const PositionComponent* p,
-                                const ScaleComponent* s, const RotationComponent* r) {
-      if (registry->GetParent(entity).has_value()) return;
+  // Queue each root's children for the descendants walk. The parent state is the root's
+  // global, which phase 1 already resolved to its local. Roots without a
+  // GlobalTransformComponent contribute identity, so their children compose as their own
+  // locals — consistent with what the flat pass wrote for them.
+  void SeedRootJobs(const Registry* registry, std::stack<TransformUpdateJob>& jobs) const {
+    PROFILE_NAMED_SCOPE("TransformSystem: Slow (seed root jobs)");
+    registry->ForEachHierarchyRoot([&](const Entity root) {
+      glm::vec2 rootPos(0.0f, 0.0f);
+      glm::vec2 rootScale(1.0f, 1.0f);
+      double rootRot = 0.0;
 
-      const glm::vec2 localPos = p ? p->value : glm::vec2(0.0f, 0.0f);
-      const glm::vec2 localScale = s ? s->value : glm::vec2(1.0f, 1.0f);
-      const double localRot = r ? r->value : 0.0;
-
-      global.position = localPos;
-      global.scale = localScale;
-      global.rotation = localRot;
-
-      for (const auto& child : registry->GetChildren(entity)) {
-        jobs.push({child, localPos, localScale, localRot});
+      const auto [archetype, chunkIdx, indexInChunk] = registry->GetEntityLocation(root);
+      if (archetype && archetype->HasComponent(globalEntity_.GetId())) {
+        const auto* gArr = archetype->GetComponentArray<GlobalTransformComponent>(chunkIdx, globalEntity_.GetId());
+        rootPos = gArr[indexInChunk].position;
+        rootScale = gArr[indexInChunk].scale;
+        rootRot = gArr[indexInChunk].rotation;
       }
+
+      registry->ForEachChild(root, [&](const Entity child) { jobs.push({child, rootPos, rootScale, rootRot}); });
     });
   }
 
@@ -114,9 +120,8 @@ class TransformSystem {
 
       WriteGlobal(archetype, chunkIdx, indexInChunk, global);
 
-      for (const auto& child : registry->GetChildren(job.entity)) {
-        jobs.push({child, global.position, global.scale, global.rotation});
-      }
+      registry->ForEachChild(job.entity,
+                             [&](const Entity child) { jobs.push({child, global.position, global.scale, global.rotation}); });
     }
   }
 
