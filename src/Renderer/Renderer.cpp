@@ -80,11 +80,19 @@ void Renderer::DrawQueue(const RenderQueue& renderQueue, SDL_Renderer* renderer)
         const auto& cmd = key.payload.sprite;
         const SDL_FRect destRect = {cmd.destX, cmd.destY, cmd.destW, cmd.destH};
         const auto deg = static_cast<float>(cmd.rotation * (180.0 / 3.14159265358979323846));
+        // Modulation state lives on the shared SDL_Texture, so set it on every draw — the
+        // previous sprite using this texture may have left different values behind. Same-state
+        // sets are cheap (SDL just stores them; they apply at draw time).
+        SDL_SetTextureColorMod(cmd.texture, cmd.colorMod.r, cmd.colorMod.g, cmd.colorMod.b);
+        SDL_SetTextureAlphaMod(cmd.texture, cmd.colorMod.a);
+        SDL_SetTextureBlendMode(cmd.texture, cmd.blendMode);
         SDL_RenderTextureRotated(renderer, cmd.texture, &cmd.srcRect, &destRect, deg, &cmd.pivot, cmd.flip);
         break;
       }
       case SQUARE_PRIMITIVE: {
         const auto& cmd = key.payload.square;
+        // Applies to both the fill-rect and the SDL_RenderGeometry (untextured) path.
+        SDL_SetRenderDrawBlendMode(renderer, cmd.blendMode);
         if (cmd.rotation == 0.0) {
           SDL_SetRenderDrawColor(renderer, cmd.color.r, cmd.color.g, cmd.color.b, cmd.color.a);
           SDL_RenderFillRect(renderer, &cmd.destRect);
