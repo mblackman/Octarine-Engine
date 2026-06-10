@@ -127,6 +127,32 @@ bool PerfOverlaySystem::UpdateLine(Line& line, TTF_Font* font, SDL_Renderer* sdl
   return true;
 }
 
+// Rasterize the four FPS lines (current/avg/p95/p99) into slots 0-3. Returns false if any raster fails.
+bool PerfOverlaySystem::UpdateFpsLines(TTF_Font* font, SDL_Renderer* sdlRenderer, const float fps, const float avgFps,
+                                       const float fps95, const float fps99) {
+  char fpsBuf[kTextBufSize];
+  char avgFpsBuf[kTextBufSize];
+  char fpsBufP95[kTextBufSize];
+  char fpsBufP99[kTextBufSize];
+  std::snprintf(fpsBuf, sizeof(fpsBuf), "FPS %5.1f", static_cast<double>(fps));
+  std::snprintf(avgFpsBuf, sizeof(avgFpsBuf), "AVG FPS %5.1f", static_cast<double>(avgFps));
+  std::snprintf(fpsBufP95, sizeof(fpsBufP95), "95P FPS %5.1f", static_cast<double>(fps95));
+  std::snprintf(fpsBufP99, sizeof(fpsBufP99), "99P FPS %5.1f", static_cast<double>(fps99));
+
+  return UpdateLine(lines_[0], font, sdlRenderer, fpsBuf) && UpdateLine(lines_[1], font, sdlRenderer, avgFpsBuf) &&
+         UpdateLine(lines_[2], font, sdlRenderer, fpsBufP95) && UpdateLine(lines_[3], font, sdlRenderer, fpsBufP99);
+}
+
+void PerfOverlaySystem::RecordFpsSample(const float fps) {
+  // Ring buffer of recent FPS samples: fill first, then overwrite oldest.
+  if (fps_metrics_.size() < kFpsBuffer) {
+    fps_metrics_.push_back(fps);
+  } else {
+    fps_metrics_[fps_metric_index_] = fps;
+    fps_metric_index_ = (fps_metric_index_ + 1) % kFpsBuffer;
+  }
+}
+
 void PerfOverlaySystem::Draw(Registry& registry, SDL_Renderer* sdlRenderer, const float deltaTime) {
   if (sdlRenderer == nullptr) return;
   auto& assetManager = registry.Get<AssetManager>();
@@ -140,13 +166,7 @@ void PerfOverlaySystem::Draw(Registry& registry, SDL_Renderer* sdlRenderer, cons
   const float fps = deltaTime > 0.0F ? 1.0F / deltaTime : 0.0F;
   const float frameMs = deltaTime * 1000.0F;
 
-  // Ring buffer of recent FPS samples: fill first, then overwrite oldest.
-  if (fps_metrics_.size() < kFpsBuffer) {
-    fps_metrics_.push_back(fps);
-  } else {
-    fps_metrics_[fps_metric_index_] = fps;
-    fps_metric_index_ = (fps_metric_index_ + 1) % kFpsBuffer;
-  }
+  RecordFpsSample(fps);
 
   // Gather the active lines in draw order (slots 0-3 = FPS/avg/p95/p99, slot 4 = frame time).
   // Inactive metrics keep their cached texture but aren't rastered/drawn this frame.
@@ -163,19 +183,7 @@ void PerfOverlaySystem::Draw(Registry& registry, SDL_Renderer* sdlRenderer, cons
     const float fps95 = PerfUtils::GetPercentile(fps_metrics_, 0.05F);
     const float fps99 = PerfUtils::GetPercentile(fps_metrics_, 0.01F);
 
-    char fpsBuf[kTextBufSize];
-    char avgFpsBuf[kTextBufSize];
-    char fpsBufP95[kTextBufSize];
-    char fpsBufP99[kTextBufSize];
-    std::snprintf(fpsBuf, sizeof(fpsBuf), "FPS %5.1f", static_cast<double>(fps));
-    std::snprintf(avgFpsBuf, sizeof(avgFpsBuf), "AVG FPS %5.1f", static_cast<double>(avgFps));
-    std::snprintf(fpsBufP95, sizeof(fpsBufP95), "95P FPS %5.1f", static_cast<double>(fps95));
-    std::snprintf(fpsBufP99, sizeof(fpsBufP99), "99P FPS %5.1f", static_cast<double>(fps99));
-
-    if (!UpdateLine(lines_[0], font, sdlRenderer, fpsBuf)) return;
-    if (!UpdateLine(lines_[1], font, sdlRenderer, avgFpsBuf)) return;
-    if (!UpdateLine(lines_[2], font, sdlRenderer, fpsBufP95)) return;
-    if (!UpdateLine(lines_[3], font, sdlRenderer, fpsBufP99)) return;
+    if (!UpdateFpsLines(font, sdlRenderer, fps, avgFps, fps95, fps99)) return;
     active[count++] = {0, FpsColor(fps)};
     active[count++] = {1, FpsColor(avgFps)};
     active[count++] = {2, FpsColor(fps95)};

@@ -45,6 +45,13 @@ class PerfOverlaySystem {
   // nullptr (latched, no retry) if registration fails.
   TTF_Font* EnsureFont(AssetManager& assetManager);
 
+  // Format + rasterize the FPS lines (current/avg/p95/p99) into slots 0-3 of lines_. Returns false
+  // if any raster fails.
+  bool UpdateFpsLines(TTF_Font* font, SDL_Renderer* sdlRenderer, float fps, float avgFps, float fps95, float fps99);
+
+  // Push an FPS sample into the fixed-size ring buffer backing the avg/p95/p99 readouts.
+  void RecordFpsSample(float fps);
+
   static constexpr int kLineCount = 5;  // [0] FPS, [1] avg FPS, [2] p95 FPS, [3] p99 FPS, [4] frame time (ms)
   std::array<Line, kLineCount> lines_{};
   // The embedded debug font is registered lazily on first Draw. Latched so a registration failure
