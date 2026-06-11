@@ -113,13 +113,15 @@ runs:
           chmod +x "$bin"
         fi
 
-        echo "engine-path=$dest" >> "$GITHUB_OUTPUT"
-        echo "engine-bin=$bin"   >> "$GITHUB_OUTPUT"
-        # Add to PATH. On Windows, GITHUB_PATH must be a Windows-style path so PowerShell
-        # steps can resolve the binary — write it through cygpath when available.
+        # On Windows, GITHUB_PATH and step outputs must use Windows-style paths so
+        # PowerShell steps can resolve them — convert through cygpath when available.
         if command -v cygpath &>/dev/null; then
+          echo "engine-path=$(cygpath -w "$dest")" >> "$GITHUB_OUTPUT"
+          echo "engine-bin=$(cygpath -w "$bin")"   >> "$GITHUB_OUTPUT"
           echo "$(cygpath -w "$dest")" >> "$GITHUB_PATH"
         else
+          echo "engine-path=$dest" >> "$GITHUB_OUTPUT"
+          echo "engine-bin=$bin"   >> "$GITHUB_OUTPUT"
           echo "$dest" >> "$GITHUB_PATH"
         fi
         echo "Engine installed at $bin"
