@@ -105,6 +105,16 @@ rb.velocity.x = 150
 rb.velocity.y = 0
 ```
 
+### Entity hierarchy
+
+| Function | Description |
+|---|---|
+| `registry.get_parent(entity)` | Returns the parent entity, or `nil` if the entity has no parent |
+| `registry.set_parent(child, parent)` | Parents `child` under `parent`, detaching it from any previous parent. Self-parenting and cycles are rejected with an error log. |
+
+Parented entities inherit their parent's transform — see
+[`docs/ecs-architecture.md`](ecs-architecture.md) for how the hierarchy is resolved.
+
 ### Convenience helpers
 
 These globals are shorthand for the most common reads and writes:

@@ -1749,6 +1749,8 @@ function registry.has_text_label(...) end
 
 function registry.has_ui_button(...) end
 
+function registry.set_parent(...) end
+
 
 function reload_scene(...) end
 
