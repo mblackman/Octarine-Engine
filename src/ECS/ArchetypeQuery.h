@@ -185,10 +185,27 @@ class ArchetypeQuery {
   // memory region, so concurrent processing is safe for per-entity writes.
   // Func signature: void (Entity, TComponents&...) or void (TComponents&...).
   // IMPORTANT: Func must not access a shared mutable state (e.g. no pushing to shared vectors).
+  //
+  // serialBelowEntities: when the matched entity count is below this, run on the calling thread
+  // instead of dispatching to the pool. Dispatch costs ~13.5 us regardless of N; for a trivial
+  // per-entity body serial wins below ~16k entities, while heavy bodies cross over at a few
+  // hundred — so the cutoff is per call site. Default 0 keeps the current always-parallel path.
   template <typename Func>
-  void ParallelForEach(Func&& func) {
+  void ParallelForEach(Func&& func, const size_t serialBelowEntities = 0) {
     const auto work = CollectChunkWork();
     if (work.empty()) return;
+
+    if (serialBelowEntities > 0) {
+      size_t totalEntities = 0;
+      for (const auto& w : work) {
+        totalEntities += w.entityCount;
+      }
+      if (totalEntities < serialBelowEntities) {
+        PROFILE_COUNTER_ADD("ParallelForEach: SerialGated", 1);
+        ProcessChunks(work, 0, work.size(), func);
+        return;
+      }
+    }
 
     const size_t num_batches = std::min(work.size(), ThreadPool::Instance().Size());
     PROFILE_COUNTER_ADD("ParallelForEach: Batches", static_cast<long long>(num_batches));

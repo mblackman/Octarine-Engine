@@ -134,9 +134,11 @@ class ComponentQuery final : public Query {
   // Parallel version of ForEach — distributes chunks across CPU threads.
   // Only safe for funcs that do per-entity independent writes (no shared mutable state).
   // Func signature: void (Entity, TComponents&...) or void(TComponents&...).
+  // serialBelowEntities: run serially on the calling thread when fewer entities match —
+  // see ArchetypeQuery::ParallelForEach for the cost model.
   template <typename Func>
-  void ParallelForEach(Func&& func) {
-    archetype_query_.ParallelForEach(std::forward<Func>(func));
+  void ParallelForEach(Func&& func, const size_t serialBelowEntities = 0) {
+    archetype_query_.ParallelForEach(std::forward<Func>(func), serialBelowEntities);
   }
 
   template <typename Func>
