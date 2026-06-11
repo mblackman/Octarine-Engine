@@ -78,14 +78,17 @@ void BlamEntities(Registry* registry, const sol::table& entities) {
       Logger::Error("blam: table entry is not an entity; skipping.");
       continue;
     }
-    registry->BlamEntity(value.as<Entity>());
+    registry->QueueBlamEntity(value.as<Entity>());
   }
 }
 }  // namespace
 
 void LuaModuleBinding<EntityModule>::install(sol::state& lua, LuaBindingContext& ctx) {
+  // Destruction is deferred: blam queues the entity and Registry::Update destroys the whole
+  // batch after all systems have run, so a script can never pull a chunk out from under an
+  // iterating system mid-frame.
   lua.set_function("blam",
-                   sol::overload([&ctx](const Entity entity) { ctx.GetRegistry()->BlamEntity(entity); },
+                   sol::overload([&ctx](const Entity entity) { ctx.GetRegistry()->QueueBlamEntity(entity); },
                                  [&ctx](const sol::table& entities) { BlamEntities(ctx.GetRegistry(), entities); }));
   lua.set_function("get_name", [&ctx](const Entity entity) { return GetEntityName(ctx.GetRegistry(), entity); });
   lua.set_function("set_name", [&ctx](const Entity entity, const std::string& name) {

@@ -100,6 +100,9 @@ void Registry::FlushPendingDestruction() {
   pending_despawn_ids_.clear();
 
   for (const Entity entity : pending) {
+    // A queued parent's cascade may have already destroyed a queued child; that's not a
+    // stale-handle bug, so skip silently instead of letting BlamEntity warn.
+    if (!IsAlive(entity)) continue;
     BlamEntity(entity);
   }
 
