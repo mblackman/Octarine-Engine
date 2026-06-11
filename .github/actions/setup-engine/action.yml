@@ -20,6 +20,13 @@ inputs:
       Engine version to download, without the 'v' prefix (e.g. '0.1.0').
       Must match an existing GitHub Release tag (v{engine-version}).
     required: true
+  flavor:
+    description: >
+      Which SDK variant to download: 'editor' (full editor UI, for local game
+      development) or 'player' (no editor/ImGui, lighter binary for game
+      packaging CI and end-user builds).
+    required: false
+    default: 'editor'
   token:
     description: >
       GitHub token used to authenticate the release download. Defaults to the
@@ -63,7 +70,7 @@ runs:
         version="${{ inputs.engine-version }}"
         os="${{ steps.platform.outputs.os }}"
         ext="${{ steps.platform.outputs.ext }}"
-        filename="OctarineEngine-${version}-${os}.${ext}"
+        filename="OctarineEngine-${version}-${os}-${{ inputs.flavor }}.${ext}"
         echo "Downloading $filename from release v${version}"
         # Use $RUNNER_TEMP (env var) instead of ${{ runner.temp }} so Git Bash on Windows
         # sees a POSIX-style path rather than a raw Windows path literal.
@@ -79,7 +86,7 @@ runs:
         version="${{ inputs.engine-version }}"
         os="${{ steps.platform.outputs.os }}"
         ext="${{ steps.platform.outputs.ext }}"
-        filename="OctarineEngine-${version}-${os}.${ext}"
+        filename="OctarineEngine-${version}-${os}-${{ inputs.flavor }}.${ext}"
 
         # Resolve install directory
         if [ -n "${{ inputs.install-dir }}" ]; then
