@@ -109,6 +109,7 @@ class GameConfig {
   void SetDefaultScaleMode(const std::string& defaultScaleMode);
   void SetDefaultWidth(int defaultWidth);
   void SetDefaultHeight(int defaultHeight);
+  void SetFpsTarget(int fpsTarget);
   void SetHotReloadEnabled(bool enabled);
   void SetHotReloadPollSeconds(float seconds);
   void SetPerfOverlay(bool enabled);

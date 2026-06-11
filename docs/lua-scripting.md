@@ -38,6 +38,7 @@ StartupScript=game.lua
 DefaultWindowWidth=1280
 DefaultWindowHeight=720
 DefaultScalingMode=nearest # 'nearest' or 'linear'
+FpsTarget=60               # frame-rate cap; 0 = uncapped (default 60)
 ```
 
 ---

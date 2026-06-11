@@ -66,7 +66,9 @@ class FrameLoop {
   Renderer* renderer_;
   EngineRuntime* runtime_;
   sol::state& lua_;
-  Uint64 milliseconds_previous_frame_ = 0;
+  // Nanosecond ticks (SDL_GetTicksNS) — ms granularity rounds sub-millisecond frames to a zero
+  // deltaTime when FpsTarget=0 lets the loop run uncapped.
+  Uint64 nanoseconds_previous_frame_ = 0;
   std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent>> collider_query_;
   EventBus::SubscriptionHandle key_input_subscription_;
   // Built-in (no-ImGui) FPS + frame-time overlay. Holds a small per-line text-texture cache, so it

@@ -18,7 +18,6 @@
 #include "Events/MouseWheelEvent.h"
 #include "Game/Game.h"
 #include "Game/GameConfig.h"
-#include "General/Constants.h"
 #include "General/Logger.h"
 #include "General/PerfUtils.h"
 #include "Lua/HotReload/ScriptHotReload.h"
@@ -78,7 +77,7 @@ void FrameLoop::SubscribeToEvents() {
   key_input_subscription_ = event_bus_->SubscribeEvent<FrameLoop, KeyInputEvent>(this, &FrameLoop::OnKeyInputEvent);
 }
 
-void FrameLoop::Begin() { milliseconds_previous_frame_ = SDL_GetTicks(); }
+void FrameLoop::Begin() { nanoseconds_previous_frame_ = SDL_GetTicksNS(); }
 
 void FrameLoop::ProcessInput() {
   PROFILE_NAMED_SCOPE("Game::ProcessInput");
@@ -295,18 +294,22 @@ void FrameLoop::Render(const float deltaTime) {
 
 float FrameLoop::WaitTime() {
   PROFILE_NAMED_SCOPE("Game::WaitTime");
-  const Uint64 elapsedTime = SDL_GetTicks() - milliseconds_previous_frame_;
-  if (elapsedTime < Constants::kMillisecondsPerFrame) {
-    const Uint32 timeToWait = Constants::kMillisecondsPerFrame - static_cast<Uint32>(elapsedTime);
-    SDL_Delay(timeToWait);
+  const int fpsTarget = registry_->Get<GameConfig>().GetEngineOptions().fpsTarget;
+  if (fpsTarget > 0) {
+    const Uint64 nsPerFrame = SDL_NS_PER_SECOND / static_cast<Uint64>(fpsTarget);
+    const Uint64 elapsedTime = SDL_GetTicksNS() - nanoseconds_previous_frame_;
+    if (elapsedTime < nsPerFrame) {
+      SDL_DelayNS(nsPerFrame - elapsedTime);
+    }
   }
 
   // Calculate delta time
-  const auto intermediate = static_cast<double>(SDL_GetTicks() - milliseconds_previous_frame_) /
-                            static_cast<double>(Constants::kMillisecondsPerSecond);
+  const Uint64 now = SDL_GetTicksNS();
+  const auto intermediate =
+      static_cast<double>(now - nanoseconds_previous_frame_) / static_cast<double>(SDL_NS_PER_SECOND);
   const auto deltaTime = static_cast<float>(intermediate);
 
-  milliseconds_previous_frame_ = SDL_GetTicks();
+  nanoseconds_previous_frame_ = now;
 
   return deltaTime;
 }

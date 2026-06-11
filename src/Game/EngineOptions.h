@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "General/Constants.h"
+
 // Screen anchor for the built-in perf overlay. config.ini: PerfOverlayCorner=top-left|top-right|
 // bottom-left|bottom-right.
 enum class PerfOverlayCorner : std::uint8_t { TopLeft, TopRight, BottomLeft, BottomRight };
@@ -21,6 +23,9 @@ inline PerfOverlayMetrics operator|(PerfOverlayMetrics lhs, PerfOverlayMetrics r
 }
 
 struct EngineOptions {
+  // Frame-rate cap enforced by FrameLoop::WaitTime. config.ini: FpsTarget= (0 = uncapped — the
+  // loop runs as fast as it can and deltaTime carries the real elapsed time).
+  int fpsTarget = Constants::kFps;
   bool showDebugGUI = false;
   bool drawColliders = false;
   bool showFpsCounter = true;

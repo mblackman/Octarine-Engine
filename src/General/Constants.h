@@ -2,9 +2,8 @@
 #include <SDL3/SDL_stdinc.h>
 
 namespace Constants {
-static constexpr int kMillisecondsPerSecond = 1000;
+// Default frame-rate cap (EngineOptions::fpsTarget); config.ini FpsTarget= overrides, 0 = uncapped.
 static constexpr int kFps = 60;
-static constexpr int kMillisecondsPerFrame = kMillisecondsPerSecond / kFps;
 static constexpr float kTwo = 2.0f;
 static constexpr Uint8 kUint8Max = 255;
 static constexpr int kDefaultWindowWidth = 1280;
