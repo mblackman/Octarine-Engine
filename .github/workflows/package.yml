@@ -236,11 +236,11 @@ jobs:
           path: ${{ matrix.pkg_glob }}
           if-no-files-found: error
 
-  # Build standalone editor-release binaries (no game project bundled) for use as SDK artifacts
-  # in game repo CI. Only runs on v* tag pushes — sdk builds are validated implicitly by build.yml
-  # running editor-release on every PR/push; here we just add artifact collection + archiving.
+  # Build standalone SDK binaries (no game project bundled) for both editor-release (full editor
+  # UI, for game development) and player-release (no editor/ImGui, for game packaging CI).
+  # Only runs on v* tag pushes — both presets are validated by build.yml on every PR/push.
   sdk:
-    name: SDK binary — ${{ matrix.platform }}
+    name: SDK ${{ matrix.flavor }} — ${{ matrix.platform }}
     runs-on: ${{ matrix.os }}
     if: startsWith(github.ref, 'refs/tags/v')
     strategy:
@@ -250,12 +250,27 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             preset: editor-release
+            flavor: editor
+          - os: ubuntu-latest
+            platform: linux
+            preset: player-release
+            flavor: player
           - os: windows-latest
             platform: windows
             preset: editor-release
+            flavor: editor
+          - os: windows-latest
+            platform: windows
+            preset: player-release
+            flavor: player
           - os: macos-latest
             platform: macos
             preset: editor-release
+            flavor: editor
+          - os: macos-latest
+            platform: macos
+            preset: player-release
+            flavor: player
 
     steps:
       - name: Checkout engine
@@ -317,14 +332,14 @@ jobs:
       - name: Upload SDK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OctarineEngine-sdk-${{ matrix.platform }}
+          name: OctarineEngine-sdk-${{ matrix.platform }}-${{ matrix.flavor }}
           path: OctarineEngine-sdk.*
           if-no-files-found: error
 
-  # Create the GitHub Release and attach all platform assets. Runs only on v* tag pushes after
-  # both the game package matrix and the SDK binary matrix complete. Game packages (CPack, engine +
-  # example game) are uploaded as OctarineEngine-example-* for reference/demo use; SDK binaries
-  # (standalone editor build, no game project) are uploaded as OctarineEngine-* for game CI use.
+  # Create the GitHub Release and attach SDK binaries. Runs only on v* tag pushes after all sdk
+  # legs complete. The `package` job (CPack game packages) still runs as a CI packaging-regression
+  # gate but its artifacts are not uploaded to the engine release — game projects publish their
+  # own releases from the example workflow pattern.
   publish:
     name: Publish GitHub Release
     needs: [package, sdk]
@@ -334,24 +349,6 @@ jobs:
       contents: write
 
     steps:
-      - name: Download game packages
-        uses: actions/download-artifact@v4
-        with:
-          pattern: OctarineEngine-linux
-          path: release-assets/packages/linux/
-
-      - name: Download game packages (windows)
-        uses: actions/download-artifact@v4
-        with:
-          pattern: OctarineEngine-windows
-          path: release-assets/packages/windows/
-
-      - name: Download game packages (macos)
-        uses: actions/download-artifact@v4
-        with:
-          pattern: OctarineEngine-macos
-          path: release-assets/packages/macos/
-
       - name: Download SDK binaries
         uses: actions/download-artifact@v4
         with:
@@ -365,23 +362,14 @@ jobs:
           set -e
           version="${GITHUB_REF#refs/tags/v}"
 
-          # SDK binaries → OctarineEngine-{version}-{platform}.{ext}
+          # SDK artifacts are named OctarineEngine-sdk-{platform}-{flavor}; files inside are
+          # OctarineEngine-sdk.tar.gz or OctarineEngine-sdk.zip.
+          # Rename → OctarineEngine-{version}-{platform}-{flavor}.{ext}
           for dir in release-assets/sdk/OctarineEngine-sdk-*/; do
-            platform=$(basename "$dir" | sed 's/^OctarineEngine-sdk-//')
+            suffix=$(basename "$dir" | sed 's/^OctarineEngine-sdk-//')   # e.g. linux-editor
             src=$(ls "$dir" | head -n 1)
             case "$src" in *.tar.gz) ext=tar.gz ;; *.zip) ext=zip ;; esac
-            cp "$dir/$src" "OctarineEngine-${version}-${platform}.${ext}"
-          done
-
-          # Game packages → OctarineEngine-example-{version}-{platform}.{ext}
-          # download-artifact@v4 places each artifact's files in a subdirectory named after the
-          # artifact (e.g. release-assets/packages/linux/OctarineEngine-linux/<file>).
-          for platform in linux windows macos; do
-            dir="release-assets/packages/${platform}/OctarineEngine-${platform}/"
-            [ -d "$dir" ] || continue
-            src=$(ls "$dir" | head -n 1)
-            case "$src" in *.tar.gz) ext=tar.gz ;; *.zip) ext=zip ;; *.dmg) ext=dmg ;; esac
-            cp "$dir/$src" "OctarineEngine-example-${version}-${platform}.${ext}"
+            cp "$dir/$src" "OctarineEngine-${version}-${suffix}.${ext}"
           done
 
           echo "--- staged release assets ---"
@@ -393,7 +381,6 @@ jobs:
         shell: bash
         run: |
           version="${GITHUB_REF#refs/tags/v}"
-          # Collect all staged assets (sdk + example packages)
           assets=()
           for f in OctarineEngine-*; do
             [ -f "$f" ] && assets+=("$f")
