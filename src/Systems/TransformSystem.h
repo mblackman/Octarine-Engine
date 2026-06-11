@@ -50,17 +50,24 @@ class TransformSystem {
     globalEntity_ = registry->Component<GlobalTransformComponent>();
   }
 
+  // The per-entity body is a handful of copies, so thread-pool dispatch (~13.5 us fixed) only
+  // pays for itself near the measured serial/parallel crossover of ~16k entities. Half that,
+  // to stay parallel where the win is real and serial where dispatch dominates.
+  static constexpr size_t kFlatSerialBelowEntities = 8192;
+
   // Fast path: no ChildOf hierarchy live. Unrelated relationship pairs do not disable it.
   // Each entity's global is its local (identity for missing slots), in a single parallel pass.
   void UpdateFlat() {
     PROFILE_NAMED_SCOPE("TransformSystem: Fast");
     LogPathOnce("TransformSystem: FAST path (no hierarchy)");
-    optionalQuery_->ParallelForEach([](GlobalTransformComponent& global, const PositionComponent* p,
-                                       const ScaleComponent* s, const RotationComponent* r) {
-      global.position = p ? p->value : glm::vec2(0.0f, 0.0f);
-      global.scale = s ? s->value : glm::vec2(1.0f, 1.0f);
-      global.rotation = r ? r->value : 0.0;
-    });
+    optionalQuery_->ParallelForEach(
+        [](GlobalTransformComponent& global, const PositionComponent* p, const ScaleComponent* s,
+           const RotationComponent* r) {
+          global.position = p ? p->value : glm::vec2(0.0f, 0.0f);
+          global.scale = s ? s->value : glm::vec2(1.0f, 1.0f);
+          global.rotation = r ? r->value : 0.0;
+        },
+        kFlatSerialBelowEntities);
   }
 
   // Hierarchy path, two phases. Phase 1 runs the parallel flat pass over every transform
