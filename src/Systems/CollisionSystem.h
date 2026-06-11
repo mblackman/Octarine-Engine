@@ -92,8 +92,8 @@ struct Partitions {
 class CollisionSystem {
  public:
   void operator()(const ContextFacade& ctx, const Iterable& /*iter*/) {
-    PROFILE_NAMED_SCOPE("Collision System Update");
-
+    // No scope timer here: Registry::Update already times this span as "CollisionSystem";
+    // a second name for the same span double-counts on the benchmark dashboard.
     auto* registry = ctx.GetRegistry();
     auto* eventBus = registry->Get<EngineContext>().eventBus;
 
