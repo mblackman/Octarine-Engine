@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdio>
 #include <string>
+#include <utility>
 
 #include "AssetManager/AssetManager.h"
 #include "ECS/Registry.h"
@@ -13,6 +14,7 @@
 #include "General/Fonts/Roboto_Medium.h"
 #include "General/Logger.h"
 #include "General/PerfUtils.h"
+#include "General/SystemMemory.h"
 #include "General/Utils.h"
 
 namespace {
@@ -21,13 +23,20 @@ namespace {
 constexpr char kDebugFontId[] = "__octarine_perf_overlay";
 constexpr float kDebugFontSize = 16.0F;
 
-constexpr float kMargin = 8.0F;   // inset of the text block from the chosen corner
-constexpr float kPadding = 6.0F;  // background panel inset around the text block
-constexpr float kLineGap = 2.0F;  // vertical gap between lines
+constexpr float kMargin = 8.0F;                        // inset of the text block from the chosen corner
+constexpr float kPadding = 6.0F;                       // background panel inset around the text block
+constexpr float kLineGap = 2.0F;                       // vertical gap between rows
+constexpr float kColGap = 14.0F;                       // minimum gap between the label column and the value column
+constexpr float kSepPad = 3.0F;                        // vertical padding above/below a section separator hairline
+constexpr float kSepBlockH = (2.0F * kSepPad) + 1.0F;  // total height a separator adds to the block
 
-constexpr int kTextBufSize = 32;                // per-line snprintf scratch
+constexpr int kTextBufSize = 32;               // per-line snprintf scratch
+constexpr float kMemoryRefreshSeconds = 0.5F;  // resident-memory poll cadence (it's a syscall)
+constexpr double kBytesPerMb = 1024.0 * 1024.0;
 constexpr Uint8 kBgAlpha = 150;                 // translucency of the background panel
-constexpr Uint8 kWhite = Constants::kUint8Max;  // labels are rastered white, then tinted at draw time
+constexpr Uint8 kBorderAlpha = 60;              // translucency of the panel border
+constexpr Uint8 kSepAlpha = 50;                 // translucency of section separator hairlines
+constexpr Uint8 kWhite = Constants::kUint8Max;  // text is rastered white, then tinted at draw time
 
 // FPS color thresholds: at or above green stays green, above yellow stays yellow, else red.
 constexpr float kFpsGreenThreshold = 55.0F;
@@ -36,28 +45,27 @@ constexpr float kFpsYellowThreshold = 30.0F;
 constexpr float kFrameMsGreenThreshold = 18.0F;
 constexpr float kFrameMsYellowThreshold = 33.0F;
 
-struct Rgb {
-  Uint8 r;
-  Uint8 g;
-  Uint8 b;
-};
-
-constexpr Rgb kGreen{60, 200, 90};
-constexpr Rgb kYellow{230, 200, 50};
-constexpr Rgb kRed{220, 70, 60};
-
 struct Vec2 {
   float x;
   float y;
 };
+}  // namespace
 
-Rgb FpsColor(const float fps) {
+// Static row-tint palette. Labels stay dim so the colored values carry the signal.
+namespace {
+constexpr PerfOverlaySystem::Rgb kGreen{60, 200, 90};
+constexpr PerfOverlaySystem::Rgb kYellow{230, 200, 50};
+constexpr PerfOverlaySystem::Rgb kRed{220, 70, 60};
+constexpr PerfOverlaySystem::Rgb kNeutral{225, 228, 230};  // values with no good/bad threshold
+constexpr PerfOverlaySystem::Rgb kLabelTint{170, 175, 180};
+
+PerfOverlaySystem::Rgb FpsColor(const float fps) {
   if (fps >= kFpsGreenThreshold) return kGreen;
   if (fps >= kFpsYellowThreshold) return kYellow;
   return kRed;
 }
 
-Rgb FrameMsColor(const float ms) {
+PerfOverlaySystem::Rgb FrameMsColor(const float ms) {
   if (ms <= kFrameMsGreenThreshold) return kGreen;
   if (ms <= kFrameMsYellowThreshold) return kYellow;
   return kRed;
@@ -87,11 +95,15 @@ Vec2 BlockOrigin(const PerfOverlayCorner corner, SDL_Renderer* sdlRenderer, cons
 }
 }  // namespace
 
-PerfOverlaySystem::PerfOverlaySystem() { fps_metrics_.reserve(kFpsBuffer); }
+PerfOverlaySystem::PerfOverlaySystem() {
+  fps_samples_.reserve(kSampleBuffer);
+  ms_samples_.reserve(kSampleBuffer);
+}
 
 PerfOverlaySystem::~PerfOverlaySystem() {
-  for (auto& line : lines_) {
-    if (line.texture != nullptr) SDL_DestroyTexture(line.texture);
+  for (auto& row : rows_) {
+    if (row.label.texture != nullptr) SDL_DestroyTexture(row.label.texture);
+    if (row.value.texture != nullptr) SDL_DestroyTexture(row.value.texture);
   }
 }
 
@@ -127,29 +139,75 @@ bool PerfOverlaySystem::UpdateLine(Line& line, TTF_Font* font, SDL_Renderer* sdl
   return true;
 }
 
-// Rasterize the four FPS lines (current/avg/p95/p99) into slots 0-3. Returns false if any raster fails.
-bool PerfOverlaySystem::UpdateFpsLines(TTF_Font* font, SDL_Renderer* sdlRenderer, const float fps, const float avgFps,
-                                       const float fps95, const float fps99) {
-  char fpsBuf[kTextBufSize];
-  char avgFpsBuf[kTextBufSize];
-  char fpsBufP95[kTextBufSize];
-  char fpsBufP99[kTextBufSize];
-  std::snprintf(fpsBuf, sizeof(fpsBuf), "FPS %5.1f", static_cast<double>(fps));
-  std::snprintf(avgFpsBuf, sizeof(avgFpsBuf), "AVG FPS %5.1f", static_cast<double>(avgFps));
-  std::snprintf(fpsBufP95, sizeof(fpsBufP95), "95P FPS %5.1f", static_cast<double>(fps95));
-  std::snprintf(fpsBufP99, sizeof(fpsBufP99), "99P FPS %5.1f", static_cast<double>(fps99));
-
-  return UpdateLine(lines_[0], font, sdlRenderer, fpsBuf) && UpdateLine(lines_[1], font, sdlRenderer, avgFpsBuf) &&
-         UpdateLine(lines_[2], font, sdlRenderer, fpsBufP95) && UpdateLine(lines_[3], font, sdlRenderer, fpsBufP99);
+bool PerfOverlaySystem::UpdateRow(const std::size_t slot, TTF_Font* font, SDL_Renderer* sdlRenderer, const char* label,
+                                  const char* value) {
+  Row& row = rows_[slot];
+  return UpdateLine(row.label, font, sdlRenderer, label) && UpdateLine(row.value, font, sdlRenderer, value);
 }
 
-void PerfOverlaySystem::RecordFpsSample(const float fps) {
-  // Ring buffer of recent FPS samples: fill first, then overwrite oldest.
-  if (fps_metrics_.size() < kFpsBuffer) {
-    fps_metrics_.push_back(fps);
+bool PerfOverlaySystem::AppendFpsRows(TTF_Font* font, SDL_Renderer* sdlRenderer, const float fps,
+                                      std::array<ActiveRow, kRowCount>& active, std::size_t& count) {
+  // Percentile lows: "P95" is the FPS exceeded 95% of the time (5th percentile of the samples),
+  // matching the 1%/5% low convention of game perf overlays.
+  const std::array<std::pair<const char*, float>, 5> entries{{{"FPS", fps},
+                                                              {"AVG", GetAverage(fps_samples_)},
+                                                              {"P50", PerfUtils::GetPercentile(fps_samples_, 0.5F)},
+                                                              {"P95", PerfUtils::GetPercentile(fps_samples_, 0.05F)},
+                                                              {"P99", PerfUtils::GetPercentile(fps_samples_, 0.01F)}}};
+  char buf[kTextBufSize];
+  for (std::size_t i = 0; i < entries.size(); ++i) {
+    std::snprintf(buf, sizeof(buf), "%.1f", static_cast<double>(entries[i].second));
+    if (!UpdateRow(kSlotFpsBase + i, font, sdlRenderer, entries[i].first, buf)) return false;
+    active[count++] = {kSlotFpsBase + i, kSectionFps, FpsColor(entries[i].second)};
+  }
+  return true;
+}
+
+bool PerfOverlaySystem::AppendFrameRows(TTF_Font* font, SDL_Renderer* sdlRenderer, const float frameMs,
+                                        std::array<ActiveRow, kRowCount>& active, std::size_t& count) {
+  // Percentile high: "P95" is the frame time 95% of frames stay under.
+  const std::array<std::pair<const char*, float>, 3> entries{
+      {{"FRAME", frameMs}, {"AVG", GetAverage(ms_samples_)}, {"P95", PerfUtils::GetPercentile(ms_samples_, 0.95F)}}};
+  char buf[kTextBufSize];
+  for (std::size_t i = 0; i < entries.size(); ++i) {
+    std::snprintf(buf, sizeof(buf), "%.2f ms", static_cast<double>(entries[i].second));
+    if (!UpdateRow(kSlotFrameBase + i, font, sdlRenderer, entries[i].first, buf)) return false;
+    active[count++] = {kSlotFrameBase + i, kSectionFrame, FrameMsColor(entries[i].second)};
+  }
+  return true;
+}
+
+bool PerfOverlaySystem::AppendWorldRows(TTF_Font* font, SDL_Renderer* sdlRenderer, Registry& registry,
+                                        const EngineOptions& options, const float deltaTime,
+                                        std::array<ActiveRow, kRowCount>& active, std::size_t& count) {
+  char buf[kTextBufSize];
+  if (HasFlag(options.perfOverlayMetrics, PerfOverlayMetrics::Entities)) {
+    std::snprintf(buf, sizeof(buf), "%llu", static_cast<unsigned long long>(registry.GetUserEntityCount()));
+    if (!UpdateRow(kSlotEntities, font, sdlRenderer, "ENTITIES", buf)) return false;
+    active[count++] = {kSlotEntities, kSectionWorld, kNeutral};
+  }
+  if (HasFlag(options.perfOverlayMetrics, PerfOverlayMetrics::Memory)) {
+    memory_refresh_timer_ -= deltaTime;
+    if (memory_refresh_timer_ <= 0.0F) {
+      resident_bytes_ = SystemMemory::GetResidentBytes();
+      memory_refresh_timer_ = kMemoryRefreshSeconds;
+    }
+    std::snprintf(buf, sizeof(buf), "%.1f MB", static_cast<double>(resident_bytes_) / kBytesPerMb);
+    if (!UpdateRow(kSlotMemory, font, sdlRenderer, "MEMORY", buf)) return false;
+    active[count++] = {kSlotMemory, kSectionWorld, kNeutral};
+  }
+  return true;
+}
+
+void PerfOverlaySystem::RecordSample(const float fps, const float frameMs) {
+  // Paired ring buffers of recent samples: fill first, then overwrite oldest.
+  if (fps_samples_.size() < kSampleBuffer) {
+    fps_samples_.push_back(fps);
+    ms_samples_.push_back(frameMs);
   } else {
-    fps_metrics_[fps_metric_index_] = fps;
-    fps_metric_index_ = (fps_metric_index_ + 1) % kFpsBuffer;
+    fps_samples_[sample_index_] = fps;
+    ms_samples_[sample_index_] = frameMs;
+    sample_index_ = (sample_index_ + 1) % kSampleBuffer;
   }
 }
 
@@ -160,67 +218,67 @@ void PerfOverlaySystem::Draw(Registry& registry, SDL_Renderer* sdlRenderer, cons
   if (font == nullptr) return;
 
   const auto& options = registry.Get<GameConfig>().GetEngineOptions();
-  const bool showFps = HasFlag(options.perfOverlayMetrics, PerfOverlayMetrics::Fps);
-  const bool showMs = HasFlag(options.perfOverlayMetrics, PerfOverlayMetrics::FrameTime);
-
   const float fps = deltaTime > 0.0F ? 1.0F / deltaTime : 0.0F;
   const float frameMs = deltaTime * 1000.0F;
+  RecordSample(fps, frameMs);
 
-  RecordFpsSample(fps);
-
-  // Gather the active lines in draw order (slots 0-3 = FPS/avg/p95/p99, slot 4 = frame time).
-  // Inactive metrics keep their cached texture but aren't rastered/drawn this frame.
-  struct ActiveLine {
-    std::size_t slot;
-    Rgb color;
-  };
-  std::array<ActiveLine, kLineCount> active{};
+  // Gather the active rows in draw order. Inactive metrics keep their cached textures but aren't
+  // rastered/drawn this frame. Bail (draw nothing) if any raster fails.
+  std::array<ActiveRow, kRowCount> active{};
   std::size_t count = 0;
-  if (showFps) {
-    const float avgFps = GetAverage(fps_metrics_);
-    // Percentile lows: "95P" is the FPS exceeded 95% of the time (5th percentile of the samples),
-    // matching the 1%/5% low convention of game perf overlays.
-    const float fps95 = PerfUtils::GetPercentile(fps_metrics_, 0.05F);
-    const float fps99 = PerfUtils::GetPercentile(fps_metrics_, 0.01F);
-
-    if (!UpdateFpsLines(font, sdlRenderer, fps, avgFps, fps95, fps99)) return;
-    active[count++] = {0, FpsColor(fps)};
-    active[count++] = {1, FpsColor(avgFps)};
-    active[count++] = {2, FpsColor(fps95)};
-    active[count++] = {3, FpsColor(fps99)};
-  }
-  if (showMs) {
-    char msBuf[kTextBufSize];
-    std::snprintf(msBuf, sizeof(msBuf), "%5.2f ms", static_cast<double>(frameMs));
-    if (!UpdateLine(lines_[4], font, sdlRenderer, msBuf)) return;
-    active[count++] = {4, FrameMsColor(frameMs)};
-  }
+  if (HasFlag(options.perfOverlayMetrics, PerfOverlayMetrics::Fps) &&
+      !AppendFpsRows(font, sdlRenderer, fps, active, count))
+    return;
+  if (HasFlag(options.perfOverlayMetrics, PerfOverlayMetrics::FrameTime) &&
+      !AppendFrameRows(font, sdlRenderer, frameMs, active, count))
+    return;
+  if (!AppendWorldRows(font, sdlRenderer, registry, options, deltaTime, active, count)) return;
   if (count == 0) return;
 
-  float blockW = 0.0F;
+  // Measure: the block is two columns (widest label + widest value), rows stacked with a hairline
+  // between sections. Right-aligning the value textures gives exact column alignment regardless of
+  // glyph widths.
+  float labelW = 0.0F;
+  float valueW = 0.0F;
   float blockH = 0.0F;
   for (std::size_t i = 0; i < count; ++i) {
-    const Line& line = lines_[active[i].slot];
-    blockW = std::max(blockW, line.width);
-    blockH += line.height + kLineGap;
+    const Row& row = rows_[active[i].slot];
+    labelW = std::max(labelW, row.label.width);
+    valueW = std::max(valueW, row.value.width);
+    blockH += std::max(row.label.height, row.value.height) + kLineGap;
+    if (i > 0 && active[i].section != active[i - 1].section) blockH += kSepBlockH;
   }
-  blockH -= kLineGap;  // no trailing gap after the last line
+  blockH -= kLineGap;  // no trailing gap after the last row
+  const float blockW = labelW + kColGap + valueW;
 
   // Anchor the block to the configured corner of the current render target (the scene texture).
   const Vec2 origin = BlockOrigin(options.perfOverlayCorner, sdlRenderer, blockW, blockH);
 
-  // Translucent background panel behind the text for legibility over any scene.
+  // Translucent background panel + subtle border behind the text for legibility over any scene.
   SDL_SetRenderDrawBlendMode(sdlRenderer, SDL_BLENDMODE_BLEND);
-  SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, kBgAlpha);
   const SDL_FRect bg{origin.x - kPadding, origin.y - kPadding, blockW + (2.0F * kPadding), blockH + (2.0F * kPadding)};
+  SDL_SetRenderDrawColor(sdlRenderer, 0, 0, 0, kBgAlpha);
   SDL_RenderFillRect(sdlRenderer, &bg);
+  SDL_SetRenderDrawColor(sdlRenderer, kWhite, kWhite, kWhite, kBorderAlpha);
+  SDL_RenderRect(sdlRenderer, &bg);
 
   float y = origin.y;
   for (std::size_t i = 0; i < count; ++i) {
-    Line& line = lines_[active[i].slot];
-    SDL_SetTextureColorMod(line.texture, active[i].color.r, active[i].color.g, active[i].color.b);
-    const SDL_FRect dst{origin.x, y, line.width, line.height};
-    SDL_RenderTexture(sdlRenderer, line.texture, nullptr, &dst);
-    y += line.height + kLineGap;
+    if (i > 0 && active[i].section != active[i - 1].section) {
+      const SDL_FRect sep{origin.x, y + kSepPad, blockW, 1.0F};
+      SDL_SetRenderDrawColor(sdlRenderer, kWhite, kWhite, kWhite, kSepAlpha);
+      SDL_RenderFillRect(sdlRenderer, &sep);
+      y += kSepBlockH;
+    }
+    Row& row = rows_[active[i].slot];
+    SDL_SetTextureColorMod(row.label.texture, kLabelTint.r, kLabelTint.g, kLabelTint.b);
+    const SDL_FRect labelDst{origin.x, y, row.label.width, row.label.height};
+    SDL_RenderTexture(sdlRenderer, row.label.texture, nullptr, &labelDst);
+
+    SDL_SetTextureColorMod(row.value.texture, active[i].color.r, active[i].color.g, active[i].color.b);
+    const SDL_FRect valueDst{origin.x + blockW - row.value.width, y, row.value.width, row.value.height};
+    SDL_RenderTexture(sdlRenderer, row.value.texture, nullptr, &valueDst);
+
+    y += std::max(row.label.height, row.value.height) + kLineGap;
   }
 }

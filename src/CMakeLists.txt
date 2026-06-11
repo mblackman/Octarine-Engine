@@ -23,6 +23,7 @@
 set(OCTARINE_CORE_SOURCES
         General/Logger.cpp
         General/FileWatcher.cpp
+        General/SystemMemory.cpp
         ECS/Registry.cpp
         Game/GameConfig.cpp
         Deploy/Adb.cpp

@@ -1806,6 +1806,8 @@ function stop_scene(...) end
 text_label_component = {}
 
 
+function toggle_perf_overlay(...) end
+
 ---@class ui
 ui = {}
 
@@ -1818,7 +1820,6 @@ function ui.flex(...) end
 
 ---@class ui_anchor_component
 ui_anchor_component = {}
-
 
 ---@class ui_button_component
 ui_button_component = {}

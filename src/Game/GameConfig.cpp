@@ -300,10 +300,15 @@ void GameConfig::SetPerfOverlayMetrics(const std::string& metrics) {
       perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::Fps;
     } else if (metric == "frametime" || metric == "frame-time" || metric == "ms") {
       perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::FrameTime;
+    } else if (metric == "entities") {
+      perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::Entities;
+    } else if (metric == "memory" || metric == "mem") {
+      perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::Memory;
     } else if (metric == "all" || metric == "both") {
       perfOverlayMetrics = PerfOverlayMetrics::All;
     } else {
-      Logger::Warn("Unknown PerfOverlayMetrics '" + metric + "' (expected fps|frametime|all); keeping current.");
+      Logger::Warn("Unknown PerfOverlayMetrics '" + metric +
+                   "' (expected fps|frametime|entities|memory|all); keeping current.");
       return;
     }
   }

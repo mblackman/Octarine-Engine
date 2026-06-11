@@ -34,7 +34,7 @@
     {
       "name": "Game",
       "binding_header": "src/Lua/Modules/GameModuleLuaBinding.h",
-      "globals": ["fire_projectile", "get_camera_position", "get_game_map_dimensions", "quit_game", "set_game_map_dimensions", "set_perf_overlay"]
+      "globals": ["fire_projectile", "get_camera_position", "get_game_map_dimensions", "quit_game", "set_game_map_dimensions", "set_perf_overlay", "toggle_perf_overlay"]
     },
     {
       "name": "UI",

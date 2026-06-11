@@ -7,8 +7,14 @@
 enum class PerfOverlayCorner : std::uint8_t { TopLeft, TopRight, BottomLeft, BottomRight };
 
 // Which metrics the perf overlay draws. config.ini: PerfOverlayMetrics takes a comma-separated
-// list of fps|frametime, or all ("both" accepted as a legacy alias).
-enum class PerfOverlayMetrics : std::uint8_t { Fps = 1 << 0, FrameTime = 1 << 1, All = Fps | FrameTime };
+// list of fps|frametime|entities|memory, or all ("both" accepted as a legacy alias).
+enum class PerfOverlayMetrics : std::uint8_t {
+  Fps = 1 << 0,
+  FrameTime = 1 << 1,
+  Entities = 1 << 2,
+  Memory = 1 << 3,
+  All = Fps | FrameTime | Entities | Memory
+};
 
 inline PerfOverlayMetrics operator|(PerfOverlayMetrics lhs, PerfOverlayMetrics rhs) {
   return static_cast<PerfOverlayMetrics>(static_cast<std::uint8_t>(lhs) | static_cast<std::uint8_t>(rhs));
@@ -25,7 +31,7 @@ struct EngineOptions {
   bool showPerfOverlay = false;
   // Placement + content of the perf overlay (config.ini only: PerfOverlayCorner=, PerfOverlayMetrics=).
   PerfOverlayCorner perfOverlayCorner = PerfOverlayCorner::TopLeft;
-  PerfOverlayMetrics perfOverlayMetrics = PerfOverlayMetrics::Fps | PerfOverlayMetrics::FrameTime;
+  PerfOverlayMetrics perfOverlayMetrics = PerfOverlayMetrics::All;
   bool showImGuiDemoWindow = false;
   bool logInputEvents = false;
   bool audioEnabled = true;
