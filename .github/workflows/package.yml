@@ -305,6 +305,9 @@ jobs:
       # Stage the binary (+ any runtime dylibs/DLLs for dynamic triplets) into a flat directory
       # and pack it. Linux/macOS default vcpkg triplets are static so the lib glob hits nothing;
       # on Windows DLLs are always copied beside the exe by vcpkg app-local.
+      # The binary output name varies by preset (OctarineEngine for editor, OctarineEngine-player
+      # for player); find it dynamically and always archive it as "OctarineEngine" so consumers
+      # can invoke it by a consistent name regardless of flavor.
       - name: Archive SDK binary (Linux / macOS)
         if: matrix.platform != 'windows'
         shell: bash
@@ -312,7 +315,9 @@ jobs:
           bin_dir="build/${{ matrix.preset }}/bin/release"
           staging="_sdk_staging"
           mkdir -p "$staging"
-          cp "$bin_dir/OctarineEngine" "$staging/"
+          bin=$(find "$bin_dir" -maxdepth 1 -type f -name "OctarineEngine*" ! -name "*.so*" ! -name "*.dylib" | head -n 1)
+          [ -n "$bin" ] || { echo "ERROR: engine binary not found in $bin_dir"; ls -la "$bin_dir"; exit 1; }
+          cp "$bin" "$staging/OctarineEngine"
           for f in "$bin_dir"/*.so* "$bin_dir"/*.dylib; do
             [ -f "$f" ] && cp "$f" "$staging/" || true
           done
@@ -325,7 +330,9 @@ jobs:
           $binDir = "build\${{ matrix.preset }}\bin\release"
           $staging = "_sdk_staging"
           New-Item -ItemType Directory -Force -Path $staging | Out-Null
-          Copy-Item "$binDir\OctarineEngine.exe" "$staging\"
+          $bin = Get-ChildItem "$binDir\OctarineEngine*.exe" | Select-Object -First 1
+          if (-not $bin) { Write-Error "Engine binary not found in $binDir"; exit 1 }
+          Copy-Item $bin.FullName "$staging\OctarineEngine.exe"
           Get-ChildItem "$binDir\*.dll" -ErrorAction SilentlyContinue | Copy-Item -Destination "$staging\"
           Compress-Archive -Path "$staging\*" -DestinationPath "OctarineEngine-sdk.zip" -Force
 
