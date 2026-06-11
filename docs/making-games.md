@@ -24,7 +24,8 @@ it alongside this guide whenever an example would help.
 10. [Audio](#10-audio)
 11. [Camera](#11-camera)
 12. [Using the Editor](#12-using-the-editor)
-13. [Further Reading](#13-further-reading)
+13. [Game CI](#13-game-ci)
+14. [Further Reading](#14-further-reading)
 
 ---
 
@@ -32,29 +33,31 @@ it alongside this guide whenever an example would help.
 
 Before writing game code you need a built copy of the engine.
 
-### Option A — Download a pre-built binary (recommended)
+### Option A — Download a versioned release (recommended)
 
-CI builds the engine for Windows, macOS, and Linux on every push to `main`.
-Download the artifact for your platform from the
-[Actions tab](https://github.com/mblackman/Octarine-Engine/actions) on GitHub:
+Pre-built engine binaries are published as assets on every
+[GitHub Release](https://github.com/mblackman/Octarine-Engine/releases).
 
-1. Open the latest successful **Build** workflow run.
-2. Scroll to **Artifacts** at the bottom.
-3. Download `OctarineEngine-<platform>-editor-release` for day-to-day development
-   or `OctarineEngine-<platform>-player-release` for a runtime-only build with no
-   editor tools.
-4. Unzip and run the binary directly — no install step required.
+1. Open the release matching your target engine version (e.g. `v0.1.0`).
+2. Download the SDK binary for your platform:
 
-Available artifact names:
-
-| Artifact | Contents |
+| Asset | Platform |
 |---|---|
-| `OctarineEngine-windows-editor-release` | Windows editor build |
-| `OctarineEngine-windows-player-release` | Windows player-only build |
-| `OctarineEngine-macos-editor-release` | macOS editor build |
-| `OctarineEngine-macos-player-release` | macOS player-only build |
-| `OctarineEngine-linux-editor-release` | Linux editor build |
-| `OctarineEngine-linux-player-release` | Linux player-only build |
+| `OctarineEngine-{version}-linux.tar.gz` | Linux x64 |
+| `OctarineEngine-{version}-windows.zip` | Windows x64 |
+| `OctarineEngine-{version}-macos.tar.gz` | macOS (arm64) |
+
+3. Extract the archive and run the binary directly — no install step required:
+
+```bash
+# Linux / macOS
+tar -xzf OctarineEngine-0.1.0-linux.tar.gz
+./OctarineEngine path/to/MyGame
+
+# Windows (PowerShell)
+Expand-Archive OctarineEngine-0.1.0-windows.zip
+.\OctarineEngine.exe path/to/MyGame
+```
 
 ### Option B — Build from source
 
@@ -111,6 +114,8 @@ script — organise the rest however suits your project.
 
 ## 3. Configuration
 
+### `config.ini` — runtime window settings
+
 `config.ini` lives at the project root and controls window setup:
 
 ```ini
@@ -125,6 +130,39 @@ DefaultScalingMode=nearest      # 'nearest' for pixel art, 'linear' for smooth
 
 `StartupScript` is the first Lua file that runs. Everything else — scenes,
 assets, entities — is loaded from there.
+
+### `project.ini` — packaging and release identity
+
+`project.ini` is the single source of truth for your game's release identity.
+It is read by the engine's CMake packaging helper, Android Gradle build, and
+the engine version check. The format is flat `key = value` (no sections).
+
+```ini
+name          = My Awesome Game
+package_id    = com.studio.myawesomegame    # reverse-DNS, required for shipping
+version_name  = 1.0.0                       # semver displayed in stores / About
+version_code  = 1                           # monotonic integer for store updates
+vendor        = My Studio
+description   = A short description for store listings.
+icon          = images/icon.png             # source PNG for icon generation
+engine_version = 0.1.0                     # engine version this project targets
+```
+
+| Key | Required for shipping | Notes |
+|---|---|---|
+| `name` | Yes | Display name |
+| `package_id` | Yes | Reverse-DNS (e.g. `com.studio.mygame`) |
+| `version_name` | Yes | SemVer string |
+| `version_code` | No | Monotonic int; defaults to 1 |
+| `vendor` | No | Studio / publisher name |
+| `description` | No | One-line store summary |
+| `icon` | No | Source image for icon generation |
+| `engine_version` | No | Declared engine version; checked at package time |
+
+The `engine_version` field is used by the `setup-engine` action in game CI (see
+[Game CI](#game-ci)) and checked at CMake configure time — a mismatch emits a
+warning so you know when a game project is being built against a newer or older
+engine than intended.
 
 ---
 
@@ -405,7 +443,68 @@ reference and keyboard shortcuts.
 
 ---
 
-## 13. Further Reading
+## 13. Game CI
+
+The `setup-engine` composite action downloads the right SDK binary for the
+current runner platform and adds it to `PATH`. Use it in game repo workflows to
+bake assets or run the game headlessly without building the engine from source.
+
+### Basic usage
+
+```yaml
+# .github/workflows/ci.yml (in your game repo)
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mblackman/Octarine-Engine/.github/actions/setup-engine@v0.1.0
+        with:
+          engine-version: '0.1.0'   # pin to the version in project.ini
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Bake the asset manifest (validates all asset references)
+      - run: OctarineEngine . -m bake
+```
+
+### Pinning the engine version
+
+Declare the engine version in your `project.ini` so it is visible alongside
+your other identity metadata:
+
+```ini
+engine_version = 0.1.0
+```
+
+When you package the game (`cmake --preset ship-release ...`) the engine
+compares this value against its own version at configure time and warns if
+they differ, making version drift visible before it reaches CI.
+
+### Available outputs
+
+| Output | Description |
+|---|---|
+| `engine-path` | Directory containing the engine binary |
+| `engine-bin` | Full path to the `OctarineEngine` binary |
+
+### Multi-platform matrix
+
+```yaml
+strategy:
+  matrix:
+    os: [ubuntu-latest, windows-latest, macos-latest]
+runs-on: ${{ matrix.os }}
+steps:
+  - uses: mblackman/Octarine-Engine/.github/actions/setup-engine@v0.1.0
+    with:
+      engine-version: '0.1.0'
+  - run: OctarineEngine . -m bake
+```
+
+---
+
+## 14. Further Reading
 
 ### Engine documentation
 
