@@ -132,6 +132,35 @@ int main() {
     Check(RunLua(lua, "blam({ 42, 'nope' })"), "Lua: blam(table) tolerates non-entity entries");
   }
 
+  std::cout << "[registry.set_parent / get_parent round-trip]\n";
+  {
+    const Entity parent = reg->CreateEntity();
+    const Entity child = reg->CreateEntity();
+    lua["hier_parent"] = parent;
+    lua["hier_child"] = child;
+
+    Check(RunLua(lua, "assert(registry.get_parent(hier_child) == nil)"), "get_parent is nil before set_parent");
+    Check(RunLua(lua, "registry.set_parent(hier_child, hier_parent)"), "Lua: set_parent call succeeds");
+    Check(reg->GetParent(child).has_value() && reg->GetParent(child)->id == parent.id,
+          "set_parent wired child->parent in the registry");
+    Check(RunLua(lua, "assert(registry.get_parent(hier_child):get_id() == hier_parent:get_id())"),
+          "get_parent returns the parent handle");
+
+    const Entity second = reg->CreateEntity();
+    lua["hier_second"] = second;
+    Check(RunLua(lua, "registry.set_parent(hier_child, hier_second)"), "Lua: reparent call succeeds");
+    Check(reg->GetParent(child).has_value() && reg->GetParent(child)->id == second.id,
+          "reparent moved the child to the new parent");
+    Check(reg->GetChildren(parent).empty(), "reparent detached the child from the old parent");
+
+    // Self-parenting and cycles are rejected with an error log, not a Lua error.
+    Check(RunLua(lua, "registry.set_parent(hier_child, hier_child)"), "Lua: self-parent call tolerated");
+    Check(reg->GetParent(child).has_value() && reg->GetParent(child)->id == second.id,
+          "self-parent rejected, parent unchanged");
+    Check(RunLua(lua, "registry.set_parent(hier_second, hier_child)"), "Lua: cycle call tolerated");
+    Check(!reg->GetParent(second).has_value(), "cycle rejected, would-be grandparent unchanged");
+  }
+
   std::cout << "[load_entity: returns the root entity handle]\n";
   {
     Check(RunLua(lua,

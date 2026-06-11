@@ -57,6 +57,21 @@ void SetEntitySpriteSrcRect(Registry* registry, const Entity entity, const float
   sprite.srcRect.y = srcRectY;
 }
 
+void SetEntityParent(Registry* registry, const Entity child, const Entity parent) {
+  if (child.id == parent.id) {
+    Logger::Error("set_parent: entity cannot be its own parent.");
+    return;
+  }
+  // Reject cycles: the new parent must not already be a descendant of the child.
+  for (auto ancestor = registry->GetParent(parent); ancestor.has_value(); ancestor = registry->GetParent(*ancestor)) {
+    if (ancestor->id == child.id) {
+      Logger::Error("set_parent: would create a hierarchy cycle.");
+      return;
+    }
+  }
+  registry->SetParent(child, parent);
+}
+
 void BlamEntities(Registry* registry, const sol::table& entities) {
   for (const auto& [key, value] : entities) {
     if (!value.is<Entity>()) {
@@ -95,6 +110,10 @@ void LuaModuleBinding<EntityModule>::install(sol::state& lua, LuaBindingContext&
     const auto parent = ctx.GetRegistry()->GetParent(entity);
     if (!parent.has_value()) return sol::lua_nil;
     return sol::make_object(state, parent.value());
+  });
+
+  reg.set_function("set_parent", [&ctx](const Entity child, const Entity parent) {
+    SetEntityParent(ctx.GetRegistry(), child, parent);
   });
 
   // Component has_/get_ accessors — driven by LuaComponentRegistry. Adding a new
