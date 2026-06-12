@@ -209,7 +209,7 @@
       "name": "RenderPrimitiveSystem",
       "source": "src/Systems/RenderPrimitiveSystem.h",
       "tier": "parallel",
-      "setup_order": 15,
+      "setup_order": 17,
       "queried_components": [
         "SquarePrimitiveComponent",
         "GlobalTransformComponent"
@@ -222,7 +222,7 @@
       "name": "RenderSpriteSystem",
       "source": "src/Systems/RenderSpriteSystem.h",
       "tier": "parallel",
-      "setup_order": 13,
+      "setup_order": 14,
       "queried_components": [
         "GlobalTransformComponent",
         "SpriteComponent"
@@ -235,9 +235,22 @@
       "name": "RenderTextSystem",
       "source": "src/Systems/RenderTextSystem.h",
       "tier": "serial",
-      "setup_order": 14,
+      "setup_order": 16,
       "queried_components": [
         "TextLabelComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "RenderUISpriteSystem",
+      "source": "src/Systems/RenderUISpriteSystem.h",
+      "tier": "serial",
+      "setup_order": 15,
+      "queried_components": [
+        "UIRectComponent",
+        "SpriteComponent"
       ],
       "emits": [],
       "subscribes": [],
@@ -291,6 +304,16 @@
       "subscribes": [
         "MouseInputEvent"
       ],
+      "lua_surface": false
+    },
+    {
+      "name": "UILayoutSystem",
+      "source": "src/Systems/UILayoutSystem.h",
+      "tier": "bulk",
+      "setup_order": 13,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [],
       "lua_surface": false
     },
     {
