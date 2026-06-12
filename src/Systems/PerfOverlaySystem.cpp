@@ -262,21 +262,27 @@ void PerfOverlaySystem::Draw(Registry& registry, SDL_Renderer* sdlRenderer, cons
   SDL_SetRenderDrawColor(sdlRenderer, kWhite, kWhite, kWhite, kBorderAlpha);
   SDL_RenderRect(sdlRenderer, &bg);
 
-  float y = origin.y;
+  DrawRows(sdlRenderer, origin.x, origin.y, blockW, active, count);
+}
+
+void PerfOverlaySystem::DrawRows(SDL_Renderer* sdlRenderer, const float originX, const float originY,
+                                 const float blockW, const std::array<ActiveRow, kRowCount>& active,
+                                 const std::size_t count) {
+  float y = originY;
   for (std::size_t i = 0; i < count; ++i) {
     if (i > 0 && active[i].section != active[i - 1].section) {
-      const SDL_FRect sep{origin.x, y + kSepPad, blockW, 1.0F};
+      const SDL_FRect sep{originX, y + kSepPad, blockW, 1.0F};
       SDL_SetRenderDrawColor(sdlRenderer, kWhite, kWhite, kWhite, kSepAlpha);
       SDL_RenderFillRect(sdlRenderer, &sep);
       y += kSepBlockH;
     }
     Row& row = rows_[active[i].slot];
     SDL_SetTextureColorMod(row.label.texture, kLabelTint.r, kLabelTint.g, kLabelTint.b);
-    const SDL_FRect labelDst{origin.x, y, row.label.width, row.label.height};
+    const SDL_FRect labelDst{originX, y, row.label.width, row.label.height};
     SDL_RenderTexture(sdlRenderer, row.label.texture, nullptr, &labelDst);
 
     SDL_SetTextureColorMod(row.value.texture, active[i].color.r, active[i].color.g, active[i].color.b);
-    const SDL_FRect valueDst{origin.x + blockW - row.value.width, y, row.value.width, row.value.height};
+    const SDL_FRect valueDst{originX + blockW - row.value.width, y, row.value.width, row.value.height};
     SDL_RenderTexture(sdlRenderer, row.value.texture, nullptr, &valueDst);
 
     y += std::max(row.label.height, row.value.height) + kLineGap;

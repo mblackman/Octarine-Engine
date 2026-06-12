@@ -37,6 +37,7 @@ std::uint64_t SystemMemory::GetResidentBytes() {
 #include <unistd.h>
 
 #include <cstdio>
+#include <cstdlib>
 
 std::uint64_t SystemMemory::GetResidentBytes() {
   std::FILE* file = std::fopen("/proc/self/statm", "r");
@@ -44,13 +45,16 @@ std::uint64_t SystemMemory::GetResidentBytes() {
     return 0;
   }
   // statm fields are in pages: size resident shared ...
-  unsigned long long sizePages = 0;
-  unsigned long long residentPages = 0;
-  const int parsed = std::fscanf(file, "%llu %llu", &sizePages, &residentPages);
+  char buf[64] = {};
+  const bool readOk = std::fgets(buf, sizeof(buf), file) != nullptr;
   std::fclose(file);
-  if (parsed != 2) {
-    return 0;
-  }
+  if (!readOk) return 0;
+  char* end1 = nullptr;
+  char* end2 = nullptr;
+  std::strtoull(buf, &end1, 10);
+  if (end1 == buf) return 0;
+  const unsigned long long residentPages = std::strtoull(end1, &end2, 10);
+  if (end2 == end1) return 0;
   const long pageSize = sysconf(_SC_PAGESIZE);
   if (pageSize <= 0) {
     return 0;

@@ -103,6 +103,11 @@ class PerfOverlaySystem {
   // readouts.
   void RecordSample(float fps, float frameMs);
 
+  // Render all active rows into the overlay block. Extracted to keep Draw's cognitive complexity
+  // within the project threshold.
+  void DrawRows(SDL_Renderer* sdlRenderer, float originX, float originY, float blockW,
+                const std::array<ActiveRow, kRowCount>& active, std::size_t count);
+
   std::array<Row, kRowCount> rows_{};
   // The embedded debug font is registered lazily on first Draw. Latched so a registration failure
   // isn't retried (and re-logged) every frame.
