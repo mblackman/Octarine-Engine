@@ -76,10 +76,12 @@
 #include "Systems/RenderPrimitiveSystem.h"
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/RenderTextSystem.h"
+#include "Systems/RenderUISpriteSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "Systems/SpatialAudioSystem.h"
 #include "Systems/TransformSystem.h"
 #include "Systems/UIButtonSystem.h"
+#include "Systems/UILayoutSystem.h"
 #include "Systems/UpdateListenerTransformSystem.h"
 #include "Systems/VelocityIntegrationSystem.h"
 
@@ -620,8 +622,14 @@ void Game::Setup() {
 
   auto cameraFollow = registry_->RegisterSystem<PositionComponent, CameraFollowComponent>(CameraFollowSystem());
 
+  // UI layout pass: resolves UIRectComponent for all canvas descendants. Runs after TransformSystem
+  // so world-parented canvases see up-to-date globals; runs before render systems that read UIRectComponent.
+  auto uiLayout = registry_->RegisterBulkSystem(UILayoutSystem());
+  registry_->Order(uiLayout).After(transform);
+
   // Render queue producers
   registry_->RegisterParallelSystem<GlobalTransformComponent, SpriteComponent>(RenderSpriteSystem());
+  registry_->RegisterSystem<UIRectComponent, SpriteComponent>(RenderUISpriteSystem());
   registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
   registry_->RegisterParallelSystem<SquarePrimitiveComponent, GlobalTransformComponent>(RenderPrimitiveSystem());
 

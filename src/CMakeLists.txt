@@ -122,6 +122,7 @@ octarine_library(octarine_lua
         Lua/Modules/LogModuleLuaBinding.cpp
         Lua/Modules/RegisterAllModules.cpp
         Lua/Modules/SceneModuleLuaBinding.cpp
+        Lua/Modules/UIModuleLuaBinding.cpp
 )
 target_link_libraries(octarine_lua PUBLIC
         octarine_core
