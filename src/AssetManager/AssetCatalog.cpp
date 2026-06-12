@@ -73,16 +73,17 @@ std::string FormatFontSize(float size) {
 std::string EscapeLua(const std::string& s) {
   std::string out;
   out.reserve(s.size());
-  for (const unsigned char c : s) {
+  for (const char raw : s) {
+    const auto c = static_cast<unsigned char>(raw);
     if (c == '\\' || c == '"') {
       out.push_back('\\');
-      out.push_back(static_cast<char>(c));
+      out.push_back(raw);
     } else if (c < 0x20 || c == 0x7f) {
       char buf[8];
       std::snprintf(buf, sizeof(buf), "\\x%02x", c);
       out.append(buf);
     } else {
-      out.push_back(static_cast<char>(c));
+      out.push_back(raw);
     }
   }
   return out;
