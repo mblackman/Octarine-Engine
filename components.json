@@ -120,6 +120,12 @@
       "usertype": "ui_rect_component",
       "has_accessor": "registry.has_ui_rect",
       "get_accessor": "registry.get_ui_rect"
+    },
+    {
+      "lua_key": "ui_z_index",
+      "usertype": "ui_z_index_component",
+      "has_accessor": "registry.has_ui_z_index",
+      "get_accessor": "registry.get_ui_z_index"
     }
   ]
 }

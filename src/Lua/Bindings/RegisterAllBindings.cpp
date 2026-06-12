@@ -21,6 +21,7 @@
 #include "Lua/Bindings/UIButtonComponentLuaBinding.h"
 #include "Lua/Bindings/UICanvasComponentLuaBinding.h"
 #include "Lua/Bindings/UIRectComponentLuaBinding.h"
+#include "Lua/Bindings/UIZIndexComponentLuaBinding.h"
 
 void RegisterAllLuaBindings() {
   LuaComponentRegistry::clear();
@@ -44,4 +45,5 @@ void RegisterAllLuaBindings() {
   LuaComponentRegistry::registerComponent<UICanvasComponent>();
   LuaComponentRegistry::registerComponent<UIAnchorComponent>();
   LuaComponentRegistry::registerComponent<UIRectComponent>();
+  LuaComponentRegistry::registerComponent<UIZIndexComponent>();
 }

@@ -45,8 +45,7 @@ class RenderUISpriteSystem {
     const float destW = rect.Width();
     const float destH = rect.Height();
 
-    auto& cmd =
-        renderQueue_->EmplaceSprite(static_cast<unsigned int>(sprite.layer), rect.top, texture, sprite.blendMode);
+    auto& cmd = renderQueue_->EmplaceSprite(static_cast<unsigned int>(rect.layer), rect.top, texture, sprite.blendMode);
     cmd.destX = rect.left;
     cmd.destY = rect.top;
     cmd.destW = destW;

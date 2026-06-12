@@ -81,10 +81,12 @@ class RenderTextSystem {
     // text.position acts as a local pixel offset within the rect (e.g., padding).
     glm::vec2 origin = text.position;
     bool effectivelyFixed = text.isFixed;
+    int renderLayer = text.layer;
     if (registry->HasComponent<UIRectComponent>(entity)) {
       const auto& rect = registry->GetComponent<UIRectComponent>(entity);
       origin = glm::vec2(rect.left, rect.top) + text.position;
       effectivelyFixed = true;
+      renderLayer = rect.layer;
     } else if (registry->HasComponent<GlobalTransformComponent>(entity)) {
       const auto& transform = registry->GetComponent<GlobalTransformComponent>(entity);
       origin += transform.position;
@@ -109,7 +111,7 @@ class RenderTextSystem {
     const float x = effectivelyFixed ? origin.x : origin.x - camera.x;
     const float y = effectivelyFixed ? origin.y : origin.y - camera.y;
 
-    auto& cmd = renderQueue.EmplaceText(static_cast<unsigned int>(text.layer), text.position.y, it->second.texture);
+    auto& cmd = renderQueue.EmplaceText(static_cast<unsigned int>(renderLayer), text.position.y, it->second.texture);
     cmd.destRect = {x, y, it->second.width, it->second.height};
     cmd.texture = it->second.texture;
   }
