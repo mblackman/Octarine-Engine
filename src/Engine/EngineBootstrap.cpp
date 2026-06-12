@@ -6,7 +6,6 @@
 #include <string>
 
 #include "AssetManager/AssetManager.h"
-#include "AssetManager/GlyphAtlas.h"
 #include "Audio/AudioTrackCache.h"
 #include "Components/CameraComponents.h"
 #include "Components/ViewportInfo.h"
@@ -75,7 +74,7 @@ int LuaDofileViaSDL(lua_State* L) {
 
 namespace engine_bootstrap {
 void InstallLuaLibraries(sol::state& lua) {
-  lua.open_libraries(sol::lib::base, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
+  lua.open_libraries(sol::lib::base, sol::lib::os, sol::lib::math, sol::lib::io, sol::lib::string, sol::lib::table);
 
   // Override Lua's stock `dofile` so chunks load through SDL_IO too. Must run after
   // open_libraries (which installs the default dofile we're replacing).
