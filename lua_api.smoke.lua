@@ -1821,6 +1821,7 @@ function ui.flex(...) end
 ---@class ui_anchor_component
 ui_anchor_component = {}
 
+
 ---@class ui_button_component
 ui_button_component = {}
 
