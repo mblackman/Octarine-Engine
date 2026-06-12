@@ -1806,6 +1806,8 @@ function stop_scene(...) end
 text_label_component = {}
 
 
+function toggle_perf_overlay(...) end
+
 ---@class ui
 ui = {}
 

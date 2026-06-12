@@ -116,7 +116,9 @@ int main() {
     const Entity single = reg->CreateEntity();
     lua["blam_single"] = single;
     Check(RunLua(lua, "blam(blam_single)"), "Lua: blam(entity) call succeeds");
-    Check(!reg->IsAlive(single), "blam(entity) destroyed the entity");
+    Check(reg->IsAlive(single), "blam(entity) defers destruction until end of frame");
+    reg->Update(0.016F);
+    Check(!reg->IsAlive(single), "blam(entity) destroyed the entity after Update");
 
     const Entity first = reg->CreateEntity();
     const Entity second = reg->CreateEntity();
@@ -124,8 +126,10 @@ int main() {
     lua["blam_first"] = first;
     lua["blam_second"] = second;
     Check(RunLua(lua, "blam({ blam_first, blam_second })"), "Lua: blam(table) call succeeds");
-    Check(!reg->IsAlive(first), "blam(table) destroyed the first entity");
-    Check(!reg->IsAlive(second), "blam(table) destroyed the second entity");
+    Check(reg->IsAlive(first) && reg->IsAlive(second), "blam(table) defers destruction until end of frame");
+    reg->Update(0.016F);
+    Check(!reg->IsAlive(first), "blam(table) destroyed the first entity after Update");
+    Check(!reg->IsAlive(second), "blam(table) destroyed the second entity after Update");
     Check(reg->IsAlive(survivor), "blam(table) left unrelated entities alone");
 
     // Non-entity entries are skipped with an error log, not a Lua error.

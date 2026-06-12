@@ -181,6 +181,7 @@ bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string>& 
   success &= SetValue(settings, "DefaultScalingMode", &GameConfig::SetDefaultScaleMode, false);
   success &= SetValue(settings, "DefaultWindowWidth", &GameConfig::SetDefaultWidth, false);
   success &= SetValue(settings, "DefaultWindowHeight", &GameConfig::SetDefaultHeight, false);
+  success &= SetValue(settings, "FpsTarget", &GameConfig::SetFpsTarget, false);
   success &= SetValue(settings, "HotReload", &GameConfig::SetHotReloadEnabled, false);
   success &= SetValue(settings, "HotReloadPollSeconds", &GameConfig::SetHotReloadPollSeconds, false);
   success &= SetValue(settings, "PerfOverlay", &GameConfig::SetPerfOverlay, false);
@@ -264,6 +265,15 @@ void GameConfig::SetDefaultScaleMode(const std::string& defaultScaleMode) {
 void GameConfig::SetDefaultWidth(const int defaultWidth) { default_width_ = defaultWidth; }
 void GameConfig::SetDefaultHeight(const int defaultHeight) { default_height_ = defaultHeight; }
 
+void GameConfig::SetFpsTarget(const int fpsTarget) {
+  if (fpsTarget < 0) {
+    Logger::Warn("FpsTarget must be >= 0 (0 = uncapped); keeping current value.");
+    return;
+  }
+  engine_options_.fpsTarget = fpsTarget;
+  Logger::Info(fpsTarget == 0 ? std::string("FPS target: uncapped") : "FPS target: " + std::to_string(fpsTarget));
+}
+
 void GameConfig::SetHotReloadEnabled(const bool enabled) {
   engine_options_.hotReloadEnabled = enabled;
   Logger::Info(std::string("Hot reload ") + (enabled ? "enabled" : "disabled"));
@@ -300,10 +310,15 @@ void GameConfig::SetPerfOverlayMetrics(const std::string& metrics) {
       perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::Fps;
     } else if (metric == "frametime" || metric == "frame-time" || metric == "ms") {
       perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::FrameTime;
+    } else if (metric == "entities") {
+      perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::Entities;
+    } else if (metric == "memory" || metric == "mem") {
+      perfOverlayMetrics = perfOverlayMetrics | PerfOverlayMetrics::Memory;
     } else if (metric == "all" || metric == "both") {
       perfOverlayMetrics = PerfOverlayMetrics::All;
     } else {
-      Logger::Warn("Unknown PerfOverlayMetrics '" + metric + "' (expected fps|frametime|all); keeping current.");
+      Logger::Warn("Unknown PerfOverlayMetrics '" + metric +
+                   "' (expected fps|frametime|entities|memory|all); keeping current.");
       return;
     }
   }

@@ -16,6 +16,8 @@ struct LuaBinding<PositionComponent> {
   }
 
   static void bindUsertype(sol::state& lua) {
-    lua.new_usertype<PositionComponent>(kUsertypeName, "value", &PositionComponent::value);
+    lua.new_usertype<PositionComponent>(kUsertypeName, "value",
+                                        sol::property([](const PositionComponent& c) { return c.value; },
+                                                      [](PositionComponent& c, const glm::vec2 v) { c.value = v; }));
   }
 };

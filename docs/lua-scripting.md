@@ -38,6 +38,7 @@ StartupScript=game.lua
 DefaultWindowWidth=1280
 DefaultWindowHeight=720
 DefaultScalingMode=nearest # 'nearest' or 'linear'
+FpsTarget=60               # frame-rate cap; 0 = uncapped (default 60)
 ```
 
 ---
@@ -127,7 +128,7 @@ These globals are shorthand for the most common reads and writes:
 | `set_name(entity, name)` | Sets the name |
 | `set_sprite_src_rect(entity, x, y)` | Sets the sprite source-rect origin |
 | `find_entity_by_name(name)` | Returns the entity ID, or `nil` |
-| `blam(entity_or_table)` | Destroys an entity, or every entity in a table |
+| `blam(entity_or_table)` | Destroys an entity, or every entity in a table. Destruction is deferred to the end of the frame's update, so the entity is still alive (and queryable) for the rest of the current frame; duplicate blams of the same entity within a frame collapse to one |
 
 ### Other Lua globals
 

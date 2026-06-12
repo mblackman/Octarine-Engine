@@ -41,13 +41,26 @@ class ScriptSystem {
   void CreateLuaTypes(sol::state& lua) {
     // Primitives — not components; kept inline.
     lua.new_usertype<Entity>("entity", "get_id", &Entity::GetId);
-    lua.new_usertype<glm::vec2>("vec2", sol::constructors<glm::vec2(float, float), glm::vec2()>(), "x", &glm::vec2::x,
-                                "y", &glm::vec2::y);
+    lua.new_usertype<glm::vec2>(
+        "vec2", sol::constructors<glm::vec2(float, float), glm::vec2()>(), "x",
+        sol::property([](const glm::vec2& v) { return v.x; }, [](glm::vec2& v, float f) { v.x = f; }), "y",
+        sol::property([](const glm::vec2& v) { return v.y; }, [](glm::vec2& v, float f) { v.y = f; }));
 
     lua.new_usertype<octarine::Color>(
         "color",
         sol::constructors<octarine::Color(), octarine::Color(std::uint8_t, std::uint8_t, std::uint8_t, std::uint8_t)>(),
-        "r", &octarine::Color::r, "g", &octarine::Color::g, "b", &octarine::Color::b, "a", &octarine::Color::a);
+        "r",
+        sol::property([](const octarine::Color& c) { return c.r; },
+                      [](octarine::Color& c, std::uint8_t v) { c.r = v; }),
+        "g",
+        sol::property([](const octarine::Color& c) { return c.g; },
+                      [](octarine::Color& c, std::uint8_t v) { c.g = v; }),
+        "b",
+        sol::property([](const octarine::Color& c) { return c.b; },
+                      [](octarine::Color& c, std::uint8_t v) { c.b = v; }),
+        "a",
+        sol::property([](const octarine::Color& c) { return c.a; },
+                      [](octarine::Color& c, std::uint8_t v) { c.a = v; }));
 
     // Component usertypes — driven by LuaComponentRegistry. Add a new component by
     // dropping a LuaBinding<T> header + one line in RegisterAllBindings.cpp.

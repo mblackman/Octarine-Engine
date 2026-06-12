@@ -18,6 +18,14 @@ void LuaModuleBinding<GameModule>::install(sol::state& lua, LuaBindingContext& c
     ctx.GetRegistry()->Get<GameConfig>().GetEngineOptions().showPerfOverlay = enabled;
   });
 
+  // Flip the perf overlay and return the new state, so a debug-key callback doesn't have to track
+  // the current value itself.
+  lua.set_function("toggle_perf_overlay", [&ctx]() {
+    auto& options = ctx.GetRegistry()->Get<GameConfig>().GetEngineOptions();
+    options.showPerfOverlay = !options.showPerfOverlay;
+    return options.showPerfOverlay;
+  });
+
   lua.set_function("set_game_map_dimensions", [&ctx](const double width, const double height) {
     auto& gameConfig = ctx.GetRegistry()->Get<GameConfig>();
     gameConfig.playableAreaHeight = static_cast<float>(height);

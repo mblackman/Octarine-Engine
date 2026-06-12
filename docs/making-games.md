@@ -126,6 +126,7 @@ StartupScript=game.lua
 DefaultWindowWidth=1280
 DefaultWindowHeight=720
 DefaultScalingMode=nearest      # 'nearest' for pixel art, 'linear' for smooth
+FpsTarget=60                    # frame-rate cap; 0 = uncapped (default 60)
 ```
 
 `StartupScript` is the first Lua file that runs. Everything else — scenes,
