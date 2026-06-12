@@ -271,8 +271,7 @@ void GameConfig::SetFpsTarget(const int fpsTarget) {
     return;
   }
   engine_options_.fpsTarget = fpsTarget;
-  Logger::Info(fpsTarget == 0 ? std::string("FPS target: uncapped")
-                              : "FPS target: " + std::to_string(fpsTarget));
+  Logger::Info(fpsTarget == 0 ? std::string("FPS target: uncapped") : "FPS target: " + std::to_string(fpsTarget));
 }
 
 void GameConfig::SetHotReloadEnabled(const bool enabled) {
