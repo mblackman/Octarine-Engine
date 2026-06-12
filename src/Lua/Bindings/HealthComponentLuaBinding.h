@@ -26,7 +26,10 @@ struct LuaBinding<HealthComponent> {
         kUsertypeName, "current_health",
         sol::property([](const HealthComponent& h) { return h.currentHealth; },
                       [](HealthComponent& h, const int v) { h.currentHealth = std::clamp(v, 0, h.maxHealth); }),
-        "max_health", &HealthComponent::maxHealth, "damage", &HealthComponent::Damage, "heal", &HealthComponent::Heal,
-        "is_dead", sol::property(&HealthComponent::IsDead), "fraction", sol::property(&HealthComponent::Fraction));
+        "max_health",
+        sol::property([](const HealthComponent& h) { return h.maxHealth; },
+                      [](HealthComponent& h, const int v) { h.maxHealth = v; }),
+        "damage", &HealthComponent::Damage, "heal", &HealthComponent::Heal, "is_dead",
+        sol::property(&HealthComponent::IsDead), "fraction", sol::property(&HealthComponent::Fraction));
   }
 };
