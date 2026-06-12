@@ -1,21 +1,37 @@
 name: Android
 
-# Builds the Android APK for the example project from a clean environment — the CI gate that any
-# project on this engine still cross-compiles + links for Android. Mirrors build.yml/package.yml:
-# vcpkg android deps from source (x-gha binary cache), the engine compiled to libmain.so by the NDK,
-# project assets staged into the APK. No device/emulator — build-only (see android/README.md).
+# CI gate that the engine still cross-compiles + links for Android.
+# On PRs (path-filtered): debug APK only — a build-passes signal without the expensive AAB.
+# On main / tags / dispatch: full release AAB, multi-ABI, AAB verification, Play upload.
+# Runtime smoke is separate: android-emulator.yml.
 on:
   push:
     branches: [ main ]
     tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'android/**'
+      - 'CMakeLists.txt'
+      - 'cmake/**'
+      - 'CMakePresets.json'
+      - 'vcpkg.json'
+      - 'vcpkg-configuration.json'
+      - 'vcpkg-overlay-ports/**'
+      - 'libs/**'
+      - '.github/actions/**'
+      - '.github/workflows/android.yml'
   workflow_dispatch:
     inputs:
       example_ref:
         description: 'Octarine-Engine-Example branch/tag/SHA to build against (default: main)'
         required: false
         default: 'main'
+
+concurrency:
+  group: android-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
@@ -91,6 +107,7 @@ jobs:
           ./gradlew "${args[@]}"
 
       - name: Upload APK
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: OctarineEngine-android-apk
@@ -102,7 +119,7 @@ jobs:
       # build-passes signal.
       - name: Decode release keystore
         id: keystore
-        if: env.OCTARINE_ANDROID_KEYSTORE != ''
+        if: github.event_name != 'pull_request' && env.OCTARINE_ANDROID_KEYSTORE != ''
         env:
           OCTARINE_ANDROID_KEYSTORE: ${{ secrets.OCTARINE_ANDROID_KEYSTORE }}
         run: |
@@ -121,6 +138,7 @@ jobs:
       # cmake + vcpkg triplet); externalNativeBuild is bypassed. bundle.abi.enableSplit (also in
       # build.gradle) lets Play deliver per-ABI APKs from the same AAB.
       - name: Build AAB (release bundle, multi-ABI)
+        if: github.event_name != 'pull_request'
         working-directory: android
         env:
           OCTARINE_ANDROID_STORE_PASSWORD: ${{ secrets.OCTARINE_ANDROID_STORE_PASSWORD }}
@@ -150,6 +168,7 @@ jobs:
       # the multi-ABI orchestration (e.g. one triplet failing to produce libmain.so) would silently
       # ship a partial AAB; catch it here rather than at the Play upload.
       - name: Verify AAB carries every ABI
+        if: github.event_name != 'pull_request'
         run: |
           set -e
           aab=android/app/build/outputs/bundle/release/app-release.aab
@@ -170,6 +189,7 @@ jobs:
       # here so the failure lands in CI, not on a user's device. Probe arm64-v8a only — the same
       # CMake invocation produces every ABI's libmain.so, so one slice covers the regression.
       - name: Verify libmain.so retains SDL JNI exports
+        if: github.event_name != 'pull_request'
         run: |
           set -e
           aab=android/app/build/outputs/bundle/release/app-release.aab
@@ -192,6 +212,7 @@ jobs:
       # aggregator off the first ABI's configure task, so the file lives once at base/assets/
       # regardless of how many ABIs the AAB carries.
       - name: Verify AAB ships third-party licenses
+        if: github.event_name != 'pull_request'
         run: |
           set -e
           aab=android/app/build/outputs/bundle/release/app-release.aab
@@ -211,12 +232,14 @@ jobs:
       # from the SDL green-robot template. The verifier skips when icon= is unset (legitimate
       # fallback path); once the example commits a real icon, this becomes a regression gate.
       - name: Verify AAB ships project icon (not SDL template)
+        if: github.event_name != 'pull_request'
         run: |
           bash scripts/verify-icons.sh \
             --project "$GITHUB_WORKSPACE/example_repo" \
             --aab android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Upload AAB
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: OctarineEngine-android-aab
