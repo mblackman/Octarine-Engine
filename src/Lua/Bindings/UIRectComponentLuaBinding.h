@@ -18,7 +18,8 @@ struct LuaBinding<UIRectComponent> {
         kUsertypeName, "left", sol::property([](const UIRectComponent& r) { return r.left; }), "top",
         sol::property([](const UIRectComponent& r) { return r.top; }), "right",
         sol::property([](const UIRectComponent& r) { return r.right; }), "bottom",
-        sol::property([](const UIRectComponent& r) { return r.bottom; }), "width",
+        sol::property([](const UIRectComponent& r) { return r.bottom; }), "layer",
+        sol::property([](const UIRectComponent& r) { return r.layer; }), "width",
         sol::property(&UIRectComponent::Width), "height", sol::property(&UIRectComponent::Height), "center",
         sol::property(&UIRectComponent::Center));
   }

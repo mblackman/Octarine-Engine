@@ -5,6 +5,7 @@
 #include "Components/UIAnchorComponent.h"
 #include "Components/UICanvasComponent.h"
 #include "Components/UIRectComponent.h"
+#include "Components/UIZIndexComponent.h"
 #include "ECS/Registry.h"
 #include "General/Logger.h"
 #include "Lua/LuaBindingContext.h"
@@ -53,6 +54,7 @@ void LuaModuleBinding<UIModule>::install(sol::state& lua, LuaBindingContext& ctx
       canvas.isFixed = (*opts)["fixed"].get_or(true);
       canvas.width = static_cast<float>((*opts)["width"].get_or(0.0));
       canvas.height = static_cast<float>((*opts)["height"].get_or(0.0));
+      canvas.baseLayer = (*opts)["base_layer"].get_or(0);
     }
     r->AddComponent(entity, canvas);
     if (!r->HasComponent<UIRectComponent>(entity)) {
@@ -87,6 +89,15 @@ void LuaModuleBinding<UIModule>::install(sol::state& lua, LuaBindingContext& ctx
                       Logger::Warn("ui.anchor: second argument must be a preset name (string) or an anchor table.");
                     }
                   });
+
+  ui.set_function("z_index", [&ctx](const Entity entity, const int z) {
+    Registry* r = ctx.GetRegistry();
+    if (r->HasComponent<UIZIndexComponent>(entity)) {
+      r->GetComponent<UIZIndexComponent>(entity).z = z;
+    } else {
+      r->AddComponent(entity, UIZIndexComponent{z});
+    }
+  });
 
   // Phase 4 slot — warns and does nothing until flex containers are implemented.
   ui.set_function("flex", [](const Entity /*entity*/, const sol::optional<sol::table>& /*opts*/) {
