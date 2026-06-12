@@ -696,6 +696,7 @@ class Registry {
 
   // Deferred blam/despawn processing at the end of Update, once all systems have run.
   void FlushPendingDestruction();
+  void FlushDespawns(const std::vector<Entity>& despawns);
 
   // Helper for CreateEntityWithBundle: index-pack expansion to dispatch each component to
   // Archetype::AddComponent at its corresponding location slot.

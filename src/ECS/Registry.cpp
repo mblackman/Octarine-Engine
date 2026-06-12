@@ -110,14 +110,18 @@ void Registry::FlushPendingDestruction() {
   // collapses them into the chunk's inactive tail without crossing archetypes. Non-pooled
   // entities are blammed outright.
   if (!despawns.empty()) {
-    auto* pool = TryGet<EntityPoolManager>();
-    for (const Entity entity : despawns) {
-      if (!IsAlive(entity)) continue;
-      if (pool && HasTag<PoolableTag>(entity)) {
-        pool->Park(*this, entity);
-      } else {
-        BlamEntity(entity);
-      }
+    FlushDespawns(despawns);
+  }
+}
+
+void Registry::FlushDespawns(const std::vector<Entity>& despawns) {
+  auto* pool = TryGet<EntityPoolManager>();
+  for (const Entity entity : despawns) {
+    if (!IsAlive(entity)) continue;
+    if (pool && HasTag<PoolableTag>(entity)) {
+      pool->Park(*this, entity);
+    } else {
+      BlamEntity(entity);
     }
   }
 }
