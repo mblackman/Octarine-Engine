@@ -1713,7 +1713,13 @@ function registry.get_square(...) end
 
 function registry.get_text_label(...) end
 
+function registry.get_ui_anchor(...) end
+
 function registry.get_ui_button(...) end
+
+function registry.get_ui_canvas(...) end
+
+function registry.get_ui_rect(...) end
 
 function registry.has_animation(...) end
 
@@ -1747,7 +1753,13 @@ function registry.has_square(...) end
 
 function registry.has_text_label(...) end
 
+function registry.has_ui_anchor(...) end
+
 function registry.has_ui_button(...) end
+
+function registry.has_ui_canvas(...) end
+
+function registry.has_ui_rect(...) end
 
 function registry.set_parent(...) end
 
@@ -1794,8 +1806,30 @@ function stop_scene(...) end
 text_label_component = {}
 
 
+---@class ui
+ui = {}
+
+function ui.anchor(...) end
+
+function ui.canvas(...) end
+
+function ui.flex(...) end
+
+
+---@class ui_anchor_component
+ui_anchor_component = {}
+
+
 ---@class ui_button_component
 ui_button_component = {}
+
+
+---@class ui_canvas_component
+ui_canvas_component = {}
+
+
+---@class ui_rect_component
+ui_rect_component = {}
 
 
 ---@class vec2

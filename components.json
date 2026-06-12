@@ -98,10 +98,28 @@
       "get_accessor": "registry.get_text_label"
     },
     {
+      "lua_key": "ui_anchor",
+      "usertype": "ui_anchor_component",
+      "has_accessor": "registry.has_ui_anchor",
+      "get_accessor": "registry.get_ui_anchor"
+    },
+    {
       "lua_key": "ui_button",
       "usertype": "ui_button_component",
       "has_accessor": "registry.has_ui_button",
       "get_accessor": "registry.get_ui_button"
+    },
+    {
+      "lua_key": "ui_canvas",
+      "usertype": "ui_canvas_component",
+      "has_accessor": "registry.has_ui_canvas",
+      "get_accessor": "registry.get_ui_canvas"
+    },
+    {
+      "lua_key": "ui_rect",
+      "usertype": "ui_rect_component",
+      "has_accessor": "registry.has_ui_rect",
+      "get_accessor": "registry.get_ui_rect"
     }
   ]
 }

@@ -17,7 +17,10 @@
 #include "Lua/Bindings/SpriteComponentLuaBinding.h"
 #include "Lua/Bindings/SquarePrimitiveComponentLuaBinding.h"
 #include "Lua/Bindings/TextLabelComponentLuaBinding.h"
+#include "Lua/Bindings/UIAnchorComponentLuaBinding.h"
 #include "Lua/Bindings/UIButtonComponentLuaBinding.h"
+#include "Lua/Bindings/UICanvasComponentLuaBinding.h"
+#include "Lua/Bindings/UIRectComponentLuaBinding.h"
 
 void RegisterAllLuaBindings() {
   LuaComponentRegistry::clear();
@@ -38,4 +41,7 @@ void RegisterAllLuaBindings() {
   LuaComponentRegistry::registerComponent<ScaleComponent>();
   LuaComponentRegistry::registerComponent<PositionComponent>();
   LuaComponentRegistry::registerComponent<RotationComponent>();
+  LuaComponentRegistry::registerComponent<UICanvasComponent>();
+  LuaComponentRegistry::registerComponent<UIAnchorComponent>();
+  LuaComponentRegistry::registerComponent<UIRectComponent>();
 }

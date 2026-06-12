@@ -9,6 +9,7 @@
 #include "Components/CameraComponents.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/UIButtonComponent.h"
+#include "Components/UIRectComponent.h"
 #include "Components/ViewportInfo.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
@@ -48,30 +49,14 @@ class UIButtonSystem {
       mouseY = transformed.y;
     }
 
-    auto query = registry_->CreateQuery<UIButtonComponent, GlobalTransformComponent, BoxColliderComponent>();
+    auto query = registry_->CreateQuery<UIButtonComponent, GlobalTransformComponent, Opt<BoxColliderComponent>>();
     const auto& camera = registry_->Get<CameraComponent>().viewport;
     auto handler = [&](Entity entity, UIButtonComponent& button, const GlobalTransformComponent& transform,
-                       const BoxColliderComponent& collider) {
+                       const BoxColliderComponent* collider) {
       if (!button.isActive || button.clickFunction == sol::lua_nil) {
         return;
       }
-
-      // transform.position is top-left. apply collider offset (scaled).
-      float x = transform.position.x + collider.offset.x * transform.scale.x;
-      float y = transform.position.y + collider.offset.y * transform.scale.y;
-
-      if (!button.isFixed) {
-        x -= camera.x;
-        y -= camera.y;
-      }
-
-      const float w = static_cast<float>(collider.width) * transform.scale.x;
-      const float h = static_cast<float>(collider.height) * transform.scale.y;
-
-      const bool isClick = mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
-
-      if (!isClick) return;
-
+      if (!HitTest(entity, button, transform, collider, camera, mouseX, mouseY)) return;
       if (auto result = button.clickFunction(button.buttonTable, entity); !result.valid()) {
         const sol::error err = result;
         Logger::ErrorLua(std::string(err.what()));
@@ -81,6 +66,27 @@ class UIButtonSystem {
   }
 
  private:
+  [[nodiscard]] bool HitTest(const Entity entity, const UIButtonComponent& button,
+                             const GlobalTransformComponent& transform, const BoxColliderComponent* collider,
+                             const octarine::Rect& camera, const float mouseX, const float mouseY) const {
+    if (registry_->HasComponent<UIRectComponent>(entity)) {
+      const auto& rect = registry_->GetComponent<UIRectComponent>(entity);
+      return mouseX >= rect.left && mouseX <= rect.right && mouseY >= rect.top && mouseY <= rect.bottom;
+    }
+    if (collider) {
+      float x = transform.position.x + collider->offset.x * transform.scale.x;
+      float y = transform.position.y + collider->offset.y * transform.scale.y;
+      if (!button.isFixed) {
+        x -= camera.x;
+        y -= camera.y;
+      }
+      const float w = static_cast<float>(collider->width) * transform.scale.x;
+      const float h = static_cast<float>(collider->height) * transform.scale.y;
+      return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
+    }
+    return false;
+  }
+
   Registry* registry_ = nullptr;
   EventBus::SubscriptionHandle subscription_;
 };

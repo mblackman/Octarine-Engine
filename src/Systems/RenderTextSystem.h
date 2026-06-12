@@ -16,6 +16,7 @@
 #include "Components/CameraComponents.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/TextLabelComponent.h"
+#include "Components/UIRectComponent.h"
 #include "ECS/Entity.h"
 #include "ECS/Iterable.h"
 #include "ECS/Registry.h"
@@ -76,15 +77,22 @@ class RenderTextSystem {
       it = StoreEntry(it, entity, text, packedColor, texture, w, h);
     }
 
+    // UIRectComponent (written by UILayoutSystem) takes priority over GlobalTransform for position.
+    // text.position acts as a local pixel offset within the rect (e.g., padding).
     glm::vec2 origin = text.position;
-    if (registry->HasComponent<GlobalTransformComponent>(entity)) {
+    bool effectivelyFixed = text.isFixed;
+    if (registry->HasComponent<UIRectComponent>(entity)) {
+      const auto& rect = registry->GetComponent<UIRectComponent>(entity);
+      origin = glm::vec2(rect.left, rect.top) + text.position;
+      effectivelyFixed = true;
+    } else if (registry->HasComponent<GlobalTransformComponent>(entity)) {
       const auto& transform = registry->GetComponent<GlobalTransformComponent>(entity);
       origin += transform.position;
     }
 
     const auto& gameConfig = registry->Get<GameConfig>();
     const bool isOutsideCamera = IsRenderableOutsideViewport(
-        origin.x, origin.y, it->second.width, it->second.height, text.isFixed, camera,
+        origin.x, origin.y, it->second.width, it->second.height, effectivelyFixed, camera,
         static_cast<float>(gameConfig.windowWidth), static_cast<float>(gameConfig.windowHeight));
 
 #ifdef OCTARINE_PROFILING
@@ -98,8 +106,8 @@ class RenderTextSystem {
     }
     PROFILE_COUNTER_INC(emplacedCounter);
 
-    const float x = text.isFixed ? origin.x : origin.x - camera.x;
-    const float y = text.isFixed ? origin.y : origin.y - camera.y;
+    const float x = effectivelyFixed ? origin.x : origin.x - camera.x;
+    const float y = effectivelyFixed ? origin.y : origin.y - camera.y;
 
     auto& cmd = renderQueue.EmplaceText(static_cast<unsigned int>(text.layer), text.position.y, it->second.texture);
     cmd.destRect = {x, y, it->second.width, it->second.height};
