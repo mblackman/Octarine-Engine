@@ -4,7 +4,7 @@
 
 // DevListenServer — editor dev-iteration TCP listener (compile-time stripped from shipped builds
 // via #ifndef OCTARINE_SHIPPED). When enabled, owns a background listener thread bound to
-// 127.0.0.1:<port> (or 0.0.0.0:<port> with --dev-listen-all) and serves a tiny length-prefixed
+// 127.0.0.1:<port> and serves a tiny length-prefixed
 // binary protocol:
 //
 //     each message:  uint32 LE length | uint32 LE op | body[length-4]
@@ -43,8 +43,8 @@ using CommandHandler =
     std::function<void(OpCode op, const std::vector<char>& body, std::uint32_t& reply_op, std::string& reply_body)>;
 
 struct ServerOptions {
-  std::uint16_t port = 0;   // 0 = pick ephemeral (BoundPort() reads back after Start)
-  bool listen_all = false;  // false = bind 127.0.0.1; true = 0.0.0.0 (warned at Start)
+  std::uint16_t port = 0;  // 0 = pick ephemeral (BoundPort() reads back after Start)
+                           // Always binds 127.0.0.1 — no LAN-exposure option.
 };
 
 class DevListenServer {

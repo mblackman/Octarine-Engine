@@ -13,8 +13,7 @@ int main(const int argc, char* argv[]) {
   std::string gamePath;
   std::string startupMode;
   bool useManifest = false;
-  int devListenPort = 0;      // 0 = disabled; >0 = bind on that TCP port
-  bool devListenAll = false;  // false = 127.0.0.1; true = 0.0.0.0 (LAN-exposed)
+  int devListenPort = 0;  // 0 = disabled; >0 = bind on that TCP port
 
   // Parse command-line arguments
   for (int i = 1; i < argc; ++i) {
@@ -55,13 +54,6 @@ int main(const int argc, char* argv[]) {
         return 1;
       }
 #endif
-    } else if (currentArg == "--dev-listen-all") {
-#ifdef OCTARINE_SHIPPED
-      Logger::Warn("--dev-listen-all is stripped from shipped builds; ignoring.");
-#else
-      devListenAll = true;
-      Logger::Warn("--dev-listen-all set; will bind 0.0.0.0 instead of 127.0.0.1.");
-#endif
     } else if (currentArg.starts_with("-")) {
       Logger::Warn("Unknown command-line argument: " + currentArg);
     } else {
@@ -80,10 +72,9 @@ int main(const int argc, char* argv[]) {
   game.SetStartupMode(startupMode);
   game.SetUseManifest(useManifest);
 #ifndef OCTARINE_SHIPPED
-  game.SetDevListen(devListenPort, devListenAll);
+  game.SetDevListen(devListenPort);
 #else
   (void)devListenPort;
-  (void)devListenAll;
 #endif
 
   if (game.Initialize(gamePath)) {

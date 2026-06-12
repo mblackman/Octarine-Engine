@@ -146,8 +146,7 @@ int main() {
   using namespace octarine::dev;
   DevListenServer server;
   ServerOptions opts;
-  opts.port = 0;            // ephemeral
-  opts.listen_all = false;  // loopback only
+  opts.port = 0;  // ephemeral; always binds 127.0.0.1
 
   Check(server.Start(opts), "Start() on ephemeral port succeeds");
   const std::uint16_t port = server.BoundPort();
