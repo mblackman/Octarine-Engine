@@ -368,6 +368,18 @@ function(octarine_package TARGET)
     _octarine_resolve_identity(_pkg_id          "${OCTARINE_PACKAGE_ID}"           "${_pi_package_id}"   "")
     _octarine_validate_identity("${OP_PROJECT}" "${_pkg_name}" "${_pkg_id}" "${_pkg_version}" ON)
 
+    # Soft engine version check: warn when project.ini declares an engine_version that doesn't
+    # match the engine being built against. Not fatal — the developer may be intentionally
+    # testing a newer engine — but surfacing the mismatch at configure time avoids surprises.
+    if (DEFINED _pi_engine_version AND NOT "${_pi_engine_version}" STREQUAL "")
+        if (NOT "${_pi_engine_version}" VERSION_EQUAL "${PROJECT_VERSION}")
+            message(WARNING
+                "Octarine: project.ini engine_version=${_pi_engine_version} does not match "
+                "building engine ${PROJECT_VERSION}. Update engine_version in project.ini "
+                "once you have validated the game against this engine build.")
+        endif ()
+    endif ()
+
     # ---- Per-project platform knobs ------------------------------------------------------------
     # Same CLI > project.ini > default precedence as identity. Resolved here so the desktop branch
     # (orientation/fullscreen reserved for downstream consumers) and the Android Gradle host

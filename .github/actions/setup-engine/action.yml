@@ -1,0 +1,127 @@
+name: Setup Octarine Engine
+description: |
+  Download and extract a versioned Octarine Engine SDK binary for the current
+  runner platform. After this action runs, `OctarineEngine` (or
+  `OctarineEngine.exe` on Windows) is on PATH and available as the `engine-bin`
+  output.
+
+  Assets are downloaded from the engine's GitHub Releases. The release tag must
+  match `v{engine-version}` (e.g. engine-version: '0.1.0' → tag v0.1.0).
+
+  Typical usage in a game repo:
+    - uses: mblackman/Octarine-Engine/.github/actions/setup-engine@v0.1.0
+      with:
+        engine-version: '0.1.0'
+    - run: OctarineEngine . -m bake
+
+inputs:
+  engine-version:
+    description: >
+      Engine version to download, without the 'v' prefix (e.g. '0.1.0').
+      Must match an existing GitHub Release tag (v{engine-version}).
+    required: true
+  flavor:
+    description: >
+      Which SDK variant to download: 'editor' (full editor UI, for local game
+      development) or 'player' (no editor/ImGui, lighter binary for game
+      packaging CI and end-user builds).
+    required: false
+    default: 'editor'
+  token:
+    description: >
+      GitHub token used to authenticate the release download. Defaults to the
+      calling workflow's GITHUB_TOKEN, which is sufficient for public repos.
+    required: false
+    default: ${{ github.token }}
+  install-dir:
+    description: >
+      Directory to extract the engine into. Defaults to ~/.octarine-engine.
+      The directory is created if it does not exist.
+    required: false
+    default: ''
+
+outputs:
+  engine-path:
+    description: Absolute path to the directory containing the engine binary.
+    value: ${{ steps.extract.outputs.engine-path }}
+  engine-bin:
+    description: Absolute path to the OctarineEngine binary.
+    value: ${{ steps.extract.outputs.engine-bin }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve platform
+      id: platform
+      shell: bash
+      run: |
+        case "${{ runner.os }}" in
+          Linux)   echo "os=linux"   >> "$GITHUB_OUTPUT"; echo "ext=tar.gz" >> "$GITHUB_OUTPUT" ;;
+          Windows) echo "os=windows" >> "$GITHUB_OUTPUT"; echo "ext=zip"    >> "$GITHUB_OUTPUT" ;;
+          macOS)   echo "os=macos"   >> "$GITHUB_OUTPUT"; echo "ext=tar.gz" >> "$GITHUB_OUTPUT" ;;
+          *)       echo "Unsupported runner OS: ${{ runner.os }}"; exit 1 ;;
+        esac
+
+    - name: Download engine release asset
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+      run: |
+        version="${{ inputs.engine-version }}"
+        os="${{ steps.platform.outputs.os }}"
+        ext="${{ steps.platform.outputs.ext }}"
+        filename="OctarineEngine-${version}-${os}-${{ inputs.flavor }}.${ext}"
+        echo "Downloading $filename from release v${version}"
+        # Use $RUNNER_TEMP (env var) instead of ${{ runner.temp }} so Git Bash on Windows
+        # sees a POSIX-style path rather than a raw Windows path literal.
+        gh release download "v${version}" \
+          --repo mblackman/Octarine-Engine \
+          --pattern "$filename" \
+          --dir "$RUNNER_TEMP/octarine-download"
+
+    - name: Extract engine binary
+      id: extract
+      shell: bash
+      run: |
+        version="${{ inputs.engine-version }}"
+        os="${{ steps.platform.outputs.os }}"
+        ext="${{ steps.platform.outputs.ext }}"
+        filename="OctarineEngine-${version}-${os}-${{ inputs.flavor }}.${ext}"
+
+        # Resolve install directory
+        if [ -n "${{ inputs.install-dir }}" ]; then
+          dest="${{ inputs.install-dir }}"
+        else
+          dest="${HOME}/.octarine-engine"
+        fi
+        mkdir -p "$dest"
+
+        case "$ext" in
+          tar.gz)
+            tar -xzf "$RUNNER_TEMP/octarine-download/$filename" -C "$dest"
+            ;;
+          zip)
+            unzip -q "$RUNNER_TEMP/octarine-download/$filename" -d "$dest"
+            ;;
+        esac
+
+        # Locate binary
+        if [ "$os" = "windows" ]; then
+          bin="$dest/OctarineEngine.exe"
+        else
+          bin="$dest/OctarineEngine"
+          chmod +x "$bin"
+        fi
+
+        # On Windows, GITHUB_PATH and step outputs must use Windows-style paths so
+        # PowerShell steps can resolve them — convert through cygpath when available.
+        if command -v cygpath &>/dev/null; then
+          echo "engine-path=$(cygpath -w "$dest")" >> "$GITHUB_OUTPUT"
+          echo "engine-bin=$(cygpath -w "$bin")"   >> "$GITHUB_OUTPUT"
+          echo "$(cygpath -w "$dest")" >> "$GITHUB_PATH"
+        else
+          echo "engine-path=$dest" >> "$GITHUB_OUTPUT"
+          echo "engine-bin=$bin"   >> "$GITHUB_OUTPUT"
+          echo "$dest" >> "$GITHUB_PATH"
+        fi
+        echo "Engine installed at $bin"
