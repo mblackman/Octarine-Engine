@@ -329,8 +329,19 @@ MIX_Audio *AssetManager::GetAudioClip(const std::string &assetId) const { return
 TTF_Font *AssetManager::GetFont(const std::string &assetId) const { return font_store_.Get(assetId); }
 
 std::string AssetManager::GetFullPath(const std::string &relativePath) const {
-  const std::filesystem::path basePath = base_path_;
-  const std::filesystem::path assetPath = basePath / relativePath;
+  const std::filesystem::path inputPath(relativePath);
+  // Absolute paths come from the catalog (already resolved). Only relative paths from
+  // user/Lua input need a traversal check to prevent escaping the asset root.
+  if (inputPath.is_absolute()) {
+    return relativePath;
+  }
+  const std::filesystem::path basePath = std::filesystem::path(base_path_).lexically_normal();
+  const std::filesystem::path assetPath = (basePath / inputPath).lexically_normal();
+  const auto rel = assetPath.lexically_relative(basePath);
+  if (rel.empty() || *rel.begin() == "..") {
+    Logger::Error("AssetManager::GetFullPath: path traversal rejected: " + relativePath);
+    return {};
+  }
   return assetPath.string();
 }
 

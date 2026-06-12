@@ -70,13 +70,9 @@ class Game : public LuaBindingContext {
   void SetUseManifest(bool useManifest) { use_manifest_ = useManifest; }
 
 #ifndef OCTARINE_SHIPPED
-  // Dev-only: opt into the DevListenServer (Stage 6 of EditorBuildAndDeployPlan). port=0 leaves
-  // the server stopped. listenAll=true binds 0.0.0.0; default 127.0.0.1. Called by Main from
-  // --dev-listen / --dev-listen-all and stripped from shipped binaries.
-  void SetDevListen(int port, bool listenAll) {
-    dev_listen_port_ = port;
-    dev_listen_all_ = listenAll;
-  }
+  // Dev-only: opt into the DevListenServer. port=0 leaves the server stopped; >0 binds on
+  // 127.0.0.1:<port>. Called by Main from --dev-listen and stripped from shipped binaries.
+  void SetDevListen(int port) { dev_listen_port_ = port; }
 #endif
 
   [[nodiscard]] SDL_Renderer* GetRenderer() const override { return runtime_.SdlRenderer(); }
@@ -133,7 +129,6 @@ class Game : public LuaBindingContext {
   bool use_manifest_ = false;
 #ifndef OCTARINE_SHIPPED
   int dev_listen_port_ = 0;
-  bool dev_listen_all_ = false;
 #endif
   int bake_validation_failures_ = 0;
 

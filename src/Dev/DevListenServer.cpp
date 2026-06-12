@@ -334,7 +334,7 @@ bool DevListenServer::Start(const ServerOptions& opts) {
   sockaddr_in addr{};
   addr.sin_family = AF_INET;
   addr.sin_port = htons(opts.port);
-  addr.sin_addr.s_addr = opts.listen_all ? htonl(INADDR_ANY) : htonl(INADDR_LOOPBACK);
+  addr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
 
   if (::bind(s, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == kSocketError) {
     Logger::Error("DevListenServer: bind() failed (err=" + std::to_string(LastSocketError()) +
@@ -363,12 +363,7 @@ bool DevListenServer::Start(const ServerOptions& opts) {
     impl_->bound_port = ntohs(bound.sin_port);
   }
 
-  if (opts.listen_all) {
-    Logger::Warn("DevListenServer: bound 0.0.0.0:" + std::to_string(impl_->bound_port) +
-                 " — exposed to LAN. Prefer 127.0.0.1 unless cross-host dev is intentional.");
-  } else {
-    Logger::Info("DevListenServer: bound 127.0.0.1:" + std::to_string(impl_->bound_port));
-  }
+  Logger::Info("DevListenServer: bound 127.0.0.1:" + std::to_string(impl_->bound_port));
 
   impl_->listen_sock = s;
   impl_->stop_requested.store(false, std::memory_order_release);

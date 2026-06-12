@@ -244,7 +244,6 @@ void Game::StartDevListenServer() {
   if (dev_listen_port_ > 0) {
     octarine::dev::ServerOptions opts;
     opts.port = static_cast<std::uint16_t>(dev_listen_port_);
-    opts.listen_all = dev_listen_all_;
     if (!devListen.Start(opts)) {
       Logger::Error("DevListenServer failed to start; --dev-listen flag had no effect.");
     }

@@ -230,7 +230,7 @@ bool AssetPak::Open(const std::string& pakPath) {
     }
     std::string relPath(reinterpret_cast<const char*>(tocCursor), pathLen);
     tocCursor += pathLen;
-    if (e.offset + e.size > header.tocOffset) {
+    if (e.size > header.tocOffset || e.offset > header.tocOffset - e.size) {
       Logger::Error("AssetPak::Open: entry '" + relPath + "' overlaps TOC region");
       SDL_free(buf);
       entries_.clear();
