@@ -84,8 +84,8 @@ void LuaModuleBinding<StorageModule>::install(sol::state& lua, LuaBindingContext
   storage.set_function("write", [&ctx](const std::string& path, const std::string& contents) -> bool {
     return Write(ctx, path, contents);
   });
-  storage.set_function(
-      "read", [&ctx](const std::string& path) -> sol::optional<std::string> { return Read(ctx, path); });
+  storage.set_function("read",
+                       [&ctx](const std::string& path) -> sol::optional<std::string> { return Read(ctx, path); });
   storage.set_function("exists", [&ctx](const std::string& path) -> bool { return Exists(ctx, path); });
   storage.set_function("remove", [&ctx](const std::string& path) -> bool { return Remove(ctx, path); });
   // Path optional: storage.list() lists the save-data root itself.

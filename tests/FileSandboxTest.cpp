@@ -3,10 +3,9 @@
 // storage.* / project.* modules end-to-end through a fake LuaBindingContext host — including the
 // editor-session gate that keeps project.* out of player sessions.
 
-#include <sol/sol.hpp>
-
 #include <filesystem>
 #include <fstream>
+#include <sol/sol.hpp>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -88,14 +87,12 @@ void TestStorageModule(LuaBindingContext& host, const std::filesystem::path& sav
   Check(lua["storage"].get_type() == sol::type::table, "storage table installed");
   Check(lua.script("return storage.write('saves/slot1.json', 'hello')").get<bool>(), "storage.write");
   Check(std::filesystem::exists(saveRoot / "saves/slot1.json"), "storage.write landed under the save root");
-  Check(lua.script("return storage.read('saves/slot1.json')").get<std::string>() == "hello",
-        "storage.read roundtrip");
+  Check(lua.script("return storage.read('saves/slot1.json')").get<std::string>() == "hello", "storage.read roundtrip");
   Check(lua.script("return storage.read('saves/missing.json') == nil").get<bool>(),
         "storage.read returns nil for a missing file");
   Check(lua.script("return storage.exists('saves/slot1.json')").get<bool>(), "storage.exists");
   Check(lua.script("return storage.list('saves')[1]").get<std::string>() == "slot1.json", "storage.list");
-  Check(lua.script("return storage.list()[1]").get<std::string>() == "saves",
-        "storage.list() lists the save root");
+  Check(lua.script("return storage.list()[1]").get<std::string>() == "saves", "storage.list() lists the save root");
   Check(!lua.script("return storage.write('../evil.txt', 'x')").get<bool>(), "storage.write rejects traversal");
   Check(!std::filesystem::exists(saveRoot.parent_path() / "evil.txt"), "traversal write created nothing");
   Check(lua.script("return storage.remove('saves/slot1.json')").get<bool>(), "storage.remove");
