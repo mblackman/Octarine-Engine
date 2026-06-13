@@ -6,12 +6,12 @@
 #include <string>
 
 #include "AssetManager/AssetManager.h"
-#include "Engine/LuaProtect.h"
 #include "Audio/AudioTrackCache.h"
 #include "Components/CameraComponents.h"
 #include "Components/ViewportInfo.h"
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
+#include "Engine/LuaProtect.h"
 #include "EventBus/EventBus.h"
 #include "Game/Game.h"
 #include "Game/GameConfig.h"

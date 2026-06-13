@@ -12,8 +12,7 @@
 inline void DecryptLuaBytes(std::string& bytes) {
 #if defined(OCTARINE_LUA_XOR_KEY)
   constexpr auto key = static_cast<uint8_t>(OCTARINE_LUA_XOR_KEY);
-  for (std::size_t i = 0; i < bytes.size(); ++i)
-    bytes[i] ^= static_cast<uint8_t>((key + i) & 0xFF);
+  for (std::size_t i = 0; i < bytes.size(); ++i) bytes[i] ^= static_cast<uint8_t>((key + i) & 0xFF);
 #else
   (void)bytes;
 #endif
