@@ -24,6 +24,7 @@ set(OCTARINE_CORE_SOURCES
         General/Logger.cpp
         General/FileSandbox.cpp
         General/FileWatcher.cpp
+        General/LuaEscape.cpp
         General/SystemMemory.cpp
         ECS/Registry.cpp
         Game/GameConfig.cpp
@@ -113,6 +114,7 @@ target_link_libraries(octarine_renderer PUBLIC
 # -----------------------------------------------------------------------------
 octarine_library(octarine_lua
         Lua/LuaApiManifest.cpp
+        Lua/LuaTableSerializer.cpp
         Lua/Bindings/InputSystemLuaBinding.cpp
         Lua/Bindings/RegisterAllBindings.cpp
         Lua/HotReload/ScriptHotReload.cpp

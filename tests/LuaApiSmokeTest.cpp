@@ -156,12 +156,13 @@ int main() {
   Check(TableHasFunction(lua, "input", "is_key_down"), "input.is_key_down (InputSystem surface)");
 
   std::cout << "[file write surface] storage.* (all builds) + project.* (editor sessions)\n";
-  for (const auto* fn : {"write", "read", "exists", "remove", "list"}) {
+  for (const auto* fn : {"write", "read", "write_table", "read_table", "exists", "remove", "list"}) {
     Check(TableHasFunction(lua, "storage", fn), std::string("storage.") + fn);
   }
 #ifdef OCTARINE_WITH_EDITOR
   Check(TableHasFunction(lua, "project", "path"), "project.path (editor session)");
   Check(TableHasFunction(lua, "project", "write_file"), "project.write_file (editor session)");
+  Check(TableHasFunction(lua, "project", "write_table"), "project.write_table (editor session)");
 #endif
 
   std::cout << "[manifest] generator runs\n";
