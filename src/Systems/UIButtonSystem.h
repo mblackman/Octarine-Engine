@@ -49,9 +49,12 @@ class UIButtonSystem {
       mouseY = transformed.y;
     }
 
-    auto query = registry_->CreateQuery<UIButtonComponent, GlobalTransformComponent, Opt<BoxColliderComponent>>();
+    // GlobalTransformComponent is optional: layout-driven UI buttons (a UIRectComponent and no
+    // transform) hit-test against their resolved rect; world-space buttons hit-test against their
+    // collider in transform space. Requiring the transform would exclude every UI button.
+    auto query = registry_->CreateQuery<UIButtonComponent, Opt<GlobalTransformComponent>, Opt<BoxColliderComponent>>();
     const auto& camera = registry_->Get<CameraComponent>().viewport;
-    auto handler = [&](Entity entity, UIButtonComponent& button, const GlobalTransformComponent& transform,
+    auto handler = [&](Entity entity, UIButtonComponent& button, const GlobalTransformComponent* transform,
                        const BoxColliderComponent* collider) {
       if (!button.isActive || button.clickFunction == sol::lua_nil) {
         return;
@@ -67,21 +70,24 @@ class UIButtonSystem {
 
  private:
   [[nodiscard]] bool HitTest(const Entity entity, const UIButtonComponent& button,
-                             const GlobalTransformComponent& transform, const BoxColliderComponent* collider,
+                             const GlobalTransformComponent* transform, const BoxColliderComponent* collider,
                              const octarine::Rect& camera, const float mouseX, const float mouseY) const {
+    // Layout-driven UI button: the resolved rect already accounts for anchoring, so no collider or
+    // transform is needed — this is the preferred path for `ui_button` + `ui_anchor` entities.
     if (registry_->HasComponent<UIRectComponent>(entity)) {
       const auto& rect = registry_->GetComponent<UIRectComponent>(entity);
       return mouseX >= rect.left && mouseX <= rect.right && mouseY >= rect.top && mouseY <= rect.bottom;
     }
-    if (collider) {
-      float x = transform.position.x + collider->offset.x * transform.scale.x;
-      float y = transform.position.y + collider->offset.y * transform.scale.y;
+    // World-space button: position the collider in transform space.
+    if (collider && transform) {
+      float x = transform->position.x + collider->offset.x * transform->scale.x;
+      float y = transform->position.y + collider->offset.y * transform->scale.y;
       if (!button.isFixed) {
         x -= camera.x;
         y -= camera.y;
       }
-      const float w = static_cast<float>(collider->width) * transform.scale.x;
-      const float h = static_cast<float>(collider->height) * transform.scale.y;
+      const float w = static_cast<float>(collider->width) * transform->scale.x;
+      const float h = static_cast<float>(collider->height) * transform->scale.y;
       return mouseX >= x && mouseX <= x + w && mouseY >= y && mouseY <= y + h;
     }
     return false;
