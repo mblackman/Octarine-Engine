@@ -10,6 +10,7 @@
 #include <sol/sol.hpp>
 #include <string>
 
+#include "Engine/LuaProtect.h"
 #include "Game/GameConfig.h"
 #include "General/Logger.h"
 
@@ -298,8 +299,9 @@ bool AssetCatalog::LoadManifest(const std::string& manifestPath, sol::state& lua
     Logger::Error("AssetCatalog: failed to read manifest '" + manifestPath + "': " + SDL_GetError());
     return false;
   }
-  const std::string chunk(static_cast<const char*>(data), size);
+  std::string chunk(static_cast<const char*>(data), size);
   SDL_free(data);
+  DecryptLuaBytes(chunk);
 
   sol::protected_function_result result = lua.safe_script(chunk, sol::script_pass_on_error, "@" + manifestPath);
   if (!result.valid()) {

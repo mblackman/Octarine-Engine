@@ -41,6 +41,7 @@
 #include "Engine/EditorBootstrap.h"
 #include "Engine/EngineBootstrap.h"
 #include "Engine/Platform/PlatformPaths.h"
+#include "Engine/LuaProtect.h"
 #include "Engine/SdlFileReader.h"
 #include "Events/KeyInputEvent.h"
 #include "Events/MouseInputEvent.h"
@@ -107,6 +108,7 @@ inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const Ga
     Logger::Error("Failed to read entry script: " + filePath);
     return;
   }
+  DecryptLuaBytes(*bytes);
 
   sol::protected_function_result result;
   try {

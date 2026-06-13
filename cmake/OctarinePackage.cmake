@@ -49,6 +49,32 @@ include("${CMAKE_CURRENT_LIST_DIR}/octarine-licenses.cmake")
 # on a machine with a working NSIS install.
 option(OCTARINE_PACKAGE_NSIS "Also emit an NSIS installer on Windows (requires a working makensis)" OFF)
 
+# Script protection: compile all .lua files in the installed package to stripped bytecode so that
+# plaintext source is not shipped. luac -s strips debug info, which specifically breaks unluac (the
+# most capable Lua decompiler). Source files in PROJECT_DIR are never modified — only the installed
+# copy is touched. Defaults ON for shipped builds. Set OFF to ship plain source (e.g. for
+# games that support modding and want the full script surface readable by players).
+# mods/ directories are always excluded so mod scripts remain human-editable regardless of this flag.
+option(OCTARINE_PROTECT_SCRIPTS "Compile Lua scripts to stripped bytecode in packaged builds" ${OCTARINE_SHIPPED})
+
+# XOR key for encrypting compiled Lua bytecode at package time and decrypting at runtime.
+# Set to any non-empty uint8 value (decimal or 0x-prefixed hex, e.g. "90" or "0x5A").
+# Leave empty (the default) to skip encryption — bytecode compilation still runs if
+# OCTARINE_PROTECT_SCRIPTS is ON, but the result is unencrypted. Change this value per project/build
+# so that the same decryption key is not shared across all Octarine games.
+set(OCTARINE_LUA_XOR_KEY "" CACHE STRING "XOR key (uint8) for Lua bytecode encryption; empty = no encryption")
+
+if (OCTARINE_PROTECT_SCRIPTS)
+    find_program(LUAC_EXECUTABLE
+        NAMES luac luac5.4
+        HINTS
+            "${CMAKE_BINARY_DIR}/vcpkg_installed/${VCPKG_TARGET_TRIPLET}/tools/lua"
+            "${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/tools/lua"
+        REQUIRED
+    )
+    message(STATUS "Octarine: script protection enabled (luac=${LUAC_EXECUTABLE})")
+endif ()
+
 # CLI overrides for project identity (precedence: CLI cache var > project.ini > built-in default).
 # Empty default = "not set on the CLI"; the helper falls through to the file or default.
 set(OCTARINE_PACKAGE_NAME         "" CACHE STRING "Override project.ini: name")
@@ -213,6 +239,62 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
             PATTERN "preferences.ini" EXCLUDE
             PATTERN "imgui.ini" EXCLUDE
     )
+
+    # Compile installed Lua scripts to stripped bytecode. Runs after install(DIRECTORY) so it
+    # operates on the installed copy without touching PROJECT_DIR source files. Excluded: mods/
+    # directories always ship as plain source so player-authored scripts remain editable regardless
+    # of OCTARINE_PROTECT_SCRIPTS. lua.safe_script() / luaL_loadbuffer detects the \x1bLua magic
+    # header transparently, so no C++ changes are required for bytecode-only payloads.
+    if (OCTARINE_PROTECT_SCRIPTS)
+        install(CODE "
+            message(STATUS \"Octarine: compiling Lua scripts to stripped bytecode...\")
+            file(GLOB_RECURSE _lua_sources
+                 LIST_DIRECTORIES false
+                 \"\${CMAKE_INSTALL_PREFIX}/${DATA_DEST}/*.lua\")
+            list(FILTER _lua_sources EXCLUDE REGEX \".*/mods/.*\")
+            foreach (_src IN LISTS _lua_sources)
+                execute_process(
+                    COMMAND \"${LUAC_EXECUTABLE}\" -s -o \"\${_src}.tmp\" \"\${_src}\"
+                    RESULT_VARIABLE _rc)
+                if (NOT _rc EQUAL 0)
+                    message(FATAL_ERROR \"Octarine: luac failed on \${_src} (rc=\${_rc})\")
+                endif ()
+                file(RENAME \"\${_src}.tmp\" \"\${_src}\")
+            endforeach ()
+            message(STATUS \"Octarine: Lua bytecode compilation done.\")
+        ")
+    endif ()
+
+    # XOR-encrypt the compiled bytecode so that automated extract-and-decompile pipelines require an
+    # extra step to recover the key. The same rolling-XOR key is compiled into the engine binary
+    # (OCTARINE_LUA_XOR_KEY compile definition) so the runtime decrypts transparently. mods/ scripts
+    # are excluded here to match the bytecode step — they ship as plain source.
+    if (OCTARINE_PROTECT_SCRIPTS AND OCTARINE_LUA_XOR_KEY AND NOT "${OCTARINE_LUA_XOR_KEY}" STREQUAL "")
+        install(CODE "
+            message(STATUS \"Octarine: XOR-encrypting Lua bytecode (key=${OCTARINE_LUA_XOR_KEY})...\")
+            file(GLOB_RECURSE _lua_enc_sources
+                 LIST_DIRECTORIES false
+                 \"\${CMAKE_INSTALL_PREFIX}/${DATA_DEST}/*.lua\")
+            list(FILTER _lua_enc_sources EXCLUDE REGEX \".*/mods/.*\")
+            # Write the encryption helper to a temp file to avoid quoting the Python code inline.
+            set(_enc_py \"\${CMAKE_INSTALL_PREFIX}/_octarine_enc.py\")
+            file(WRITE \"\${_enc_py}\"
+                \"import sys\\n\"
+                \"k = ${OCTARINE_LUA_XOR_KEY}\\n\"
+                \"for f in sys.argv[1:]:\\n\"
+                \"    d = open(f, 'rb').read()\\n\"
+                \"    open(f, 'wb').write(bytes((b ^ ((k + i) & 0xFF)) for i, b in enumerate(d)))\\n\"
+            )
+            execute_process(
+                COMMAND python3 \"\${_enc_py}\" \${_lua_enc_sources}
+                RESULT_VARIABLE _rc)
+            file(REMOVE \"\${_enc_py}\")
+            if (NOT _rc EQUAL 0)
+                message(FATAL_ERROR \"Octarine: Lua XOR encryption failed (rc=\${_rc})\")
+            endif ()
+            message(STATUS \"Octarine: Lua XOR encryption done.\")
+        ")
+    endif ()
 endfunction()
 
 # Bundle vcpkg runtime libs + C/C++ runtime beside the binary.

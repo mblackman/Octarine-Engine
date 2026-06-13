@@ -6,6 +6,7 @@
 #include <string>
 
 #include "AssetManager/AssetManager.h"
+#include "Engine/LuaProtect.h"
 #include "Audio/AudioTrackCache.h"
 #include "Components/CameraComponents.h"
 #include "Components/ViewportInfo.h"
@@ -58,6 +59,7 @@ int LuaDofileViaSDL(lua_State* L) {
   if (!bytes) {
     return luaL_error(L, "dofile: cannot open '%s'", path.c_str());
   }
+  DecryptLuaBytes(*bytes);
 
   lua_settop(L, 0);
   const int topBefore = lua_gettop(L);

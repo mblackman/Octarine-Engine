@@ -13,6 +13,7 @@
 #include "Audio/AudioTrackCache.h"
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
+#include "Engine/LuaProtect.h"
 #include "Engine/SdlFileReader.h"
 #include "Game/GameConfig.h"
 #include "General/Logger.h"
@@ -87,6 +88,7 @@ void SceneLoader::LoadScene(const std::string& scenePath) {
 #endif
 
   auto sceneBytes = ReadFileViaSDL(fullPath);
+  if (sceneBytes) DecryptLuaBytes(*sceneBytes);
   sol::protected_function_result result;
   if (sceneBytes) {
     result = lua_.safe_script(*sceneBytes, sol::script_pass_on_error, "@" + fullPath);

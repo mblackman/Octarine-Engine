@@ -5,6 +5,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <sol/sol.hpp>
 
+#include "Engine/LuaProtect.h"
 #include "General/Logger.h"
 #include "stb/stb_image.h"
 
@@ -66,7 +67,18 @@ bool GlyphAtlas::Load(const std::string& pngFullPath, const std::string& luaFull
 
   sol::state lua;
   lua.open_libraries(sol::lib::base);
-  sol::protected_function_result rc = lua.safe_script_file(luaFullPath, sol::script_pass_on_error);
+  std::size_t luaBytes = 0;
+  void* luaRaw = SDL_LoadFile(luaFullPath.c_str(), &luaBytes);
+  if (luaRaw == nullptr) {
+    Logger::Error("GlyphAtlas::Load: SDL_LoadFile failed for " + luaFullPath + ": " + std::string(SDL_GetError()));
+    SDL_DestroySurface(source_surface_);
+    source_surface_ = nullptr;
+    return false;
+  }
+  std::string luaChunk(static_cast<const char*>(luaRaw), luaBytes);
+  SDL_free(luaRaw);
+  DecryptLuaBytes(luaChunk);
+  sol::protected_function_result rc = lua.safe_script(luaChunk, sol::script_pass_on_error, "@" + luaFullPath);
   if (!rc.valid()) {
     const sol::error err = rc;
     Logger::Error("GlyphAtlas::Load: dofile failed for " + luaFullPath + ": " + err.what());
