@@ -61,12 +61,12 @@ All four live on the global `ui` table, installed by the UI Lua module.
 
 Marks `entity` as a layout root. `opts` (all optional):
 
-| Key | Default | Meaning |
-|---|---|---|
-| `fixed` | `true` | Canvas is screen-fixed (does not scroll with the camera). |
-| `width` | `0` | Canvas width in pixels. `0` → use the live viewport width at layout time. |
-| `height` | `0` | Canvas height in pixels. `0` → use the live viewport height. |
-| `base_layer` | `0` | Render layer all entities in this canvas inherit as their baseline. |
+| Key          | Default | Meaning                                                                   |
+|--------------|---------|---------------------------------------------------------------------------|
+| `fixed`      | `true`  | Canvas is screen-fixed (does not scroll with the camera).                 |
+| `width`      | `0`     | Canvas width in pixels. `0` → use the live viewport width at layout time. |
+| `height`     | `0`     | Canvas height in pixels. `0` → use the live viewport height.              |
+| `base_layer` | `0`     | Render layer all entities in this canvas inherit as their baseline.       |
 
 The canvas itself needs no transform components — `{ components = {} }` is a
 fine canvas entity.
@@ -79,21 +79,21 @@ Attaches (or replaces) the anchor on `entity`. The second argument is either a
 **Preset form** — `ui.anchor(e, "center", { width = 400, height = 40 })`. The
 optional third argument reads only three keys:
 
-| Opt key | Used by | Meaning |
-|---|---|---|
-| `width` | sized presets | Element width in pixels. |
-| `height` | sized presets | Element height in pixels. |
-| `margin` | `fill` | Inset from the parent edges. |
+| Opt key  | Used by       | Meaning                      |
+|----------|---------------|------------------------------|
+| `width`  | sized presets | Element width in pixels.     |
+| `height` | sized presets | Element height in pixels.    |
+| `margin` | `fill`        | Inset from the parent edges. |
 
 Presets:
 
-| Preset | Result |
-|---|---|
-| `fill` | Stretch to the parent rect, inset by `margin`. |
-| `center` | `width`×`height` box centered in the parent. |
-| `top_left`, `top_right`, `bottom_left`, `bottom_right` | `width`×`height` box pinned to that corner. |
-| `top_center`, `bottom_center` | `width`×`height` box centered on that edge. |
-| `left`, `right` | Full-height bar of `width`, pinned to that side. |
+| Preset                                                 | Result                                           |
+|--------------------------------------------------------|--------------------------------------------------|
+| `fill`                                                 | Stretch to the parent rect, inset by `margin`.   |
+| `center`                                               | `width`×`height` box centered in the parent.     |
+| `top_left`, `top_right`, `bottom_left`, `bottom_right` | `width`×`height` box pinned to that corner.      |
+| `top_center`, `bottom_center`                          | `width`×`height` box centered on that edge.      |
+| `left`, `right`                                        | Full-height bar of `width`, pinned to that side. |
 
 > Presets ignore `offset_*` keys. Passing `offset_top` to `ui.anchor(e, "center", {...})`
 > does nothing — use the raw table form when you need explicit offsets.
@@ -126,11 +126,6 @@ Adds `z` to the entity's render layer. Layers **accumulate down the hierarchy**:
 a child's final layer is `canvas.base_layer` + the sum of every `z_index` on the
 path from the canvas to that child. Use it to lift a panel and its contents
 above the background in one place.
-
-### `ui.flex(entity, opts?)`
-
-Reserved for flex containers — **not yet implemented**. Calling it logs a
-warning and does nothing.
 
 ---
 
@@ -177,8 +172,6 @@ ui.anchor(sub, {
 
 ## Gotchas
 
-- **`set_parent(child, parent)` — child first.** Reversing the arguments
-  reparents the canvas and silently breaks layout.
 - **No canvas ancestor → no layout.** An anchored entity that is not a
   descendant of a canvas is never resolved.
 - **Presets ignore `offset_*`.** Preset opts read only `width` / `height` /
@@ -191,13 +184,13 @@ ui.anchor(sub, {
 
 ## Related components
 
-| Lua key | Set by | Holds |
-|---|---|---|
-| `ui_canvas` | `ui.canvas` | Canvas flags + size + base layer. |
-| `ui_anchor` | `ui.anchor` | The four anchors and four offsets. |
-| `ui_rect` | `UILayoutSystem` (computed) | Resolved `left/top/right/bottom/layer` in pixels. |
-| `ui_z_index` | `ui.z_index` | Per-entity layer delta. |
-| `ui_button` | project scripts | Interactive state (`registry.get_ui_button`). |
+| Lua key      | Set by                      | Holds                                             |
+|--------------|-----------------------------|---------------------------------------------------|
+| `ui_canvas`  | `ui.canvas`                 | Canvas flags + size + base layer.                 |
+| `ui_anchor`  | `ui.anchor`                 | The four anchors and four offsets.                |
+| `ui_rect`    | `UILayoutSystem` (computed) | Resolved `left/top/right/bottom/layer` in pixels. |
+| `ui_z_index` | `ui.z_index`                | Per-entity layer delta.                           |
+| `ui_button`  | project scripts             | Interactive state (`registry.get_ui_button`).     |
 
 `ui_rect` is output, not input — read it if you need an element's resolved
 screen position, but do not author it by hand.
