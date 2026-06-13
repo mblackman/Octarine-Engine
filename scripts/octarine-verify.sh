@@ -150,7 +150,8 @@ test_targets=(
   OctarineEcsTest OctarineEcsHierarchyTest OctarineSystemLogicTest OctarineEventBusTest
   OctarineCollisionSystemTest OctarineCollisionResponseTest OctarineProjectileEmitSystemTest
   OctarineAssetRefcounterTest OctarineDevListenServerTest OctarineLuaBehaviorTest
-  OctarineFileWatcherTest OctarineGameBakeTest
+  OctarineFileWatcherTest OctarineGameBakeTest OctarineFileSandboxTest
+  OctarineRenderQueueTest OctarineAssetStoreTest
 )
 
 if [[ $do_build -eq 1 ]]; then

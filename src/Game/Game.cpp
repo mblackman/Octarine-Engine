@@ -9,6 +9,7 @@
 #include <set>
 #include <sol/sol.hpp>
 #include <string>
+#include <string_view>
 #include <unordered_set>
 
 #include "AssetManager/AssetCatalog.h"
@@ -48,6 +49,7 @@
 #include "General/Logger.h"
 #include "General/PerfUtils.h"
 #include "General/Rect.h"
+#include "Project/ProjectIni.h"
 #include "Renderer/RenderQueue.h"
 #include "Renderer/Renderer.h"
 #include "Renderer/SpriteRenderCache.h"
@@ -261,6 +263,53 @@ bool Game::CreateWindowAndScene(bool projectLoaded) {
     return false;
   }
   return renderer_->CreateScene(runtime_.SdlRenderer(), gameConfig.windowWidth, gameConfig.windowHeight);
+}
+
+bool Game::IsEditorMode() const {
+  const auto* config = registry_->TryGet<GameConfig>();
+  return config != nullptr && config->IsEditorMode();
+}
+
+std::string Game::GetProjectPath() const {
+  const auto* config = registry_->TryGet<GameConfig>();
+  return config != nullptr ? config->GetAssetPath() : std::string{};
+}
+
+std::string Game::GetSaveDataPath() {
+  if (!save_data_path_.empty()) {
+    return save_data_path_;
+  }
+
+  // Identity precedence: project.ini vendor/name > config.ini GameTitle > engine defaults.
+  // project.ini is read via SDL so it resolves inside an APK or .app bundle the same way
+  // config.ini does.
+  std::string org = "Octarine";
+  std::string app = "Engine";
+  if (const auto* config = registry_->TryGet<GameConfig>(); config != nullptr && config->HasLoadedConfig()) {
+    if (!config->GetGameTitle().empty()) {
+      app = config->GetGameTitle();
+    }
+    const std::string iniPath = config->GetAssetPath() + "/project.ini";
+    size_t dataSize = 0;
+    if (void* data = SDL_LoadFile(iniPath.c_str(), &dataSize)) {
+      const auto ini = octarine::project::ProjectIni::Parse(std::string_view(static_cast<const char*>(data), dataSize));
+      SDL_free(data);
+      if (!ini.vendor.empty()) {
+        org = ini.vendor;
+      }
+      if (!ini.name.empty()) {
+        app = ini.name;
+      }
+    }
+  }
+
+  if (char* prefPath = SDL_GetPrefPath(org.c_str(), app.c_str())) {
+    save_data_path_ = prefPath;
+    SDL_free(prefPath);
+  } else {
+    Logger::Error("Game::GetSaveDataPath: SDL_GetPrefPath failed: " + std::string(SDL_GetError()));
+  }
+  return save_data_path_;
 }
 
 void Game::Destroy() {
