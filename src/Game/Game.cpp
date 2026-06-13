@@ -79,6 +79,7 @@
 #include "Systems/RenderPrimitiveSystem.h"
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/RenderTextSystem.h"
+#include "Systems/RenderUIPrimitiveSystem.h"
 #include "Systems/RenderUISpriteSystem.h"
 #include "Systems/ScriptCollisionSystem.h"
 #include "Systems/ScriptSystem.h"
@@ -685,6 +686,7 @@ void Game::Setup() {
   // Render queue producers
   registry_->RegisterParallelSystem<GlobalTransformComponent, SpriteComponent>(RenderSpriteSystem());
   registry_->RegisterSystem<UIRectComponent, SpriteComponent>(RenderUISpriteSystem());
+  registry_->RegisterSystem<UIRectComponent, SquarePrimitiveComponent>(RenderUIPrimitiveSystem());
   registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
   registry_->RegisterParallelSystem<SquarePrimitiveComponent, GlobalTransformComponent>(RenderPrimitiveSystem());
 
