@@ -99,6 +99,73 @@ void TestStorageModule(LuaBindingContext& host, const std::filesystem::path& sav
   Check(!std::filesystem::exists(saveRoot / "saves/slot1.json"), "storage.remove deleted the file");
 }
 
+void TestTableRoundtrip(LuaBindingContext& host) {
+  sol::state lua;
+  lua.open_libraries(sol::lib::base, sol::lib::string, sol::lib::table, sol::lib::math);
+  LuaModuleBinding<StorageModule>::install(lua, host);
+
+  Check(lua.script(R"(
+    local state = {
+      level = 3, hp = 72.5, name = 'Rince"wind\n', alive = true,
+      inventory = { 'sword', 'luggage' },
+      flags = { [false] = 'no', [true] = 'yes' },
+      big = 2^53, neg = -7, huge = math.huge,
+    }
+    return storage.write_table('saves/state.lua', state)
+  )")
+            .get<bool>(),
+        "storage.write_table");
+
+  Check(lua.script(R"(
+    local s = storage.read_table('saves/state.lua')
+    return s ~= nil
+      and s.level == 3 and s.hp == 72.5 and s.name == 'Rince"wind\n' and s.alive == true
+      and s.inventory[1] == 'sword' and s.inventory[2] == 'luggage'
+      and s.flags[false] == 'no' and s.flags[true] == 'yes'
+      and s.big == 2^53 and s.neg == -7 and s.huge == math.huge
+  )")
+            .get<bool>(),
+        "storage.read_table roundtrips every value");
+
+  Check(lua.script("return storage.read_table('saves/nope.lua') == nil").get<bool>(),
+        "storage.read_table returns nil for a missing file");
+
+  // A save file is data, not code: a tampered file that calls anything fails to load (its
+  // environment is empty), and one that returns a non-table is rejected.
+  Check(lua.script(R"(
+    storage.write('saves/evil.lua', 'print("pwned") return {}')
+    return storage.read_table('saves/evil.lua') == nil
+  )")
+            .get<bool>(),
+        "storage.read_table runs tampered files without any globals");
+  Check(lua.script(R"(
+    storage.write('saves/notatable.lua', 'return 42')
+    return storage.read_table('saves/notatable.lua') == nil
+  )")
+            .get<bool>(),
+        "storage.read_table rejects a non-table result");
+
+  // Unserializable inputs fail loudly instead of writing a partial save.
+  Check(!lua.script("return storage.write_table('saves/fn.lua', { f = function() end })").get<bool>(),
+        "storage.write_table rejects function values");
+  Check(!lua.script(R"(
+    local t = {}
+    t.self = t
+    return storage.write_table('saves/cycle.lua', t)
+  )")
+             .get<bool>(),
+        "storage.write_table rejects cyclic tables");
+
+  // Determinism: serializing the same logical table twice yields identical bytes.
+  Check(lua.script(R"(
+    storage.write_table('saves/a.lua', { z = 1, a = 2, [3] = 'c', [1] = 'a' })
+    storage.write_table('saves/b.lua', { [1] = 'a', a = 2, [3] = 'c', z = 1 })
+    return storage.read('saves/a.lua') == storage.read('saves/b.lua')
+  )")
+            .get<bool>(),
+        "storage.write_table output is deterministic");
+}
+
 void TestProjectModule(const std::string& saveRoot, const std::filesystem::path& projectRoot) {
   {
     sol::state lua;
@@ -141,6 +208,9 @@ int main() {
   std::cout << "[storage module]\n";
   FakeHost host(saveRoot.string(), projectRoot.string(), /*editorMode=*/false);
   TestStorageModule(host, saveRoot);
+
+  std::cout << "[table serialization]\n";
+  TestTableRoundtrip(host);
 
   std::cout << "[project module]\n";
   TestProjectModule(saveRoot.string(), projectRoot);

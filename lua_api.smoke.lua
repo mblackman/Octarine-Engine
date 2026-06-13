@@ -1675,6 +1675,8 @@ function project.path(...) end
 
 function project.write_file(...) end
 
+function project.write_table(...) end
+
 
 ---@class projectile_emitter_component
 projectile_emitter_component = {}
@@ -1823,9 +1825,13 @@ function storage.list(...) end
 
 function storage.read(...) end
 
+function storage.read_table(...) end
+
 function storage.remove(...) end
 
 function storage.write(...) end
+
+function storage.write_table(...) end
 
 
 ---@class text_label_component
