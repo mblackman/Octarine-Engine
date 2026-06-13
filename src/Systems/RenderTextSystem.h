@@ -84,7 +84,18 @@ class RenderTextSystem {
     int renderLayer = text.layer;
     if (registry->HasComponent<UIRectComponent>(entity)) {
       const auto& rect = registry->GetComponent<UIRectComponent>(entity);
-      origin = glm::vec2(rect.left, rect.top) + text.position;
+      // Align the rasterized texture within the rect. Start leaves the top-left at the rect corner
+      // (historical behavior); Center/End shift by the slack between the rect and the text size.
+      const float slackX = rect.Width() - it->second.width;
+      const float slackY = rect.Height() - it->second.height;
+      const auto offsetFor = [](const TextAlign align, const float slack) {
+        static constexpr float kHalf = 0.5f;
+        if (align == TextAlign::Center) return slack * kHalf;
+        if (align == TextAlign::End) return slack;
+        return 0.0f;
+      };
+      origin = glm::vec2(rect.left + offsetFor(text.hAlign, slackX), rect.top + offsetFor(text.vAlign, slackY)) +
+               text.position;
       effectivelyFixed = true;
       renderLayer = rect.layer;
     } else if (registry->HasComponent<GlobalTransformComponent>(entity)) {
