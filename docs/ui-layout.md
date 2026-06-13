@@ -170,6 +170,45 @@ ui.anchor(sub, {
 
 ---
 
+## Buttons
+
+A clickable button is a layout entity carrying a `ui_button` component. Add an
+anchor and it becomes both visible and clickable — `UIButtonSystem` hit-tests
+the mouse against the entity's resolved `ui_rect`, so the click region always
+matches what layout drew. No collider is involved.
+
+```lua
+local btn = load_entity({
+    components = {
+        square    = { color = { r = 60, g = 40, b = 90, a = 230 } },  -- panel body
+        ui_button = {
+            is_active = true,
+            is_fixed  = true,
+            on_click  = function(self, entity)
+                self.is_active = false        -- `self` is the ui_button table; guard re-fire
+                load_scene("scenes/arena.lua")
+            end,
+        },
+    },
+})
+registry.set_parent(btn, menu)
+ui.anchor(btn, "center", { width = 240, height = 64 })   -- sizes both the panel and the hit region
+```
+
+- **No `box_collider` needed.** Hit-testing uses `ui_rect`. A collider on a UI
+  button is ignored (and, being world-space, would not follow the anchor
+  anyway). Colliders remain the hit path only for world-space buttons that have
+  a `transform` instead of a `ui_rect`.
+- **`on_click(self, entity)`** — `self` is the `ui_button` table (set extra
+  fields on it to read them back here); `entity` is the button entity. Fetch the
+  live component elsewhere with `registry.get_ui_button(entity)`.
+- **`is_active = false`** disables hit-testing without destroying the entity —
+  use it to debounce a click that triggers a scene load mid-frame.
+- Add a centered `text_label` child for the label, anchored `center` to the
+  button, so the caption follows the button rect.
+
+---
+
 ## Gotchas
 
 - **No canvas ancestor → no layout.** An anchored entity that is not a
