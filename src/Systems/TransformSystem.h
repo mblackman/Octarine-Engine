@@ -178,6 +178,10 @@ class TransformSystem {
   }
 
   void WriteGlobal(Archetype* archetype, size_t chunkIdx, size_t indexInChunk, const GlobalTransform& g) const {
+    // Hierarchy members are visited via ForEachChild regardless of components, so a parented
+    // entity without a GlobalTransformComponent (e.g. a UI node) reaches here. Guard before the
+    // array fetch — GetComponentArray asserts HasComponent, it does not return null.
+    if (!archetype->HasComponent(globalEntity_.GetId())) return;
     auto* gArray = archetype->GetComponentArray<GlobalTransformComponent>(chunkIdx, globalEntity_.GetId());
     if (!gArray) return;
     auto& global = gArray[indexInChunk];
