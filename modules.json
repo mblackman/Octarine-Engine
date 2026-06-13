@@ -40,6 +40,16 @@
       "name": "UI",
       "binding_header": "src/Lua/Modules/UIModuleLuaBinding.h",
       "globals": ["ui"]
+    },
+    {
+      "name": "Storage",
+      "binding_header": "src/Lua/Modules/StorageModuleLuaBinding.h",
+      "globals": ["storage"]
+    },
+    {
+      "name": "Project",
+      "binding_header": "src/Lua/Modules/ProjectModuleLuaBinding.h",
+      "globals": ["project"]
     }
   ]
 }

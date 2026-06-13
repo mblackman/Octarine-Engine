@@ -101,6 +101,14 @@ class Game : public LuaBindingContext {
   // uses this to decide whether Play should resume a paused scene or (re)start a stopped one.
   [[nodiscard]] bool IsSceneRunning() const { return scene_loader_->IsSceneRunning(); }
 
+  // Sandbox roots + session kind for the Lua file-write modules (storage.* / project.*). All
+  // three tolerate a missing GameConfig singleton (headless tests construct Game without
+  // Initialize). GetSaveDataPath resolves once and caches — see the .cpp for the identity
+  // precedence (project.ini vendor/name > config.ini GameTitle > engine defaults).
+  [[nodiscard]] bool IsEditorMode() const override;
+  [[nodiscard]] std::string GetProjectPath() const override;
+  std::string GetSaveDataPath() override;
+
   // Run any scene swap queued (deferred) during this frame's input/system passes. FrameLoop calls
   // this at the top of Update, before systems run, so the swap happens outside any ForEach.
   void FlushPendingSceneLoad() { scene_loader_->FlushPendingSceneLoad(); }
@@ -134,6 +142,7 @@ class Game : public LuaBindingContext {
 
   sol::state lua;
   std::string startup_mode_;
+  std::string save_data_path_;
   std::unique_ptr<Registry> registry_;
   std::unique_ptr<EventBus> event_bus_;
   std::unique_ptr<Renderer> renderer_;

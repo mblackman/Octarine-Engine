@@ -453,6 +453,21 @@ if (OCTARINE_ENABLE_TESTS)
     endif ()
     add_test(NAME ProjectIniTest COMMAND OctarineProjectIniTest)
 
+    # Sandboxed Lua file-write surface: file_sandbox containment/atomic-write helpers, then the
+    # storage.* / project.* modules end-to-end through a fake LuaBindingContext host (including
+    # the editor-session gate). Links octarine_lua for the module bindings + sol2.
+    add_executable(OctarineFileSandboxTest tests/FileSandboxTest.cpp)
+    set_target_properties(OctarineFileSandboxTest PROPERTIES
+            CXX_STANDARD 20
+            CXX_STANDARD_REQUIRED ON
+            CXX_EXTENSIONS OFF
+    )
+    target_link_libraries(OctarineFileSandboxTest PRIVATE octarine_lua)
+    if (MSVC)
+        target_compile_options(OctarineFileSandboxTest PRIVATE /MP /bigobj /permissive- /wd4201 /wd5321)
+    endif ()
+    add_test(NAME FileSandboxTest COMMAND OctarineFileSandboxTest)
+
     # adb wrapper parser test: standalone — Adb + its Process/Logger deps. Exercises the pure
     # `adb devices -l` parser; no device or adb binary required.
     add_executable(OctarineAdbTest

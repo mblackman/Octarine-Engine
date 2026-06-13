@@ -22,6 +22,7 @@
 # -----------------------------------------------------------------------------
 set(OCTARINE_CORE_SOURCES
         General/Logger.cpp
+        General/FileSandbox.cpp
         General/FileWatcher.cpp
         General/SystemMemory.cpp
         ECS/Registry.cpp
@@ -121,8 +122,10 @@ octarine_library(octarine_lua
         Lua/Modules/GameModuleLuaBinding.cpp
         Lua/Modules/IoModuleLuaBinding.cpp
         Lua/Modules/LogModuleLuaBinding.cpp
+        Lua/Modules/ProjectModuleLuaBinding.cpp
         Lua/Modules/RegisterAllModules.cpp
         Lua/Modules/SceneModuleLuaBinding.cpp
+        Lua/Modules/StorageModuleLuaBinding.cpp
         Lua/Modules/UIModuleLuaBinding.cpp
 )
 target_link_libraries(octarine_lua PUBLIC

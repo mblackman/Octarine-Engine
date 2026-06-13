@@ -1668,6 +1668,14 @@ function play_sound(...) end
 position_component = {}
 
 
+---@class project
+project = {}
+
+function project.path(...) end
+
+function project.write_file(...) end
+
+
 ---@class projectile_emitter_component
 projectile_emitter_component = {}
 
@@ -1805,6 +1813,20 @@ square_primitive_component = {}
 
 
 function stop_scene(...) end
+
+---@class storage
+storage = {}
+
+function storage.exists(...) end
+
+function storage.list(...) end
+
+function storage.read(...) end
+
+function storage.remove(...) end
+
+function storage.write(...) end
+
 
 ---@class text_label_component
 text_label_component = {}
