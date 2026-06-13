@@ -193,6 +193,17 @@ local btn = load_entity({
 })
 registry.set_parent(btn, menu)
 ui.anchor(btn, "center", { width = 240, height = 64 })   -- sizes both the panel and the hit region
+
+-- Caption: a label that covers the button rect, with the text centered inside it.
+local label = load_entity({
+    components = {
+        text_label = { text = "Start Run", font_id = "ui-font", is_fixed = true,
+                       align = "center", valign = "center" },
+    },
+})
+registry.set_parent(label, btn)
+ui.anchor(label, "center", { width = 240, height = 64 })  -- label rect covers the button
+ui.z_index(label, 1)                                      -- draw the text above the panel
 ```
 
 - **No `box_collider` needed.** Hit-testing uses `ui_rect`. A collider on a UI
@@ -204,8 +215,12 @@ ui.anchor(btn, "center", { width = 240, height = 64 })   -- sizes both the panel
   live component elsewhere with `registry.get_ui_button(entity)`.
 - **`is_active = false`** disables hit-testing without destroying the entity —
   use it to debounce a click that triggers a scene load mid-frame.
-- Add a centered `text_label` child for the label, anchored `center` to the
-  button, so the caption follows the button rect.
+- **Center the caption with `align` / `valign`.** A `text_label` on the UI path
+  draws its texture at the rect's top-left by default. Set `align = "center"`
+  (also `"right"`) and `valign = "center"` (also `"bottom"`) to position the
+  text within its rect — so a label whose rect covers the button appears
+  centered. Give the caption a higher `ui.z_index` than the panel, or it sorts
+  behind the square at the same layer.
 
 ---
 
