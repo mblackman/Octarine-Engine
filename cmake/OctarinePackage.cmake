@@ -240,6 +240,10 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
             PATTERN "editor_prefs.ini" EXCLUDE
             PATTERN "preferences.ini" EXCLUDE
             PATTERN "imgui.ini" EXCLUDE
+            # *.bak are editor/source backups (e.g. game.lua.bak). They are never loaded at runtime
+            # and would otherwise ship a plaintext copy of a script that the protection step only
+            # touches under its .lua name — defeating bytecode/encryption for that file.
+            PATTERN "*.bak" EXCLUDE
     )
 
     # Compile installed Lua scripts to stripped bytecode. Runs after install(DIRECTORY) so it
