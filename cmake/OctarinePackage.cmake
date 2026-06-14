@@ -75,6 +75,10 @@ if (OCTARINE_PROTECT_SCRIPTS)
     message(STATUS "Octarine: script protection enabled (luac=${LUAC_EXECUTABLE})")
 endif ()
 
+if (OCTARINE_PROTECT_SCRIPTS AND OCTARINE_LUA_XOR_KEY)
+    find_package(Python3 COMPONENTS Interpreter REQUIRED)
+endif ()
+
 # CLI overrides for project identity (precedence: CLI cache var > project.ini > built-in default).
 # Empty default = "not set on the CLI"; the helper falls through to the file or default.
 set(OCTARINE_PACKAGE_NAME         "" CACHE STRING "Override project.ini: name")
@@ -251,12 +255,13 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
             file(GLOB_RECURSE _lua_sources
                  LIST_DIRECTORIES false
                  \"\${CMAKE_INSTALL_PREFIX}/${DATA_DEST}/*.lua\")
-            list(FILTER _lua_sources EXCLUDE REGEX \".*/mods/.*\")
+            list(FILTER _lua_sources EXCLUDE REGEX \"/mods/\")
             foreach (_src IN LISTS _lua_sources)
                 execute_process(
                     COMMAND \"${LUAC_EXECUTABLE}\" -s -o \"\${_src}.tmp\" \"\${_src}\"
                     RESULT_VARIABLE _rc)
                 if (NOT _rc EQUAL 0)
+                    file(REMOVE \"\${_src}.tmp\")
                     message(FATAL_ERROR \"Octarine: luac failed on \${_src} (rc=\${_rc})\")
                 endif ()
                 file(RENAME \"\${_src}.tmp\" \"\${_src}\")
@@ -269,24 +274,28 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
     # extra step to recover the key. The same rolling-XOR key is compiled into the engine binary
     # (OCTARINE_LUA_XOR_KEY compile definition) so the runtime decrypts transparently. mods/ scripts
     # are excluded here to match the bytecode step — they ship as plain source.
-    if (OCTARINE_PROTECT_SCRIPTS AND OCTARINE_LUA_XOR_KEY AND NOT "${OCTARINE_LUA_XOR_KEY}" STREQUAL "")
+    if (OCTARINE_PROTECT_SCRIPTS AND OCTARINE_LUA_XOR_KEY)
         install(CODE "
-            message(STATUS \"Octarine: XOR-encrypting Lua bytecode (key=${OCTARINE_LUA_XOR_KEY})...\")
+            message(STATUS \"Octarine: XOR-encrypting Lua bytecode...\")
             file(GLOB_RECURSE _lua_enc_sources
                  LIST_DIRECTORIES false
                  \"\${CMAKE_INSTALL_PREFIX}/${DATA_DEST}/*.lua\")
-            list(FILTER _lua_enc_sources EXCLUDE REGEX \".*/mods/.*\")
+            list(FILTER _lua_enc_sources EXCLUDE REGEX \"/mods/\")
             # Write the encryption helper to a temp file to avoid quoting the Python code inline.
+            # Uses os.replace() for atomic writes so an interrupted install cannot leave a
+            # partially-encrypted file.
             set(_enc_py \"\${CMAKE_INSTALL_PREFIX}/_octarine_enc.py\")
             file(WRITE \"\${_enc_py}\"
-                \"import sys\\n\"
+                \"import sys, os\\n\"
                 \"k = ${OCTARINE_LUA_XOR_KEY}\\n\"
                 \"for f in sys.argv[1:]:\\n\"
                 \"    d = open(f, 'rb').read()\\n\"
-                \"    open(f, 'wb').write(bytes((b ^ ((k + i) & 0xFF)) for i, b in enumerate(d)))\\n\"
+                \"    tmp = f + '.tmp'\\n\"
+                \"    open(tmp, 'wb').write(bytes((b ^ ((k + i) & 0xFF)) for i, b in enumerate(d)))\\n\"
+                \"    os.replace(tmp, f)\\n\"
             )
             execute_process(
-                COMMAND python3 \"\${_enc_py}\" \${_lua_enc_sources}
+                COMMAND \"${Python3_EXECUTABLE}\" \"\${_enc_py}\" \${_lua_enc_sources}
                 RESULT_VARIABLE _rc)
             file(REMOVE \"\${_enc_py}\")
             if (NOT _rc EQUAL 0)
