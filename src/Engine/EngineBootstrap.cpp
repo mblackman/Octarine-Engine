@@ -11,6 +11,7 @@
 #include "Components/ViewportInfo.h"
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
+#include "Engine/LuaProtect.h"
 #include "EventBus/EventBus.h"
 #include "Game/Game.h"
 #include "Game/GameConfig.h"
@@ -58,6 +59,7 @@ int LuaDofileViaSDL(lua_State* L) {
   if (!bytes) {
     return luaL_error(L, "dofile: cannot open '%s'", path.c_str());
   }
+  DecryptLuaBytes(*bytes);
 
   lua_settop(L, 0);
   const int topBefore = lua_gettop(L);

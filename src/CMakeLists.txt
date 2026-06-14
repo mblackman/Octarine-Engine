@@ -263,3 +263,12 @@ endif ()
 if (NOT OCTARINE_SHIPPED AND WIN32)
     target_link_libraries(octarine_engine PUBLIC ws2_32)
 endif ()
+# Pass the XOR key into the engine so LuaProtect.h can decrypt at runtime. Only defined when
+# packaging with an explicit key — dev builds see no define and DecryptLuaBytes() is a no-op.
+if (OCTARINE_PROTECT_SCRIPTS AND OCTARINE_LUA_XOR_KEY)
+    target_compile_definitions(octarine_engine PRIVATE
+        OCTARINE_LUA_XOR_KEY=${OCTARINE_LUA_XOR_KEY})
+    # octarine_assets owns AssetCatalog::LoadManifest which also decrypts the baked manifest.
+    target_compile_definitions(octarine_assets PRIVATE
+        OCTARINE_LUA_XOR_KEY=${OCTARINE_LUA_XOR_KEY})
+endif ()

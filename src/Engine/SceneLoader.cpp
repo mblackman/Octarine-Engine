@@ -13,6 +13,7 @@
 #include "Audio/AudioTrackCache.h"
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
+#include "Engine/LuaProtect.h"
 #include "Engine/SdlFileReader.h"
 #include "Game/GameConfig.h"
 #include "General/Logger.h"
@@ -54,6 +55,7 @@ void SceneLoader::FlushPendingSceneLoad() {
   LoadScene(path);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void SceneLoader::LoadScene(const std::string& scenePath) {
   if (scenePath.empty()) {
     Logger::Warn("LoadScene called with empty path.");
@@ -89,6 +91,7 @@ void SceneLoader::LoadScene(const std::string& scenePath) {
   auto sceneBytes = ReadFileViaSDL(fullPath);
   sol::protected_function_result result;
   if (sceneBytes) {
+    DecryptLuaBytes(*sceneBytes);
     result = lua_.safe_script(*sceneBytes, sol::script_pass_on_error, "@" + fullPath);
   }
   if (!sceneBytes || !result.valid()) {
