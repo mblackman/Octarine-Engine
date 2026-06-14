@@ -55,6 +55,7 @@ void SceneLoader::FlushPendingSceneLoad() {
   LoadScene(path);
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void SceneLoader::LoadScene(const std::string& scenePath) {
   if (scenePath.empty()) {
     Logger::Warn("LoadScene called with empty path.");
