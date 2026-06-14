@@ -21,6 +21,9 @@
     },
     {
       "name": "lua",
+      "features": [
+        "tools"
+      ],
       "version>=": "5.4.7"
     },
     {
