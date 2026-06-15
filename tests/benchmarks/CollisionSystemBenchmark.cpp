@@ -113,7 +113,7 @@ void BuildDenseCluster(Registry& registry, int n) {
   mask.set(0);
   for (int i = 0; i < n; ++i) {
     Entity e = registry.CreateEntity();
-    const float p = static_cast<float>(i % 8);  // all within [0,8) px -> mutual overlap
+    const auto p = static_cast<float>(i % 8);  // all within [0,8) px -> mutual overlap
     registry.AddComponent(e, GlobalTransformComponent{glm::vec2(p, p), glm::vec2(1.0f, 1.0f), 0.0});
     registry.AddComponent(e, BoxColliderComponent(32, 32, glm::vec2(0.0f, 0.0f), false, mask));
     registry.AddComponent(e, EntityMaskComponent(mask));

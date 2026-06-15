@@ -15,6 +15,7 @@
 #include "Components/GlobalTransformComponent.h"
 #include "ECS/Entity.h"
 #include "ECS/Iterable.h"
+#include "ECS/Query.h"
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
 #include "EventBus/EventBus.h"
@@ -106,38 +107,7 @@ class CollisionSystem {
     if (collisionResult_.valid()) {
       PROFILE_NAMED_SCOPE("Emit Events");
       CollisionResult result = collisionResult_.get();
-      PROFILE_COUNTER_SET("Collision: Intersecting pairs", static_cast<long long>(result.intersectingPairs.size()));
-
-      // W2.2: emit only entering pairs — first-contact overlaps not present last frame.
-      // Persistent overlaps (enemy pinned against a wall, stacked entities) would otherwise
-      // re-fire every frame, causing repeat bounces and redundant damage checks.
-      PairSet currentSet;
-      currentSet.reserve(result.intersectingPairs.size());
-      for (const auto& [a, b] : result.intersectingPairs) {
-        currentSet.emplace(std::min(a.id, b.id), std::max(a.id, b.id));
-      }
-
-      std::vector<std::pair<Entity, Entity>> enteringPairs;
-      enteringPairs.reserve(result.intersectingPairs.size());
-      for (const auto& [a, b] : result.intersectingPairs) {
-        if (!prevPairSet_.count({std::min(a.id, b.id), std::max(a.id, b.id)})) {
-          enteringPairs.emplace_back(a, b);
-        }
-      }
-
-      // Exiting pairs: in prevPairSet_ (last frame) but absent from currentSet (this frame).
-      std::vector<std::pair<Entity, Entity>> exitingPairs;
-      for (const auto& [minId, maxId] : prevPairSet_) {
-        if (!currentSet.count({minId, maxId})) {
-          exitingPairs.emplace_back(Entity{minId}, Entity{maxId});
-        }
-      }
-
-      prevPairSet_ = std::move(currentSet);
-
-      PROFILE_COUNTER_SET("Collision: Entering pairs", static_cast<long long>(enteringPairs.size()));
-      eventBus->EmitEvent<CollisionBatchEvent>(enteringPairs);
-      eventBus->EmitEvent<CollisionExitBatchEvent>(exitingPairs);
+      EmitCollisionEvents(eventBus, result.intersectingPairs);
       cachedBoxes_ = std::move(result.boxes);
       cachedBoxes_.clear();
     }
@@ -223,6 +193,41 @@ class CollisionSystem {
   std::vector<Box> cachedBoxes_;
   std::future<CollisionResult> collisionResult_;
   std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent>> query_;
+
+  // Diff this frame's overlaps against the previous frame and emit the enter/exit batches.
+  //   - enter (W2.2): pairs overlapping now but not last frame — first-contact only, so persistent
+  //     overlaps (enemy pinned against a wall, stacked entities) don't re-fire every frame.
+  //   - exit: pairs that overlapped last frame but no longer do.
+  void EmitCollisionEvents(EventBus* eventBus, const std::vector<std::pair<Entity, Entity>>& intersectingPairs) {
+    PROFILE_COUNTER_SET("Collision: Intersecting pairs", static_cast<long long>(intersectingPairs.size()));
+
+    PairSet currentSet;
+    currentSet.reserve(intersectingPairs.size());
+    for (const auto& [a, b] : intersectingPairs) {
+      currentSet.emplace(std::min(a.id, b.id), std::max(a.id, b.id));
+    }
+
+    std::vector<std::pair<Entity, Entity>> enteringPairs;
+    enteringPairs.reserve(intersectingPairs.size());
+    for (const auto& [a, b] : intersectingPairs) {
+      if (!prevPairSet_.count({std::min(a.id, b.id), std::max(a.id, b.id)})) {
+        enteringPairs.emplace_back(a, b);
+      }
+    }
+
+    std::vector<std::pair<Entity, Entity>> exitingPairs;
+    for (const auto& [minId, maxId] : prevPairSet_) {
+      if (!currentSet.count({minId, maxId})) {
+        exitingPairs.emplace_back(Entity{minId}, Entity{maxId});
+      }
+    }
+
+    prevPairSet_ = std::move(currentSet);
+
+    PROFILE_COUNTER_SET("Collision: Entering pairs", static_cast<long long>(enteringPairs.size()));
+    eventBus->EmitEvent<CollisionBatchEvent>(enteringPairs);
+    eventBus->EmitEvent<CollisionExitBatchEvent>(exitingPairs);
+  }
 
   std::future<CollisionResult> StartAsyncCollisionDetection(std::vector<Box> boxes) {
     // Run on the persistent worker pool rather than std::async(launch::async), which spawns and
