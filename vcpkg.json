@@ -35,6 +35,7 @@
       "features": [
         "x11",
         "wayland",
+        "alsa",
         "dbus"
       ],
       "platform": "linux"

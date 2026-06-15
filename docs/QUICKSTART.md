@@ -20,6 +20,35 @@ CMake presets live in `CMakePresets.json`. The common ones:
 | `player-profile`  | RelWithDebInfo + `OCTARINE_ENABLE_PROFILING` for timing |
 | `ship-release`    | Canonical shipping config (manifest-load catalog) |
 
+### Linux build prerequisites
+
+vcpkg builds SDL3 (and its `alsa` dependency) **from source** on first configure, so the host needs the windowing/audio dev headers and autotools **before** that build runs. If they're absent, the SDL3 build doesn't fail loudly — it silently disables the missing backends, and you only find out at runtime when the engine exits with `SDL_Init Error: No available video device` (or `No available audio device`). The vcpkg binary cache then keeps that broken build around, so installing the packages later isn't enough on its own — see the note below.
+
+On Debian/Ubuntu/Pop!\_OS:
+
+```bash
+sudo apt install cmake ninja-build \
+  autoconf autoconf-archive automake libtool \
+  wayland-protocols libwayland-bin libxkbcommon-dev \
+  libx11-dev libxext-dev libxrandr-dev libxcursor-dev libxi-dev \
+  libxfixes-dev libxtst-dev libxss-dev libxrender-dev \
+  libegl1-mesa-dev libgles2-mesa-dev \
+  libasound2-dev libpulse-dev libdbus-1-dev libdrm-dev libgbm-dev
+```
+
+If you already configured once with packages missing, the broken SDL3 lives in vcpkg's binary cache, and `apt install` alone won't trigger a rebuild (the cache key ignores system libraries). Force a clean from-source rebuild:
+
+```bash
+rm -rf build/<preset>/vcpkg_installed
+VCPKG_BINARY_SOURCES=clear cmake --preset <preset>
+```
+
+To confirm the backends actually compiled in, the built binary should contain `wayland`/`x11` (video) and `alsa` (audio):
+
+```bash
+for s in wayland x11 alsa; do strings build/<preset>/bin/debug/OctarineEngine* | grep -qx "$s" && echo "present: $s"; done
+```
+
 ## 2. Run
 
 The engine takes the game project directory as a positional argument:
