@@ -79,18 +79,8 @@ class RenderTextSystem {
 
     // UIRectComponent (written by UILayoutSystem) takes priority over GlobalTransform for position.
     // text.position acts as a local pixel offset within the rect (e.g., padding).
-    glm::vec2 origin = text.position;
-    bool effectivelyFixed = text.isFixed;
-    int renderLayer = text.layer;
-    if (registry->HasComponent<UIRectComponent>(entity)) {
-      const auto& rect = registry->GetComponent<UIRectComponent>(entity);
-      origin = glm::vec2(rect.left, rect.top) + text.position;
-      effectivelyFixed = true;
-      renderLayer = rect.layer;
-    } else if (registry->HasComponent<GlobalTransformComponent>(entity)) {
-      const auto& transform = registry->GetComponent<GlobalTransformComponent>(entity);
-      origin += transform.position;
-    }
+    const auto [origin, effectivelyFixed, renderLayer] =
+        ResolvePlacement(registry, entity, text, it->second.width, it->second.height);
 
     const auto& gameConfig = registry->Get<GameConfig>();
     const bool isOutsideCamera = IsRenderableOutsideViewport(
@@ -117,6 +107,38 @@ class RenderTextSystem {
   }
 
  private:
+  struct TextPlacement {
+    glm::vec2 origin;
+    bool effectivelyFixed;
+    int renderLayer;
+  };
+
+  static TextPlacement ResolvePlacement(Registry* registry, const Entity entity, const TextLabelComponent& text,
+                                        const float textWidth, const float textHeight) {
+    glm::vec2 origin = text.position;
+    bool effectivelyFixed = text.isFixed;
+    int renderLayer = text.layer;
+    if (registry->HasComponent<UIRectComponent>(entity)) {
+      const auto& rect = registry->GetComponent<UIRectComponent>(entity);
+      const float slackX = rect.Width() - textWidth;
+      const float slackY = rect.Height() - textHeight;
+      const auto offsetFor = [](const TextAlign align, const float slack) {
+        static constexpr float kHalf = 0.5f;
+        if (align == TextAlign::Center) return slack * kHalf;
+        if (align == TextAlign::End) return slack;
+        return 0.0f;
+      };
+      origin = glm::vec2(rect.left + offsetFor(text.hAlign, slackX), rect.top + offsetFor(text.vAlign, slackY)) +
+               text.position;
+      effectivelyFixed = true;
+      renderLayer = rect.layer;
+    } else if (registry->HasComponent<GlobalTransformComponent>(entity)) {
+      const auto& transform = registry->GetComponent<GlobalTransformComponent>(entity);
+      origin += transform.position;
+    }
+    return {origin, effectivelyFixed, renderLayer};
+  }
+
   struct TextCacheEntry {
     std::string fontId;
     std::string text;
