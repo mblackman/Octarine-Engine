@@ -323,10 +323,14 @@ void Game::Destroy() {
     }
 #endif
 
-    auto& gameConfig = registry_->Get<GameConfig>();
-    gameConfig.SaveUserPreferences();
-    // Persist editor prefs (audio + per-project layout); no-op in player builds.
-    engine_bootstrap::editor::SaveOnShutdown(*registry_);
+    // GameConfig is only Set once Initialize gets past subsystem init; a failed Initialize
+    // (e.g. SDL_Init with no video device) tears down here with the singleton absent, so guard
+    // against it rather than throwing out of Destroy.
+    if (auto* gameConfig = registry_->TryGet<GameConfig>()) {
+      gameConfig->SaveUserPreferences();
+      // Persist editor prefs (audio + per-project layout); no-op in player builds.
+      engine_bootstrap::editor::SaveOnShutdown(*registry_);
+    }
   }
 
   // Tear registry/event bus down BEFORE SDL_Quit so owned systems (AudioSystem -> MIX_Quit,
