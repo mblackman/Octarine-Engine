@@ -24,7 +24,7 @@
     {
       "name": "Entity",
       "binding_header": "src/Lua/Modules/EntityModuleLuaBinding.h",
-      "globals": ["blam", "find_entity_by_name", "get_name", "get_position", "registry", "set_name", "set_position", "set_sprite_src_rect"]
+      "globals": ["are_colliding", "blam", "find_entity_by_name", "get_name", "get_position", "registry", "set_name", "set_position", "set_sprite_src_rect"]
     },
     {
       "name": "Scene",

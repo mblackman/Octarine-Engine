@@ -24,11 +24,13 @@ struct LuaBinding<ScriptComponent> {
       return FromSource(spec, sourceObj.as<std::string>());
     }
 
-    // Inline form (status quo): table itself carries on_update / on_debug_gui. sourcePath stays
-    // empty so the hot-reload subsystem leaves it alone.
+    // Inline form (status quo): table itself carries on_update / on_debug_gui / on_collision /
+    // on_collision_exit. sourcePath stays empty so the hot-reload subsystem leaves it alone.
     const sol::protected_function updateFn = SafeGetProtectedFunction(spec, "on_update");
     const sol::protected_function onDebugGuiFn = SafeGetProtectedFunction(spec, "on_debug_gui");
-    return ScriptComponent(spec, updateFn, onDebugGuiFn, /*sourcePath=*/"");
+    const sol::protected_function onCollisionFn = SafeGetProtectedFunction(spec, "on_collision");
+    const sol::protected_function onCollisionExitFn = SafeGetProtectedFunction(spec, "on_collision_exit");
+    return ScriptComponent(spec, updateFn, onDebugGuiFn, onCollisionFn, onCollisionExitFn, /*sourcePath=*/"");
   }
 
   static void bindUsertype(sol::state& lua) {
@@ -66,19 +68,21 @@ struct LuaBinding<ScriptComponent> {
     if (!result.valid()) {
       const auto err = result.get<sol::error>();
       Logger::ErrorLua("ScriptComponent dofile '" + absPath + "': " + err.what());
-      return ScriptComponent(spec, sol::lua_nil, sol::lua_nil, absPath);
+      return ScriptComponent(spec, sol::lua_nil, sol::lua_nil, sol::lua_nil, sol::lua_nil, absPath);
     }
 
     const auto returned = result.get<sol::object>();
     if (!returned.is<sol::table>()) {
       Logger::Error("ScriptComponent: '" + absPath + "' did not return a table");
-      return ScriptComponent(spec, sol::lua_nil, sol::lua_nil, absPath);
+      return ScriptComponent(spec, sol::lua_nil, sol::lua_nil, sol::lua_nil, sol::lua_nil, absPath);
     }
 
     const sol::table loaded = returned.as<sol::table>();
     using namespace LuaComponentHelpers;
     const sol::protected_function updateFn = SafeGetProtectedFunction(loaded, "on_update");
     const sol::protected_function onDebugGuiFn = SafeGetProtectedFunction(loaded, "on_debug_gui");
-    return ScriptComponent(loaded, updateFn, onDebugGuiFn, absPath);
+    const sol::protected_function onCollisionFn = SafeGetProtectedFunction(loaded, "on_collision");
+    const sol::protected_function onCollisionExitFn = SafeGetProtectedFunction(loaded, "on_collision_exit");
+    return ScriptComponent(loaded, updateFn, onDebugGuiFn, onCollisionFn, onCollisionExitFn, absPath);
   }
 };

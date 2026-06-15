@@ -6,10 +6,12 @@
 #include "Components/NameComponent.h"
 #include "Components/PositionComponent.h"
 #include "Components/SpriteComponent.h"
+#include "ECS/Query.h"
 #include "ECS/Registry.h"
 #include "General/Logger.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
 #include "Lua/LuaBindingContext.h"
+#include "Systems/CollisionSystem.h"
 
 namespace {
 glm::vec2 GetEntityPosition(Registry* registry, const Entity entity) {
@@ -104,6 +106,11 @@ void LuaModuleBinding<EntityModule>::install(sol::state& lua, LuaBindingContext&
   });
   lua.set_function("set_sprite_src_rect", [&ctx](const Entity entity, const float x, const float y) {
     SetEntitySpriteSrcRect(ctx.GetRegistry(), entity, x, y);
+  });
+
+  lua.set_function("are_colliding", [&ctx](const Entity a, const Entity b) {
+    CollisionSystem* cs = ctx.GetRegistry()->Get<CollisionSystem*>();
+    return cs != nullptr && cs->IsOverlapping(a, b);
   });
 
   lua["registry"] = lua.create_table();

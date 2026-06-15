@@ -38,7 +38,7 @@
       "emit_sites": [
         {
           "file": "src/Systems/CollisionSystem.h",
-          "line": 129
+          "line": 139
         }
       ],
       "subscribe_sites": [
@@ -51,6 +51,30 @@
           "file": "src/Systems/ObstacleBounceSystem.h",
           "line": 22,
           "owner": "ObstacleBounceSystem"
+        },
+        {
+          "file": "src/Systems/ScriptCollisionSystem.h",
+          "line": 16,
+          "owner": "ScriptCollisionSystem"
+        }
+      ]
+    },
+    {
+      "name": "CollisionExitBatchEvent",
+      "kind": "class",
+      "source": "src/Events/CollisionExitBatchEvent.h",
+      "fields": [],
+      "emit_sites": [
+        {
+          "file": "src/Systems/CollisionSystem.h",
+          "line": 140
+        }
+      ],
+      "subscribe_sites": [
+        {
+          "file": "src/Systems/ScriptCollisionSystem.h",
+          "line": 18,
+          "owner": "ScriptCollisionSystem"
         }
       ]
     },

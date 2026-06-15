@@ -19,6 +19,7 @@
 #include "Engine/EngineContext.h"
 #include "EventBus/EventBus.h"
 #include "Events/CollisionBatchEvent.h"
+#include "Events/CollisionExitBatchEvent.h"
 #include "General/PerfUtils.h"
 #include "General/ThreadPool.h"
 
@@ -123,10 +124,20 @@ class CollisionSystem {
           enteringPairs.emplace_back(a, b);
         }
       }
+
+      // Exiting pairs: in prevPairSet_ (last frame) but absent from currentSet (this frame).
+      std::vector<std::pair<Entity, Entity>> exitingPairs;
+      for (const auto& [minId, maxId] : prevPairSet_) {
+        if (!currentSet.count({minId, maxId})) {
+          exitingPairs.emplace_back(Entity{minId}, Entity{maxId});
+        }
+      }
+
       prevPairSet_ = std::move(currentSet);
 
       PROFILE_COUNTER_SET("Collision: Entering pairs", static_cast<long long>(enteringPairs.size()));
       eventBus->EmitEvent<CollisionBatchEvent>(enteringPairs);
+      eventBus->EmitEvent<CollisionExitBatchEvent>(exitingPairs);
       cachedBoxes_ = std::move(result.boxes);
       cachedBoxes_.clear();
     }
@@ -186,6 +197,13 @@ class CollisionSystem {
     }
 
     collisionResult_ = StartAsyncCollisionDetection(std::move(boxes));
+  }
+
+  // Returns true if entity a and entity b are currently overlapping (sustained OR just-entered).
+  // Reflects the result of the most recently completed async detection pass (one frame of lag
+  // on the very first frame, stable thereafter). Safe to call from on_update or on_collision.
+  [[nodiscard]] bool IsOverlapping(const Entity a, const Entity b) const {
+    return prevPairSet_.count({std::min(a.id, b.id), std::max(a.id, b.id)}) > 0;
   }
 
  private:

@@ -80,6 +80,7 @@
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/RenderTextSystem.h"
 #include "Systems/RenderUISpriteSystem.h"
+#include "Systems/ScriptCollisionSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "Systems/SpatialAudioSystem.h"
 #include "Systems/TransformSystem.h"
@@ -649,6 +650,10 @@ void Game::Setup() {
   auto transform = registry_->RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
 
   auto collision = registry_->RegisterBulkSystem(CollisionSystem());
+  // Store a pointer so the Lua are_colliding() query can reach IsOverlapping() without coupling
+  // the module binding to the BulkSystem registration mechanism. The pointer is stable for the
+  // registry's lifetime (the wrapper is owned by registry_->systems_).
+  registry_->Set<CollisionSystem*>(&collision.Func());
 
   // Spatial audio: snapshot the listener entity (UpdateListenerTransformSystem) then mutate
   // gain + stereo pan on live spatial tracks (SpatialAudioSystem). AudioSystem (above) is the
@@ -710,9 +715,11 @@ void Game::Setup() {
   auto& uiButtonSystem = registry_->Set<UIButtonSystem>(UIButtonSystem());
   auto& damageSystem = registry_->Set<DamageSystem>(DamageSystem());
   auto& obstacleBounceSystem = registry_->Set<ObstacleBounceSystem>(ObstacleBounceSystem());
+  auto& scriptCollisionSystem = registry_->Set<ScriptCollisionSystem>(ScriptCollisionSystem());
   uiButtonSystem.Init(registry_.get(), event_bus_);
   damageSystem.Init(registry_.get(), event_bus_);
   obstacleBounceSystem.Init(registry_.get(), event_bus_);
+  scriptCollisionSystem.Init(registry_.get(), event_bus_);
 
   // Hot reload owns its own FileWatcher + (path -> entities) discovery loop. Compiled out
   // under OCTARINE_SHIPPED; in dev/editor builds the runtime gate lives on EngineOptions.

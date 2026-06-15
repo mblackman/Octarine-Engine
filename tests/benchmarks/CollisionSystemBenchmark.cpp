@@ -100,3 +100,51 @@ static void BM_CollisionDispatch(benchmark::State& state) {
   state.SetItemsProcessed(static_cast<int64_t>(state.iterations()));
 }
 BENCHMARK(BM_CollisionDispatch)->Range(8, 512)->UseRealTime();
+
+namespace {
+// Dense cluster: every box overlaps every other (all within a 16px span, boxes are 32px), so the
+// detection pass yields O(n^2) *sustained* pairs. After the first cycle no pairs enter or exit, but
+// the per-frame event-emission bookkeeping still runs over the full pair set every cycle:
+// currentSet construction, the entering-pair scan, and (under test) the exiting-pair scan +
+// CollisionExitBatchEvent emit. This isolates that bookkeeping at a realistic high pair count —
+// the broadphase/narrowphase cost is identical across builds, so any delta is the new exit path.
+void BuildDenseCluster(Registry& registry, int n) {
+  EntityMask mask;
+  mask.set(0);
+  for (int i = 0; i < n; ++i) {
+    Entity e = registry.CreateEntity();
+    const float p = static_cast<float>(i % 8);  // all within [0,8) px -> mutual overlap
+    registry.AddComponent(e, GlobalTransformComponent{glm::vec2(p, p), glm::vec2(1.0f, 1.0f), 0.0});
+    registry.AddComponent(e, BoxColliderComponent(32, 32, glm::vec2(0.0f, 0.0f), false, mask));
+    registry.AddComponent(e, EntityMaskComponent(mask));
+  }
+}
+}  // namespace
+
+static void BM_CollisionDispatchDense(benchmark::State& state) {
+  Registry registry;
+  EventBus bus;
+  CollisionCounter counter;
+  auto subscription =
+      bus.SubscribeEvent<CollisionCounter, CollisionBatchEvent>(&counter, &CollisionCounter::OnCollisionBatch);
+
+  EngineContext ec;
+  ec.eventBus = &bus;
+  registry.Set<EngineContext>(ec);
+
+  BuildDenseCluster(registry, static_cast<int>(state.range(0)));
+
+  CollisionSystem system;
+  StubContext impl(&registry);
+  const ContextFacade ctx(&impl);
+  const Iterable iter = MakeUnusedIterable();
+
+  for (auto _ : state) {
+    const std::uint64_t before = counter.count;
+    do {
+      system(ctx, iter);
+    } while (counter.count == before);
+  }
+  state.SetItemsProcessed(static_cast<int64_t>(state.iterations()));
+}
+BENCHMARK(BM_CollisionDispatchDense)->Range(16, 256)->UseRealTime();

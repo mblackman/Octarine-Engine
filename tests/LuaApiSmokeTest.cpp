@@ -214,7 +214,8 @@ int main() {
     // Author-side mutation before reload: bump a value that must survive the swap.
     v1Table["data"]["persisted"] = 99;
 
-    ScriptComponent sc(v1Table, v1Update, sol::protected_function(sol::lua_nil), scriptPath);
+    ScriptComponent sc(v1Table, v1Update, sol::protected_function(sol::lua_nil), sol::protected_function(sol::lua_nil),
+                       sol::protected_function(sol::lua_nil), scriptPath);
     const Entity ent = reg->CreateEntity();
     reg->AddComponent(ent, std::move(sc));
 
