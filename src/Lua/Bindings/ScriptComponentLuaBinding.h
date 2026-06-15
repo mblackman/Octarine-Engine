@@ -30,7 +30,7 @@ struct LuaBinding<ScriptComponent> {
     const sol::protected_function onDebugGuiFn = SafeGetProtectedFunction(spec, "on_debug_gui");
     const sol::protected_function onCollisionFn = SafeGetProtectedFunction(spec, "on_collision");
     const sol::protected_function onCollisionExitFn = SafeGetProtectedFunction(spec, "on_collision_exit");
-    return ScriptComponent(spec, updateFn, onDebugGuiFn, onCollisionFn, onCollisionExitFn, /*sourcePath=*/"");
+    return ScriptComponent(spec, updateFn, onDebugGuiFn, onCollisionFn, onCollisionExitFn, /*t_sourcePath=*/"");
   }
 
   static void bindUsertype(sol::state& lua) {
