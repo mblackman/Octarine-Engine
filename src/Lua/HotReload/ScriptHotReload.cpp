@@ -122,17 +122,23 @@ bool ScriptHotReload::SwapComponent(ScriptComponent& sc, const sol::table& newTa
   // Resolve new callbacks first so we never end up with a half-swapped state if Lua throws.
   sol::protected_function newUpdate = SafeGetProtectedFunction(newTable, "on_update");
   sol::protected_function newDebugGui = SafeGetProtectedFunction(newTable, "on_debug_gui");
+  sol::protected_function newOnCollision = SafeGetProtectedFunction(newTable, "on_collision");
+  sol::protected_function newOnCollisionExit = SafeGetProtectedFunction(newTable, "on_collision_exit");
 
   // Drop old protected_function refs before assigning the new table — pins on the old chunk
   // would otherwise leak across reloads (sol2 holds Lua-side registry refs).
   sc.updateFunction = sol::lua_nil;
   sc.onDebugGUIFunction = sol::lua_nil;
+  sc.onCollisionFunction = sol::lua_nil;
+  sc.onCollisionExitFunction = sol::lua_nil;
   sc.scriptTable = newTable;
   if (preservedData.valid() && preservedData.get_type() != sol::type::lua_nil) {
     sc.scriptTable["data"] = preservedData;
   }
   sc.updateFunction = newUpdate;
   sc.onDebugGUIFunction = newDebugGui;
+  sc.onCollisionFunction = newOnCollision;
+  sc.onCollisionExitFunction = newOnCollisionExit;
   return true;
 }
 

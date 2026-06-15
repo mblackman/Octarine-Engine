@@ -1554,6 +1554,8 @@ function acquire_scene_assets(...) end
 animation_component = {}
 
 
+function are_colliding(...) end
+
 ---@class audio_listener_component
 audio_listener_component = {}
 

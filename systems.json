@@ -72,7 +72,8 @@
       "setup_order": 7,
       "queried_components": [],
       "emits": [
-        "CollisionBatchEvent"
+        "CollisionBatchEvent",
+        "CollisionExitBatchEvent"
       ],
       "subscribes": [],
       "lua_surface": false
@@ -254,6 +255,19 @@
       ],
       "emits": [],
       "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "ScriptCollisionSystem",
+      "source": "src/Systems/ScriptCollisionSystem.h",
+      "tier": null,
+      "setup_order": null,
+      "queried_components": [],
+      "emits": [],
+      "subscribes": [
+        "CollisionBatchEvent",
+        "CollisionExitBatchEvent"
+      ],
       "lua_surface": false
     },
     {
