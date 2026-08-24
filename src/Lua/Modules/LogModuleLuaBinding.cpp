@@ -25,7 +25,6 @@ void LuaModuleBinding<LogModule>::install(sol::state& lua, LuaBindingContext& /*
   lua.set_function("log_e", &Logger::ErrorLua);
   lua.set_function("log_w", &Logger::WarnLua);
   lua.set_function("log_i", &Logger::InfoLua);
-  lua.set_function("print", [](const std::string& message) { Logger::LogLua(message); });
 
   lua.set_exception_handler(&LuaHandler);
 }
