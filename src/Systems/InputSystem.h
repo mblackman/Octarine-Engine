@@ -76,7 +76,6 @@ class InputSystem {
     onMouseDown_.clear();
     onMouseUp_.clear();
     onMouseWheel_.clear();
-    actions_.clear();
     pressedKeys_.clear();
     releasedKeys_.clear();
     heldKeys_.clear();
