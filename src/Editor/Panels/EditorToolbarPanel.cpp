@@ -10,6 +10,7 @@
 #include "Editor/EditorPersistence.h"
 #include "Editor/ExportBuilder.h"
 #include "Editor/PlayerLauncher.h"
+#include "Engine/EditorExceptionGuard.h"
 #include "Game/Game.h"
 #include "Game/GameConfig.h"
 #include "imgui.h"
@@ -106,10 +107,14 @@ void DrawToolbar(Game* game, bool& showProjectSelector, bool& openSaveLayoutModa
         // Disabled while already running so the button reads as the current state.
         ImGui::BeginDisabled(!engineOptions.isPaused);
         if (ImGui::Button("Play")) {
+          // ReloadScene runs the scene's Lua, which can throw. Guard it so a broken scene logs +
+          // stays paused instead of crashing the editor (toolbar handlers run during ImGui render,
+          // outside FrameLoop's per-frame Update guard). See EditorExceptionGuard.h.
+          bool started = true;
           if (!game->IsSceneRunning() && hasScene) {
-            game->ReloadScene();
+            started = RunEditorGuarded(gameConfig, "ReloadScene", [&] { game->ReloadScene(); });
           }
-          engineOptions.isPaused = false;
+          engineOptions.isPaused = !started;
         }
         ImGui::EndDisabled();
         ImGui::SameLine();
@@ -126,7 +131,7 @@ void DrawToolbar(Game* game, bool& showProjectSelector, bool& openSaveLayoutModa
         }
         ImGui::SameLine();
         if (ImGui::Button("Stop")) {
-          game->StopScene();
+          RunEditorGuarded(gameConfig, "StopScene", [&] { game->StopScene(); });
           engineOptions.isPaused = true;  // back to the default ready-but-paused state
         }
 
