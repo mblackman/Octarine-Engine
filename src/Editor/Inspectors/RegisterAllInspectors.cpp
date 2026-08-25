@@ -9,6 +9,7 @@
 #include "Editor/Inspectors/EntityMaskComponentInspector.h"
 #include "Editor/Inspectors/GlobalTransformComponentInspector.h"
 #include "Editor/Inspectors/HealthComponentInspector.h"
+#include "Editor/Inspectors/LifetimeComponentInspector.h"
 #include "Editor/Inspectors/PositionComponentInspector.h"
 #include "Editor/Inspectors/ProjectileComponentInspector.h"
 #include "Editor/Inspectors/ProjectileEmitterComponentInspector.h"
@@ -29,6 +30,7 @@ void RegisterAllComponentInspectors() {
   ComponentInspectorRegistry::registerComponent<RotationComponent>();
   ComponentInspectorRegistry::registerComponent<GlobalTransformComponent>();
   ComponentInspectorRegistry::registerComponent<HealthComponent>();
+  ComponentInspectorRegistry::registerComponent<LifetimeComponent>();
   ComponentInspectorRegistry::registerComponent<SpriteComponent>();
   ComponentInspectorRegistry::registerComponent<RigidBodyComponent>();
   ComponentInspectorRegistry::registerComponent<BoxColliderComponent>();

@@ -38,6 +38,12 @@
       "get_accessor": "registry.get_health"
     },
     {
+      "lua_key": "lifetime",
+      "usertype": "lifetime_component",
+      "has_accessor": "registry.has_lifetime",
+      "get_accessor": "registry.get_lifetime"
+    },
+    {
       "lua_key": "name",
       "usertype": "name_component",
       "has_accessor": "registry.has_name",

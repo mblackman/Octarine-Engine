@@ -155,6 +155,26 @@ Makes an entity clickable.
 | `is_active` | `boolean`  | `true`  | Whether the button is interactive.                  |
 | `on_click`  | `function` | `nil`   | Function called on click: `function(self, entity)`. |
 
+### `lifetime`
+
+Automatically counts down remaining time and queues the entity for destruction when time expires. Processed by `LifetimeSystem`.
+
+| Field      | Type     | Default | Description                                              |
+|------------|----------|---------|----------------------------------------------------------|
+| `duration` | `number` | `1.0`   | Total lifespan in seconds. A bare number is also accepted. |
+
+```lua
+components = { lifetime = { duration = 2.5 } }  -- table authoring
+components = { lifetime = 2.5 }                 -- bare number shorthand
+```
+
+Properties and Methods:
+- `lifetime.duration` — Read/write total duration.
+- `lifetime.remaining_duration` — Read-only remaining time in seconds.
+- `lifetime:extend(seconds)` — Adds additional seconds to the remaining duration.
+- `lifetime:reset()` — Resets remaining duration back to the total `duration`.
+- `lifetime:is_alive()` — Returns true if remaining duration is greater than 0.
+
 ---
 
 ## Common Entity Patterns

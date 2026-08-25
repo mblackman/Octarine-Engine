@@ -58,6 +58,7 @@
 // LuaSystemRegistry::registerSystem(inputSystem) instantiates the lookup. Don't drop.
 #include "Components/AudioActiveTag.h"
 #include "Components/AudioListenerComponent.h"
+#include "Components/LifetimeComponent.h"
 #include "Lua/Bindings/InputSystemLuaBinding.h"
 #include "Lua/Bindings/LuaSystemRegistry.h"
 #include "Lua/HotReload/ScriptHotReload.h"
@@ -72,6 +73,7 @@
 #include "Systems/DopplerSystem.h"
 #include "Systems/DrawColliderSystem.h"
 #include "Systems/InputSystem.h"
+#include "Systems/LifetimeSystem.h"
 #include "Systems/ObstacleBounceSystem.h"
 #include "Systems/OffScreenDespawnSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
@@ -659,6 +661,9 @@ void Game::Setup() {
   // the module binding to the BulkSystem registration mechanism. The pointer is stable for the
   // registry's lifetime (the wrapper is owned by registry_->systems_).
   registry_->Set<CollisionSystem*>(&collision.Func());
+
+  // Lifetime system for blamming entities based on conditions.
+  registry_->RegisterBulkSystem<LifetimeComponent>(LifetimeSystem());
 
   // Spatial audio: snapshot the listener entity (UpdateListenerTransformSystem) then mutate
   // gain + stereo pan on live spatial tracks (SpatialAudioSystem). AudioSystem (above) is the

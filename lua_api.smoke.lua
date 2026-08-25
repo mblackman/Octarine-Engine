@@ -1660,6 +1660,10 @@ function log_i(...) end
 
 function log_w(...) end
 
+---@class lifetime_component
+lifetime_component = {}
+
+
 ---@class name_component
 name_component = {}
 
@@ -1702,6 +1706,8 @@ function registry.get_box_collider(...) end
 function registry.get_camera_follow(...) end
 
 function registry.get_health(...) end
+
+function registry.get_lifetime(...) end
 
 function registry.get_name(...) end
 
@@ -1746,6 +1752,8 @@ function registry.has_box_collider(...) end
 function registry.has_camera_follow(...) end
 
 function registry.has_health(...) end
+
+function registry.has_lifetime(...) end
 
 function registry.has_name(...) end
 

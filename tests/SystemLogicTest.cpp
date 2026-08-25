@@ -6,8 +6,10 @@
 
 #include <glm/glm.hpp>
 
+#include "Components/LifetimeComponent.h"
 #include "ECS/Query.h"  // full ComponentQuery definition for RegisterSystem dispatch
 #include "ECS/Registry.h"
+#include "Systems/LifetimeSystem.h"
 #include "Systems/VelocityIntegrationSystem.h"
 #include "TestHarness.h"
 
@@ -58,6 +60,28 @@ int main() {
     Check(registry.GetComponent<Position>(stationary).x == 10.0f &&
               registry.GetComponent<Position>(stationary).y == 10.0f,
           "system skipped the entity missing a queried component");
+  }
+
+  // Part 3 — LifetimeSystem countdown and despawn.
+  {
+    std::cout << "[lifetime] LifetimeComponent counts down and queues despawn\n";
+    Registry registry;
+    registry.RegisterBulkSystem<LifetimeComponent>(LifetimeSystem());
+
+    const Entity e1 = registry.CreateEntity();
+    registry.AddComponent(e1, LifetimeComponent(1.0f));
+    const Entity e2 = registry.CreateEntity();
+    registry.AddComponent(e2, LifetimeComponent(0.2f));
+
+    registry.Update(0.1f);
+    Check(registry.IsAlive(e1), "entity 1 still alive after 0.1s");
+    Check(registry.IsAlive(e2), "entity 2 still alive after 0.1s");
+    Check(std::abs(registry.GetComponent<LifetimeComponent>(e1).remainingDuration - 0.9f) < 1e-4f,
+          "remaining duration reduced");
+
+    registry.Update(0.15f);
+    Check(registry.IsAlive(e1), "entity 1 still alive after 0.25s total");
+    Check(!registry.IsAlive(e2), "entity 2 despawned when remaining duration reached 0");
   }
 
   return octarine::test::Result();
