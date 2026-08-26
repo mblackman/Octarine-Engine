@@ -5,6 +5,7 @@
 
 #include "General/Constants.h"
 #include "General/Logger.h"
+#include "General/Rotation2D.h"
 
 namespace {
 constexpr Uint8 kSceneClearGrey = 24;
@@ -97,23 +98,19 @@ void Renderer::DrawQueue(const RenderQueue& renderQueue, SDL_Renderer* renderer)
           SDL_SetRenderDrawColor(renderer, cmd.color.r, cmd.color.g, cmd.color.b, cmd.color.a);
           SDL_RenderFillRect(renderer, &cmd.destRect);
         } else {
-          const float cx = cmd.destRect.x + cmd.destRect.w * 0.5f;
-          const float cy = cmd.destRect.y + cmd.destRect.h * 0.5f;
-          const float hx = cmd.destRect.w * 0.5f;
-          const float hy = cmd.destRect.h * 0.5f;
-          const auto c = static_cast<float>(std::cos(cmd.rotation));
-          const auto s = static_cast<float>(std::sin(cmd.rotation));
+          // Spin about destRect origin + pivot, matching SDL_RenderTextureRotated on the sprite
+          // path. Corner offsets are measured from that pivot, so they are not symmetric.
+          const glm::vec2 centre = {cmd.destRect.x + cmd.pivot.x, cmd.destRect.y + cmd.pivot.y};
+          const glm::vec2 topLeft = {-cmd.pivot.x, -cmd.pivot.y};
+          const glm::vec2 bottomRight = {cmd.destRect.w - cmd.pivot.x, cmd.destRect.h - cmd.pivot.y};
+          const auto rot = octarine::Rotation2D::FromRadians(cmd.rotation);
           const SDL_FColor fcol = {cmd.color.r / 255.0f, cmd.color.g / 255.0f, cmd.color.b / 255.0f,
                                    cmd.color.a / 255.0f};
-          const SDL_FPoint corners[4] = {
-              {cx + (-hx) * c - (-hy) * s, cy + (-hx) * s + (-hy) * c},
-              {cx + (hx)*c - (-hy) * s, cy + (hx)*s + (-hy) * c},
-              {cx + (hx)*c - (hy)*s, cy + (hx)*s + (hy)*c},
-              {cx + (-hx) * c - (hy)*s, cy + (-hx) * s + (hy)*c},
-          };
+          const glm::vec2 offsets[4] = {topLeft, {bottomRight.x, topLeft.y}, bottomRight, {topLeft.x, bottomRight.y}};
           SDL_Vertex verts[4];
           for (int i = 0; i < 4; ++i) {
-            verts[i].position = corners[i];
+            const glm::vec2 p = centre + octarine::Rotate(offsets[i], rot);
+            verts[i].position = {p.x, p.y};
             verts[i].color = fcol;
             verts[i].tex_coord = {0.0f, 0.0f};
           }

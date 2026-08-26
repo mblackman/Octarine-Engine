@@ -99,7 +99,11 @@ class LuaEntityLoader {
           registry->AddComponent(entity, ScaleComponent(SafeGetVec2(t, "scale", 1.0f, 1.0f)));
         }
         if (t["rotation"].valid()) {
-          registry->AddComponent(entity, RotationComponent(SafeGetOptionalValue<double>(t, "rotation", 0.0)));
+          // `pivot` is a sibling key of `rotation` in the transform table, not nested under it,
+          // since `rotation` is authored as a bare number here. Absent means the centre anchor.
+          registry->AddComponent(entity, RotationComponent(SafeGetOptionalValue<double>(t, "rotation", 0.0),
+                                                           SafeGetVec2(t, "pivot", RotationComponent::kDefaultPivotX,
+                                                                       RotationComponent::kDefaultPivotY)));
         }
         continue;
       }

@@ -5,7 +5,9 @@
 #include <algorithm>
 #include <cmath>
 
+#include "Components/SpriteComponent.h"
 #include "ECS/Registry.h"
+#include "Systems/PivotResolveSystem.h"
 #include "Systems/TransformSystem.h"
 #include "TestHarness.h"
 
@@ -14,6 +16,12 @@ using octarine::test::Check;
 namespace {
 bool ChildrenContain(const std::vector<Entity>& children, const Entity needle) {
   return std::any_of(children.begin(), children.end(), [&](const Entity c) { return c.GetId() == needle.GetId(); });
+}
+
+// Composition through a rotation is exact only up to float trig error, so positions that fall out
+// of a rotated compose are compared with a tolerance rather than ==.
+bool NearVec(const glm::vec2 got, const glm::vec2 want, const float eps = 1e-3f) {
+  return std::fabs(got.x - want.x) < eps && std::fabs(got.y - want.y) < eps;
 }
 }  // namespace
 
@@ -120,6 +128,125 @@ int main() {
     registry.Update(1.0f / 60.0f);
     Check(registry.GetComponent<GlobalTransformComponent>(late).position == glm::vec2(7.0f, 7.0f),
           "entity created after first frame is resolved on the next frame");
+  }
+
+  // PivotResolveSystem bakes the normalized anchor into local pixels, and TransformSystem then
+  // scales it into the world-space offset every downstream consumer rotates about.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<RotationComponent>(PivotResolveSystem());
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    const Entity sprite = registry.CreateEntityWithBundle(
+        GlobalTransformComponent{}, PositionComponent{{0.0f, 0.0f}}, ScaleComponent{{2.0f, 2.0f}},
+        RotationComponent{0.0, glm::vec2(0.5f, 0.5f)}, SpriteComponent{"tex", 32.0f, 16.0f});
+
+    registry.Update(1.0f / 60.0f);
+
+    Check(registry.GetComponent<RotationComponent>(sprite).pivotOffset == glm::vec2(16.0f, 8.0f),
+          "normalized pivot resolves to local pixels from the sprite size");
+    Check(registry.GetComponent<GlobalTransformComponent>(sprite).pivot == glm::vec2(32.0f, 16.0f),
+          "global pivot is the local offset scaled into world pixels");
+
+    // No size source anywhere on the entity means no anchor to resolve against, so rotation
+    // falls back to spinning about `position`.
+    const Entity bare = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{1.0f, 1.0f}},
+                                                        RotationComponent{0.0, glm::vec2(0.5f, 0.5f)});
+    registry.Update(1.0f / 60.0f);
+    Check(registry.GetComponent<GlobalTransformComponent>(bare).pivot == glm::vec2(0.0f, 0.0f),
+          "entity with no size source resolves a zero pivot");
+  }
+
+  // A parent's rotation acts about its own pivot, so children orbit the point the parent is
+  // visibly drawn spinning around rather than its top-left corner.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    constexpr double kQuarterTurn = 1.5707963267948966;  // pi/2
+    // pivotOffset is set directly here: this exercises TransformSystem's composition in
+    // isolation, without depending on PivotResolveSystem having run.
+    const Entity parent =
+        registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{100.0f, 100.0f}},
+                                        RotationComponent{kQuarterTurn, glm::vec2(0.0f, 0.0f)});
+    registry.GetComponent<RotationComponent>(parent).pivotOffset = glm::vec2(10.0f, 0.0f);
+
+    const Entity atPivot =
+        registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{10.0f, 0.0f}});
+    const Entity offPivot =
+        registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{20.0f, 0.0f}});
+    registry.SetParent(atPivot, parent);
+    registry.SetParent(offPivot, parent);
+
+    registry.Update(1.0f / 60.0f);
+
+    // A child sitting exactly on the parent's pivot is the rotation's fixed point.
+    Check(NearVec(registry.GetComponent<GlobalTransformComponent>(atPivot).position, glm::vec2(110.0f, 100.0f)),
+          "child on the parent pivot is unmoved by the parent's rotation");
+    // 10 units past the pivot, swung a quarter turn: +x becomes +y.
+    Check(NearVec(registry.GetComponent<GlobalTransformComponent>(offPivot).position, glm::vec2(110.0f, 110.0f)),
+          "child off the parent pivot orbits that pivot, not the parent's origin");
+  }
+
+  // A SetParent cycle must not hang or revisit entities during the level walk.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    const Entity flat = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{3.0f, 4.0f}});
+    const Entity a = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{1.0f, 0.0f}});
+    const Entity b = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{2.0f, 0.0f}});
+    const Entity c = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{4.0f, 0.0f}});
+    registry.SetParent(b, a);
+    registry.SetParent(c, b);
+    registry.SetParent(a, c);  // closes the loop — the hierarchy now has no root
+
+    registry.Update(1.0f / 60.0f);
+
+    Check(registry.GetComponent<GlobalTransformComponent>(flat).position == glm::vec2(3.0f, 4.0f),
+          "a parent cycle terminates and leaves unrelated entities correct");
+  }
+
+  // Reparenting bumps HierarchyGeneration, which is what invalidates the cached depth buckets.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    const Entity p1 = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{10.0f, 0.0f}});
+    const Entity p2 = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{50.0f, 0.0f}});
+    const Entity child = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{1.0f, 0.0f}});
+
+    registry.SetParent(child, p1);
+    registry.Update(1.0f / 60.0f);
+    Check(registry.GetComponent<GlobalTransformComponent>(child).position == glm::vec2(11.0f, 0.0f),
+          "child composes under its first parent");
+
+    registry.SetParent(child, p2);
+    registry.Update(1.0f / 60.0f);
+    Check(registry.GetComponent<GlobalTransformComponent>(child).position == glm::vec2(51.0f, 0.0f),
+          "reparenting rebuilds the cached depth buckets");
+  }
+
+  // Destroying a hierarchy member must invalidate the cached buckets. If it did not, the stale
+  // handle would resolve through GetEntityLocation onto whatever entity recycled that id.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    const Entity parent = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{20.0f, 0.0f}});
+    const Entity keep = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{1.0f, 0.0f}});
+    const Entity drop = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{2.0f, 0.0f}});
+    registry.SetParent(keep, parent);
+    registry.SetParent(drop, parent);
+
+    registry.Update(1.0f / 60.0f);
+    Check(registry.GetComponent<GlobalTransformComponent>(keep).position == glm::vec2(21.0f, 0.0f),
+          "both children compose before the blam");
+
+    registry.BlamEntity(drop);
+    registry.Update(1.0f / 60.0f);
+    Check(registry.GetComponent<GlobalTransformComponent>(keep).position == glm::vec2(21.0f, 0.0f),
+          "surviving sibling still composes after a hierarchy member is blammed");
   }
 
   return octarine::test::Result();

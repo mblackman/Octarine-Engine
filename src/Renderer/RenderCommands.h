@@ -42,6 +42,7 @@ struct SquareCommand {
   SDL_FRect destRect{};
   SDL_Color color{};
   double rotation{};
+  SDL_FPoint pivot{};
   SDL_BlendMode blendMode{SDL_BLENDMODE_BLEND};
 };
 

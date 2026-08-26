@@ -13,11 +13,24 @@ Components are added to entities within the `components` table of an entity defi
 
 Defines the position, scale, and rotation of an entity in the world.
 
-| Field      | Type           | Default      | Description              |
-|------------|----------------|--------------|--------------------------|
-| `position` | `table {x, y}` | `{x=0, y=0}` | The world position.      |
-| `scale`    | `table {x, y}` | `{x=1, y=1}` | The scale of the entity. |
-| `rotation` | `number`       | `0.0`        | Rotation in degrees.     |
+| Field      | Type           | Default          | Description                                              |
+|------------|----------------|------------------|----------------------------------------------------------|
+| `position` | `table {x, y}` | `{x=0, y=0}`     | The world position of the entity's top-left corner.      |
+| `scale`    | `table {x, y}` | `{x=1, y=1}`     | The scale of the entity.                                 |
+| `rotation` | `number`       | `0.0`            | Rotation in **radians**.                                 |
+| `pivot`    | `table {x, y}` | `{x=0.5, y=0.5}` | Rotation anchor, normalized to the entity's bounds.      |
+
+`pivot` is normalized against whatever the entity draws at: `{x=0, y=0}` is the top-left corner,
+`{x=0.5, y=0.5}` the centre (the default, and what the engine used before pivots were authorable),
+`{x=1, y=1}` the bottom-right. Values outside `0..1` are allowed and place the anchor outside the
+bounds, which is a convenient way to make something orbit a point.
+
+The size the anchor resolves against comes from the entity's `sprite`, else its `square`, else its
+`boxcollider`. An entity with none of those has nothing to anchor to and rotates about `position`.
+
+The pivot is the single point everything agrees to rotate about: the sprite and primitive
+renderers, the collision broadphase, the collider debug draw, and — importantly — child entities,
+which orbit their parent's pivot rather than its top-left corner.
 
 ### `rigidbody`
 

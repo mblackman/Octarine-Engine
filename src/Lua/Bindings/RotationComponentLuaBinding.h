@@ -14,12 +14,18 @@ struct LuaBinding<RotationComponent> {
     if (data.is<double>()) return RotationComponent(data.as<double>());
     if (data.is<sol::table>()) {
       const auto t = data.as<sol::table>();
-      return RotationComponent(LuaComponentHelpers::SafeGetOptionalValue<double>(t, "value", 0.0));
+      // Omitting `pivot` keeps the centre anchor, which is how sprites rotated before pivots
+      // were authorable — existing games must not shift.
+      return RotationComponent(LuaComponentHelpers::SafeGetOptionalValue<double>(t, "value", 0.0),
+                               LuaComponentHelpers::SafeGetVec2(t, "pivot", RotationComponent::kDefaultPivotX,
+                                                                RotationComponent::kDefaultPivotY));
     }
     return RotationComponent(0.0);
   }
 
   static void bindUsertype(sol::state& lua) {
-    lua.new_usertype<RotationComponent>(kUsertypeName, "value", &RotationComponent::value);
+    // pivotOffset is derived state owned by PivotResolveSystem and is deliberately not exposed.
+    lua.new_usertype<RotationComponent>(kUsertypeName, "value", &RotationComponent::value, "pivot",
+                                        &RotationComponent::pivot);
   }
 };

@@ -1806,6 +1806,8 @@ function set_perf_overlay(...) end
 
 function set_position(...) end
 
+function set_rotation(...) end
+
 function set_sprite_src_rect(...) end
 
 ---@class sprite_component

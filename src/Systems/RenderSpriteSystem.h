@@ -88,7 +88,9 @@ class RenderSpriteSystem {
     cmd.srcRect.w = sprite.srcRect.w;
     cmd.srcRect.h = sprite.srcRect.h;
     cmd.rotation = transform.rotation;
-    cmd.pivot = {cmd.destW * 0.5f, cmd.destH * 0.5f};
+    // transform.pivot is already the scaled offset from the sprite's top-left, which is exactly
+    // the origin SDL_RenderTextureRotated rotates about.
+    cmd.pivot = {.x = transform.pivot.x, .y = transform.pivot.y};
     cmd.flip = static_cast<SDL_FlipMode>(sprite.flip);
     cmd.texture = texture;
     cmd.colorMod = SDL_Color{sprite.colorMod.r, sprite.colorMod.g, sprite.colorMod.b, sprite.colorMod.a};

@@ -27,10 +27,16 @@ class RenderPrimitiveSystem {
   }
 
   void operator()(const SquarePrimitiveComponent& square, const GlobalTransformComponent& transform) const {
-    const glm::vec2 origin = square.position + transform.position;
+    // square.position is a local offset from the entity's transform, so it scales with the
+    // entity the same way BoxColliderComponent::offset does in CollisionSystem — otherwise a
+    // scaled entity's primitive grows but stays pinned at its unscaled offset.
+    const glm::vec2 scaledOffset = square.position * transform.scale;
+    const glm::vec2 origin = transform.position + scaledOffset;
+    const float w = square.width * transform.scale.x;
+    const float h = square.height * transform.scale.y;
 
-    const bool isOutsideCamera = IsRenderableOutsideViewport(origin.x, origin.y, square.width, square.height,
-                                                             square.isFixed, camera_, windowWidth_, windowHeight_);
+    const bool isOutsideCamera =
+        IsRenderableOutsideViewport(origin.x, origin.y, w, h, square.isFixed, camera_, windowWidth_, windowHeight_);
 
     if (isOutsideCamera) {
       PROFILE_COUNTER_INC(culledCounter_);
@@ -44,9 +50,12 @@ class RenderPrimitiveSystem {
 
     auto& cmd = renderQueue_->EmplaceSquare(static_cast<unsigned int>(square.layer), square.position.y, nullptr,
                                             square.blendMode);
-    cmd.destRect = {x, y, square.width, square.height};
+    cmd.destRect = {x, y, w, h};
     cmd.color = SDL_Color{square.color.r, square.color.g, square.color.b, square.color.a};
     cmd.rotation = transform.rotation;
+    // The quad's top-left is `origin`, but pivot is an offset from transform.position, so rebase
+    // it onto the destRect the renderer receives. Both are in scaled pixels.
+    cmd.pivot = {.x = transform.pivot.x - scaledOffset.x, .y = transform.pivot.y - scaledOffset.y};
     cmd.blendMode = octarine::ToSdlBlendMode(square.blendMode);
   }
 
