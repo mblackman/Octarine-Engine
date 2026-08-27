@@ -17,9 +17,9 @@ struct Rotation2D {
 
   // Identity is the overwhelmingly common case — most entities never rotate — and it is the one
   // angle whose pair is exactly known, so it skips the library calls outright.
-  [[nodiscard]] static Rotation2D FromRadians(const double radians) {
-    if (radians == 0.0) return {};
-    return {static_cast<float>(std::cos(radians)), static_cast<float>(std::sin(radians))};
+  [[nodiscard]] static Rotation2D FromRadians(const float radians) {
+    if (radians == 0.0F) return {};
+    return {std::cos(radians), std::sin(radians)};
   }
 
   [[nodiscard]] bool IsIdentity() const { return sin == 0.0F && cos == 1.0F; }

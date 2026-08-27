@@ -24,6 +24,7 @@
 #include "Components/EntityMaskComponent.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/HealthComponent.h"
+#include "Components/PivotComponent.h"
 #include "Components/PositionComponent.h"
 #include "Components/ProjectileComponent.h"
 #include "Components/ProjectileEmitterComponent.h"
@@ -76,7 +77,6 @@
 #include "Systems/LifetimeSystem.h"
 #include "Systems/ObstacleBounceSystem.h"
 #include "Systems/OffScreenDespawnSystem.h"
-#include "Systems/PivotResolveSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
 #include "Systems/ProjectileLifecycleSystem.h"
 #include "Systems/RenderPrimitiveSystem.h"
@@ -654,13 +654,8 @@ void Game::Setup() {
   // Despawn entities (except the player) once they leave the playable area.
   registry_->RegisterParallelSystem<PositionComponent, SpriteComponent>(OffScreenDespawnSystem());
 
-  // Bake normalized rotation pivots into local pixels. Must precede TransformSystem, which
-  // consumes the resolved offset and would otherwise compose against a stale one.
-  auto pivotResolve = registry_->RegisterBulkSystem<RotationComponent>(PivotResolveSystem());
-
   // Resolve the transform hierarchy into global positions/scales.
   auto transform = registry_->RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
-  registry_->Order(transform).After(pivotResolve);
 
   auto collision = registry_->RegisterBulkSystem(CollisionSystem());
   // Store a pointer so the Lua are_colliding() query can reach IsOverlapping() without coupling

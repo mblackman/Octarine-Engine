@@ -9,6 +9,7 @@
 #include "Components/SpriteComponent.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
+#include "General/AngleUnit.h"
 #include "General/Logger.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
 #include "Lua/LuaBindingContext.h"
@@ -50,12 +51,12 @@ void SetEntityPosition(Registry* registry, const Entity entity, const double x, 
   registry->GetComponent<PositionComponent>(entity).value = glm::vec2(static_cast<float>(x), static_cast<float>(y));
 }
 
-void SetEntityRotation(Registry* registry, const Entity entity, const double value) {
+void SetEntityRotation(Registry* registry, const Entity entity, const float value) {
   if (!registry->HasComponent<RotationComponent>(entity)) {
     Logger::Error("Entity does not have RotationComponent.");
     return;
   }
-  registry->GetComponent<RotationComponent>(entity).value = value;
+  registry->GetComponent<RotationComponent>(entity).value = octarine::AngleUnits::ToRadians(value);
 }
 
 void SetEntitySpriteSrcRect(Registry* registry, const Entity entity, const float srcRectX, const float srcRectY) {
@@ -113,7 +114,7 @@ void LuaModuleBinding<EntityModule>::install(sol::state& lua, LuaBindingContext&
   lua.set_function("set_position", [&ctx](const Entity entity, const double x, const double y) {
     SetEntityPosition(ctx.GetRegistry(), entity, x, y);
   });
-  lua.set_function("set_rotation", [&ctx](const Entity entity, const double value) {
+  lua.set_function("set_rotation", [&ctx](const Entity entity, const float value) {
     SetEntityRotation(ctx.GetRegistry(), entity, value);
   });
   lua.set_function("set_sprite_src_rect", [&ctx](const Entity entity, const float x, const float y) {

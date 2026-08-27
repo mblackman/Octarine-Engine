@@ -3,19 +3,25 @@
 #include <cmath>
 #include <cstdint>
 #include <glm/glm.hpp>
+#include <limits>
 #include <memory>
 #include <unordered_set>
 #include <vector>
 
+#include "Components/BoxColliderComponent.h"
 #include "Components/GlobalTransformComponent.h"
+#include "Components/PivotComponent.h"
 #include "Components/PositionComponent.h"
 #include "Components/RotationComponent.h"
 #include "Components/ScaleComponent.h"
+#include "Components/SpriteComponent.h"
+#include "Components/SquarePrimitiveComponent.h"
 #include "ECS/Iterable.h"
 #include "ECS/Query.h"
 #include "ECS/Registry.h"
 #include "General/PerfUtils.h"
 #include "General/Rotation2D.h"
+#include "Systems/LocalSize.h"
 
 class TransformSystem {
  public:
@@ -25,8 +31,9 @@ class TransformSystem {
     optionalQuery_->Update();
 
     // The flat pass is unconditional: it finalises every entity outside a hierarchy, and it
-    // leaves hierarchy roots holding exactly their local transform, which is what the descend
-    // pass wants to read out of them.
+    // leaves hierarchy roots holding their local transform already resolved about their own
+    // anchor — a root has nothing above it, so that composition is final and the descend pass
+    // reads it back as-is.
     UpdateFlat();
 
     if (registry->HasAnyChildPairs()) {
@@ -35,40 +42,57 @@ class TransformSystem {
   }
 
  private:
-  using TransformQuery =
-      ComponentQuery<GlobalTransformComponent, Opt<PositionComponent>, Opt<ScaleComponent>, Opt<RotationComponent>>;
+  using TransformQuery = ComponentQuery<GlobalTransformComponent, Opt<PositionComponent>, Opt<ScaleComponent>,
+                                        Opt<RotationComponent>, Opt<PivotComponent>, Opt<SpriteComponent>,
+                                        Opt<SquarePrimitiveComponent>, Opt<BoxColliderComponent>>;
 
   struct LocalTransform {
     glm::vec2 position{0.0f, 0.0f};
     glm::vec2 scale{1.0f, 1.0f};
-    double rotation{0.0};
-    glm::vec2 pivotOffset{0.0f, 0.0f};  // local pixels, resolved by PivotResolveSystem
+    float rotation{0.0f};
+    glm::vec2 anchor{0.0f, 0.0f};  // what scale and rotation act about, unscaled local pixels
   };
 
   struct GlobalTransform {
     glm::vec2 position{0.0f, 0.0f};
     glm::vec2 scale{1.0f, 1.0f};
-    double rotation{0.0};
+    float rotation{0.0f};
     glm::vec2 pivot{0.0f, 0.0f};  // world pixels, offset from position
   };
 
+  // Slot of a hierarchy root, which owns no entry in children_ of its own.
+  static constexpr uint32_t kNoParentSlot = std::numeric_limits<uint32_t>::max();
+
   // One parent paired with the contiguous span of its children inside children_. Grouping by
   // parent is what makes the descend pass cheap: the parent's global is resolved once and reused
-  // across every child in the span, instead of being re-resolved per child.
+  // across every child in the span, instead of being re-resolved per child. parentSlot indexes
+  // children_ for the parent itself, where the previous level left its composed global.
   struct ParentGroup {
     Entity parent{};
+    uint32_t parentSlot{kNoParentSlot};
     uint32_t firstChild{0};
     uint32_t childCount{0};
+  };
+
+  // An entity in the breadth-first frontier, with the slot it was assigned in children_.
+  struct FrontierNode {
+    Entity entity{};
+    uint32_t slot{kNoParentSlot};
   };
 
   void EnsureInitialized(Registry* registry) {
     if (optionalQuery_) return;
     optionalQuery_ = registry->CreateQuery<GlobalTransformComponent, Opt<PositionComponent>, Opt<ScaleComponent>,
-                                           Opt<RotationComponent>>();
+                                           Opt<RotationComponent>, Opt<PivotComponent>, Opt<SpriteComponent>,
+                                           Opt<SquarePrimitiveComponent>, Opt<BoxColliderComponent>>();
     posEntity_ = registry->Component<PositionComponent>();
     scaleEntity_ = registry->Component<ScaleComponent>();
     rotEntity_ = registry->Component<RotationComponent>();
+    pivotEntity_ = registry->Component<PivotComponent>();
     globalEntity_ = registry->Component<GlobalTransformComponent>();
+    spriteEntity_ = registry->Component<SpriteComponent>();
+    squareEntity_ = registry->Component<SquarePrimitiveComponent>();
+    colliderEntity_ = registry->Component<BoxColliderComponent>();
   }
 
   // The per-entity body is a handful of copies, so thread-pool dispatch (~13.5 us fixed) only
@@ -82,14 +106,31 @@ class TransformSystem {
     PROFILE_NAMED_SCOPE("TransformSystem: Flat");
     optionalQuery_->ParallelForEach(
         [](GlobalTransformComponent& global, const PositionComponent* p, const ScaleComponent* s,
-           const RotationComponent* r) {
+           const RotationComponent* r, const PivotComponent* pivot, const SpriteComponent* sprite,
+           const SquarePrimitiveComponent* square, const BoxColliderComponent* collider) {
           const glm::vec2 scale = s ? s->value : glm::vec2(1.0f, 1.0f);
-          global.position = p ? p->value : glm::vec2(0.0f, 0.0f);
+          const glm::vec2 anchor = ResolveAnchor(pivot, sprite, square, collider);
+          global.position = (p ? p->value : glm::vec2(0.0f, 0.0f)) + AnchorScaleShift(anchor, scale);
           global.scale = scale;
-          global.rotation = r ? r->value : 0.0;
-          global.pivot = r ? r->pivotOffset * scale : glm::vec2(0.0f, 0.0f);
+          global.rotation = r ? r->value : 0.0f;
+          global.pivot = anchor * scale;
         },
         kFlatSerialBelowEntities);
+  }
+
+  // A normalized pivot resolved against the entity's own size. No pivot means the centre, which
+  // is what the default (0.5, 0.5) resolves to anyway, so the two cases share one expression.
+  static glm::vec2 ResolveAnchor(const PivotComponent* pivot, const SpriteComponent* sprite,
+                                 const SquarePrimitiveComponent* square, const BoxColliderComponent* collider) {
+    const glm::vec2 normalized = pivot ? pivot->value : glm::vec2(PivotComponent::kDefaultX, PivotComponent::kDefaultY);
+    return octarine::LocalSize(sprite, square, collider) * normalized;
+  }
+
+  // Scaling about the anchor is the same as sliding the origin by this, then scaling about the
+  // origin. Every consumer reads `position` as the top-left and multiplies its own offsets by
+  // `scale`, so folding it in here fixes the sprite quad, primitive quad, and collider at once.
+  static glm::vec2 AnchorScaleShift(const glm::vec2 anchor, const glm::vec2 scale) {
+    return anchor * (glm::vec2(1.0f, 1.0f) - scale);
   }
 
   // Hierarchy members are re-composed in breadth-first depth order. Every entity at depth N is
@@ -121,35 +162,38 @@ class TransformSystem {
     children_.clear();
     visited_.clear();
 
-    std::vector<Entity> frontier;
+    std::vector<FrontierNode> frontier;
     registry->ForEachHierarchyRoot([&](const Entity root) {
-      if (visited_.insert(root.id).second) frontier.push_back(root);
+      if (visited_.insert(root.id).second) frontier.push_back({root, kNoParentSlot});
     });
 
     while (!frontier.empty()) {
       frontier = BuildLevel(registry, frontier);
     }
 
+    // Written at depth N before any depth N+1 group reads it, so it never needs clearing.
+    childGlobals_.resize(children_.size());
+
     cachedHierarchyGeneration_ = generation;
     levelsBuilt_ = true;
   }
 
   // Append one depth bucket for the given parents and return the next frontier (their children).
-  std::vector<Entity> BuildLevel(const Registry* registry, const std::vector<Entity>& parents) {
+  std::vector<FrontierNode> BuildLevel(const Registry* registry, const std::vector<FrontierNode>& parents) {
     std::vector<ParentGroup> level;
-    std::vector<Entity> next;
+    std::vector<FrontierNode> next;
 
-    for (const Entity parent : parents) {
+    for (const FrontierNode& parent : parents) {
       const auto first = static_cast<uint32_t>(children_.size());
-      registry->ForEachChild(parent, [&](const Entity child) {
+      registry->ForEachChild(parent.entity, [&](const Entity child) {
         // A SetParent cycle would otherwise loop forever here. visited_ also keeps an entity
         // reachable by two routes from being composed twice.
         if (!visited_.insert(child.id).second) return;
+        next.push_back({child, static_cast<uint32_t>(children_.size())});
         children_.push_back(child);
-        next.push_back(child);
       });
       if (const auto count = static_cast<uint32_t>(children_.size()) - first; count > 0) {
-        level.push_back({parent, first, count});
+        level.push_back({parent.entity, parent.slot, first, count});
       }
     }
 
@@ -157,41 +201,53 @@ class TransformSystem {
     return next;
   }
 
-  void Descend(const Registry* registry) const {
+  // Globals thread down through childGlobals_ rather than being read back out of the components,
+  // so a grouping node with no GlobalTransformComponent still passes composition to its children.
+  // Only the write-out is gated on the component existing.
+  void Descend(const Registry* registry) {
     PROFILE_NAMED_SCOPE("TransformSystem: Descend");
     for (const auto& level : levels_) {
       for (const ParentGroup& group : level) {
-        const GlobalTransform parentGlobal = LoadGlobal(registry, group.parent);
+        const GlobalTransform parentGlobal = group.parentSlot == kNoParentSlot ? LoadRootGlobal(registry, group.parent)
+                                                                               : childGlobals_[group.parentSlot];
         // Every child in the group shares this one parent, so its cos/sin pair is resolved once
         // per family rather than once per child. This is the payoff for grouping by parent: a
         // hundred-child emitter costs one trig pair instead of a hundred.
         const octarine::Rotation2D parentRotation = octarine::Rotation2D::FromRadians(parentGlobal.rotation);
         for (uint32_t i = 0; i < group.childCount; ++i) {
-          ComposeChild(registry, children_[group.firstChild + i], parentGlobal, parentRotation);
+          const uint32_t slot = group.firstChild + i;
+          childGlobals_[slot] = ComposeChild(registry, children_[slot], parentGlobal, parentRotation);
         }
       }
     }
   }
 
-  void ComposeChild(const Registry* registry, const Entity child, const GlobalTransform& parentGlobal,
-                    const octarine::Rotation2D parentRotation) const {
+  GlobalTransform ComposeChild(const Registry* registry, const Entity child, const GlobalTransform& parentGlobal,
+                               const octarine::Rotation2D parentRotation) const {
     const auto [archetype, chunkIdx, indexInChunk] = registry->GetEntityLocation(child);
-    if (!archetype) return;
+    if (!archetype) return {};
     const GlobalTransform global = Compose(parentGlobal, parentRotation, LoadLocal(archetype, chunkIdx, indexInChunk));
     WriteGlobal(archetype, chunkIdx, indexInChunk, global);
+    return global;
   }
 
-  // A parent's global was finalised either by the flat pass (roots) or by the previous depth
-  // bucket. A parent without a GlobalTransformComponent — a bare grouping node — contributes
-  // identity, so its children compose as their own locals.
-  GlobalTransform LoadGlobal(const Registry* registry, const Entity parent) const {
-    const auto [archetype, chunkIdx, indexInChunk] = registry->GetEntityLocation(parent);
-    if (!archetype || !archetype->HasComponent(globalEntity_.GetId())) {
-      return {glm::vec2(0.0f, 0.0f), glm::vec2(1.0f, 1.0f), 0.0, glm::vec2(0.0f, 0.0f)};
+  // Whatever the flat pass finalised. A root with no GlobalTransformComponent was never in that
+  // query, so its local stands in — otherwise a grouping node's own transform would be dropped.
+  GlobalTransform LoadRootGlobal(const Registry* registry, const Entity root) const {
+    const auto [archetype, chunkIdx, indexInChunk] = registry->GetEntityLocation(root);
+    if (!archetype) return {};
+    if (!archetype->HasComponent(globalEntity_.GetId())) {
+      return FromLocal(LoadLocal(archetype, chunkIdx, indexInChunk));
     }
     const auto* gArr = archetype->GetComponentArray<GlobalTransformComponent>(chunkIdx, globalEntity_.GetId());
     const auto& g = gArr[indexInChunk];
     return {g.position, g.scale, g.rotation, g.pivot};
+  }
+
+  // Mirrors the flat pass: with nothing above it, a local transform is already its own global.
+  static GlobalTransform FromLocal(const LocalTransform& local) {
+    return {local.position + AnchorScaleShift(local.anchor, local.scale), local.scale, local.rotation,
+            local.anchor * local.scale};
   }
 
   // Per-entity chunk fetch: each component is independently optional, so we look up the
@@ -206,12 +262,34 @@ class TransformSystem {
     const auto* rArr = archetype->HasComponent(rotEntity_.GetId())
                            ? archetype->GetComponentArray<RotationComponent>(chunkIdx, rotEntity_.GetId())
                            : nullptr;
+    const auto* pivotArr = archetype->HasComponent(pivotEntity_.GetId())
+                               ? archetype->GetComponentArray<PivotComponent>(chunkIdx, pivotEntity_.GetId())
+                               : nullptr;
     return {
         pArr ? pArr[indexInChunk].value : glm::vec2(0.0f, 0.0f),
         sArr ? sArr[indexInChunk].value : glm::vec2(1.0f, 1.0f),
-        rArr ? rArr[indexInChunk].value : 0.0,
-        rArr ? rArr[indexInChunk].pivotOffset : glm::vec2(0.0f, 0.0f),
+        rArr ? rArr[indexInChunk].value : 0.0f,
+        LoadAnchor(archetype, chunkIdx, indexInChunk, pivotArr ? &pivotArr[indexInChunk] : nullptr),
     };
+  }
+
+  // Hierarchy-path counterpart to ResolveAnchor. The flat pass gets geometry from its query; here
+  // each size component costs an archetype probe, paid only by entities inside a hierarchy.
+  glm::vec2 LoadAnchor(Archetype* archetype, size_t chunkIdx, size_t indexInChunk, const PivotComponent* pivot) const {
+    const auto* spriteArr = archetype->HasComponent(spriteEntity_.GetId())
+                                ? archetype->GetComponentArray<SpriteComponent>(chunkIdx, spriteEntity_.GetId())
+                                : nullptr;
+    const auto* squareArr =
+        archetype->HasComponent(squareEntity_.GetId())
+            ? archetype->GetComponentArray<SquarePrimitiveComponent>(chunkIdx, squareEntity_.GetId())
+            : nullptr;
+    const auto* colliderArr =
+        archetype->HasComponent(colliderEntity_.GetId())
+            ? archetype->GetComponentArray<BoxColliderComponent>(chunkIdx, colliderEntity_.GetId())
+            : nullptr;
+    return ResolveAnchor(pivot, spriteArr ? &spriteArr[indexInChunk] : nullptr,
+                         squareArr ? &squareArr[indexInChunk] : nullptr,
+                         colliderArr ? &colliderArr[indexInChunk] : nullptr);
   }
 
   // Compose parent x local into world space. The parent's scale and rotation act about the
@@ -227,14 +305,18 @@ class TransformSystem {
                                  const LocalTransform& local) {
     const glm::vec2 scale = parent.scale * local.scale;
     const glm::vec2 pivotWorld = parent.position + parent.pivot;
+    // Place the anchor, not the corner: the anchor offset is a vector in the child's own frame,
+    // so it has to travel through the parent's scale and rotation like everything else. Composing
+    // the corner and adding an unrotated shift afterwards breaks at any parent angle or scale.
+    const glm::vec2 anchorWorld = octarine::RotateAround(
+        parent.position + ((local.position + local.anchor) * parent.scale), pivotWorld, parentRotation);
     return {
-        .position =
-            octarine::RotateAround(parent.position + (local.position * parent.scale), pivotWorld, parentRotation),
+        // Backing off by the scaled anchor puts the renderer's `position + pivot` on the anchor.
+        .position = anchorWorld - (local.anchor * scale),
         .scale = scale,
         .rotation = parent.rotation + local.rotation,
-        // Pivot is a per-entity property, not an inherited one: a child spins about its own
-        // anchor. Only the parent's pivot influences where the child is placed, above.
-        .pivot = local.pivotOffset * scale,
+        // Pivot is per-entity, not inherited: a child spins about its own anchor.
+        .pivot = local.anchor * scale,
     };
   }
 
@@ -257,11 +339,17 @@ class TransformSystem {
   // backing array those groups index into.
   std::vector<std::vector<ParentGroup>> levels_;
   std::vector<Entity> children_;
+  // Parallel to children_, so members with no GlobalTransformComponent can still hand a result on.
+  std::vector<GlobalTransform> childGlobals_;
   std::unordered_set<EntityID> visited_;
   uint64_t cachedHierarchyGeneration_ = 0;
   bool levelsBuilt_ = false;
   Entity posEntity_ = {};
   Entity scaleEntity_ = {};
   Entity rotEntity_ = {};
+  Entity pivotEntity_ = {};
   Entity globalEntity_ = {};
+  Entity spriteEntity_ = {};
+  Entity squareEntity_ = {};
+  Entity colliderEntity_ = {};
 };

@@ -29,7 +29,7 @@ inline SDL_BlendMode ToSdlBlendMode(const BlendMode mode) {
 struct SpriteCommand {
   float destX{}, destY{}, destW{}, destH{};
   SDL_FRect srcRect{};
-  double rotation{};
+  float rotation{};
   SDL_FPoint pivot{};
   SDL_FlipMode flip{};
   SDL_Texture* texture{};
@@ -41,7 +41,7 @@ struct SpriteCommand {
 struct SquareCommand {
   SDL_FRect destRect{};
   SDL_Color color{};
-  double rotation{};
+  float rotation{};
   SDL_FPoint pivot{};
   SDL_BlendMode blendMode{SDL_BLENDMODE_BLEND};
 };

@@ -127,7 +127,23 @@ DefaultWindowWidth=1280
 DefaultWindowHeight=720
 DefaultScalingMode=nearest      # 'nearest' for pixel art, 'linear' for smooth
 FpsTarget=60                    # frame-rate cap; 0 = uncapped (default 60)
+AngleUnit=degrees               # 'degrees' (default) or 'radians' for authored angles
 ```
+
+`AngleUnit` picks the unit you write and read angles in — `rotation` in component
+tables, `set_rotation()`, the `rotation` component's `value`, and the editor
+inspectors. The engine always stores and composes in radians; the unit is a
+conversion applied at those boundaries, so it costs nothing at runtime and
+changing it never alters engine behaviour, only how your numbers are spelled.
+
+**It defaults to `degrees`.** A project written against radians must say
+`AngleUnit=radians` explicitly — otherwise a `rotation` of `1.57` is read as
+1.57°, not a quarter turn, with no error to point at. The effective unit is
+logged at startup so you can confirm which one is live.
+
+It is global to the project. A number in a scene file or a shared Lua library
+means whatever this key says, so a snippet copied between two projects with
+different settings will silently change meaning. Pick one early and leave it.
 
 `StartupScript` is the first Lua file that runs. Everything else — scenes,
 assets, entities — is loaded from there.

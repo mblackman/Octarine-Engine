@@ -12,6 +12,7 @@
 #include <sstream>
 #include <unordered_map>
 
+#include "General/AngleUnit.h"
 #include "General/Logger.h"
 #include "General/Utils.h"
 
@@ -187,6 +188,12 @@ bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string>& 
   success &= SetValue(settings, "PerfOverlay", &GameConfig::SetPerfOverlay, false);
   success &= SetValue(settings, "PerfOverlayCorner", &GameConfig::SetPerfOverlayCorner, false);
   success &= SetValue(settings, "PerfOverlayMetrics", &GameConfig::SetPerfOverlayMetrics, false);
+  success &= SetValue(settings, "AngleUnit", &GameConfig::SetAngleUnit, false);
+
+  // Logged whether or not the key was present: the default is degrees, so a project authored in
+  // radians that omits the key would otherwise reinterpret every angle silently.
+  octarine::AngleUnits::Set(engine_options_.angleUnit);
+  Logger::Info(std::string("Angle unit: ") + (octarine::AngleUnits::IsDegrees() ? "degrees" : "radians"));
 
   return success;
 }
@@ -299,6 +306,17 @@ void GameConfig::SetPerfOverlayCorner(const std::string& corner) {
     return;
   }
   Logger::Info("Perf overlay corner: " + corner);
+}
+
+// Parses only; LoadConfig applies it to the process-wide AngleUnits once every key is read.
+void GameConfig::SetAngleUnit(const std::string& unit) {
+  if (unit == "radians" || unit == "rad") {
+    engine_options_.angleUnit = octarine::AngleUnit::Radians;
+  } else if (unit == "degrees" || unit == "deg") {
+    engine_options_.angleUnit = octarine::AngleUnit::Degrees;
+  } else {
+    Logger::Warn("Unknown AngleUnit '" + unit + "' (expected radians|degrees); keeping current.");
+  }
 }
 
 void GameConfig::SetPerfOverlayMetrics(const std::string& metrics) {

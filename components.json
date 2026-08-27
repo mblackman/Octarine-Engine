@@ -44,6 +44,12 @@
       "get_accessor": "registry.get_name"
     },
     {
+      "lua_key": "pivot",
+      "usertype": "pivot_component",
+      "has_accessor": "registry.has_pivot",
+      "get_accessor": "registry.get_pivot"
+    },
+    {
       "lua_key": "position",
       "usertype": "position_component",
       "has_accessor": "registry.has_position",

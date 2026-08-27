@@ -1664,6 +1664,10 @@ function log_w(...) end
 name_component = {}
 
 
+---@class pivot_component
+pivot_component = {}
+
+
 function play_sound(...) end
 
 ---@class position_component
@@ -1707,6 +1711,8 @@ function registry.get_name(...) end
 
 function registry.get_parent(...) end
 
+function registry.get_pivot(...) end
+
 function registry.get_position(...) end
 
 function registry.get_projectile_emitter(...) end
@@ -1748,6 +1754,8 @@ function registry.has_camera_follow(...) end
 function registry.has_health(...) end
 
 function registry.has_name(...) end
+
+function registry.has_pivot(...) end
 
 function registry.has_position(...) end
 

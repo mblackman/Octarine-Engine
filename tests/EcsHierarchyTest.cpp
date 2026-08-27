@@ -5,9 +5,10 @@
 #include <algorithm>
 #include <cmath>
 
+#include "Components/PivotComponent.h"
 #include "Components/SpriteComponent.h"
+#include "Components/SquarePrimitiveComponent.h"
 #include "ECS/Registry.h"
-#include "Systems/PivotResolveSystem.h"
 #include "Systems/TransformSystem.h"
 #include "TestHarness.h"
 
@@ -130,31 +131,38 @@ int main() {
           "entity created after first frame is resolved on the next frame");
   }
 
-  // PivotResolveSystem bakes the normalized anchor into local pixels, and TransformSystem then
-  // scales it into the world-space offset every downstream consumer rotates about.
+  // TransformSystem resolves the normalized anchor against the entity's size and scales it into
+  // the world-space offset every downstream consumer rotates about.
   {
     Registry registry;
-    registry.RegisterBulkSystem<RotationComponent>(PivotResolveSystem());
     registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
 
     const Entity sprite = registry.CreateEntityWithBundle(
         GlobalTransformComponent{}, PositionComponent{{0.0f, 0.0f}}, ScaleComponent{{2.0f, 2.0f}},
-        RotationComponent{0.0, glm::vec2(0.5f, 0.5f)}, SpriteComponent{"tex", 32.0f, 16.0f});
+        PivotComponent{glm::vec2(0.5f, 0.5f)}, SpriteComponent{"tex", 32.0f, 16.0f});
 
     registry.Update(1.0f / 60.0f);
 
-    Check(registry.GetComponent<RotationComponent>(sprite).pivotOffset == glm::vec2(16.0f, 8.0f),
-          "normalized pivot resolves to local pixels from the sprite size");
+    // 0.5 of a 32x16 sprite is (16, 8) in local pixels, doubled into world pixels by the scale.
     Check(registry.GetComponent<GlobalTransformComponent>(sprite).pivot == glm::vec2(32.0f, 16.0f),
-          "global pivot is the local offset scaled into world pixels");
+          "normalized pivot resolves against the sprite size and scales into world pixels");
 
     // No size source anywhere on the entity means no anchor to resolve against, so rotation
     // falls back to spinning about `position`.
     const Entity bare = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{1.0f, 1.0f}},
-                                                        RotationComponent{0.0, glm::vec2(0.5f, 0.5f)});
+                                                        PivotComponent{glm::vec2(0.5f, 0.5f)});
     registry.Update(1.0f / 60.0f);
     Check(registry.GetComponent<GlobalTransformComponent>(bare).pivot == glm::vec2(0.0f, 0.0f),
           "entity with no size source resolves a zero pivot");
+
+    // A pivot is independent of rotation now: this entity has no RotationComponent at all, and
+    // its scale still anchors to the authored corner rather than the geometry centre.
+    const Entity unrotated = registry.CreateEntityWithBundle(
+        GlobalTransformComponent{}, PositionComponent{{50.0f, 50.0f}}, ScaleComponent{{3.0f, 3.0f}},
+        PivotComponent{glm::vec2(0.0f, 0.0f)}, SpriteComponent{"tex", 32.0f, 16.0f});
+    registry.Update(1.0f / 60.0f);
+    Check(NearVec(registry.GetComponent<GlobalTransformComponent>(unrotated).position, glm::vec2(50.0f, 50.0f)),
+          "a pivot with no rotation component still anchors scale");
   }
 
   // A parent's rotation acts about its own pivot, so children orbit the point the parent is
@@ -163,13 +171,11 @@ int main() {
     Registry registry;
     registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
 
-    constexpr double kQuarterTurn = 1.5707963267948966;  // pi/2
-    // pivotOffset is set directly here: this exercises TransformSystem's composition in
-    // isolation, without depending on PivotResolveSystem having run.
-    const Entity parent =
-        registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{100.0f, 100.0f}},
-                                        RotationComponent{kQuarterTurn, glm::vec2(0.0f, 0.0f)});
-    registry.GetComponent<RotationComponent>(parent).pivotOffset = glm::vec2(10.0f, 0.0f);
+    constexpr float kQuarterTurn = 1.5707964F;  // pi/2
+    // A 10x20 primitive anchored at (1, 0) puts the parent's anchor 10px right of its origin.
+    const Entity parent = registry.CreateEntityWithBundle(
+        GlobalTransformComponent{}, PositionComponent{{100.0f, 100.0f}}, RotationComponent{kQuarterTurn},
+        PivotComponent{glm::vec2(1.0f, 0.0f)}, SquarePrimitiveComponent{glm::vec2(0.0f, 0.0f), 0, 10.0f, 20.0f});
 
     const Entity atPivot =
         registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{10.0f, 0.0f}});
@@ -247,6 +253,158 @@ int main() {
     registry.Update(1.0f / 60.0f);
     Check(registry.GetComponent<GlobalTransformComponent>(keep).position == glm::vec2(21.0f, 0.0f),
           "surviving sibling still composes after a hierarchy member is blammed");
+  }
+
+  // A grouping node — a local transform with no GlobalTransformComponent, which is what the Lua
+  // loader produces for an entity that carries no renderable — still drives its children. Its
+  // local stands in as its global instead of collapsing to identity at the world origin.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    constexpr float kQuarterTurn = 1.5707964F;  // pi/2
+    const Entity group =
+        registry.CreateEntityWithBundle(PositionComponent{{200.0f, 300.0f}}, RotationComponent{kQuarterTurn});
+    const Entity child = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{10.0f, 0.0f}});
+    registry.SetParent(child, group);
+
+    registry.Update(1.0f / 60.0f);
+
+    const auto& childGlobal = registry.GetComponent<GlobalTransformComponent>(child);
+    // Zero pivot, so the child orbits the group's origin: +x swings to +y a quarter turn round.
+    Check(NearVec(childGlobal.position, glm::vec2(200.0f, 310.0f)),
+          "child of a global-less grouping node inherits its position and rotation");
+    Check(std::fabs(childGlobal.rotation - kQuarterTurn) < 1e-6F,
+          "child of a global-less grouping node inherits its rotation");
+  }
+
+  // The same node in the middle of a chain has to pass its ancestors' composition through, not
+  // just its own local — nothing writes it back to a component, so the pass carries it in memory.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    const Entity root = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{100.0f, 0.0f}},
+                                                        ScaleComponent{{2.0f, 2.0f}});
+    const Entity group = registry.CreateEntityWithBundle(PositionComponent{{10.0f, 0.0f}});
+    const Entity child = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{1.0f, 0.0f}});
+    registry.SetParent(group, root);
+    registry.SetParent(child, group);
+
+    registry.Update(1.0f / 60.0f);
+
+    // group sits at 100 + 10*2 = 120; child adds its own local scaled by the inherited (2,2).
+    const auto& childGlobal = registry.GetComponent<GlobalTransformComponent>(child);
+    Check(NearVec(childGlobal.position, glm::vec2(122.0f, 0.0f)),
+          "a global-less node mid-chain passes its ancestors' composition through");
+    Check(childGlobal.scale == glm::vec2(2.0f, 2.0f), "scale survives a global-less node mid-chain");
+  }
+
+  // Scale acts about the entity's anchor. With no authored pivot that is the centre of its own
+  // geometry, so a scaled sprite grows in place instead of sprawling down-right from its corner.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    const Entity grown =
+        registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{100.0f, 100.0f}},
+                                        ScaleComponent{{2.0f, 2.0f}}, SpriteComponent{"tex", 32.0f, 16.0f});
+    // Scale 1 must be a no-op: nothing unscaled anywhere in a game may shift because of this.
+    const Entity unscaled =
+        registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{100.0f, 100.0f}},
+                                        ScaleComponent{{1.0f, 1.0f}}, SpriteComponent{"tex", 32.0f, 16.0f});
+
+    registry.Update(1.0f / 60.0f);
+
+    const auto& g = registry.GetComponent<GlobalTransformComponent>(grown);
+    Check(NearVec(g.position, glm::vec2(84.0f, 92.0f)), "unpivoted scale backs the top-left off by half the growth");
+    Check(NearVec(g.position + glm::vec2(32.0f, 16.0f) * g.scale * 0.5f, glm::vec2(116.0f, 108.0f)),
+          "the sprite centre is exactly where it sat before scaling");
+    Check(NearVec(registry.GetComponent<GlobalTransformComponent>(unscaled).position, glm::vec2(100.0f, 100.0f)),
+          "scale 1 leaves position untouched");
+  }
+
+  // An authored pivot overrides the centre — including restoring the old grow-from-the-corner
+  // behaviour by anchoring at (0, 0).
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    const Entity corner = registry.CreateEntityWithBundle(
+        GlobalTransformComponent{}, PositionComponent{{100.0f, 100.0f}}, ScaleComponent{{2.0f, 2.0f}},
+        PivotComponent{glm::vec2(0.0f, 0.0f)}, SpriteComponent{"tex", 32.0f, 16.0f});
+    const Entity farCorner = registry.CreateEntityWithBundle(
+        GlobalTransformComponent{}, PositionComponent{{100.0f, 100.0f}}, ScaleComponent{{2.0f, 2.0f}},
+        PivotComponent{glm::vec2(1.0f, 1.0f)}, SpriteComponent{"tex", 32.0f, 16.0f});
+
+    registry.Update(1.0f / 60.0f);
+
+    Check(NearVec(registry.GetComponent<GlobalTransformComponent>(corner).position, glm::vec2(100.0f, 100.0f)),
+          "a top-left pivot scales from the corner, leaving position untouched");
+    // Anchor (32, 16) held fixed: the top-left backs off by the full extra size.
+    const auto& far = registry.GetComponent<GlobalTransformComponent>(farCorner);
+    Check(NearVec(far.position, glm::vec2(68.0f, 84.0f)), "a bottom-right pivot scales from that corner");
+    Check(NearVec(far.position + far.pivot, glm::vec2(132.0f, 116.0f)),
+          "the anchored corner itself does not move under scale");
+  }
+
+  // A child grows about its own anchor using the scale it inherited, while the parent's scale
+  // still places it. The two anchor terms are independent.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    // No geometry on the parent, so its own anchor is zero and only the child's applies.
+    const Entity parent = registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{100.0f, 0.0f}},
+                                                          ScaleComponent{{2.0f, 2.0f}});
+    const Entity child =
+        registry.CreateEntityWithBundle(GlobalTransformComponent{}, PositionComponent{{10.0f, 0.0f}},
+                                        SquarePrimitiveComponent{glm::vec2(0.0f, 0.0f), 0, 32.0f, 16.0f});
+    registry.SetParent(child, parent);
+
+    registry.Update(1.0f / 60.0f);
+
+    const auto& g = registry.GetComponent<GlobalTransformComponent>(child);
+    Check(g.scale == glm::vec2(2.0f, 2.0f), "child inherits the parent scale");
+    // The parent's scale doubles the whole subtree about the parent's anchor at (100, 0). The
+    // child's unscaled box spans [110, 142] in world x, so doubling puts its corner at 120.
+    Check(NearVec(g.position, glm::vec2(120.0f, 0.0f)), "parent scale places the child's corner");
+    // Its anchor — the centre of a 32x16 square — is at (10 + 16) * 2 from the parent origin.
+    Check(NearVec(g.position + glm::vec2(32.0f, 16.0f) * g.scale * 0.5f, glm::vec2(152.0f, 16.0f)),
+          "the child's centre lands on its placed anchor");
+  }
+
+  // A child that carries both a scale and a pivot, under a rotating parent. The anchor offset
+  // is a vector in the child's own frame, so it has to travel through the parent's rotation with
+  // everything else — adding it unrotated puts the child badly out of place at any parent angle.
+  {
+    Registry registry;
+    registry.RegisterBulkSystem<GlobalTransformComponent>(TransformSystem());
+
+    constexpr float kQuarterTurn = 1.5707964F;  // pi/2
+    const Entity parent = registry.CreateEntityWithBundle(
+        GlobalTransformComponent{}, PositionComponent{{100.0f, 100.0f}}, RotationComponent{kQuarterTurn});
+    const Entity child = registry.CreateEntityWithBundle(
+        GlobalTransformComponent{}, PositionComponent{{50.0f, 0.0f}}, ScaleComponent{{2.0f, 2.0f}},
+        PivotComponent{glm::vec2(0.5f, 0.5f)}, SquarePrimitiveComponent{glm::vec2(0.0f, 0.0f), 0, 40.0f, 20.0f});
+    registry.SetParent(child, parent);
+
+    registry.Update(1.0f / 60.0f);
+
+    const auto& g = registry.GetComponent<GlobalTransformComponent>(child);
+    // The child's anchor sits at (50, 0) + (20, 10) = (70, 10) in the parent's frame. A quarter
+    // turn about the parent's own origin swings that to (-10, 70), landing it at (90, 170).
+    Check(NearVec(g.position + g.pivot, glm::vec2(90.0f, 170.0f)),
+          "a scaled, pivoted child anchors where the parent's rotation carries it");
+    Check(NearVec(g.position, glm::vec2(50.0f, 150.0f)), "its drawn corner backs off by the scaled anchor");
+    Check(NearVec(g.pivot, glm::vec2(40.0f, 20.0f)), "its pivot is the anchor at the inherited scale");
+
+    // The anchor is the fixed point of the child's own scale, so changing scale must not move it.
+    registry.GetComponent<ScaleComponent>(child).value = glm::vec2(5.0f, 5.0f);
+    registry.Update(1.0f / 60.0f);
+    const auto& scaled = registry.GetComponent<GlobalTransformComponent>(child);
+    Check(NearVec(scaled.position + scaled.pivot, glm::vec2(90.0f, 170.0f)),
+          "rescaling a pivoted child under a rotated parent holds its anchor still");
   }
 
   return octarine::test::Result();

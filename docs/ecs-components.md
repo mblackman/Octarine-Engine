@@ -16,21 +16,88 @@ Defines the position, scale, and rotation of an entity in the world.
 | Field      | Type           | Default          | Description                                              |
 |------------|----------------|------------------|----------------------------------------------------------|
 | `position` | `table {x, y}` | `{x=0, y=0}`     | The world position of the entity's top-left corner.      |
-| `scale`    | `table {x, y}` | `{x=1, y=1}`     | The scale of the entity.                                 |
-| `rotation` | `number`       | `0.0`            | Rotation in **radians**.                                 |
-| `pivot`    | `table {x, y}` | `{x=0.5, y=0.5}` | Rotation anchor, normalized to the entity's bounds.      |
+| `scale`    | `table {x, y}` or `number` | `{x=1, y=1}` | The scale of the entity, applied about its anchor. A bare number scales both axes. |
+| `rotation` | `number`       | `0.0`            | Rotation, in the project's `AngleUnit` (degrees by default). |
+| `pivot`    | `table {x, y}` | *(centre)*       | Anchor for rotation *and* scale. Builds a `pivot` component. |
+
+```lua
+components = { transform = { scale = 2 } }                  -- uniform: both axes at once
+components = { transform = { scale = { x = 2, y = 5 } } }   -- per-axis
+```
+
+### `pivot`
+
+The anchor that rotation and scale both act about. It is its own component, independent of
+`rotation` in both directions: an entity can rotate with no pivot, and can carry a pivot with no
+rotation purely to anchor its scaling.
+
+| Field  | Type           | Default          | Description                                        |
+|--------|----------------|------------------|----------------------------------------------------|
+| `x`    | `number`       | `0.5`            | Horizontal anchor, normalized to the entity's bounds. |
+| `y`    | `number`       | `0.5`            | Vertical anchor, normalized to the entity's bounds.   |
+
+Unlike `position` and `scale`, the standalone component is authored **flat** — `x` and `y` at the
+top level, the same shape it has inside the transform table. The nested `{ value = { x, y } }`
+spelling those two components use is accepted as well, so either reads correctly:
+
+```lua
+components = { transform = { pivot = { x = 0, y = 0 } } }   -- inline in the transform
+components = { pivot = { x = 0, y = 0 } }                   -- as its own component
+components = { pivot = 0 }                                  -- shorthand: both axes at once
+components = { pivot = { value = { x = 0, y = 0 } } }       -- nested, matching scale/position
+```
+
+At runtime the component exposes `value` (a `vec2`) plus `x` and `y` accessors:
+
+```lua
+local p = registry.get_pivot(entity)   -- registry.has_pivot(entity) to test first
+p.x = 0                                -- writes through to the component
+```
 
 `pivot` is normalized against whatever the entity draws at: `{x=0, y=0}` is the top-left corner,
-`{x=0.5, y=0.5}` the centre (the default, and what the engine used before pivots were authorable),
-`{x=1, y=1}` the bottom-right. Values outside `0..1` are allowed and place the anchor outside the
-bounds, which is a convenient way to make something orbit a point.
+`{x=0.5, y=0.5}` the centre, `{x=1, y=1}` the bottom-right. Values outside `0..1` are allowed and
+place the anchor outside the bounds, which is a convenient way to make something orbit a point.
 
 The size the anchor resolves against comes from the entity's `sprite`, else its `square`, else its
-`boxcollider`. An entity with none of those has nothing to anchor to and rotates about `position`.
+`boxcollider`. An entity with none of those has nothing to anchor to and falls back to `position`.
 
-The pivot is the single point everything agrees to rotate about: the sprite and primitive
-renderers, the collision broadphase, the collider debug draw, and — importantly — child entities,
-which orbit their parent's pivot rather than its top-left corner.
+**Omitting the component anchors to the centre of the entity's geometry** — the same point
+`{x=0.5, y=0.5}` resolves to. So you only need a `pivot` to move the anchor somewhere other than
+the middle, and rotation behaves identically with or without one.
+
+The anchor is the single point everything agrees on: the sprite and primitive renderers, the
+collision broadphase, the collider debug draw, and — importantly — child entities, which orbit
+their parent's anchor rather than its top-left corner.
+
+`scale` acts about it too, so an entity grows in place rather than sprawling down and to the right
+from its corner. Anchor at `{x=0, y=0}` to get corner-anchored growth instead. Scale `1` is always
+a no-op: an unscaled entity never moves because of this.
+
+> **Migrating an existing project.** Scaling about the anchor is a change in where scaled entities
+> land. Anything at scale `1` is untouched, and rotation-only behaviour is unchanged, but a sprite
+> at scale `2` now sits half its growth up and to the left of where it used to, holding its centre
+> instead of its corner. Add `pivot = { x = 0, y = 0 }` to restore the old placement per entity.
+>
+> Separately, a child that carries its own geometry under a **rotated** parent moves even at scale
+> `1`. That is a bug fix: the child's anchor previously did not travel through the parent's
+> rotation, so it span about the wrong point. Nothing needs to change in your project, but
+> rotated hierarchies will look different — and correct.
+
+### Reading transforms from Lua
+
+`position`, `scale`, and `pivot` all expose their `vec2` as `value` plus `x` and `y` accessors that
+write through to the component:
+
+```lua
+local pos = registry.get_position(entity)
+pos.x = 100          -- equivalent to pos.value.x = 100
+local s = registry.get_scale(entity)
+s.scale = 2          -- uniform view: writes both axes
+if not s:is_uniform() then print(s.x, s.y) end
+```
+
+`scale` (the singular accessor) reports the **x** axis, so it only summarises the pair when
+`is_uniform()` is true. Reading it on a per-axis scale is safe; it just tells you half the story.
 
 ### `rigidbody`
 

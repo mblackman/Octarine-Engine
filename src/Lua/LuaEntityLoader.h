@@ -6,6 +6,7 @@
 #include "Components/EntityMaskComponent.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/NameComponent.h"
+#include "Components/PivotComponent.h"
 #include "Components/PositionComponent.h"
 #include "Components/RotationComponent.h"
 #include "Components/ScaleComponent.h"
@@ -14,6 +15,7 @@
 #include "Components/TextLabelComponent.h"
 #include "Components/UIButtonComponent.h"
 #include "ECS/Registry.h"
+#include "General/AngleUnit.h"
 #include "General/Logger.h"
 #include "Lua/Bindings/LuaBinding.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
@@ -96,14 +98,24 @@ class LuaEntityLoader {
           registry->AddComponent(entity, PositionComponent(SafeGetVec2(t, "position")));
         }
         if (t["scale"].valid()) {
-          registry->AddComponent(entity, ScaleComponent(SafeGetVec2(t, "scale", 1.0f, 1.0f)));
+          // `scale = 2` is uniform-scale shorthand. The table form here is a bare {x, y}, not the
+          // {value = {x, y}} the standalone component takes, so it cannot defer to fromLua.
+          if (const sol::object scaleObj = t.get<sol::object>("scale"); scaleObj.is<float>()) {
+            const auto uniform = scaleObj.as<float>();
+            registry->AddComponent(entity, ScaleComponent(uniform, uniform));
+          } else {
+            registry->AddComponent(entity, ScaleComponent(SafeGetVec2(t, "scale", 1.0f, 1.0f)));
+          }
         }
         if (t["rotation"].valid()) {
-          // `pivot` is a sibling key of `rotation` in the transform table, not nested under it,
-          // since `rotation` is authored as a bare number here. Absent means the centre anchor.
-          registry->AddComponent(entity, RotationComponent(SafeGetOptionalValue<double>(t, "rotation", 0.0),
-                                                           SafeGetVec2(t, "pivot", RotationComponent::kDefaultPivotX,
-                                                                       RotationComponent::kDefaultPivotY)));
+          registry->AddComponent(
+              entity,
+              RotationComponent(octarine::AngleUnits::ToRadians(SafeGetOptionalValue<float>(t, "rotation", 0.0F))));
+        }
+        // Independent of `rotation`: a pivot with no rotation still anchors the entity's scale.
+        if (t["pivot"].valid()) {
+          registry->AddComponent(
+              entity, PivotComponent(SafeGetVec2(t, "pivot", PivotComponent::kDefaultX, PivotComponent::kDefaultY)));
         }
         continue;
       }

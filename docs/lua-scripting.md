@@ -39,7 +39,14 @@ DefaultWindowWidth=1280
 DefaultWindowHeight=720
 DefaultScalingMode=nearest # 'nearest' or 'linear'
 FpsTarget=60               # frame-rate cap; 0 = uncapped (default 60)
+AngleUnit=degrees          # 'degrees' (default) or 'radians'
 ```
+
+`AngleUnit` sets the unit for every angle you author or read from Lua —
+`rotation` in a component table, `set_rotation()`, and the `rotation`
+component's `value`. Storage stays radians; this converts at the boundary.
+It defaults to `degrees`, so a project authored in radians must set
+`AngleUnit=radians` or its angles will be read as degrees.
 
 ---
 

@@ -36,19 +36,18 @@ sections).
 | 4 | `ProjectileLifecycleSystem` | parallel · `ProjectileComponent` | Counts down projectile lifetime and despawns on expiry. |
 | 5 | `VelocityIntegrationSystem` | parallel · `PositionComponent, RigidBodyComponent` | Integrates velocity into local position. Runs **before** transform resolution. |
 | 6 | `OffScreenDespawnSystem` | parallel · `PositionComponent, SpriteComponent` | Despawns non-player entities that leave the playable bounds. |
-| 7 | `PivotResolveSystem` | bulk · `RotationComponent` (+ optional sprite/primitive/collider) | Bakes each normalized rotation pivot into local pixels (`RotationComponent.pivotOffset`). Must run before `TransformSystem`. |
-| 8 | `TransformSystem` | bulk · `GlobalTransformComponent` (+ optional position/scale/rotation) | Resolves the entity hierarchy into world-space `GlobalTransformComponent`. Flat parallel pass for every entity, then a breadth-first depth-bucketed pass for hierarchy members only. |
-| 9 | `CollisionSystem` | bulk · `GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent` | Broadphase + OBB narrowphase; **emits one `CollisionBatchEvent`** carrying all overlapping pairs. |
-| 10 | `UpdateListenerTransformSystem` | bulk · `GlobalTransformComponent, AudioListenerComponent` | Snapshots the active listener's position/velocity for the spatial-audio chain. |
-| 11 | `AudioCullingSystem` | serial · `GlobalTransformComponent, AudioSourceComponent` | Gates spatial sources by listener radius (adds/removes the active tag + sink). |
-| 12 | `SpatialAudioSystem` | serial · `GlobalTransformComponent, AudioSourceComponent, AudioSinkComponent` | Distance attenuation + stereo pan for active spatial sources. |
-| 13 | `DopplerSystem` | serial · `GlobalTransformComponent, RigidBodyComponent, AudioSourceComponent, AudioSinkComponent` | Doppler pitch shift from relative emitter/listener velocity. |
-| 14 | `CameraFollowSystem` | serial · `PositionComponent, CameraFollowComponent` | Moves the camera viewport to follow its target within bounds. |
-| 15 | `RenderSpriteSystem` | parallel · `GlobalTransformComponent, SpriteComponent` | Resolves textures and enqueues visible sprites into the render queue (viewport-culled). |
-| 16 | `RenderTextSystem` | serial · `TextLabelComponent` | Rasterizes/caches glyphs and enqueues visible text (viewport-culled). |
-| 17 | `RenderPrimitiveSystem` | parallel · `SquarePrimitiveComponent, GlobalTransformComponent` | Enqueues square primitives (viewport-culled). |
+| 7 | `TransformSystem` | bulk · `GlobalTransformComponent` (+ optional position/scale/rotation/pivot/sprite/primitive/collider) | Resolves the entity hierarchy into world-space `GlobalTransformComponent`, resolving each entity's anchor against its own geometry on the way. Flat parallel pass for every entity, then a breadth-first depth-bucketed pass for hierarchy members only. |
+| 8 | `CollisionSystem` | bulk · `GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent` | Broadphase + OBB narrowphase; **emits one `CollisionBatchEvent`** carrying all overlapping pairs. |
+| 9 | `UpdateListenerTransformSystem` | bulk · `GlobalTransformComponent, AudioListenerComponent` | Snapshots the active listener's position/velocity for the spatial-audio chain. |
+| 10 | `AudioCullingSystem` | serial · `GlobalTransformComponent, AudioSourceComponent` | Gates spatial sources by listener radius (adds/removes the active tag + sink). |
+| 11 | `SpatialAudioSystem` | serial · `GlobalTransformComponent, AudioSourceComponent, AudioSinkComponent` | Distance attenuation + stereo pan for active spatial sources. |
+| 12 | `DopplerSystem` | serial · `GlobalTransformComponent, RigidBodyComponent, AudioSourceComponent, AudioSinkComponent` | Doppler pitch shift from relative emitter/listener velocity. |
+| 13 | `CameraFollowSystem` | serial · `PositionComponent, CameraFollowComponent` | Moves the camera viewport to follow its target within bounds. |
+| 14 | `RenderSpriteSystem` | parallel · `GlobalTransformComponent, SpriteComponent` | Resolves textures and enqueues visible sprites into the render queue (viewport-culled). |
+| 15 | `RenderTextSystem` | serial · `TextLabelComponent` | Rasterizes/caches glyphs and enqueues visible text (viewport-culled). |
+| 16 | `RenderPrimitiveSystem` | parallel · `SquarePrimitiveComponent, GlobalTransformComponent` | Enqueues square primitives (viewport-culled). |
 
-The render systems (15–17) only *produce* render-queue entries; `Game::Render` sorts the queue and
+The render systems (14–16) only *produce* render-queue entries; `Game::Render` sorts the queue and
 draws it after `Update` (see [`ecs-architecture.md`](ecs-architecture.md) § Rendering).
 
 ### Why the order matters

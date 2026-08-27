@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "General/AngleUnit.h"
 #include "General/Constants.h"
 
 // Screen anchor for the built-in perf overlay. config.ini: PerfOverlayCorner=top-left|top-right|
@@ -57,4 +58,7 @@ struct EngineOptions {
   // runtime toggle. Poll cadence is mtime-based, single-threaded, on the main loop.
   bool hotReloadEnabled = true;
   float hotReloadPollSeconds = 0.25F;
+  // Unit that angles are authored and displayed in (Lua tables, set_rotation, the editor
+  // inspectors). Storage stays radians regardless. config.ini: AngleUnit=radians|degrees.
+  octarine::AngleUnit angleUnit = octarine::AngleUnit::Degrees;
 };
