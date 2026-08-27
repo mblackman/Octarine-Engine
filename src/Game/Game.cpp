@@ -24,6 +24,7 @@
 #include "Components/EntityMaskComponent.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/HealthComponent.h"
+#include "Components/PivotComponent.h"
 #include "Components/PositionComponent.h"
 #include "Components/ProjectileComponent.h"
 #include "Components/ProjectileEmitterComponent.h"

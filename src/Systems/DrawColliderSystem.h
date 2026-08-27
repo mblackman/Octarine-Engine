@@ -11,6 +11,7 @@
 #include "ECS/Registry.h"
 #include "Engine/EngineContext.h"
 #include "General/Constants.h"
+#include "General/Rotation2D.h"
 
 class DrawColliderSystem {
  public:
@@ -25,31 +26,46 @@ class DrawColliderSystem {
     const float hy = h * 0.5f;
 
     // transform.position is top-left. apply collider offset (scaled).
-    float cx = transform.position.x + collider.offset.x * transform.scale.x + hx;
-    float cy = transform.position.y + collider.offset.y * transform.scale.y + hy;
+    glm::vec2 centre = {transform.position.x + collider.offset.x * transform.scale.x + hx,
+                        transform.position.y + collider.offset.y * transform.scale.y + hy};
+    glm::vec2 origin = transform.position + transform.pivot;
 
     if (!collider.isFixed) {
-      cx -= camera.x;
-      cy -= camera.y;
+      const glm::vec2 cameraOffset = {camera.x, camera.y};
+      centre -= cameraOffset;
+      origin -= cameraOffset;
     }
 
     SDL_SetRenderDrawColor(renderer, Constants::kUint8Max, 0, 0, Constants::kUint8Max);
 
-    if (transform.rotation == 0.0) {
-      const SDL_FRect rect = {cx - hx, cy - hy, w, h};
+    const octarine::Rotation2D rot = octarine::Rotation2D::FromRadians(transform.rotation);
+    if (rot.IsIdentity()) {
+      const SDL_FRect rect = {centre.x - hx, centre.y - hy, w, h};
       SDL_RenderRect(renderer, &rect);
       return;
     }
 
-    const auto c = static_cast<float>(std::cos(transform.rotation));
-    const auto s = static_cast<float>(std::sin(transform.rotation));
-    const SDL_FPoint corners[5] = {
-        {cx + (-hx) * c - (-hy) * s, cy + (-hx) * s + (-hy) * c},
-        {cx + (hx)*c - (-hy) * s, cy + (hx)*s + (-hy) * c},
-        {cx + (hx)*c - (hy)*s, cy + (hx)*s + (hy)*c},
-        {cx + (-hx) * c - (hy)*s, cy + (-hx) * s + (hy)*c},
-        {cx + (-hx) * c - (-hy) * s, cy + (-hx) * s + (-hy) * c},
-    };
-    SDL_RenderLines(renderer, corners, 5);
+    // Match CollisionSystem: orbit the box centre about `position + pivot` before drawing the
+    // OBB, so the debug outline lands on the box the broadphase actually tested.
+    centre = octarine::RotateAround(centre, origin, rot);
+    DrawOrientedBox(renderer, centre, {hx, hy}, rot);
+  }
+
+ private:
+  static constexpr int kBoxCorners = 4;
+  // SDL_RenderLines draws an open polyline, so the outline repeats the first corner to close.
+  static constexpr int kOutlinePoints = kBoxCorners + 1;
+
+  // Trace the four corners of a centred box under `rot`, closing back on the first.
+  static void DrawOrientedBox(SDL_Renderer* renderer, const glm::vec2 centre, const glm::vec2 half,
+                              const octarine::Rotation2D rot) {
+    const glm::vec2 offsets[kBoxCorners] = {{-half.x, -half.y}, {half.x, -half.y}, {half.x, half.y}, {-half.x, half.y}};
+    SDL_FPoint corners[kOutlinePoints];
+    for (int i = 0; i < kBoxCorners; ++i) {
+      const glm::vec2 p = centre + octarine::Rotate(offsets[i], rot);
+      corners[i] = {p.x, p.y};
+    }
+    corners[kBoxCorners] = corners[0];
+    SDL_RenderLines(renderer, corners, kOutlinePoints);
   }
 };

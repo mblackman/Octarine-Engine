@@ -8,14 +8,17 @@
 
 #include "Components/RotationComponent.h"
 #include "Editor/Inspectors/EditorInspector.h"
+#include "General/AngleUnit.h"
 
 template <>
 struct EditorInspector<RotationComponent> {
   static constexpr const char* kDisplayName = "Rotation";
+
   static void draw(Registry* /*registry*/, Entity /*entity*/, RotationComponent& rotationComp) {
-    auto rotation = static_cast<float>(rotationComp.value);
-    if (ImGui::DragFloat("Rotation", &rotation)) {
-      rotationComp.value = rotation;
+    // Dragged and shown in the configured AngleUnit; storage stays radians.
+    float authored = octarine::AngleUnits::ToAuthored(rotationComp.value);
+    if (ImGui::DragFloat(octarine::AngleUnits::IsDegrees() ? "Rotation (deg)" : "Rotation (rad)", &authored)) {
+      rotationComp.value = octarine::AngleUnits::ToRadians(authored);
     }
   }
   static std::optional<RotationComponent> makeDefault() { return RotationComponent{}; }

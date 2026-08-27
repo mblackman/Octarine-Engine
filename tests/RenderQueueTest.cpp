@@ -9,10 +9,16 @@
 #include <string>
 #include <vector>
 
+#include "Components/CameraComponents.h"
+#include "Components/GlobalTransformComponent.h"
+#include "Components/SquarePrimitiveComponent.h"
+#include "ECS/Registry.h"
+#include "Game/GameConfig.h"
 #include "General/BlendMode.h"
 #include "General/Constants.h"
 #include "Renderer/RenderKey.h"
 #include "Renderer/RenderQueue.h"
+#include "Systems/RenderPrimitiveSystem.h"
 #include "TestHarness.h"
 
 using octarine::BlendMode;
@@ -161,6 +167,63 @@ int main() {
     queue.Sort();
     CheckEq(queue.Size(), static_cast<size_t>(1), "queue reusable after Clear");
     CheckEq(queue.begin()->payload.sprite.destX, 42.0f, "payload survives the post-Clear sort");
+  }
+
+  std::cout << "[primitive] RenderPrimitiveSystem applies transform scale\n";
+  {
+    // The system reads its singletons in Prepare(), then writes straight into the queue, so a
+    // bare registry with the three singletons set is enough to exercise it.
+    Registry registry;
+    registry.Set<GameConfig>(GameConfig{});
+    registry.Get<GameConfig>().windowWidth = 800;
+    registry.Get<GameConfig>().windowHeight = 600;
+    registry.Set<CameraComponent>(CameraComponent{});
+    registry.Set<RenderQueue>(RenderQueue(16));
+
+    RenderPrimitiveSystem system;
+    system.Prepare(&registry);
+
+    SquarePrimitiveComponent square(glm::vec2(10.0f, 20.0f), 0, 30.0f, 40.0f);
+    GlobalTransformComponent transform;
+    transform.position = {100.0f, 100.0f};
+    transform.scale = {2.0f, 3.0f};
+
+    system(square, transform);
+
+    const auto& queue = registry.Get<RenderQueue>();
+    CheckEq(queue.Size(), static_cast<size_t>(1), "square emplaced");
+    const auto& cmd = queue.begin()->payload.square;
+    CheckEq(cmd.destRect.w, 60.0f, "square width scales with transform.scale.x");
+    CheckEq(cmd.destRect.h, 120.0f, "square height scales with transform.scale.y");
+    // Local offset (10, 20) scaled by (2, 3) -> (20, 60), added to the transform position.
+    CheckEq(cmd.destRect.x, 120.0f, "square local offset scales on x");
+    CheckEq(cmd.destRect.y, 160.0f, "square local offset scales on y");
+  }
+
+  std::cout << "[primitive] a centre pivot lands mid-quad at any scale\n";
+  {
+    Registry registry;
+    registry.Set<GameConfig>(GameConfig{});
+    registry.Get<GameConfig>().windowWidth = 800;
+    registry.Get<GameConfig>().windowHeight = 600;
+    registry.Set<CameraComponent>(CameraComponent{});
+    registry.Set<RenderQueue>(RenderQueue(16));
+
+    RenderPrimitiveSystem system;
+    system.Prepare(&registry);
+
+    SquarePrimitiveComponent square(glm::vec2(0.0f, 0.0f), 0, 30.0f, 40.0f);
+    GlobalTransformComponent transform;
+    transform.position = {0.0f, 0.0f};
+    transform.scale = {2.0f, 3.0f};
+    // What TransformSystem writes for a (0.5, 0.5) pivot: normalized * size * scale.
+    transform.pivot = {30.0f, 60.0f};
+
+    system(square, transform);
+
+    const auto& cmd = registry.Get<RenderQueue>().begin()->payload.square;
+    CheckEq(cmd.pivot.x, cmd.destRect.w * 0.5f, "centre pivot stays centred on x under scale");
+    CheckEq(cmd.pivot.y, cmd.destRect.h * 0.5f, "centre pivot stays centred on y under scale");
   }
 
   return octarine::test::ReportSummary("RenderQueueTest");

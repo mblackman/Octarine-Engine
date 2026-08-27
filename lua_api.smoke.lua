@@ -1668,6 +1668,10 @@ lifetime_component = {}
 name_component = {}
 
 
+---@class pivot_component
+pivot_component = {}
+
+
 function play_sound(...) end
 
 ---@class position_component
@@ -1713,6 +1717,8 @@ function registry.get_name(...) end
 
 function registry.get_parent(...) end
 
+function registry.get_pivot(...) end
+
 function registry.get_position(...) end
 
 function registry.get_projectile_emitter(...) end
@@ -1756,6 +1762,8 @@ function registry.has_health(...) end
 function registry.has_lifetime(...) end
 
 function registry.has_name(...) end
+
+function registry.has_pivot(...) end
 
 function registry.has_position(...) end
 
@@ -1813,6 +1821,8 @@ function set_name(...) end
 function set_perf_overlay(...) end
 
 function set_position(...) end
+
+function set_rotation(...) end
 
 function set_sprite_src_rect(...) end
 

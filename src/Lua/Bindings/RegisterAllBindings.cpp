@@ -9,6 +9,7 @@
 #include "Lua/Bindings/LifetimeComponentLuaBinding.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
 #include "Lua/Bindings/NameComponentLuaBinding.h"
+#include "Lua/Bindings/PivotComponentLuaBinding.h"
 #include "Lua/Bindings/PositionComponentLuaBinding.h"
 #include "Lua/Bindings/ProjectileEmitterComponentLuaBinding.h"
 #include "Lua/Bindings/RigidBodyComponentLuaBinding.h"
@@ -44,6 +45,7 @@ void RegisterAllLuaBindings() {
   LuaComponentRegistry::registerComponent<ScaleComponent>();
   LuaComponentRegistry::registerComponent<PositionComponent>();
   LuaComponentRegistry::registerComponent<RotationComponent>();
+  LuaComponentRegistry::registerComponent<PivotComponent>();
   LuaComponentRegistry::registerComponent<UICanvasComponent>();
   LuaComponentRegistry::registerComponent<UIAnchorComponent>();
   LuaComponentRegistry::registerComponent<UIRectComponent>();

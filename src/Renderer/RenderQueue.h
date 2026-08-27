@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cassert>
 #include <cstdint>
 #include <vector>
 
@@ -74,7 +75,7 @@ class RenderQueue {
   void Clear() { count_.store(0, std::memory_order_relaxed); }
 
   void Sort() {
-    const size_t n = count_.load(std::memory_order_relaxed);
+    const size_t n = std::min(count_.load(std::memory_order_relaxed), render_keys_.size());
     if (n <= 1) return;
 
     // Build (sortKey, srcIdx) entries — 16 bytes each. Sorting these instead of the
@@ -107,17 +108,23 @@ class RenderQueue {
 
   [[nodiscard]] const_iterator begin() const noexcept { return render_keys_.cbegin(); }
   [[nodiscard]] const_iterator end() const noexcept {
-    return render_keys_.cbegin() + static_cast<std::ptrdiff_t>(count_.load(std::memory_order_relaxed));
+    const size_t n = std::min(count_.load(std::memory_order_relaxed), render_keys_.size());
+    return render_keys_.cbegin() + static_cast<std::ptrdiff_t>(n);
   }
   [[nodiscard]] const_iterator cbegin() const noexcept { return begin(); }
   [[nodiscard]] const_iterator cend() const noexcept { return end(); }
   [[nodiscard]] bool IsEmpty() const noexcept { return count_.load(std::memory_order_relaxed) == 0; }
-  [[nodiscard]] size_t Size() const noexcept { return count_.load(std::memory_order_relaxed); }
+  [[nodiscard]] size_t Size() const noexcept {
+    return std::min(count_.load(std::memory_order_relaxed), render_keys_.size());
+  }
 
  private:
   RenderKey& ClaimSlot() {
     const size_t i = count_.fetch_add(1, std::memory_order_relaxed);
-    // Pre-sized vector — caller must size capacity to peak frame load.
+    if (i >= render_keys_.size()) {
+      assert(i < render_keys_.size() && "RenderQueue capacity exceeded!");
+      return render_keys_.back();
+    }
     return render_keys_[i];
   }
 

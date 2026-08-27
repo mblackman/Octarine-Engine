@@ -36,7 +36,7 @@ sections).
 | 4 | `ProjectileLifecycleSystem` | parallel · `ProjectileComponent` | Counts down projectile lifetime and despawns on expiry. |
 | 5 | `VelocityIntegrationSystem` | parallel · `PositionComponent, RigidBodyComponent` | Integrates velocity into local position. Runs **before** transform resolution. |
 | 6 | `OffScreenDespawnSystem` | parallel · `PositionComponent, SpriteComponent` | Despawns non-player entities that leave the playable bounds. |
-| 7 | `TransformSystem` | bulk · `GlobalTransformComponent` (+ optional position/scale/rotation) | Resolves the entity hierarchy into world-space `GlobalTransformComponent`. Fast path when no `ChildOf` relationships exist. |
+| 7 | `TransformSystem` | bulk · `GlobalTransformComponent` (+ optional position/scale/rotation/pivot/sprite/primitive/collider) | Resolves the entity hierarchy into world-space `GlobalTransformComponent`, resolving each entity's anchor against its own geometry on the way. Flat parallel pass for every entity, then a breadth-first depth-bucketed pass for hierarchy members only. |
 | 8 | `CollisionSystem` | bulk · `GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent` | Broadphase + OBB narrowphase; **emits one `CollisionBatchEvent`** carrying all overlapping pairs. |
 | 9 | `UpdateListenerTransformSystem` | bulk · `GlobalTransformComponent, AudioListenerComponent` | Snapshots the active listener's position/velocity for the spatial-audio chain. |
 | 10 | `AudioCullingSystem` | serial · `GlobalTransformComponent, AudioSourceComponent` | Gates spatial sources by listener radius (adds/removes the active tag + sink). |

@@ -22,6 +22,7 @@
 #include "Events/CollisionBatchEvent.h"
 #include "Events/CollisionExitBatchEvent.h"
 #include "General/PerfUtils.h"
+#include "General/Rotation2D.h"
 #include "General/ThreadPool.h"
 
 constexpr int kMaxDimensions = 2;
@@ -39,8 +40,7 @@ struct Box {
   // OBB narrowphase state.
   float cx, cy;
   float hx, hy;
-  float rotCos, rotSin;
-  bool rotated;
+  octarine::Rotation2D rot;
 
   [[nodiscard]] bool intersectsInDimension(const Box& other, const int dim) const {
     if (dim == 0) return !(maxX < other.minX || minX > other.maxX);
@@ -51,10 +51,10 @@ struct Box {
   // SAT on the 4 face normals of two OBBs. Only invoked when at least one box is rotated;
   // axis-aligned pairs short-circuit on the AABB check above.
   [[nodiscard]] bool obbIntersects(const Box& other) const {
-    const float ax0 = rotCos, ay0 = rotSin;
-    const float ax1 = -rotSin, ay1 = rotCos;
-    const float bx0 = other.rotCos, by0 = other.rotSin;
-    const float bx1 = -other.rotSin, by1 = other.rotCos;
+    const float ax0 = rot.cos, ay0 = rot.sin;
+    const float ax1 = -rot.sin, ay1 = rot.cos;
+    const float bx0 = other.rot.cos, by0 = other.rot.sin;
+    const float bx1 = -other.rot.sin, by1 = other.rot.cos;
     const float dx = other.cx - cx;
     const float dy = other.cy - cy;
 
@@ -76,7 +76,7 @@ struct Box {
       return false;
     }
     if (!intersectsInDimension(other, 0) || !intersectsInDimension(other, 1)) return false;
-    if (!rotated && !other.rotated) return true;
+    if (rot.IsIdentity() && other.rot.IsIdentity()) return true;
     return obbIntersects(other);
   }
 };
@@ -134,29 +134,32 @@ class CollisionSystem {
         const float hy = h * 0.5f;
 
         // transform.position is top-left. apply collider offset (scaled).
-        const float cx = transform.position.x + collider.offset.x * transform.scale.x + hx;
-        const float cy = transform.position.y + collider.offset.y * transform.scale.y + hy;
+        const float boxCx = transform.position.x + collider.offset.x * transform.scale.x + hx;
+        const float boxCy = transform.position.y + collider.offset.y * transform.scale.y + hy;
 
-        const float rot = static_cast<float>(transform.rotation);
-        const float rc = std::cos(rot);
-        const float rs = std::sin(rot);
-        const bool rotated = transform.rotation != 0.0;
-        const float aabbHx = hx * std::abs(rc) + hy * std::abs(rs);
-        const float aabbHy = hx * std::abs(rs) + hy * std::abs(rc);
-        boxes[idx] = {entity,
-                      entityMask.mask,
-                      collider.collisionMask,
-                      cx - aabbHx,
-                      cy - aabbHy,
-                      cx + aabbHx,
-                      cy + aabbHy,
-                      cx,
-                      cy,
-                      hx,
-                      hy,
-                      rc,
-                      rs,
-                      rotated};
+        // FromRadians short-circuits the unrotated majority, and RotateAround collapses to a
+        // copy for identity — so a world of axis-aligned colliders pays no trig at all here.
+        const octarine::Rotation2D rot = octarine::Rotation2D::FromRadians(transform.rotation);
+
+        // The entity turns about `position + pivot`, not about the collider's own centre, so
+        // orbit the box centre around that point. Otherwise a pivoted sprite and its collider
+        // separate as soon as the entity rotates. The OBB axes are unaffected — only where the
+        // centre lands changes.
+        const glm::vec2 centre = octarine::RotateAround({boxCx, boxCy}, transform.position + transform.pivot, rot);
+        const glm::vec2 aabbHalf = octarine::RotatedHalfExtents({hx, hy}, rot);
+
+        boxes[idx] = {.entity = entity,
+                      .entityMask = entityMask.mask,
+                      .collisionMask = collider.collisionMask,
+                      .minX = centre.x - aabbHalf.x,
+                      .minY = centre.y - aabbHalf.y,
+                      .maxX = centre.x + aabbHalf.x,
+                      .maxY = centre.y + aabbHalf.y,
+                      .cx = centre.x,
+                      .cy = centre.y,
+                      .hx = hx,
+                      .hy = hy,
+                      .rot = rot};
       });
     }
 

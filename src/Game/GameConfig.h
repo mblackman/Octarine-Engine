@@ -115,6 +115,7 @@ class GameConfig {
   void SetPerfOverlay(bool enabled);
   void SetPerfOverlayCorner(const std::string& corner);
   void SetPerfOverlayMetrics(const std::string& metrics);
+  void SetAngleUnit(const std::string& unit);
   // Runtime override of the compile-time default log level. Invoked from LoadConfig; pushes the
   // value straight into spdlog via Logger::SetLevel, so subsequent Logger calls honor it.
   void SetLogLevel(const std::string& logLevel);
