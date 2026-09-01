@@ -25,7 +25,21 @@ void LuaModuleBinding<LogModule>::install(sol::state& lua, LuaBindingContext& /*
   lua.set_function("log_e", &Logger::ErrorLua);
   lua.set_function("log_w", &Logger::WarnLua);
   lua.set_function("log_i", &Logger::InfoLua);
-  lua.set_function("print", [](const std::string& message) { Logger::LogLua(message); });
+  lua.set_function("print", [](sol::variadic_args va) {
+    std::string msg;
+    bool first = true;
+    for (auto v : va) {
+      if (!first) msg += "\t";
+      first = false;
+      if (v.is<std::string>()) {
+        msg += v.as<std::string>();
+      } else {
+        sol::state_view sv(v.lua_state());
+        msg += sv["tostring"](v).get<std::string>();
+      }
+    }
+    Logger::LogLua(msg);
+  });
 
   lua.set_exception_handler(&LuaHandler);
 }
