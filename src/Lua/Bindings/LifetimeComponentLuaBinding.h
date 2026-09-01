@@ -19,8 +19,7 @@ struct LuaBinding<LifetimeComponent> {
 
   static void bindUsertype(sol::state& lua) {
     lua.new_usertype<LifetimeComponent>(
-        kUsertypeName, "remaining_duration", sol::readonly(&LifetimeComponent::remainingDuration),
-        "duration",
+        kUsertypeName, "remaining_duration", sol::readonly(&LifetimeComponent::remainingDuration), "duration",
         sol::property([](const LifetimeComponent& s) { return s.lifetimeDuration; },
                       [](LifetimeComponent& s, const float duration) { s.lifetimeDuration = duration; }));
   }

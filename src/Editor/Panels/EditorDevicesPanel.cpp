@@ -419,8 +419,7 @@ void DrawDevicesWindow(Game* game, bool* p_open) {
       ImGui::TableSetColumnIndex(3);
       if (ImGui::SmallButton("Ping")) {
         auto result = octarine::dev::DevListenClient::Ping(entry.host_port);
-        entry.ping_status =
-            result.ok ? RemoteTcpEntry::PingStatus::Reachable : RemoteTcpEntry::PingStatus::Unreachable;
+        entry.ping_status = result.ok ? RemoteTcpEntry::PingStatus::Reachable : RemoteTcpEntry::PingStatus::Unreachable;
       }
       ImGui::SameLine();
 

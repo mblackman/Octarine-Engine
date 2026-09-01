@@ -1,14 +1,64 @@
 #include "Lua/Modules/GameModuleLuaBinding.h"
 
 #include <glm/glm.hpp>
+#include <sstream>
+#include <string>
 
 #include "Components/CameraComponents.h"
 #include "ECS/Registry.h"
 #include "Game/GameConfig.h"
+#include "General/Logger.h"
 #include "Lua/LuaBindingContext.h"
 #include "Systems/ProjectileEmitSystem.h"
 
+namespace {
+std::string FormatLuaTable(const sol::table& table, int indent_level = 0, int max_depth = 5) {
+  if (indent_level > max_depth) {
+    return "{ ... }";
+  }
+  std::ostringstream result;
+  std::string indent(indent_level * 2, ' ');
+  std::string inner_indent((indent_level + 1) * 2, ' ');
+  result << "{\n";
+  for (const auto& kv : table) {
+    result << inner_indent;
+
+    // Key
+    if (kv.first.get_type() == sol::type::string) {
+      result << kv.first.as<std::string>();
+    } else if (kv.first.get_type() == sol::type::number) {
+      result << "[" << kv.first.as<double>() << "]";
+    } else {
+      result << "[" << lua_typename(table.lua_state(), static_cast<int>(kv.first.get_type())) << "]";
+    }
+
+    result << " = ";
+
+    // Value
+    if (kv.second.get_type() == sol::type::string) {
+      result << "\"" << kv.second.as<std::string>() << "\"";
+    } else if (kv.second.get_type() == sol::type::number) {
+      result << kv.second.as<double>();
+    } else if (kv.second.get_type() == sol::type::boolean) {
+      result << (kv.second.as<bool>() ? "true" : "false");
+    } else if (kv.second.get_type() == sol::type::table) {
+      result << FormatLuaTable(kv.second.as<sol::table>(), indent_level + 1, max_depth);
+    } else {
+      result << "<" << lua_typename(table.lua_state(), static_cast<int>(kv.second.get_type())) << ">";
+    }
+    result << ",\n";
+  }
+  result << indent << "}";
+  return result.str();
+}
+}  // namespace
+
 void LuaModuleBinding<GameModule>::install(sol::state& lua, LuaBindingContext& ctx) {
+  lua.set_function("log_table", [](const sol::table& table, const sol::optional<std::string>& message) {
+    std::string prefix = message.has_value() ? (message.value() + ": ") : "";
+    Logger::InfoLua(prefix + FormatLuaTable(table));
+  });
+
   lua.set_function("quit_game", [&ctx]() { ctx.RequestQuit(); });
 
   // Toggle the built-in performance overlay (FPS + frame time) at runtime. Placement and which

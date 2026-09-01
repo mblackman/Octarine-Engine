@@ -1658,6 +1658,8 @@ function log_e(...) end
 
 function log_i(...) end
 
+function log_table(...) end
+
 function log_w(...) end
 
 ---@class name_component
