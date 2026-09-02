@@ -74,22 +74,31 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_un
   }
 #endif
 
-  if (showGameOverlays) {
-    if (projectLoaded) {
-      auto query = registry->CreateQuery<ScriptComponent>();
-      RenderDebugGUISystem system;
-      query->ForEach(system);
+  if (showGameOverlays || engineOptions.showFpsCounter) {
+    ImVec4 bgColor = ImVec4(
+        engineOptions.debugOverlayBackgroundColor.r / 255.0f, engineOptions.debugOverlayBackgroundColor.g / 255.0f,
+        engineOptions.debugOverlayBackgroundColor.b / 255.0f, engineOptions.debugOverlayBackgroundColor.a / 255.0f);
+    ImGui::PushStyleColor(ImGuiCol_WindowBg, bgColor);
+
+    if (showGameOverlays) {
+      if (projectLoaded) {
+        auto query = registry->CreateQuery<ScriptComponent>();
+        RenderDebugGUISystem system;
+        query->ForEach(system);
+      }
+      EntityInfoWindow(registry);
+#ifdef OCTARINE_WITH_EDITOR
+      FPSWindow(deltaTime);
+#endif
     }
-    EntityInfoWindow(registry);
 #ifdef OCTARINE_WITH_EDITOR
-    FPSWindow(deltaTime);
+    else if (engineOptions.showFpsCounter) {
+      FPSWindow(deltaTime);
+    }
 #endif
+
+    ImGui::PopStyleColor();
   }
-#ifdef OCTARINE_WITH_EDITOR
-  else if (engineOptions.showFpsCounter) {
-    FPSWindow(deltaTime);
-  }
-#endif
 
 #ifdef OCTARINE_WITH_EDITOR
   octarine::editor::panels::DrawProjectSelectorIfNeeded(game, projectLoaded);

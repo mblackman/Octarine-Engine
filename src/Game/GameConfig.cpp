@@ -188,6 +188,7 @@ bool GameConfig::LoadConfig(const std::unordered_map<std::string, std::string>& 
   success &= SetValue(settings, "PerfOverlay", &GameConfig::SetPerfOverlay, false);
   success &= SetValue(settings, "PerfOverlayCorner", &GameConfig::SetPerfOverlayCorner, false);
   success &= SetValue(settings, "PerfOverlayMetrics", &GameConfig::SetPerfOverlayMetrics, false);
+  success &= SetValue(settings, "DebugOverlayBackgroundColor", &GameConfig::SetDebugOverlayBackgroundColor, false);
   success &= SetValue(settings, "AngleUnit", &GameConfig::SetAngleUnit, false);
 
   // Logged whether or not the key was present: the default is degrees, so a project authored in
@@ -343,6 +344,28 @@ void GameConfig::SetPerfOverlayMetrics(const std::string& metrics) {
 
   engine_options_.perfOverlayMetrics = perfOverlayMetrics;
   Logger::Info("Perf overlay metrics: " + metrics);
+}
+
+void GameConfig::SetDebugOverlayBackgroundColor(const std::string& colorStr) {
+  const auto parts = SplitString(colorStr, ',');
+  if (parts.size() >= 3) {
+    try {
+      engine_options_.debugOverlayBackgroundColor.r = static_cast<std::uint8_t>(std::stoi(parts[0]));
+      engine_options_.debugOverlayBackgroundColor.g = static_cast<std::uint8_t>(std::stoi(parts[1]));
+      engine_options_.debugOverlayBackgroundColor.b = static_cast<std::uint8_t>(std::stoi(parts[2]));
+      if (parts.size() >= 4) {
+        engine_options_.debugOverlayBackgroundColor.a = static_cast<std::uint8_t>(std::stoi(parts[3]));
+      } else {
+        engine_options_.debugOverlayBackgroundColor.a = 255;
+      }
+      Logger::Info("Debug overlay background color: " + colorStr);
+    } catch (const std::exception& e) {
+      Logger::Warn("Failed to parse DebugOverlayBackgroundColor '" + colorStr + "': " + e.what());
+    }
+  } else {
+    Logger::Warn("Invalid format for DebugOverlayBackgroundColor '" + colorStr +
+                 "' (expected R,G,B[,A]); keeping current.");
+  }
 }
 
 void GameConfig::SetHotReloadPollSeconds(const float seconds) {

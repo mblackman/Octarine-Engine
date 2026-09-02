@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "General/AngleUnit.h"
+#include "General/Color.h"
 #include "General/Constants.h"
 
 // Screen anchor for the built-in perf overlay. config.ini: PerfOverlayCorner=top-left|top-right|
@@ -38,6 +39,7 @@ struct EngineOptions {
   // Placement + content of the perf overlay (config.ini only: PerfOverlayCorner=, PerfOverlayMetrics=).
   PerfOverlayCorner perfOverlayCorner = PerfOverlayCorner::TopLeft;
   PerfOverlayMetrics perfOverlayMetrics = PerfOverlayMetrics::All;
+  octarine::Color debugOverlayBackgroundColor = {0, 0, 0, 0};
   bool showImGuiDemoWindow = false;
   bool logInputEvents = false;
   bool audioEnabled = true;

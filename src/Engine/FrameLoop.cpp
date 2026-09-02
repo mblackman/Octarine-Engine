@@ -231,7 +231,6 @@ void FrameLoop::Render(const float deltaTime) {
 
   renderer_->EndScene(runtime_->SdlRenderer());
 
-  auto& options = gameConfig.GetEngineOptions();
   const bool editorSession = gameConfig.IsEditorMode() || !gameConfig.HasLoadedConfig();
 
   // Update viewport info for non-editor sessions or when ImGui is disabled.
@@ -254,9 +253,9 @@ void FrameLoop::Render(const float deltaTime) {
 #endif
 
   if (!game_->IsBenchMode()) {
-    // Only draw the game texture to the full window if we are NOT in an editor session
-    // and NOT showing debug overlays. In editor mode, the Scene window handles drawing this texture.
-    if (!editorSession && !options.showDebugGUI) {
+    // Only draw the game texture to the full window if we are NOT in an editor session.
+    // In editor mode, the Scene window handles drawing this texture.
+    if (!editorSession) {
       renderer_->CompositeSceneToWindow(runtime_->SdlRenderer());
     }
 #ifdef OCTARINE_WITH_IMGUI
