@@ -86,7 +86,9 @@ void RenderDebugGUISystem::Render(Game* game, SDL_Renderer* renderer, [[maybe_un
         RenderDebugGUISystem system;
         query->ForEach(system);
       }
-      EntityInfoWindow(registry);
+      if (engineOptions.showEntityInfo) {
+        EntityInfoWindow(registry);
+      }
 #ifdef OCTARINE_WITH_EDITOR
       FPSWindow(deltaTime);
 #endif
