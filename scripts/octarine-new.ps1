@@ -16,8 +16,9 @@ param(
     [Parameter(Mandatory = $true)][string]$Name,
     [Parameter(Mandatory = $true)][string]$PackageId,
     [Parameter(Mandatory = $true)][string]$Dir,
-    [string]$VersionName = "0.1.0",
-    [int]$VersionCode = 1
+    [string]$VersionName = "0.2.0",
+    [int]$VersionCode = 1,
+    [string]$EngineVersion = "0.2.0"
 )
 
 $ErrorActionPreference = "Stop"
@@ -45,10 +46,11 @@ $projectIni = @"
 # Game identity for packaging. Read by desktop CPack, Android Gradle, iOS Info.plist (later).
 # Single source of truth across every platform. Flat key=value, no sections.
 
-name         = $Name
-package_id   = $PackageId
-version_name = $VersionName
-version_code = $VersionCode
+name           = $Name
+package_id     = $PackageId
+version_name   = $VersionName
+version_code   = $VersionCode
+engine_version = $EngineVersion
 "@
 
 $configIni = @"

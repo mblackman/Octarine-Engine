@@ -38,7 +38,7 @@ Before writing game code you need a built copy of the engine.
 Pre-built engine binaries are published as assets on every
 [GitHub Release](https://github.com/mblackman/Octarine-Engine/releases).
 
-1. Open the release matching your target engine version (e.g. `v0.1.0`).
+1. Open the release matching your target engine version (e.g. `v0.2.0`).
 2. Download the SDK binary for your platform:
 
 | Asset | Platform |
@@ -51,11 +51,11 @@ Pre-built engine binaries are published as assets on every
 
 ```bash
 # Linux / macOS
-tar -xzf OctarineEngine-0.1.0-linux.tar.gz
+tar -xzf OctarineEngine-0.2.0-linux.tar.gz
 ./OctarineEngine path/to/MyGame
 
 # Windows (PowerShell)
-Expand-Archive OctarineEngine-0.1.0-windows.zip
+Expand-Archive OctarineEngine-0.2.0-windows.zip
 .\OctarineEngine.exe path/to/MyGame
 ```
 
@@ -162,7 +162,7 @@ version_code  = 1                           # monotonic integer for store update
 vendor        = My Studio
 description   = A short description for store listings.
 icon          = images/icon.png             # source PNG for icon generation
-engine_version = 0.1.0                     # engine version this project targets
+engine_version = 0.2.0                     # engine version this project targets
 ```
 
 | Key | Required for shipping | Notes |
@@ -476,9 +476,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: mblackman/Octarine-Engine/.github/actions/setup-engine@v0.1.0
+      - uses: mblackman/Octarine-Engine/.github/actions/setup-engine@v0.2.0
         with:
-          engine-version: '0.1.0'   # pin to the version in project.ini
+          engine-version: '0.2.0'   # pin to the version in project.ini
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # Bake the asset manifest (validates all asset references)
@@ -491,7 +491,7 @@ Declare the engine version in your `project.ini` so it is visible alongside
 your other identity metadata:
 
 ```ini
-engine_version = 0.1.0
+engine_version = 0.2.0
 ```
 
 When you package the game (`cmake --preset ship-release ...`) the engine
@@ -513,9 +513,9 @@ strategy:
     os: [ubuntu-latest, windows-latest, macos-latest]
 runs-on: ${{ matrix.os }}
 steps:
-  - uses: mblackman/Octarine-Engine/.github/actions/setup-engine@v0.1.0
+  - uses: mblackman/Octarine-Engine/.github/actions/setup-engine@v0.2.0
     with:
-      engine-version: '0.1.0'
+      engine-version: '0.2.0'
   - run: OctarineEngine . -m bake
 ```
 

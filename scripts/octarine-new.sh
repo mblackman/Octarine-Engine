@@ -21,8 +21,9 @@ Required:
   --dir         Output directory (must not already exist or must be empty)
 
 Optional:
-  --version-name   semver string (default: 0.1.0)
+  --version-name   semver string (default: 0.2.0)
   --version-code   integer build code (default: 1)
+  --engine-version engine version targeted (default: 0.2.0)
   -h, --help       show this message
 EOF
 }
@@ -30,8 +31,9 @@ EOF
 name=""
 package_id=""
 dir=""
-version_name="0.1.0"
+version_name="0.2.0"
 version_code="1"
+engine_version="0.2.0"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -40,6 +42,7 @@ while [[ $# -gt 0 ]]; do
     --dir) dir="$2"; shift 2 ;;
     --version-name) version_name="$2"; shift 2 ;;
     --version-code) version_code="$2"; shift 2 ;;
+    --engine-version) engine_version="$2"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) echo "unknown arg: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -69,10 +72,11 @@ cat > "$dir/project.ini" <<EOF
 # Game identity for packaging. Read by desktop CPack, Android Gradle, iOS Info.plist (later).
 # Single source of truth across every platform. Flat key=value, no sections.
 
-name         = ${name}
-package_id   = ${package_id}
-version_name = ${version_name}
-version_code = ${version_code}
+name           = ${name}
+package_id     = ${package_id}
+version_name   = ${version_name}
+version_code   = ${version_code}
+engine_version = ${engine_version}
 EOF
 
 cat > "$dir/config.ini" <<EOF

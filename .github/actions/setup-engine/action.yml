@@ -6,18 +6,18 @@ description: |
   output.
 
   Assets are downloaded from the engine's GitHub Releases. The release tag must
-  match `v{engine-version}` (e.g. engine-version: '0.1.0' → tag v0.1.0).
+  match `v{engine-version}` (e.g. engine-version: '0.2.0' → tag v0.2.0).
 
   Typical usage in a game repo:
-    - uses: mblackman/Octarine-Engine/.github/actions/setup-engine@v0.1.0
+    - uses: mblackman/Octarine-Engine/.github/actions/setup-engine@v0.2.0
       with:
-        engine-version: '0.1.0'
+        engine-version: '0.2.0'
     - run: OctarineEngine . -m bake
 
 inputs:
   engine-version:
     description: >
-      Engine version to download, without the 'v' prefix (e.g. '0.1.0').
+      Engine version to download, without the 'v' prefix (e.g. '0.2.0').
       Must match an existing GitHub Release tag (v{engine-version}).
     required: true
   flavor:
