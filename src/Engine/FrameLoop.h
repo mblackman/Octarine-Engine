@@ -59,6 +59,10 @@ class FrameLoop {
 
  private:
   static KeyInputEvent GetKeyInputEvent(SDL_KeyboardEvent* event);
+  void UpdateViewportInfo(bool editorSession, bool showDebugGUI);
+#ifndef OCTARINE_SHIPPED
+  void CheckHeadlessCapture();
+#endif
 
   Game* game_;
   Registry* registry_;

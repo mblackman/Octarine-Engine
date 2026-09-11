@@ -10,6 +10,7 @@
 #ifdef OCTARINE_WITH_IMGUI
 
 class Game;
+struct EngineOptions;
 
 // Per-frame ImGui pass. In editor builds it delegates the whole editor chrome to
 // Editor/Panels/EditorPanelHost; here it owns only the game-facing overlays (the script
@@ -28,13 +29,16 @@ class RenderDebugGUISystem {
   }
 
   static void Render(Game* game, SDL_Renderer* renderer, SDL_Texture* gameTexture, float deltaTime);
-
- private:
-  static void FPSWindow(float deltaTime);
-  static void EntityInfoWindow(const Registry* registry);
+  static void ReturnFocusToGame(Game* game);
   // True while any recent script error is inside its toast window — used both to draw the toast
   // and to keep the ImGui frame alive when nothing else would render it.
   static bool HasActiveScriptErrorToast();
+
+ private:
+  static void DrawDebugOverlays(Registry* registry, const EngineOptions& engineOptions, bool showGameOverlays,
+                                bool projectLoaded, float deltaTime);
+  static void FPSWindow(float deltaTime);
+  static void EntityInfoWindow(const Registry* registry);
   static void ScriptErrorToastWindow();
 };
 #endif

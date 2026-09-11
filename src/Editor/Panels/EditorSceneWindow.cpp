@@ -10,7 +10,7 @@ namespace octarine::editor::panels {
 
 void DrawSceneWindow(Game* game, SDL_Texture* gameTexture, bool* p_open) {
   ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-  if (ImGui::Begin("Scene View", p_open)) {
+  if (ImGui::Begin("Scene View", p_open, ImGuiWindowFlags_NoNavInputs)) {
     ImVec2 viewportPanelSize = ImGui::GetContentRegionAvail();
     if (gameTexture) {
       float texW = 0, texH = 0;

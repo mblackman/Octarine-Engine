@@ -12,11 +12,13 @@
 #include "Editor/PlayerLauncher.h"
 #include "Game/Game.h"
 #include "Game/GameConfig.h"
+#include "Systems/RenderDebugGUISystem.h"
 #include "imgui.h"
 #include "imgui_internal.h"  // BeginViewportSideBar (playback toolbar pinned under the menu bar)
 
 namespace octarine::editor::panels {
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 void DrawToolbar(Game* game, bool& showProjectSelector, bool& openSaveLayoutModal, bool& openExportBuildModal) {
   auto* registry = game->GetRegistry();
   auto& gameConfig = registry->Get<GameConfig>();
@@ -84,7 +86,11 @@ void DrawToolbar(Game* game, bool& showProjectSelector, bool& openSaveLayoutModa
       ImGui::MenuItem("Export Output", nullptr, &editorPersistence.showExportOutput);
       ImGui::MenuItem("Signing Settings", nullptr, &editorPersistence.showSigningSettings);
       ImGui::MenuItem("Devices", nullptr, &editorPersistence.showDevices);
-      ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI);
+      if (ImGui::MenuItem("Game Debug Overlays", "Grave", &engineOptions.showDebugGUI)) {
+        if (!engineOptions.showDebugGUI) {
+          RenderDebugGUISystem::ReturnFocusToGame(game);
+        }
+      }
       ImGui::Separator();
       ImGui::MenuItem("FPS Counter", nullptr, &engineOptions.showFpsCounter);
       ImGui::MenuItem("ImGui Demo Window", nullptr, &engineOptions.showImGuiDemoWindow);

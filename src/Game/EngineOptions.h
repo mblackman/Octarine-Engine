@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "General/AngleUnit.h"
+#include "General/Color.h"
 #include "General/Constants.h"
 
 // Screen anchor for the built-in perf overlay. config.ini: PerfOverlayCorner=top-left|top-right|
@@ -30,7 +31,7 @@ struct EngineOptions {
   bool showDebugGUI = false;
   bool drawColliders = false;
   bool showFpsCounter = true;
-  bool showEntityInfo = true;
+  bool showEntityInfo = false;
   // Built-in renderer FPS + frame-time overlay (no ImGui). Unlike the ImGui FPS window this ships in
   // packaged builds, so it's the player-facing perf readout. Off by default; opt in via the
   // `PerfOverlay` config.ini key, the editor settings toggle, or set_perf_overlay() from Lua.
@@ -38,6 +39,7 @@ struct EngineOptions {
   // Placement + content of the perf overlay (config.ini only: PerfOverlayCorner=, PerfOverlayMetrics=).
   PerfOverlayCorner perfOverlayCorner = PerfOverlayCorner::TopLeft;
   PerfOverlayMetrics perfOverlayMetrics = PerfOverlayMetrics::All;
+  octarine::Color debugOverlayBackgroundColor = {0, 0, 0, 0};
   bool showImGuiDemoWindow = false;
   bool logInputEvents = false;
   bool audioEnabled = true;

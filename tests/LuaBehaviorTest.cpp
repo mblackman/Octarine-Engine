@@ -23,6 +23,7 @@
 #include "Events/GamepadButtonEvent.h"
 #include "Events/KeyInputEvent.h"
 #include "Game/Game.h"
+#include "Game/GameConfig.h"
 #include "General/AngleUnit.h"
 #include "General/Logger.h"
 #include "Lua/Bindings/HealthComponentLuaBinding.h"
@@ -33,6 +34,7 @@
 #include "Lua/Bindings/RotationComponentLuaBinding.h"
 #include "Lua/Modules/RegisterAllModules.h"
 #include "Systems/InputSystem.h"
+#include "Systems/RenderDebugGUISystem.h"
 #include "Systems/ScriptSystem.h"
 #include "Systems/TransformSystem.h"
 #include "Systems/UIButtonSystem.h"
@@ -593,6 +595,57 @@ int main() {
     CheckEq(comp1.key, std::string("x"), "btn1.key mutated to x");
     CheckEq(comp1.controllerButton, std::string("y"), "btn1.controllerButton mutated to y");
     CheckEq(comp1.action, std::string("jump"), "btn1.action mutated to jump");
+  }
+
+  std::cout << "[debug_overlay: closing overlay returns focus to game window and restores directional inputs]\n";
+  {
+    auto eventBus = std::make_unique<EventBus>();
+    auto* viewport = reg->TryGet<ViewportInfo>();
+    if (!viewport) {
+      viewport = &reg->Set<ViewportInfo>(ViewportInfo{});
+    }
+
+    auto* inputSystem = reg->TryGet<InputSystem>();
+    if (!inputSystem) {
+      inputSystem = &reg->Set<InputSystem>(InputSystem());
+    }
+    inputSystem->SubscribeToEvents(eventBus, reg);
+
+    // 1. Simulate debug overlay open and holding focus: viewport is unfocused
+    viewport->isFocused = false;
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_LEFT, SDL_KMOD_NONE, true);
+    Check(!inputSystem->IsKeyDown("left"), "left arrow input is eaten while overlay holds focus");
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_LEFT, SDL_KMOD_NONE, false);
+
+    // 2. Closing the debug overlay calls ReturnFocusToGame, returning focus to game window
+    if (!reg->TryGet<GameConfig>()) {
+      reg->Set<GameConfig>(GameConfig{});
+    }
+    reg->Get<GameConfig>().GetEngineOptions().showDebugGUI = false;
+#ifdef OCTARINE_WITH_IMGUI
+    RenderDebugGUISystem::ReturnFocusToGame(&game);
+#else
+    viewport->isFocused = true;
+#endif
+
+    Check(viewport->isFocused, "ReturnFocusToGame restored focus to game window");
+
+    // 3. Directional inputs are now received by the game, not eaten
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_LEFT, SDL_KMOD_NONE, true);
+    Check(inputSystem->IsKeyDown("left"), "left arrow input is received by game after overlay is closed");
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_LEFT, SDL_KMOD_NONE, false);
+
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_RIGHT, SDL_KMOD_NONE, true);
+    Check(inputSystem->IsKeyDown("right"), "right arrow input is received by game after overlay is closed");
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_RIGHT, SDL_KMOD_NONE, false);
+
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_UP, SDL_KMOD_NONE, true);
+    Check(inputSystem->IsKeyDown("up"), "up arrow input is received by game after overlay is closed");
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_UP, SDL_KMOD_NONE, false);
+
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_DOWN, SDL_KMOD_NONE, true);
+    Check(inputSystem->IsKeyDown("down"), "down arrow input is received by game after overlay is closed");
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_DOWN, SDL_KMOD_NONE, false);
   }
 
   std::cout << "[lifetime component Lua binding and helpers]\n";

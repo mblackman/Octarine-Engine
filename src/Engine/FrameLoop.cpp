@@ -222,6 +222,52 @@ void FrameLoop::Update(const float deltaTime) {
   }
 }
 
+void FrameLoop::UpdateViewportInfo([[maybe_unused]] const bool editorSession,
+                                   [[maybe_unused]] const bool showDebugGUI) {
+  // Update viewport info for non-editor sessions or when ImGui is disabled.
+  // In editor mode with ImGui, RenderDebugGUISystem::Render will override this with the Scene window bounds.
+  auto& viewportInfo = registry_->Get<ViewportInfo>();
+  viewportInfo.x = 0;
+  viewportInfo.y = 0;
+  int windowW = 0;
+  int windowH = 0;
+  SDL_GetWindowSize(runtime_->Window(), &windowW, &windowH);
+  viewportInfo.width = static_cast<float>(windowW);
+  viewportInfo.height = static_cast<float>(windowH);
+
+#ifdef OCTARINE_WITH_IMGUI
+  const auto& io = ImGui::GetIO();
+  if (!editorSession && !showDebugGUI && !RenderDebugGUISystem::HasActiveScriptErrorToast()) {
+    viewportInfo.isHovered = true;
+    viewportInfo.isFocused = true;
+  } else {
+    viewportInfo.isHovered = !io.WantCaptureMouse;
+    viewportInfo.isFocused = !io.WantCaptureKeyboard;
+  }
+#else
+  (void)editorSession;
+  (void)showDebugGUI;
+  viewportInfo.isHovered = true;
+  viewportInfo.isFocused = true;
+#endif
+}
+
+#ifndef OCTARINE_SHIPPED
+void FrameLoop::CheckHeadlessCapture() {
+  // Headless capture: once the target frame is reached, write the rendered scene to disk and quit.
+  if (!capture_path_.empty() && !capture_done_) {
+    if (frame_index_ >= capture_frame_) {
+      if (renderer_->CaptureScene(runtime_->SdlRenderer(), capture_path_)) {
+        Logger::Info("FrameLoop: captured frame " + std::to_string(frame_index_) + " to " + capture_path_);
+      }
+      capture_done_ = true;
+      Game::Quit();
+    }
+    ++frame_index_;
+  }
+}
+#endif
+
 void FrameLoop::Render(const float deltaTime) {
   PROFILE_NAMED_SCOPE("Game::Render (total)");
   auto& renderQueue = registry_->Get<RenderQueue>();
@@ -260,32 +306,13 @@ void FrameLoop::Render(const float deltaTime) {
 
   renderer_->EndScene(runtime_->SdlRenderer());
 
-  auto& options = gameConfig.GetEngineOptions();
   const bool editorSession = gameConfig.IsEditorMode() || !gameConfig.HasLoadedConfig();
-
-  // Update viewport info for non-editor sessions or when ImGui is disabled.
-  // In editor mode with ImGui, RenderDebugGUISystem::Render will override this with the Scene window bounds.
-  auto& viewportInfo = registry_->Get<ViewportInfo>();
-  viewportInfo.x = 0;
-  viewportInfo.y = 0;
-  int windowW, windowH;
-  SDL_GetWindowSize(runtime_->Window(), &windowW, &windowH);
-  viewportInfo.width = static_cast<float>(windowW);
-  viewportInfo.height = static_cast<float>(windowH);
-
-#ifdef OCTARINE_WITH_IMGUI
-  auto& io = ImGui::GetIO();
-  viewportInfo.isHovered = !io.WantCaptureMouse;
-  viewportInfo.isFocused = !io.WantCaptureKeyboard;
-#else
-  viewportInfo.isHovered = true;
-  viewportInfo.isFocused = true;
-#endif
+  UpdateViewportInfo(editorSession, gameConfig.GetEngineOptions().showDebugGUI);
 
   if (!game_->IsBenchMode()) {
-    // Only draw the game texture to the full window if we are NOT in an editor session
-    // and NOT showing debug overlays. In editor mode, the Scene window handles drawing this texture.
-    if (!editorSession && !options.showDebugGUI) {
+    // Only draw the game texture to the full window if we are NOT in an editor session.
+    // In editor mode, the Scene window handles drawing this texture.
+    if (!editorSession) {
       renderer_->CompositeSceneToWindow(runtime_->SdlRenderer());
     }
 #ifdef OCTARINE_WITH_IMGUI
@@ -307,17 +334,7 @@ void FrameLoop::Render(const float deltaTime) {
   renderQueue.Clear();
 
 #ifndef OCTARINE_SHIPPED
-  // Headless capture: once the target frame is reached, write the rendered scene to disk and quit.
-  if (!capture_path_.empty() && !capture_done_) {
-    if (frame_index_ >= capture_frame_) {
-      if (renderer_->CaptureScene(runtime_->SdlRenderer(), capture_path_)) {
-        Logger::Info("FrameLoop: captured frame " + std::to_string(frame_index_) + " to " + capture_path_);
-      }
-      capture_done_ = true;
-      Game::Quit();
-    }
-    ++frame_index_;
-  }
+  CheckHeadlessCapture();
 #endif
 }
 
@@ -356,6 +373,11 @@ void FrameLoop::OnKeyInputEvent(const KeyInputEvent& event) {
       break;
     case SDLK_GRAVE:
       gameConfig.GetEngineOptions().showDebugGUI = !gameConfig.GetEngineOptions().showDebugGUI;
+      if (!gameConfig.GetEngineOptions().showDebugGUI) {
+#ifdef OCTARINE_WITH_IMGUI
+        RenderDebugGUISystem::ReturnFocusToGame(game_);
+#endif
+      }
       break;
     default:
       break;
