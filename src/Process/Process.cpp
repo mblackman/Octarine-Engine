@@ -25,10 +25,12 @@
 #include <unistd.h>
 extern char** environ;
 
-// `posix_spawn_file_actions_addchdir_np` is macOS 10.15+ and glibc 2.29+. The macro check must
-// be nested rather than `defined() && __GLIBC_PREREQ(...)` in one expression — Clang token-checks
-// the function-like macro invocation even when the LHS of `&&` is false, so the unguarded
-// expression fatals on macOS where `__GLIBC_PREREQ` is undefined.
+// POSIX.1-2024 standardized `posix_spawn_file_actions_addchdir`, which macOS 26.0+ provides
+// while deprecating `posix_spawn_file_actions_addchdir_np`. macOS 10.15+ and glibc 2.29+ provide
+// `posix_spawn_file_actions_addchdir_np`. The macro check must be nested rather than
+// `defined() && __GLIBC_PREREQ(...)` in one expression — Clang token-checks the function-like
+// macro invocation even when the LHS of `&&` is false, so the unguarded expression fatals on
+// macOS where `__GLIBC_PREREQ` is undefined.
 #if defined(__APPLE__)
 #define OCTARINE_HAS_SPAWN_ADDCHDIR 1
 #elif defined(__GLIBC__)
@@ -317,6 +319,39 @@ void Process::Kill() {
   TerminateProcess(impl_->process, 1);
 }
 #else  // POSIX
+#if OCTARINE_HAS_SPAWN_ADDCHDIR
+namespace {
+int SpawnFileActionsAddChdir(posix_spawn_file_actions_t* actions, const char* path) {
+#if defined(__APPLE__)
+#if defined(__has_builtin)
+#if __has_builtin(__builtin_available)
+#if defined(__MAC_26_0) && defined(__MAC_OS_X_VERSION_MAX_ALLOWED) && __MAC_OS_X_VERSION_MAX_ALLOWED >= __MAC_26_0
+  if (__builtin_available(macOS 26.0, *)) {
+    return posix_spawn_file_actions_addchdir(actions, path);
+  }
+#endif
+#endif
+#endif
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"
+#elif defined(__GNUC__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+#endif
+  return posix_spawn_file_actions_addchdir_np(actions, path);
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#elif defined(__GNUC__)
+#pragma GCC diagnostic pop
+#endif
+#else
+  return posix_spawn_file_actions_addchdir_np(actions, path);
+#endif
+}
+}  // namespace
+#endif
+
 std::optional<Process> Process::Spawn(const SpawnOptions& opts) {
   if (opts.argv.empty()) {
     return std::nullopt;
@@ -343,7 +378,7 @@ std::optional<Process> Process::Spawn(const SpawnOptions& opts) {
   posix_spawn_file_actions_addclose(&actions, err_pipe[1]);
 #if OCTARINE_HAS_SPAWN_ADDCHDIR
   if (!opts.cwd.empty()) {
-    posix_spawn_file_actions_addchdir_np(&actions, opts.cwd.c_str());
+    SpawnFileActionsAddChdir(&actions, opts.cwd.c_str());
   }
 #endif
 
