@@ -61,10 +61,20 @@ void LuaSystemBinding<InputSystem>::bind(sol::state& lua, InputSystem& system) {
   input.set_function("is_action_pressed", [&system](const std::string& a) { return system.IsActionPressed(a); });
   input.set_function("is_action_released", [&system](const std::string& a) { return system.IsActionReleased(a); });
 
+  input.set_function("is_gamepad_down", [&system](const std::string& btn) { return system.IsGamepadButtonDown(btn); });
+  input.set_function("is_gamepad_pressed",
+                     [&system](const std::string& btn) { return system.IsGamepadButtonPressed(btn); });
+  input.set_function("is_gamepad_released",
+                     [&system](const std::string& btn) { return system.IsGamepadButtonReleased(btn); });
+  input.set_function("is_gamepad_connected", [&system]() { return system.IsGamepadConnected(); });
+
   input.set_function("on_key_down", [&system](sol::protected_function fn) { system.AddOnKeyDown(std::move(fn)); });
   input.set_function("on_key_up", [&system](sol::protected_function fn) { system.AddOnKeyUp(std::move(fn)); });
   input.set_function("on_mouse_down", [&system](sol::protected_function fn) { system.AddOnMouseDown(std::move(fn)); });
   input.set_function("on_mouse_up", [&system](sol::protected_function fn) { system.AddOnMouseUp(std::move(fn)); });
   input.set_function("on_mouse_wheel",
                      [&system](sol::protected_function fn) { system.AddOnMouseWheel(std::move(fn)); });
+  input.set_function("on_gamepad_down",
+                     [&system](sol::protected_function fn) { system.AddOnGamepadDown(std::move(fn)); });
+  input.set_function("on_gamepad_up", [&system](sol::protected_function fn) { system.AddOnGamepadUp(std::move(fn)); });
 }

@@ -10,6 +10,7 @@
 
 #include "Components/LifetimeComponent.h"
 #include "ECS/Query.h"  // full ComponentQuery definition for RegisterSystem dispatch
+#include "ECS/Registry.h"
 #include "General/AngleUnit.h"
 #include "General/Rotation2D.h"
 #include "Systems/LifetimeSystem.h"

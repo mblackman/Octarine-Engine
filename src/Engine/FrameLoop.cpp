@@ -13,6 +13,7 @@
 #include "Engine/EngineContext.h"
 #include "Engine/EngineRuntime.h"
 #include "EventBus/EventBus.h"
+#include "Events/GamepadButtonEvent.h"
 #include "Events/KeyInputEvent.h"
 #include "Events/MouseInputEvent.h"
 #include "Events/MouseWheelEvent.h"
@@ -77,7 +78,16 @@ void FrameLoop::SubscribeToEvents() {
   key_input_subscription_ = event_bus_->SubscribeEvent<FrameLoop, KeyInputEvent>(this, &FrameLoop::OnKeyInputEvent);
 }
 
-void FrameLoop::Begin() { nanoseconds_previous_frame_ = SDL_GetTicksNS(); }
+void FrameLoop::Begin() {
+  nanoseconds_previous_frame_ = SDL_GetTicksNS();
+  int count = 0;
+  if (SDL_JoystickID* gamepads = SDL_GetGamepads(&count)) {
+    for (int i = 0; i < count; ++i) {
+      SDL_OpenGamepad(gamepads[i]);
+    }
+    SDL_free(gamepads);
+  }
+}
 
 void FrameLoop::ProcessInput() {
   PROFILE_NAMED_SCOPE("Game::ProcessInput");
@@ -113,6 +123,25 @@ void FrameLoop::ProcessInput() {
       }
       case SDL_EVENT_MOUSE_WHEEL: {
         event_bus_->EmitEvent<MouseWheelEvent>(event.wheel.x, event.wheel.y);
+        break;
+      }
+      case SDL_EVENT_GAMEPAD_ADDED: {
+        SDL_OpenGamepad(event.gdevice.which);
+        break;
+      }
+      case SDL_EVENT_GAMEPAD_REMOVED: {
+        if (SDL_Gamepad* gamepad = SDL_GetGamepadFromID(event.gdevice.which)) {
+          SDL_CloseGamepad(gamepad);
+        }
+        break;
+      }
+      case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+      case SDL_EVENT_GAMEPAD_BUTTON_UP: {
+        const auto btn = static_cast<SDL_GamepadButton>(event.gbutton.button);
+        const char* rawName = SDL_GetGamepadStringForButton(btn);
+        std::string name = rawName ? rawName : "";
+        GamepadButtonEvent gamepadEvent(event.gbutton.which, btn, std::move(name), event.gbutton.down);
+        event_bus_->EmitEvent<GamepadButtonEvent>(gamepadEvent);
         break;
       }
       case SDL_EVENT_WINDOW_RESIZED:

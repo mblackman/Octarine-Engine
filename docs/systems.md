@@ -67,7 +67,7 @@ events on the [event bus](events.md):
 |--------|-----------|--------------|
 | `DamageSystem` | `CollisionBatchEvent` | Applies projectile damage / health deduction and despawns. |
 | `ObstacleBounceSystem` | `CollisionBatchEvent` | Bounces an entity off an obstacle and flips its sprite. |
-| `UIButtonSystem` | `MouseInputEvent` | Hit-tests clicks against button colliders and invokes callbacks. |
+| `UIButtonSystem` | `MouseInputEvent`, `KeyInputEvent`, `GamepadButtonEvent` | Hit-tests mouse clicks and handles keyboard, gamepad, and action bindings to trigger button callbacks. |
 
 ## Services and on-demand systems
 

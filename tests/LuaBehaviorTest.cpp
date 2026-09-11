@@ -12,12 +12,16 @@
 #include "Components/ColorGridComponent.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/HealthComponent.h"
+#include "Components/LifetimeComponent.h"
 #include "Components/NameComponent.h"
 #include "Components/PivotComponent.h"
 #include "Components/PositionComponent.h"
 #include "Components/RotationComponent.h"
 #include "Components/ScaleComponent.h"
+#include "Components/UIButtonComponent.h"
 #include "ECS/Registry.h"
+#include "Events/GamepadButtonEvent.h"
+#include "Events/KeyInputEvent.h"
 #include "Game/Game.h"
 #include "General/AngleUnit.h"
 #include "General/Logger.h"
@@ -28,8 +32,10 @@
 #include "Lua/Bindings/RegisterAllBindings.h"
 #include "Lua/Bindings/RotationComponentLuaBinding.h"
 #include "Lua/Modules/RegisterAllModules.h"
+#include "Systems/InputSystem.h"
 #include "Systems/ScriptSystem.h"
 #include "Systems/TransformSystem.h"
+#include "Systems/UIButtonSystem.h"
 #include "TestHarness.h"
 
 using octarine::test::Check;
@@ -469,6 +475,162 @@ int main() {
     Check(!grid.isFixed, "is_fixed is false");
     CheckEq(grid.scrollVelocity.x, 20.0f, "scrollVelocity.x is 20");
     CheckEq(grid.scrollVelocity.y, 0.0f, "scrollVelocity.y is 0");
+  }
+
+  std::cout << "[ui_button: key, controller, action, trigger -> on_click]\n";
+  {
+    UIButtonSystem uiButtonSystem;
+    auto eventBus = std::make_unique<EventBus>();
+    auto* inputSystem = reg->TryGet<InputSystem>();
+    if (!inputSystem) {
+      inputSystem = &reg->Set<InputSystem>(InputSystem());
+      inputSystem->SubscribeToEvents(eventBus, reg);
+    }
+    uiButtonSystem.Init(reg, eventBus);
+
+    auto* viewport = reg->TryGet<ViewportInfo>();
+    if (!viewport) {
+      viewport = &reg->Set<ViewportInfo>(ViewportInfo{});
+    }
+    viewport->isFocused = true;
+    viewport->isHovered = true;
+
+    Check(RunLua(lua, R"LUA(
+      clicked_btn1 = false
+      clicked_btn2 = false
+      clicked_self_matched = false
+
+      btn1 = load_entity({
+        components = {
+          ui_button = {
+            key = "space",
+            controller_button = "a",
+            action = "submit",
+            on_click = function(self, entity)
+              clicked_btn1 = true
+              if self.key == "space" or self.key == "x" then
+                clicked_self_matched = true
+              end
+            end
+          }
+        }
+      })
+
+      btn2 = load_entity({
+        components = {
+          ui_button = {
+            key = "escape",
+            controller_button = "b",
+            action = "cancel",
+            on_click = function(self, entity)
+              clicked_btn2 = true
+            end
+          }
+        }
+      })
+    )LUA"),
+          "ui_button loaded from Lua with key, controller_button, and action");
+
+    const Entity btn1 = lua["btn1"];
+    const Entity btn2 = lua["btn2"];
+    Check(reg->HasComponent<UIButtonComponent>(btn1), "btn1 has UIButtonComponent");
+    Check(reg->HasComponent<UIButtonComponent>(btn2), "btn2 has UIButtonComponent");
+    auto& comp1 = reg->GetComponent<UIButtonComponent>(btn1);
+    auto& comp2 = reg->GetComponent<UIButtonComponent>(btn2);
+    CheckEq(comp1.key, std::string("space"), "key is space");
+    CheckEq(comp1.controllerButton, std::string("a"), "controllerButton is a");
+    CheckEq(comp1.action, std::string("submit"), "action is submit");
+
+    // 1. Programmatic trigger calls on_click
+    Check(RunLua(lua, R"LUA(
+      local b = registry.get_ui_button(btn1)
+      b:trigger(btn1)
+    )LUA"),
+          "btn:trigger() runs");
+    Check(lua["clicked_btn1"] == true, "btn1 on_click fired via trigger()");
+    Check(lua["clicked_self_matched"] == true, "on_click received button self table");
+    lua["clicked_btn1"] = false;
+
+    // 2. Keyboard key press (space) triggers btn1 on_click directly
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_SPACE, SDL_KMOD_NONE, true);
+    Check(lua["clicked_btn1"] == true, "btn1 on_click triggered by keyboard key (space)");
+    lua["clicked_btn1"] = false;
+
+    // 3. Controller button press ("south" matching alias "a") triggers btn1 on_click directly
+    eventBus->EmitEvent<GamepadButtonEvent>(0, SDL_GAMEPAD_BUTTON_SOUTH, "south", true);
+    Check(lua["clicked_btn1"] == true, "btn1 on_click triggered by controller button (south -> a)");
+    lua["clicked_btn1"] = false;
+
+    // 4. Action trigger: bind action "submit" to key "return", then press Return
+    inputSystem->Bind("submit", "return");
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_RETURN, SDL_KMOD_NONE, true);
+    Check(lua["clicked_btn1"] == true, "btn1 on_click triggered by action 'submit' bound to return");
+    lua["clicked_btn1"] = false;
+
+    // 5. btn2 triggers on_click via key 'escape' and controller 'east' -> 'b'
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_ESCAPE, SDL_KMOD_NONE, true);
+    Check(lua["clicked_btn2"] == true, "btn2 on_click triggered by key 'escape'");
+    lua["clicked_btn2"] = false;
+
+    eventBus->EmitEvent<GamepadButtonEvent>(0, SDL_GAMEPAD_BUTTON_EAST, "east", true);
+    Check(lua["clicked_btn2"] == true, "btn2 on_click triggered by controller button 'east'");
+    lua["clicked_btn2"] = false;
+
+    // 6. Inactive button does not fire on_click
+    comp2.isActive = false;
+    eventBus->EmitEvent<KeyInputEvent>(SDLK_ESCAPE, SDL_KMOD_NONE, true);
+    Check(lua["clicked_btn2"] == false, "inactive button does not fire on_click on key press");
+    comp2.isActive = true;
+
+    // 7. Property mutation via Lua
+    Check(RunLua(lua, R"LUA(
+      local b = registry.get_ui_button(btn1)
+      b.key = "x"
+      b.controller_button = "y"
+      b.action = "jump"
+    )LUA"),
+          "btn1 properties mutate from Lua");
+    CheckEq(comp1.key, std::string("x"), "btn1.key mutated to x");
+    CheckEq(comp1.controllerButton, std::string("y"), "btn1.controllerButton mutated to y");
+    CheckEq(comp1.action, std::string("jump"), "btn1.action mutated to jump");
+  }
+
+  std::cout << "[lifetime component Lua binding and helpers]\n";
+  {
+    Check(RunLua(lua, R"LUA(
+      e_life = load_entity({ components = { lifetime = { duration = 5.0 } } })
+      e_life_num = load_entity({ components = { lifetime = 2.5 } })
+    )LUA"),
+          "lifetime component loads via Lua");
+
+    const Entity eLife = lua["e_life"];
+    const Entity eLifeNum = lua["e_life_num"];
+    Check(reg->HasComponent<LifetimeComponent>(eLife), "e_life has LifetimeComponent");
+    Check(reg->GetComponent<LifetimeComponent>(eLife).lifetimeDuration == 5.0F, "duration parsed as 5.0");
+    Check(reg->GetComponent<LifetimeComponent>(eLifeNum).lifetimeDuration == 2.5F, "bare number duration parsed");
+
+    Check(RunLua(lua, "dur = registry.get_lifetime(e_life).duration"), "read duration property");
+    CheckEq(lua["dur"].get<float>(), 5.0F, "duration property is 5.0");
+    Check(RunLua(lua, "rem = registry.get_lifetime(e_life).remaining_duration"), "read remaining_duration property");
+    CheckEq(lua["rem"].get<float>(), 5.0F, "initial remaining_duration equals duration");
+
+    // Decrease lifetime in C++
+    reg->GetComponent<LifetimeComponent>(eLife).Decrease(2.0F);
+    Check(RunLua(lua, "rem2 = registry.get_lifetime(e_life).remaining_duration"), "read remaining after decrease");
+    CheckEq(lua["rem2"].get<float>(), 3.0F, "remaining_duration decreased to 3.0");
+
+    // Extend via helper method
+    Check(RunLua(lua, "registry.get_lifetime(e_life):extend(1.5)"), "call extend(1.5)");
+    CheckEq(reg->GetComponent<LifetimeComponent>(eLife).remainingDuration, 4.5F,
+            "extend bumped remainingDuration to 4.5");
+
+    // Reset via helper method
+    Check(RunLua(lua, "registry.get_lifetime(e_life):reset()"), "call reset()");
+    CheckEq(reg->GetComponent<LifetimeComponent>(eLife).remainingDuration, 5.0F,
+            "reset restored remainingDuration to 5.0");
+
+    Check(RunLua(lua, "alive = registry.get_lifetime(e_life):is_alive()"), "call is_alive()");
+    Check(lua["alive"].get<bool>(), "is_alive reports true");
   }
 
   return octarine::test::ReportSummary("Lua behavior test");

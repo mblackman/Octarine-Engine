@@ -38,7 +38,7 @@ REG_RE = re.compile(r"Register(Parallel|Bulk)?System\s*(?:<([^>]*)>)?\s*\(\s*([A
 EMIT_RE = re.compile(r"EmitEvent\s*<\s*([A-Za-z_]\w*)\s*>")
 SUB_RE = re.compile(r"SubscribeEvent\s*<\s*([A-Za-z_]\w*)\s*,\s*([A-Za-z_]\w*)\s*>")
 EVENT_DECL_RE = re.compile(r"\b(struct|class)\s+([A-Za-z_]\w*)\s*:\s*(?:public\s+)?Event\b")
-FIELD_RE = re.compile(r"^\s+([A-Za-z_][\w:]*(?:\s*<[^>]*>)?)\s+([A-Za-z_]\w*)\s*;\s*$")
+FIELD_RE = re.compile(r"^\s+([A-Za-z_][\w:]*(?:\s*<[^>]*>)?)\s+([A-Za-z_]\w*)\s*(?:=\s*[^;]+|\{[^}]*\})?\s*;\s*$")
 
 TIER = {"": "serial", "Parallel": "parallel", "Bulk": "bulk"}
 

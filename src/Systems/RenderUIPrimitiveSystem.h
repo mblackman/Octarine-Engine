@@ -19,8 +19,7 @@
 // does), so caching it in a member would leave it null.
 class RenderUIPrimitiveSystem {
  public:
-  void operator()(const ContextFacade& ctx, const UIRectComponent& rect,
-                  const SquarePrimitiveComponent& square) const {
+  void operator()(const ContextFacade& ctx, const UIRectComponent& rect, const SquarePrimitiveComponent& square) const {
     // Position and size come from the resolved rect; color and blend come from the square. Layer
     // is the rect's computed layer (canvas base + accumulated z), matching RenderUISpriteSystem.
     auto& renderQueue = ctx.GetRegistry()->Get<RenderQueue>();

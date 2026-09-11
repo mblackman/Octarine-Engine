@@ -59,7 +59,7 @@ engine calls two callbacks on it each frame:
 |---|---|
 | `on_update(self, entity, dt)` | Every frame, in system order |
 | `on_debug_gui(self, entity)` | Every frame, but only when editor debug UI is visible |
-| `on_click(self, entity)` | When the entity has a `ui_button` component and is clicked |
+| `on_click(self, entity)` | When the entity has a `ui_button` component and is clicked or input-triggered |
 
 - **`self`** is the script table itself — store per-entity state here.
 - **`entity`** is the numeric entity ID — pass it to `registry.*` and helper globals.

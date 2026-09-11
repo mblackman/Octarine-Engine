@@ -13,6 +13,7 @@
 
 #include "ECS/Registry.h"
 #include "EventBus/EventBus.h"
+#include "Events/GamepadButtonEvent.h"
 #include "Events/KeyInputEvent.h"
 #include "Events/MouseInputEvent.h"
 #include "Events/MouseWheelEvent.h"
@@ -32,9 +33,14 @@
 class InputSystem {
  public:
   InputSystem() : registry_(nullptr) {
-    keyAliases_["ctrl"] = {"left ctrl", "right ctrl"};
-    keyAliases_["shift"] = {"left shift", "right shift"};
-    keyAliases_["alt"] = {"left alt", "right alt"};
+    keyAliases_["ctrl"] = {"left ctrl", "right ctrl", "ctrl"};
+    keyAliases_["shift"] = {"left shift", "right shift", "shift"};
+    keyAliases_["alt"] = {"left alt", "right alt", "alt"};
+    keyAliases_["enter"] = {"return", "enter", "keypad enter"};
+    keyAliases_["return"] = {"return", "enter", "keypad enter"};
+    keyAliases_["esc"] = {"escape", "esc"};
+    keyAliases_["escape"] = {"escape", "esc"};
+    InitGamepadAliases();
   }
 
   static std::string MakeKey(const std::string& key) {
@@ -50,6 +56,8 @@ class InputSystem {
     subscriptions_.push_back(eventBus->SubscribeEvent<InputSystem, KeyInputEvent>(this, &InputSystem::OnKeyInput));
     subscriptions_.push_back(eventBus->SubscribeEvent<InputSystem, MouseInputEvent>(this, &InputSystem::OnMouseInput));
     subscriptions_.push_back(eventBus->SubscribeEvent<InputSystem, MouseWheelEvent>(this, &InputSystem::OnMouseWheel));
+    subscriptions_.push_back(
+        eventBus->SubscribeEvent<InputSystem, GamepadButtonEvent>(this, &InputSystem::OnGamepadButton));
   }
 
   // Called near the top of Game::Update so polling APIs see a fresh cursor position
@@ -64,6 +72,8 @@ class InputSystem {
     releasedKeys_.clear();
     pressedMouseButtons_.clear();
     releasedMouseButtons_.clear();
+    pressedGamepadButtons_.clear();
+    releasedGamepadButtons_.clear();
     wheelDx_ = 0.0f;
     wheelDy_ = 0.0f;
   }
@@ -76,13 +86,17 @@ class InputSystem {
     onMouseDown_.clear();
     onMouseUp_.clear();
     onMouseWheel_.clear();
-    actions_.clear();
+    onGamepadDown_.clear();
+    onGamepadUp_.clear();
     pressedKeys_.clear();
     releasedKeys_.clear();
     heldKeys_.clear();
     pressedMouseButtons_.clear();
     releasedMouseButtons_.clear();
     heldMouseButtons_.clear();
+    pressedGamepadButtons_.clear();
+    releasedGamepadButtons_.clear();
+    heldGamepadButtons_.clear();
     wheelDx_ = 0.0f;
     wheelDy_ = 0.0f;
   }
@@ -111,21 +125,36 @@ class InputSystem {
   [[nodiscard]] bool IsActionPressed(const std::string& action) const;
   [[nodiscard]] bool IsActionReleased(const std::string& action) const;
 
+  [[nodiscard]] bool IsGamepadButtonDown(const std::string& button) const;
+  [[nodiscard]] bool IsGamepadButtonPressed(const std::string& button) const;
+  [[nodiscard]] bool IsGamepadButtonReleased(const std::string& button) const;
+  [[nodiscard]] bool IsGamepadConnected() const;
+
+  [[nodiscard]] bool MatchesGamepadAlias(const std::string& requested, const std::string& actual) const;
+  [[nodiscard]] bool MatchesKeyAlias(const std::string& requested, const std::string& actual) const;
+  [[nodiscard]] bool IsActionBoundToKey(const std::string& action, const std::string& key) const;
+  [[nodiscard]] bool IsActionBoundToGamepadButton(const std::string& action, const std::string& button) const;
+  [[nodiscard]] bool IsActionBoundToInput(const std::string& action, const std::string& input) const;
+
   void Bind(const std::string& action, const std::string& key);
   void Unbind(const std::string& action, const std::string& key);
   // Clear all bindings for an action; the Lua `input.unbind(action)` form (no key arg) maps to this.
-  void UnbindAction(const std::string& action) { actions_.erase(action); }
+  void UnbindAction(const std::string& action) { actions_.erase(MakeKey(action)); }
 
   void AddOnKeyDown(sol::protected_function fn) { onKeyDown_.push_back(std::move(fn)); }
   void AddOnKeyUp(sol::protected_function fn) { onKeyUp_.push_back(std::move(fn)); }
   void AddOnMouseDown(sol::protected_function fn) { onMouseDown_.push_back(std::move(fn)); }
   void AddOnMouseUp(sol::protected_function fn) { onMouseUp_.push_back(std::move(fn)); }
   void AddOnMouseWheel(sol::protected_function fn) { onMouseWheel_.push_back(std::move(fn)); }
+  void AddOnGamepadDown(sol::protected_function fn) { onGamepadDown_.push_back(std::move(fn)); }
+  void AddOnGamepadUp(sol::protected_function fn) { onGamepadUp_.push_back(std::move(fn)); }
 
  private:
   void OnKeyInput(const KeyInputEvent& event);
   void OnMouseInput(const MouseInputEvent& event);
   void OnMouseWheel(const MouseWheelEvent& event);
+  void OnGamepadButton(const GamepadButtonEvent& event);
+  void InitGamepadAliases();
 
   template <typename... Args>
   static void Dispatch(const std::vector<sol::protected_function>& fns, Args&&... args) {
@@ -140,10 +169,11 @@ class InputSystem {
   }
 
   [[nodiscard]] bool MatchesSet(const std::string& key, const std::unordered_set<std::string>& set) const;
+  [[nodiscard]] bool MatchesGamepadSet(const std::string& button, const std::unordered_set<std::string>& set) const;
 
   template <typename Pred>
   bool AnyBoundKey(const std::string& action, Pred&& pred) const {
-    const auto it = actions_.find(action);
+    const auto it = actions_.find(MakeKey(action));
     if (it == actions_.end()) return false;
     for (const auto& k : it->second) {
       if (pred(k)) return true;
@@ -164,6 +194,11 @@ class InputSystem {
   std::unordered_set<int> releasedMouseButtons_;
   std::unordered_set<int> heldMouseButtons_;
 
+  std::unordered_set<std::string> pressedGamepadButtons_;
+  std::unordered_set<std::string> releasedGamepadButtons_;
+  std::unordered_set<std::string> heldGamepadButtons_;
+  std::unordered_map<std::string, std::unordered_set<std::string>> gamepadAliases_;
+
   float mouseX_ = 0.0f;
   float mouseY_ = 0.0f;
   float wheelDx_ = 0.0f;
@@ -176,4 +211,6 @@ class InputSystem {
   std::vector<sol::protected_function> onMouseDown_;
   std::vector<sol::protected_function> onMouseUp_;
   std::vector<sol::protected_function> onMouseWheel_;
+  std::vector<sol::protected_function> onGamepadDown_;
+  std::vector<sol::protected_function> onGamepadUp_;
 };

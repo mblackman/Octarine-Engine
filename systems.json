@@ -133,6 +133,7 @@
       "queried_components": [],
       "emits": [],
       "subscribes": [
+        "GamepadButtonEvent",
         "KeyInputEvent",
         "MouseInputEvent",
         "MouseWheelEvent"
@@ -354,6 +355,8 @@
       "queried_components": [],
       "emits": [],
       "subscribes": [
+        "GamepadButtonEvent",
+        "KeyInputEvent",
         "MouseInputEvent"
       ],
       "lua_surface": false

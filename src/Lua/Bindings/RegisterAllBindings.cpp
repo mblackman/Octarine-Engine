@@ -31,9 +31,9 @@ void RegisterAllLuaBindings() {
   LuaComponentRegistry::registerComponent<RigidBodyComponent>();
   LuaComponentRegistry::registerComponent<SpriteComponent>();
   LuaComponentRegistry::registerComponent<SquarePrimitiveComponent>();
+  LuaComponentRegistry::registerComponent<ColorGridComponent>();
   LuaComponentRegistry::registerComponent<AnimationComponent>();
   LuaComponentRegistry::registerComponent<BoxColliderComponent>();
-  LuaComponentRegistry::registerComponent<ColorGridComponent>();
   LuaComponentRegistry::registerComponent<HealthComponent>();
   LuaComponentRegistry::registerComponent<LifetimeComponent>();
   LuaComponentRegistry::registerComponent<ProjectileEmitterComponent>();

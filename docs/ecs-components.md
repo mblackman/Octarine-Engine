@@ -228,12 +228,18 @@ relative to the `audio_listener`.
 
 ### `ui_button`
 
-Makes an entity clickable.
+Makes an entity clickable and input-triggerable. Triggering via a mapped key, controller button, or action calls `on_click`, identical to clicking with the mouse.
 
-| Field       | Type       | Default | Description                                         |
-|-------------|------------|---------|-----------------------------------------------------|
-| `is_active` | `boolean`  | `true`  | Whether the button is interactive.                  |
-| `on_click`  | `function` | `nil`   | Function called on click: `function(self, entity)`. |
+| Field               | Type       | Default | Description                                                                                                   |
+|---------------------|------------|---------|---------------------------------------------------------------------------------------------------------------|
+| `is_active`         | `boolean`  | `true`  | Whether the button is interactive.                                                                            |
+| `on_click`          | `function` | `nil`   | Function called on click or input trigger: `function(self, entity)`.                                          |
+| `key`               | `string`   | `""`    | Keyboard key(s) that trigger the button (e.g. `"space"`, `"return, space"`). Also aliased as `input_key`.     |
+| `controller_button` | `string`   | `""`    | Gamepad button(s) that trigger the button (e.g. `"a"`, `"south, start"`). Also aliased as `gamepad_button`.  |
+| `action`            | `string`   | `""`    | Named input action configured in `input` that triggers the button (e.g. `"ui_confirm"`, `"jump"`).           |
+
+Methods:
+- `button:trigger(entity)` — Programmatically activates the button, invoking `on_click`.
 
 ### `color_grid`
 

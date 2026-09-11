@@ -182,9 +182,12 @@ local btn = load_entity({
     components = {
         square    = { color = { r = 60, g = 40, b = 90, a = 230 } },  -- panel body
         ui_button = {
-            is_active = true,
-            is_fixed  = true,
-            on_click  = function(self, entity)
+            is_active         = true,
+            is_fixed          = true,
+            key               = "return, space", -- trigger via keyboard Return or Space
+            controller_button = "a, south",      -- trigger via gamepad A / South button
+            action            = "ui_confirm",    -- trigger via bound input action
+            on_click          = function(self, entity)
                 self.is_active = false        -- `self` is the ui_button table; guard re-fire
                 load_scene("scenes/arena.lua")
             end,
@@ -197,7 +200,7 @@ ui.anchor(btn, "center", { width = 240, height = 64 })   -- sizes both the panel
 -- Caption: a label that covers the button rect, with the text centered inside it.
 local label = load_entity({
     components = {
-        text_label = { text = "Start Run", font_id = "ui-font", is_fixed = true,
+        text_label = { text = "Start Run [Space / A]", font_id = "ui-font", is_fixed = true,
                        align = "center", valign = "center" },
     },
 })
@@ -213,7 +216,13 @@ ui.z_index(label, 1)                                      -- draw the text above
 - **`on_click(self, entity)`** — `self` is the `ui_button` table (set extra
   fields on it to read them back here); `entity` is the button entity. Fetch the
   live component elsewhere with `registry.get_ui_button(entity)`.
-- **`is_active = false`** disables hit-testing without destroying the entity —
+- **Keyboard, controller, and action bindings** — Set `key` (or `input_key`),
+  `controller_button` (or `gamepad_button`), and/or `action`. Multiple comma-separated
+  inputs are supported (e.g. `key = "return, space"`). Input names are case-insensitive
+  and normalized across common aliases (e.g. `"south"` matches `"a"`, `"east"` matches `"b"`).
+  Pressing a mapped input calls `on_click(self, entity)` directly — identical to clicking with the mouse.
+- **Programmatic trigger** — Buttons can be pressed from code via `btn:trigger(entity)`.
+- **`is_active = false`** disables hit-testing and input triggers without destroying the entity —
   use it to debounce a click that triggers a scene load mid-frame.
 - **Center the caption with `align` / `valign`.** A `text_label` on the UI path
   draws its texture at the rect's top-left by default. Set `align = "center"`

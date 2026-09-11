@@ -55,7 +55,8 @@ Subscriptions are wired once during startup (`Game::Setup`, each system's `Init`
 |-------|---------|------------|---------------|
 | `AudioPlayEvent` | `clipId: string`, `volume: float` | Lua `play_sound()` (`AudioModuleLuaBinding.cpp`) | `AudioSystem::OnAudioPlay` |
 | `CollisionBatchEvent` | `pairs: const std::vector<std::pair<Entity, Entity>>&` (frame's *entering* pairs — first-contact overlaps not seen last frame) | `CollisionSystem` (narrowphase) | `DamageSystem::OnCollisionBatch`, `ObstacleBounceSystem::OnCollisionBatch` |
-| `KeyInputEvent` | `inputKey: SDL_Keycode`, `inputModifier: SDL_Keymod`, `isPressed: bool` | `Game::ProcessInput` (SDL key events) | `InputSystem::OnKeyInput`, `FrameLoop::OnKeyInputEvent` |
+| `GamepadButtonEvent` | `which: SDL_JoystickID`, `button: SDL_GamepadButton`, `buttonName: string`, `isPressed: bool` | `Game::ProcessInput` / `FrameLoop` (SDL gamepad button events) | `InputSystem::OnGamepadButton`, `UIButtonSystem::OnGamepadButton` |
+| `KeyInputEvent` | `inputKey: SDL_Keycode`, `inputModifier: SDL_Keymod`, `isPressed: bool` | `Game::ProcessInput` (SDL key events) | `InputSystem::OnKeyInput`, `FrameLoop::OnKeyInputEvent`, `UIButtonSystem::OnKeyInput` |
 | `MouseInputEvent` | `event: SDL_MouseButtonEvent` | `Game::ProcessInput` (SDL mouse-button events) | `InputSystem::OnMouseInput`, `UIButtonSystem::OnMouseInput` |
 | `MouseWheelEvent` | `dx: float`, `dy: float` | `Game::ProcessInput` (SDL wheel events) | `InputSystem::OnMouseWheel` |
 
@@ -63,9 +64,9 @@ Event types live in `src/Events/`.
 
 ### Flows at a glance
 
-- **Input:** SDL events → `Game::ProcessInput` emits `KeyInputEvent` / `MouseInputEvent` /
-  `MouseWheelEvent` → `InputSystem` folds them into per-frame state (also `FrameLoop` for engine
-  hotkeys, `UIButtonSystem` for clicks).
+- **Input:** SDL events → `Game::ProcessInput` / `FrameLoop` emit `KeyInputEvent` / `MouseInputEvent` /
+  `MouseWheelEvent` / `GamepadButtonEvent` → `InputSystem` folds them into per-frame state (also `FrameLoop` for engine
+  hotkeys, `UIButtonSystem` for mouse clicks and keyboard/gamepad/action bindings).
 - **Collision:** `CollisionSystem` detects overlaps and emits a single `CollisionBatchEvent` carrying
   the frame's *entering* pairs (first-contact overlaps not seen last frame) → `DamageSystem` and
   `ObstacleBounceSystem` iterate the batch and react. (One batched event per frame rather than one

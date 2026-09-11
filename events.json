@@ -79,6 +79,47 @@
       ]
     },
     {
+      "name": "GamepadButtonEvent",
+      "kind": "struct",
+      "source": "src/Events/GamepadButtonEvent.h",
+      "fields": [
+        {
+          "type": "SDL_JoystickID",
+          "name": "which"
+        },
+        {
+          "type": "SDL_GamepadButton",
+          "name": "button"
+        },
+        {
+          "type": "std::string",
+          "name": "buttonName"
+        },
+        {
+          "type": "bool",
+          "name": "isPressed"
+        }
+      ],
+      "emit_sites": [
+        {
+          "file": "src/Engine/FrameLoop.cpp",
+          "line": 144
+        }
+      ],
+      "subscribe_sites": [
+        {
+          "file": "src/Systems/InputSystem.h",
+          "line": 60,
+          "owner": "InputSystem"
+        },
+        {
+          "file": "src/Systems/UIButtonSystem.h",
+          "line": 42,
+          "owner": "UIButtonSystem"
+        }
+      ]
+    },
+    {
       "name": "KeyInputEvent",
       "kind": "struct",
       "source": "src/Events/KeyInputEvent.h",
@@ -99,19 +140,24 @@
       "emit_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 105
+          "line": 115
         }
       ],
       "subscribe_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 77,
+          "line": 78,
           "owner": "FrameLoop"
         },
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 50,
+          "line": 56,
           "owner": "InputSystem"
+        },
+        {
+          "file": "src/Systems/UIButtonSystem.h",
+          "line": 40,
+          "owner": "UIButtonSystem"
         }
       ]
     },
@@ -128,18 +174,18 @@
       "emit_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 111
+          "line": 121
         }
       ],
       "subscribe_sites": [
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 51,
+          "line": 57,
           "owner": "InputSystem"
         },
         {
           "file": "src/Systems/UIButtonSystem.h",
-          "line": 25,
+          "line": 38,
           "owner": "UIButtonSystem"
         }
       ]
@@ -161,13 +207,13 @@
       "emit_sites": [
         {
           "file": "src/Engine/FrameLoop.cpp",
-          "line": 115
+          "line": 125
         }
       ],
       "subscribe_sites": [
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 52,
+          "line": 58,
           "owner": "InputSystem"
         }
       ]

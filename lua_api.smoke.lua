@@ -1619,6 +1619,14 @@ function input.is_action_released(...) end
 
 function input.is_focused(...) end
 
+function input.is_gamepad_connected(...) end
+
+function input.is_gamepad_down(...) end
+
+function input.is_gamepad_pressed(...) end
+
+function input.is_gamepad_released(...) end
+
 function input.is_hovered(...) end
 
 function input.is_key_down(...) end
@@ -1636,6 +1644,10 @@ function input.is_mouse_released(...) end
 function input.mouse_position(...) end
 
 function input.mouse_wheel(...) end
+
+function input.on_gamepad_down(...) end
+
+function input.on_gamepad_up(...) end
 
 function input.on_key_down(...) end
 
