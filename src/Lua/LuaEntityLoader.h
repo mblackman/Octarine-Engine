@@ -3,6 +3,7 @@
 #include <stack>
 
 #include "Components/BoxColliderComponent.h"
+#include "Components/ColorGridComponent.h"
 #include "Components/EntityMaskComponent.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/NameComponent.h"
@@ -39,6 +40,57 @@ class LuaEntityLoader {
     }
   }
 
+  struct ComponentMaskAndCollider {
+    sol::object mask = sol::lua_nil;
+    bool hasMask = false;
+    bool hasCollider = false;
+  };
+
+  static void ScanInnerComponentTable(const sol::table& inner, ComponentMaskAndCollider& result) {
+    if (!result.hasMask) {
+      const sol::object innerMask = inner.get<sol::object>("entity_mask");
+      if (innerMask.valid() && innerMask.is<int>()) {
+        result.mask = innerMask;
+        result.hasMask = true;
+      }
+    }
+    if (!result.hasCollider) {
+      const sol::object innerCollider = inner.get<sol::object>("box_collider");
+      if (innerCollider.valid() && innerCollider.is<sol::table>()) {
+        result.hasCollider = true;
+      }
+    }
+  }
+
+  static ComponentMaskAndCollider ScanComponentsForMaskAndCollider(const sol::table& currentData) {
+    ComponentMaskAndCollider result;
+    const sol::optional<sol::table> componentsOpt = currentData["components"];
+    if (!componentsOpt || !componentsOpt.value().valid()) {
+      return result;
+    }
+
+    const sol::table& components = componentsOpt.value();
+    result.mask = components.get<sol::object>("entity_mask");
+    result.hasMask = result.mask.valid() && result.mask.is<int>();
+
+    const sol::object boxCollider = components.get<sol::object>("box_collider");
+    result.hasCollider = boxCollider.valid() && boxCollider.is<sol::table>();
+
+    if (result.hasCollider && result.hasMask) {
+      return result;
+    }
+
+    for (const auto& [name, data] : components) {
+      if (data.is<sol::table>() && (name.is<int>() || name.is<size_t>())) {
+        ScanInnerComponentTable(data.as<sol::table>(), result);
+        if (result.hasCollider && result.hasMask) {
+          break;
+        }
+      }
+    }
+    return result;
+  }
+
   // Reads top-level `mask` int from the entity table and attaches an EntityMaskComponent.
   // Also attaches a default EntityMaskComponent when the entity declares a `box_collider`
   // (CollisionSystem queries this component, so collider entities must have one).
@@ -46,17 +98,7 @@ class LuaEntityLoader {
     const sol::object topLevelMask = currentData.get<sol::object>("entity_mask");
     const bool hasTopLevelMask = topLevelMask.valid() && topLevelMask.is<int>();
 
-    sol::object componentMask = sol::lua_nil;
-    bool hasComponentMask = false;
-    bool hasCollider = false;
-    const std::string componentsKey = "components";
-    if (sol::optional<sol::table> componentsOpt = currentData[componentsKey];
-        componentsOpt && componentsOpt.value().valid()) {
-      componentMask = componentsOpt.value().get<sol::object>("entity_mask");
-      hasComponentMask = componentMask.valid() && componentMask.is<int>();
-      const sol::object boxCollider = componentsOpt.value().get<sol::object>("box_collider");
-      hasCollider = boxCollider.valid() && boxCollider.is<sol::table>();
-    }
+    const auto [componentMask, hasComponentMask, hasCollider] = ScanComponentsForMaskAndCollider(currentData);
 
     if (hasTopLevelMask && hasComponentMask) {
       Logger::Error("LoadEntityFromLua: entity_mask set at both top-level and components - pick one. Skipping mask.");
@@ -70,6 +112,50 @@ class LuaEntityLoader {
     registry->AddComponent(entity, EntityMaskComponent(EntityMask(static_cast<unsigned long long>(raw))));
   }
 
+  static void ProcessTransformEntry(Registry* registry, const Entity& entity, const sol::object& data) {
+    if (!data.is<sol::table>()) {
+      Logger::Error("LoadEntityFromLua: 'transform' must be a table.");
+      return;
+    }
+    const sol::table t = data.as<sol::table>();
+    using namespace LuaComponentHelpers;
+    if (t.get<sol::object>("position").valid()) {
+      registry->AddComponent(entity, PositionComponent(SafeGetVec2(t, "position")));
+    }
+    if (t.get<sol::object>("scale").valid()) {
+      if (const sol::object scaleObj = t.get<sol::object>("scale"); scaleObj.is<float>()) {
+        const auto uniform = scaleObj.as<float>();
+        registry->AddComponent(entity, ScaleComponent(uniform, uniform));
+      } else {
+        registry->AddComponent(entity, ScaleComponent(SafeGetVec2(t, "scale", 1.0f, 1.0f)));
+      }
+    }
+    if (t.get<sol::object>("rotation").valid()) {
+      registry->AddComponent(
+          entity, RotationComponent(octarine::AngleUnits::ToRadians(SafeGetOptionalValue<float>(t, "rotation", 0.0F))));
+    }
+    if (t.get<sol::object>("pivot").valid()) {
+      registry->AddComponent(
+          entity, PivotComponent(SafeGetVec2(t, "pivot", PivotComponent::kDefaultX, PivotComponent::kDefaultY)));
+    }
+  }
+
+  static void ProcessComponentEntry(Registry* registry, const Entity& entity, const std::string& componentName,
+                                    const sol::object& data) {
+    if (componentName == "entity_mask") return;
+
+    if (componentName == "transform") {
+      ProcessTransformEntry(registry, entity, data);
+      return;
+    }
+
+    if (const auto* entry = LuaComponentRegistry::find(componentName)) {
+      entry->attach(registry, entity, data);
+    } else {
+      Logger::Error("LoadEntityFromLua: Unknown component type '" + componentName + "' in Lua table.");
+    }
+  }
+
   static void LoadEntityComponents(const sol::table& currentData, Registry* registry, const Entity& entity) {
     const std::string componentsKey = "components";
     sol::optional<sol::table> componentsTableOpt = currentData[componentsKey];
@@ -80,51 +166,14 @@ class LuaEntityLoader {
 
     const sol::table& componentsTable = componentsTableOpt.value();
     for (const auto& [name, data] : componentsTable) {
-      auto componentName = name.as<std::string>();
-
-      // entity_mask handled in ApplyEntityMask (also validates top-level vs component-level conflict).
-      if (componentName == "entity_mask") continue;
-
-      // `transform` explodes into up-to-three real components. Per-field tables are optional;
-      // omitted fields fall back to system defaults (identity).
-      if (componentName == "transform") {
-        if (!data.is<sol::table>()) {
-          Logger::Error("LoadEntityFromLua: 'transform' must be a table.");
-          continue;
-        }
-        const sol::table t = data.as<sol::table>();
-        using namespace LuaComponentHelpers;
-        if (t["position"].valid()) {
-          registry->AddComponent(entity, PositionComponent(SafeGetVec2(t, "position")));
-        }
-        if (t["scale"].valid()) {
-          // `scale = 2` is uniform-scale shorthand. The table form here is a bare {x, y}, not the
-          // {value = {x, y}} the standalone component takes, so it cannot defer to fromLua.
-          if (const sol::object scaleObj = t.get<sol::object>("scale"); scaleObj.is<float>()) {
-            const auto uniform = scaleObj.as<float>();
-            registry->AddComponent(entity, ScaleComponent(uniform, uniform));
-          } else {
-            registry->AddComponent(entity, ScaleComponent(SafeGetVec2(t, "scale", 1.0f, 1.0f)));
+      if (data.is<sol::table>() && (name.is<int>() || name.is<size_t>())) {
+        for (const auto& [innerName, innerData] : data.as<sol::table>()) {
+          if (innerName.is<std::string>()) {
+            ProcessComponentEntry(registry, entity, innerName.as<std::string>(), innerData);
           }
         }
-        if (t["rotation"].valid()) {
-          registry->AddComponent(
-              entity,
-              RotationComponent(octarine::AngleUnits::ToRadians(SafeGetOptionalValue<float>(t, "rotation", 0.0F))));
-        }
-        // Independent of `rotation`: a pivot with no rotation still anchors the entity's scale.
-        if (t["pivot"].valid()) {
-          registry->AddComponent(
-              entity, PivotComponent(SafeGetVec2(t, "pivot", PivotComponent::kDefaultX, PivotComponent::kDefaultY)));
-        }
-        continue;
-      }
-
-      const sol::object dataObj = data;
-      if (const auto* entry = LuaComponentRegistry::find(componentName)) {
-        entry->attach(registry, entity, dataObj);
-      } else {
-        Logger::Error("LoadEntityFromLua: Unknown component type '" + componentName + "' in Lua table.");
+      } else if (name.is<std::string>()) {
+        ProcessComponentEntry(registry, entity, name.as<std::string>(), data);
       }
     }
 
@@ -194,6 +243,11 @@ class LuaEntityLoader {
   // (b) at least one world-space consumer system (sprite/primitive/collider/UI button/text label)
   // is attached. Keeps script-only or camera-anchor entities lean.
   static void MaybeAttachGlobalTransform(Registry* registry, const Entity& entity) {
+    const bool isGrid = registry->HasComponent<ColorGridComponent>(entity);
+    if (isGrid && !registry->HasComponent<PositionComponent>(entity)) {
+      registry->AddComponent(entity, PositionComponent{});
+    }
+
     const bool hasAnyLocal = registry->HasComponent<PositionComponent>(entity) ||
                              registry->HasComponent<ScaleComponent>(entity) ||
                              registry->HasComponent<RotationComponent>(entity);
@@ -201,8 +255,8 @@ class LuaEntityLoader {
 
     const bool needsGlobal =
         registry->HasComponent<SpriteComponent>(entity) || registry->HasComponent<SquarePrimitiveComponent>(entity) ||
-        registry->HasComponent<BoxColliderComponent>(entity) || registry->HasComponent<UIButtonComponent>(entity) ||
-        registry->HasComponent<TextLabelComponent>(entity);
+        registry->HasComponent<ColorGridComponent>(entity) || registry->HasComponent<BoxColliderComponent>(entity) ||
+        registry->HasComponent<UIButtonComponent>(entity) || registry->HasComponent<TextLabelComponent>(entity);
     if (!needsGlobal) return;
 
     if (registry->HasComponent<GlobalTransformComponent>(entity)) return;

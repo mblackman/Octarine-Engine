@@ -79,6 +79,7 @@
 #include "Systems/OffScreenDespawnSystem.h"
 #include "Systems/ProjectileEmitSystem.h"
 #include "Systems/ProjectileLifecycleSystem.h"
+#include "Systems/RenderColorGridSystem.h"
 #include "Systems/RenderPrimitiveSystem.h"
 #include "Systems/RenderSpriteSystem.h"
 #include "Systems/RenderTextSystem.h"
@@ -699,6 +700,7 @@ void Game::Setup() {
   registry_->RegisterSystem<UIRectComponent, SquarePrimitiveComponent>(RenderUIPrimitiveSystem());
   registry_->RegisterSystem<TextLabelComponent>(RenderTextSystem());
   registry_->RegisterParallelSystem<SquarePrimitiveComponent, GlobalTransformComponent>(RenderPrimitiveSystem());
+  registry_->RegisterParallelSystem<ColorGridComponent, GlobalTransformComponent>(RenderColorGridSystem());
 
   // Execution-order edges (topo-sorted in Registry::Update; registration order breaks ties).
   // Emit before integration so freshly-spawned projectiles integrate/transform/collide the same

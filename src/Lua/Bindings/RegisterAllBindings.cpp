@@ -5,6 +5,7 @@
 #include "Lua/Bindings/AudioSourceComponentLuaBinding.h"
 #include "Lua/Bindings/BoxColliderComponentLuaBinding.h"
 #include "Lua/Bindings/CameraFollowComponentLuaBinding.h"
+#include "Lua/Bindings/ColorGridComponentLuaBinding.h"
 #include "Lua/Bindings/HealthComponentLuaBinding.h"
 #include "Lua/Bindings/LifetimeComponentLuaBinding.h"
 #include "Lua/Bindings/LuaComponentRegistry.h"
@@ -32,6 +33,7 @@ void RegisterAllLuaBindings() {
   LuaComponentRegistry::registerComponent<SquarePrimitiveComponent>();
   LuaComponentRegistry::registerComponent<AnimationComponent>();
   LuaComponentRegistry::registerComponent<BoxColliderComponent>();
+  LuaComponentRegistry::registerComponent<ColorGridComponent>();
   LuaComponentRegistry::registerComponent<HealthComponent>();
   LuaComponentRegistry::registerComponent<LifetimeComponent>();
   LuaComponentRegistry::registerComponent<ProjectileEmitterComponent>();

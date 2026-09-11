@@ -9,8 +9,10 @@
 #include <sol/sol.hpp>
 #include <string>
 
+#include "Components/ColorGridComponent.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/HealthComponent.h"
+#include "Components/NameComponent.h"
 #include "Components/PivotComponent.h"
 #include "Components/PositionComponent.h"
 #include "Components/RotationComponent.h"
@@ -252,15 +254,17 @@ int main() {
   std::cout << "[scale shorthand: a bare number means uniform scale on both authoring paths]\n";
   {
     Check(RunLua(lua, R"LUA(
-      inline_uniform = load_entity({ components = { transform = { scale = 3 } } })
-      inline_table   = load_entity({ components = { transform = { scale = { x = 2, y = 5 } } } })
-      standalone     = load_entity({ components = { scale = 4 } })
+      inline_uniform  = load_entity({ components = { transform = { scale = 3 } } })
+      inline_table    = load_entity({ components = { transform = { scale = { x = 2, y = 5 } } } })
+      standalone      = load_entity({ components = { scale = 4 } })
+      standalone_flat = load_entity({ components = { scale = { x = 6, y = 7 } } })
     )LUA"),
           "scale shorthand script runs");
 
     const Entity inlineUniform = lua["inline_uniform"];
     const Entity inlineTable = lua["inline_table"];
     const Entity standalone = lua["standalone"];
+    const Entity standaloneFlat = lua["standalone_flat"];
 
     Check(reg->GetComponent<ScaleComponent>(inlineUniform).value == glm::vec2(3.0F, 3.0F),
           "transform.scale = 3 is uniform scale, not the (1,1) default");
@@ -268,6 +272,8 @@ int main() {
           "transform.scale as a table still reads both axes");
     Check(reg->GetComponent<ScaleComponent>(standalone).value == glm::vec2(4.0F, 4.0F),
           "a standalone scale component takes the same shorthand");
+    Check(reg->GetComponent<ScaleComponent>(standaloneFlat).value == glm::vec2(6.0F, 7.0F),
+          "a standalone scale component accepts flat { x = ..., y = ... }");
 
     // `scale` is the uniform view and reads x, so scripts need is_uniform() to know whether that
     // is the whole story. It must not fail on the non-uniform case, only report it.
@@ -381,6 +387,88 @@ int main() {
     reg->Update(1.0F / 60.0F);
     Check(NearVec2(reg->GetComponent<GlobalTransformComponent>(anchored).position, glm::vec2(200.0F, 100.0F)),
           "a pivot written from Lua re-anchors the entity the next frame");
+  }
+
+  std::cout << "[color_grid component Lua binding and mutation]\n";
+  {
+    Check(RunLua(lua, R"LUA(
+      grid_ent = load_entity({ components = {
+        color_grid = {
+          cell_size = 64,
+          color1 = { r = 10, g = 20, b = 30, a = 255 },
+          color2 = { r = 40, g = 50, b = 60, a = 255 },
+          offset = { x = 5, y = 15 },
+          scroll_velocity = { x = 100, y = 50 },
+          layer = -5,
+          is_fixed = true,
+          blend_mode = "add",
+        }
+      }})
+    )LUA"),
+          "color_grid entity loads from Lua");
+    const Entity gridEnt = lua["grid_ent"];
+    Check(reg->HasComponent<ColorGridComponent>(gridEnt), "entity has ColorGridComponent in C++");
+    const auto& grid = reg->GetComponent<ColorGridComponent>(gridEnt);
+    CheckEq(grid.cellWidth, 64.0f, "cellWidth parsed from cell_size");
+    CheckEq(grid.cellHeight, 64.0f, "cellHeight parsed from cell_size");
+    CheckEq(static_cast<int>(grid.color1.r), 10, "color1.r parsed");
+    CheckEq(static_cast<int>(grid.color2.b), 60, "color2.b parsed");
+    CheckEq(grid.offset.x, 5.0f, "offset.x parsed");
+    CheckEq(grid.offset.y, 15.0f, "offset.y parsed");
+    CheckEq(grid.scrollVelocity.x, 100.0f, "scrollVelocity.x parsed");
+    CheckEq(grid.layer, -5, "layer parsed");
+    Check(grid.isFixed, "isFixed parsed");
+    Check(grid.blendMode == octarine::BlendMode::Add, "blendMode parsed as add");
+
+    // Mutation from Lua
+    Check(RunLua(lua, R"LUA(
+      local g = registry.get_color_grid(grid_ent)
+      g.cell_size = 128
+      g.offset.x = 25
+      g.layer = 2
+      g.blend_mode = "blend"
+    )LUA"),
+          "color_grid mutates from Lua");
+    CheckEq(grid.cellWidth, 128.0f, "cellWidth mutated from Lua");
+    CheckEq(grid.cellHeight, 128.0f, "cellHeight mutated from Lua");
+    CheckEq(grid.offset.x, 25.0f, "offset.x mutated from Lua");
+    CheckEq(grid.layer, 2, "layer mutated from Lua");
+    Check(grid.blendMode == octarine::BlendMode::Blend, "blendMode mutated from Lua");
+  }
+
+  std::cout << "[color_grid loaded via array-of-tables components style]\n";
+  {
+    Check(RunLua(lua, R"LUA(
+      grid_bg = load_entity({
+        name = "Grid Background",
+        components = {
+          {
+            color_grid = {
+              cell_size = 64,              -- square tile width & height
+              color1 = { r = 30, g = 30, b = 30, a = 255 },
+              color2 = { r = 60, g = 60, b = 60, a = 255 },
+              layer = -10,                 -- render behind sprites
+              is_fixed = false,            -- scrolls with camera
+              scroll_velocity = { x = 20, y = 0 }, -- auto-scrolls 20 px/sec right
+            }
+          }
+        },
+      })
+    )LUA"),
+          "user's exact load_entity snippet loads successfully");
+    const Entity gridBg = lua["grid_bg"];
+    Check(reg->HasComponent<ColorGridComponent>(gridBg), "grid_bg has ColorGridComponent");
+    Check(reg->HasComponent<NameComponent>(gridBg), "grid_bg has NameComponent");
+    CheckEq(reg->GetComponent<NameComponent>(gridBg).name, std::string("Grid Background"), "name parsed");
+    const auto& grid = reg->GetComponent<ColorGridComponent>(gridBg);
+    CheckEq(grid.cellWidth, 64.0f, "cellWidth is 64");
+    CheckEq(grid.cellHeight, 64.0f, "cellHeight is 64");
+    CheckEq(static_cast<int>(grid.color1.r), 30, "color1.r is 30");
+    CheckEq(static_cast<int>(grid.color2.r), 60, "color2.r is 60");
+    CheckEq(grid.layer, -10, "layer is -10");
+    Check(!grid.isFixed, "is_fixed is false");
+    CheckEq(grid.scrollVelocity.x, 20.0f, "scrollVelocity.x is 20");
+    CheckEq(grid.scrollVelocity.y, 0.0f, "scrollVelocity.y is 0");
   }
 
   return octarine::test::ReportSummary("Lua behavior test");

@@ -19,7 +19,7 @@
       "name": "AudioCullingSystem",
       "source": "src/Systems/AudioCullingSystem.h",
       "tier": "serial",
-      "setup_order": 9,
+      "setup_order": 10,
       "queried_components": [
         "GlobalTransformComponent",
         "AudioSourceComponent"
@@ -46,7 +46,7 @@
       "name": "CameraFollowSystem",
       "source": "src/Systems/CameraFollowSystem.h",
       "tier": "serial",
-      "setup_order": 12,
+      "setup_order": 13,
       "queried_components": [
         "PositionComponent",
         "CameraFollowComponent"
@@ -94,7 +94,7 @@
       "name": "DopplerSystem",
       "source": "src/Systems/DopplerSystem.h",
       "tier": "serial",
-      "setup_order": 11,
+      "setup_order": 12,
       "queried_components": [
         "GlobalTransformComponent",
         "RigidBodyComponent",
@@ -138,6 +138,18 @@
         "MouseWheelEvent"
       ],
       "lua_surface": true
+    },
+    {
+      "name": "LifetimeSystem",
+      "source": "src/Systems/LifetimeSystem.h",
+      "tier": "bulk",
+      "setup_order": 8,
+      "queried_components": [
+        "LifetimeComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
     },
     {
       "name": "ObstacleBounceSystem",
@@ -197,6 +209,19 @@
       "lua_surface": false
     },
     {
+      "name": "RenderColorGridSystem",
+      "source": "src/Systems/RenderColorGridSystem.h",
+      "tier": "parallel",
+      "setup_order": 20,
+      "queried_components": [
+        "ColorGridComponent",
+        "GlobalTransformComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
       "name": "RenderDebugGUISystem",
       "source": "src/Systems/RenderDebugGUISystem.h",
       "tier": null,
@@ -210,7 +235,7 @@
       "name": "RenderPrimitiveSystem",
       "source": "src/Systems/RenderPrimitiveSystem.h",
       "tier": "parallel",
-      "setup_order": 17,
+      "setup_order": 19,
       "queried_components": [
         "SquarePrimitiveComponent",
         "GlobalTransformComponent"
@@ -223,7 +248,7 @@
       "name": "RenderSpriteSystem",
       "source": "src/Systems/RenderSpriteSystem.h",
       "tier": "parallel",
-      "setup_order": 14,
+      "setup_order": 15,
       "queried_components": [
         "GlobalTransformComponent",
         "SpriteComponent"
@@ -236,9 +261,22 @@
       "name": "RenderTextSystem",
       "source": "src/Systems/RenderTextSystem.h",
       "tier": "serial",
-      "setup_order": 16,
+      "setup_order": 18,
       "queried_components": [
         "TextLabelComponent"
+      ],
+      "emits": [],
+      "subscribes": [],
+      "lua_surface": false
+    },
+    {
+      "name": "RenderUIPrimitiveSystem",
+      "source": "src/Systems/RenderUIPrimitiveSystem.h",
+      "tier": "serial",
+      "setup_order": 17,
+      "queried_components": [
+        "UIRectComponent",
+        "SquarePrimitiveComponent"
       ],
       "emits": [],
       "subscribes": [],
@@ -248,7 +286,7 @@
       "name": "RenderUISpriteSystem",
       "source": "src/Systems/RenderUISpriteSystem.h",
       "tier": "serial",
-      "setup_order": 15,
+      "setup_order": 16,
       "queried_components": [
         "UIRectComponent",
         "SpriteComponent"
@@ -286,7 +324,7 @@
       "name": "SpatialAudioSystem",
       "source": "src/Systems/SpatialAudioSystem.h",
       "tier": "serial",
-      "setup_order": 10,
+      "setup_order": 11,
       "queried_components": [
         "GlobalTransformComponent",
         "AudioSourceComponent",
@@ -324,7 +362,7 @@
       "name": "UILayoutSystem",
       "source": "src/Systems/UILayoutSystem.h",
       "tier": "bulk",
-      "setup_order": 13,
+      "setup_order": 14,
       "queried_components": [],
       "emits": [],
       "subscribes": [],
@@ -334,7 +372,7 @@
       "name": "UpdateListenerTransformSystem",
       "source": "src/Systems/UpdateListenerTransformSystem.h",
       "tier": "bulk",
-      "setup_order": 8,
+      "setup_order": 9,
       "queried_components": [
         "GlobalTransformComponent"
       ],

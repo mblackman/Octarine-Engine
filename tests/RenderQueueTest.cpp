@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "Components/CameraComponents.h"
+#include "Components/ColorGridComponent.h"
 #include "Components/GlobalTransformComponent.h"
 #include "Components/SquarePrimitiveComponent.h"
 #include "ECS/Registry.h"
@@ -18,6 +19,7 @@
 #include "General/Constants.h"
 #include "Renderer/RenderKey.h"
 #include "Renderer/RenderQueue.h"
+#include "Systems/RenderColorGridSystem.h"
 #include "Systems/RenderPrimitiveSystem.h"
 #include "TestHarness.h"
 
@@ -224,6 +226,74 @@ int main() {
     const auto& cmd = registry.Get<RenderQueue>().begin()->payload.square;
     CheckEq(cmd.pivot.x, cmd.destRect.w * 0.5f, "centre pivot stays centred on x under scale");
     CheckEq(cmd.pivot.y, cmd.destRect.h * 0.5f, "centre pivot stays centred on y under scale");
+  }
+
+  std::cout << "[color_grid] RenderColorGridSystem auto-scrolls and emits batched squares\n";
+  {
+    Registry registry;
+    registry.Set<GameConfig>(GameConfig{});
+    registry.Get<GameConfig>().windowWidth = 100;
+    registry.Get<GameConfig>().windowHeight = 100;
+    registry.Set<CameraComponent>(CameraComponent{});
+    registry.Get<CameraComponent>().viewport = octarine::Rect{0.0f, 0.0f, 100.0f, 100.0f};
+    registry.Set<RenderQueue>(RenderQueue(32));
+
+    RenderColorGridSystem system;
+    system.Prepare(&registry);
+
+    ColorGridComponent grid(50.0f, 50.0f);
+    grid.scrollVelocity = {10.0f, 20.0f};
+    GlobalTransformComponent transform;
+    transform.position = {0.0f, 0.0f};
+    transform.scale = {1.0f, 1.0f};
+
+    // dt = 0.5s -> offset becomes (5, 10)
+    system(0.5f, grid, transform);
+    CheckEq(grid.offset.x, 5.0f, "scroll velocity integrates x into offset");
+    CheckEq(grid.offset.y, 10.0f, "scroll velocity integrates y into offset");
+
+    auto& queue = registry.Get<RenderQueue>();
+    Check(!queue.IsEmpty(), "color grid emitted commands into queue");
+
+    // Opaque 100x100 viewport with 50x50 cells:
+    // Emits 1 full-viewport background square (color1, batchKey 0x100)
+    // plus alternating squares (color2, batchKey 0x200).
+    const auto& firstCmd = queue.begin()->payload.square;
+    CheckEq(firstCmd.destRect.w, 100.0f, "opaque background width covers visible viewport");
+    CheckEq(firstCmd.destRect.h, 100.0f, "opaque background height covers visible viewport");
+
+    queue.Sort();
+    // Sort radix groups all same-batchKey primitives together
+    std::vector<uint64_t> sortKeys;
+    for (const auto& key : queue) {
+      sortKeys.push_back(key.sortKey);
+    }
+    for (size_t i = 1; i < sortKeys.size(); ++i) {
+      Check(sortKeys[i - 1] <= sortKeys[i], "render keys sorted in non-descending order");
+    }
+  }
+
+  std::cout << "[color_grid] RenderColorGridSystem culls bounded grid when outside viewport\n";
+  {
+    Registry registry;
+    registry.Set<GameConfig>(GameConfig{});
+    registry.Get<GameConfig>().windowWidth = 100;
+    registry.Get<GameConfig>().windowHeight = 100;
+    registry.Set<CameraComponent>(CameraComponent{});
+    registry.Get<CameraComponent>().viewport = octarine::Rect{0.0f, 0.0f, 100.0f, 100.0f};
+    registry.Set<RenderQueue>(RenderQueue(32));
+
+    RenderColorGridSystem system;
+    system.Prepare(&registry);
+
+    ColorGridComponent grid(50.0f, 50.0f);
+    grid.bounds = {200.0f, 200.0f};
+    GlobalTransformComponent transform;
+    transform.position = {500.0f, 500.0f};  // Way outside (0, 0, 100, 100)
+
+    system(0.0f, grid, transform);
+    const auto& queue = registry.Get<RenderQueue>();
+    Check(queue.IsEmpty(), "bounded grid completely outside camera is culled");
   }
 
   return octarine::test::ReportSummary("RenderQueueTest");

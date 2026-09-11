@@ -5,6 +5,7 @@
 #include "Editor/Inspectors/AnimationComponentInspector.h"
 #include "Editor/Inspectors/BoxColliderComponentInspector.h"
 #include "Editor/Inspectors/CameraFollowComponentInspector.h"
+#include "Editor/Inspectors/ColorGridComponentInspector.h"
 #include "Editor/Inspectors/ComponentInspectorRegistry.h"
 #include "Editor/Inspectors/EntityMaskComponentInspector.h"
 #include "Editor/Inspectors/GlobalTransformComponentInspector.h"
@@ -44,6 +45,7 @@ void RegisterAllComponentInspectors() {
   ComponentInspectorRegistry::registerComponent<EntityMaskComponent>();
   ComponentInspectorRegistry::registerComponent<ProjectileComponent>();
   ComponentInspectorRegistry::registerComponent<SquarePrimitiveComponent>();
+  ComponentInspectorRegistry::registerComponent<ColorGridComponent>();
   ComponentInspectorRegistry::registerComponent<UIButtonComponent>();
 }
 

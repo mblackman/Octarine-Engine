@@ -32,6 +32,12 @@
       "get_accessor": "registry.get_camera_follow"
     },
     {
+      "lua_key": "color_grid",
+      "usertype": "color_grid_component",
+      "has_accessor": "registry.has_color_grid",
+      "get_accessor": "registry.get_color_grid"
+    },
+    {
       "lua_key": "health",
       "usertype": "health_component",
       "has_accessor": "registry.has_health",

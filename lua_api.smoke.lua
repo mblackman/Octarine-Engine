@@ -1580,6 +1580,10 @@ function clear_scene(...) end
 color = {}
 
 
+---@class color_grid_component
+color_grid_component = {}
+
+
 ---@class entity
 entity = {}
 
@@ -1646,6 +1650,10 @@ function input.on_mouse_wheel(...) end
 function input.unbind(...) end
 
 
+---@class lifetime_component
+lifetime_component = {}
+
+
 function load_asset(...) end
 
 function load_entity(...) end
@@ -1661,10 +1669,6 @@ function log_i(...) end
 function log_table(...) end
 
 function log_w(...) end
-
----@class lifetime_component
-lifetime_component = {}
-
 
 ---@class name_component
 name_component = {}
@@ -1710,6 +1714,8 @@ function registry.get_audio_source(...) end
 function registry.get_box_collider(...) end
 
 function registry.get_camera_follow(...) end
+
+function registry.get_color_grid(...) end
 
 function registry.get_health(...) end
 
@@ -1758,6 +1764,8 @@ function registry.has_audio_source(...) end
 function registry.has_box_collider(...) end
 
 function registry.has_camera_follow(...) end
+
+function registry.has_color_grid(...) end
 
 function registry.has_health(...) end
 

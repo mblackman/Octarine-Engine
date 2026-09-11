@@ -235,6 +235,35 @@ Makes an entity clickable.
 | `is_active` | `boolean`  | `true`  | Whether the button is interactive.                  |
 | `on_click`  | `function` | `nil`   | Function called on click: `function(self, entity)`. |
 
+### `color_grid`
+
+Renders an infinite or bounded scrolling two-color checkerboard grid. Handled by `RenderColorGridSystem` for background effects.
+
+| Field             | Type                  | Default                 | Description                                                                 |
+|-------------------|-----------------------|-------------------------|-----------------------------------------------------------------------------|
+| `cell_width`      | `number`              | `32.0`                  | Width of each grid cell in pixels (min `8.0`).                              |
+| `cell_height`     | `number`              | `32.0`                  | Height of each grid cell in pixels (min `8.0`).                             |
+| `cell_size`       | `number`              | `32.0`                  | Shorthand property setting both `cell_width` and `cell_height`.             |
+| `color1`          | `table {r, g, b, a}`  | `{40, 40, 40, 255}`     | First grid square color. Also aliased as `color_a`.                         |
+| `color2`          | `table {r, g, b, a}`  | `{70, 70, 70, 255}`     | Second grid square color. Also aliased as `color_b`.                        |
+| `offset`          | `table {x, y}`        | `{x=0, y=0}`            | Local pixel offset of the grid origin.                                      |
+| `scroll_velocity` | `table {x, y}`        | `{x=0, y=0}`            | Pixels per second to continuously scroll the grid.                          |
+| `bounds`          | `table {x, y}`        | `{x=0, y=0}`            | Dimensions of grid coverage in pixels. `{0, 0}` covers the entire viewport. |
+| `layer`           | `integer`             | `0`                     | Render queue layer.                                                         |
+| `is_fixed`        | `boolean`             | `false`                 | If true, stays fixed relative to the window rather than moving with camera. |
+| `blend_mode`      | `string`              | `"blend"`               | Blend mode (`"none"`, `"blend"`, `"add"`, `"mod"`).                         |
+
+```lua
+components = {
+  color_grid = {
+    cell_size = 48,
+    color1 = { 25, 25, 35, 255 },
+    color2 = { 35, 35, 50, 255 },
+    scroll_velocity = { x = 20, y = 0 }
+  }
+}
+```
+
 ### `lifetime`
 
 Automatically counts down remaining time and queues the entity for destruction when time expires. Processed by `LifetimeSystem`.
