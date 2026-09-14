@@ -89,6 +89,7 @@ set(OCTARINE_PACKAGE_ORIENTATION  "" CACHE STRING "Override project.ini: orienta
 set(OCTARINE_PACKAGE_FULLSCREEN   "" CACHE STRING "Override project.ini: fullscreen (true|false)")
 set(OCTARINE_PACKAGE_PERMISSIONS  "" CACHE STRING "Override project.ini: permissions (comma list: internet,recording,camera,location,photos)")
 set(OCTARINE_PACKAGE_CATEGORY     "" CACHE STRING "Override project.ini: category (reserved for Android category surfaces; currently informational)")
+set(OCTARINE_PACKAGE_EXCLUDE      "" CACHE STRING "Override project.ini: package_exclude (comma list of file/dir patterns to exclude)")
 
 # Parse a flat key=value INI (no sections; Java Properties compatible) into ${PREFIX}_<key> vars in
 # the caller's scope. Skips blank lines and `#`-prefixed comments. Unknown keys are still set —
@@ -192,6 +193,10 @@ endfunction()
 #     CI gate: a broken asset reference exits nonzero and aborts the install.
 #   - install(DIRECTORY) stages the project (now including the baked manifest) next to the binary.
 function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DEST)
+    set(oneValueArgs "")
+    set(multiValueArgs EXTRA_EXCLUDES)
+    cmake_parse_arguments(_INST "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
     install(TARGETS ${TARGET}
             RUNTIME DESTINATION "${RUNTIME_DEST}"
             BUNDLE DESTINATION "${RUNTIME_DEST}"
@@ -229,21 +234,36 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
         endif ()
     ")
 
-    # Stage the whole project dir beside the binary. Exclude editor/runtime scratch that isn't part
-    # of the shipped game (user prefs, imgui layout). asset_manifest.lua is produced by the bake
-    # above and lives in PROJECT_DIR, so it rides along here.
-    install(DIRECTORY "${PROJECT_DIR}/"
-            DESTINATION "${DATA_DEST}"
+    # Stage the project dir beside the binary. Exclude editor/runtime scratch and dev-only tooling.
+    # asset_manifest.lua is produced by the bake above and lives in PROJECT_DIR, so it rides along here.
+    set(_install_excludes
             PATTERN ".git" EXCLUDE
             PATTERN ".gitignore" EXCLUDE
+            PATTERN ".gitattributes" EXCLUDE
+            PATTERN ".github" EXCLUDE
+            PATTERN ".vscode" EXCLUDE
+            PATTERN ".idea" EXCLUDE
+            PATTERN ".env*" EXCLUDE
+            PATTERN ".engine" EXCLUDE
             PATTERN "*.meta" EXCLUDE
             PATTERN "editor_prefs.ini" EXCLUDE
             PATTERN "preferences.ini" EXCLUDE
             PATTERN "imgui.ini" EXCLUDE
-            # *.bak are editor/source backups (e.g. game.lua.bak). They are never loaded at runtime
-            # and would otherwise ship a plaintext copy of a script that the protection step only
-            # touches under its .lua name — defeating bytecode/encryption for that file.
             PATTERN "*.bak" EXCLUDE
+            PATTERN "*.sh" EXCLUDE
+            PATTERN "*.ps1" EXCLUDE
+            PATTERN "types" EXCLUDE
+    )
+    foreach (_ex IN LISTS _INST_EXTRA_EXCLUDES)
+        string(STRIP "${_ex}" _ex_clean)
+        if (_ex_clean)
+            list(APPEND _install_excludes PATTERN "${_ex_clean}" EXCLUDE)
+        endif ()
+    endforeach ()
+
+    install(DIRECTORY "${PROJECT_DIR}/"
+            DESTINATION "${DATA_DEST}"
+            ${_install_excludes}
     )
 
     # Compile installed Lua scripts to stripped bytecode. Runs after install(DIRECTORY) so it
@@ -462,6 +482,9 @@ function(octarine_package TARGET)
     _octarine_resolve_identity(_pkg_id          "${OCTARINE_PACKAGE_ID}"           "${_pi_package_id}"   "")
     _octarine_validate_identity("${OP_PROJECT}" "${_pkg_name}" "${_pkg_id}" "${_pkg_version}" ON)
 
+    # Set binary and bundle output name to the resolved package identity
+    set_target_properties(${TARGET} PROPERTIES OUTPUT_NAME "${_pkg_name}")
+
     # Soft engine version check: warn when project.ini declares an engine_version that doesn't
     # match the engine being built against. Not fatal — the developer may be intentionally
     # testing a newer engine — but surfacing the mismatch at configure time avoids surprises.
@@ -483,6 +506,11 @@ function(octarine_package TARGET)
     _octarine_resolve_identity(_pkg_fullscreen  "${OCTARINE_PACKAGE_FULLSCREEN}"   "${_pi_fullscreen}"   "")
     _octarine_resolve_identity(_pkg_permissions "${OCTARINE_PACKAGE_PERMISSIONS}"  "${_pi_permissions}"  "")
     _octarine_resolve_identity(_pkg_category    "${OCTARINE_PACKAGE_CATEGORY}"     "${_pi_category}"     "")
+    _octarine_resolve_identity(_pkg_exclude     "${OCTARINE_PACKAGE_EXCLUDE}"      "${_pi_package_exclude}" "")
+    set(_extra_excludes "")
+    if (_pkg_exclude)
+        string(REPLACE "," ";" _extra_excludes "${_pkg_exclude}")
+    endif ()
 
     # ---- Desktop ------------------------------------------------------------------------------
     # macOS: a .app bundle; binary in Contents/MacOS, project files in Contents/Resources.
@@ -502,8 +530,8 @@ function(octarine_package TARGET)
     if (APPLE)
         set_target_properties(${TARGET} PROPERTIES MACOSX_BUNDLE ON)
         set(_runtime_dest ".")
-        set(_data_dest "${TARGET}.app/Contents/Resources")
-        set(_framework_dest "${TARGET}.app/Contents/Frameworks")
+        set(_data_dest "${_pkg_name}.app/Contents/Resources")
+        set(_framework_dest "${_pkg_name}.app/Contents/Frameworks")
         # MACOSX_BUNDLE_ICON_FILE writes CFBundleIconFile into Info.plist; the .icns must land in
         # Contents/Resources/ with the matching name. Both pieces only kick in when the generator
         # produced an .icns (project supplied an icon).
@@ -524,7 +552,7 @@ function(octarine_package TARGET)
         endif ()
     endif ()
 
-    _octarine_setup_desktop_install(${TARGET} "${OP_PROJECT}" "${_runtime_dest}" "${_data_dest}")
+    _octarine_setup_desktop_install(${TARGET} "${OP_PROJECT}" "${_runtime_dest}" "${_data_dest}" EXTRA_EXCLUDES ${_extra_excludes})
     _octarine_bundle_runtime_libs(${TARGET} "${_runtime_dest}" "${_framework_dest}")
     _octarine_setup_cpack("${_pkg_name}" "${_pkg_version}" "${_pkg_description}" "${_pkg_vendor}" "${_desktop_ico}")
 endfunction()
