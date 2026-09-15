@@ -13,7 +13,9 @@ FontStore::FontStore(FontStore&&) noexcept = default;
 FontStore& FontStore::operator=(FontStore&&) noexcept = default;
 FontStore::~FontStore() { Clear(); }
 
-TTF_Font* FontStore::Add(const std::string& id, SDL_IOStream* io, const float fontSize, const std::string& basePath) {
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+TTF_Font* FontStore::Add(const std::string& id, SDL_IOStream* io, const float fontSize, const std::string& basePath,
+                         const IoOpener& openIO) {
   TTF_Font* font = TTF_OpenFontIO(io, true, fontSize);  // closes the stream
   if (!font) {
     Logger::Error("Failed to load font " + id + ": " + std::string(SDL_GetError()));
@@ -31,18 +33,39 @@ TTF_Font* FontStore::Add(const std::string& id, SDL_IOStream* io, const float fo
   Logger::Info("Added font: " + id);
 
   // Probe for a glyph-atlas sidecar pair (Stage 14 B3). The bake step writes them under
-  // <basePath>/atlases/<asset_id>.atlas.{png,lua}; presence is the opt-in. SDL_IOFromFile is used
-  // for the existence check so the probe transparently resolves through a shipped pak too.
-  if (basePath.empty()) return font;
-  const std::filesystem::path atlasPng = std::filesystem::path(basePath) / "atlases" / (id + ".atlas.png");
-  const std::filesystem::path atlasLua = std::filesystem::path(basePath) / "atlases" / (id + ".atlas.lua");
-  SDL_IOStream* probe = SDL_IOFromFile(atlasPng.string().c_str(), "rb");
-  if (probe == nullptr) return font;
-  SDL_CloseIO(probe);
-  auto atlas = std::make_unique<GlyphAtlas>();
-  if (atlas->Load(atlasPng.string(), atlasLua.string())) {
-    glyph_atlases_[id] = std::move(atlas);
+  // atlases/<asset_id>.atlas.{png,lua}; presence is the opt-in. When openIO is provided
+  // (e.g. via AssetManager), streams resolve through asset_bundle.pak or loose files alike.
+  const std::string relPng = "atlases/" + id + ".atlas.png";
+  const std::string relLua = "atlases/" + id + ".atlas.lua";
+
+  SDL_IOStream* pngStream = nullptr;
+  SDL_IOStream* luaStream = nullptr;
+
+  if (openIO) {
+    pngStream = openIO(relPng);
+    if (pngStream != nullptr) {
+      luaStream = openIO(relLua);
+    }
+  } else if (!basePath.empty()) {
+    const std::filesystem::path atlasPng = std::filesystem::path(basePath) / relPng;
+    const std::filesystem::path atlasLua = std::filesystem::path(basePath) / relLua;
+    pngStream = SDL_IOFromFile(atlasPng.string().c_str(), "rb");
+    if (pngStream != nullptr) {
+      luaStream = SDL_IOFromFile(atlasLua.string().c_str(), "rb");
+    }
   }
+
+  if (pngStream != nullptr) {
+    if (luaStream != nullptr) {
+      auto atlas = std::make_unique<GlyphAtlas>();
+      if (atlas->Load(pngStream, luaStream, relPng, relLua)) {
+        glyph_atlases_[id] = std::move(atlas);
+      }
+    } else {
+      SDL_CloseIO(pngStream);
+    }
+  }
+
   return font;
 }
 

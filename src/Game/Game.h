@@ -42,7 +42,7 @@ class Game : public LuaBindingContext {
   // emit a scan-free `asset_manifest.lua` (relative paths) next to it. Creates no window, renderer,
   // audio, or game loop. Returns false (→ nonzero process exit, a CI gate) on a config/catalog/write
   // failure or any unresolved asset reference. Constructs its own headless Game internally.
-  [[nodiscard]] static bool Bake(const std::string& assetPath);
+  [[nodiscard]] static bool Bake(const std::string& assetPath, const std::string& scriptsOverrideDir = "");
 
   // True while running under the headless bake (`-m bake`). Asset-loading Lua globals
   // (`acquire_scene_assets`, `load_asset`) consult this to validate-and-count referenced ids
@@ -129,7 +129,7 @@ class Game : public LuaBindingContext {
   // the startup script touches, force-scans the catalog, runs the startup script (which validates
   // its scene references via the bake-mode asset globals), then writes the manifest. Returns false
   // on a load/scan/write failure or any unresolved reference.
-  [[nodiscard]] bool RunBakeValidation(const std::string& assetPath);
+  [[nodiscard]] bool RunBakeValidation(const std::string& assetPath, const std::string& scriptsOverrideDir = "");
 
   EngineRuntime runtime_;
   static inline bool s_is_running_{false};

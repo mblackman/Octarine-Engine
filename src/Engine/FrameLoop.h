@@ -69,7 +69,7 @@ class FrameLoop {
   EventBus* event_bus_;
   Renderer* renderer_;
   EngineRuntime* runtime_;
-  sol::state& lua_;
+  [[maybe_unused]] sol::state& lua_;
   // Nanosecond ticks (SDL_GetTicksNS) — ms granularity rounds sub-millisecond frames to a zero
   // deltaTime when FpsTarget=0 lets the loop run uncapped.
   Uint64 nanoseconds_previous_frame_ = 0;

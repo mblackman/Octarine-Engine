@@ -39,7 +39,7 @@ void InstallLuaLibraries(sol::state& lua);
 // SpriteRenderCache and AudioTrackCache. Also plumbs the freshly-Set AssetManager pointer onto
 // the EngineContext; other context fields must already be populated by the caller.
 void InstallCoreSingletons(Registry& registry, EngineContext& context, int windowWidth, int windowHeight,
-                           bool withFramePathCaches);
+                           bool withFramePathCaches, sol::state* lua = nullptr);
 
 // EntityPoolManager + ProjectileEmitSystem. ProjectileEmitSystem::Init calls RegisterPool
 // against the EntityPoolManager, so EntityPoolManager must be Set first. Both bind Lua

@@ -88,7 +88,7 @@ void SceneLoader::LoadScene(const std::string& scenePath) {
   }
 #endif
 
-  auto sceneBytes = ReadFileViaSDL(fullPath);
+  auto sceneBytes = ReadFileViaSDL(fullPath, &assetManager);
   sol::protected_function_result result;
   if (sceneBytes) {
     DecryptLuaBytes(*sceneBytes);

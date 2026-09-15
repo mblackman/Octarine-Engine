@@ -52,6 +52,7 @@ AssetPak::~AssetPak() {
   }
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 bool AssetPak::Pack(const AssetCatalog& catalog, const std::string& outPath, const std::string& basePath,
                     const std::vector<std::string>& extraFiles,
                     const std::map<std::string, std::string>& pathOverrides) {
@@ -116,9 +117,13 @@ bool AssetPak::Pack(const AssetCatalog& catalog, const std::string& outPath, con
     const std::string rel = MakeRelPath(extraPath, basePath);
     const bool dup = std::any_of(staged.begin(), staged.end(), [&](const StagedEntry& s) { return s.relPath == rel; });
     if (dup) continue;
-    std::ifstream in(extraPath, std::ios::binary);
+    std::string sourcePath = extraPath;
+    if (const auto it = pathOverrides.find(rel); it != pathOverrides.end()) {
+      sourcePath = it->second;
+    }
+    std::ifstream in(sourcePath, std::ios::binary);
     if (!in) {
-      Logger::Error("AssetPak::Pack: failed to read extra " + extraPath);
+      Logger::Error("AssetPak::Pack: failed to read extra " + sourcePath);
       out.close();
       std::error_code ec;
       std::filesystem::remove(outPath, ec);

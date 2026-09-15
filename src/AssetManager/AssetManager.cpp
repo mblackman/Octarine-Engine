@@ -11,14 +11,25 @@
 
 AssetManager::~AssetManager() { ClearAssets(); }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 SDL_IOStream *AssetManager::OpenAssetIO(const std::string &fullPath) const {
-  if (asset_pak_ != nullptr && asset_pak_->IsOpen() && !base_path_.empty()) {
-    std::error_code ec;
-    const std::filesystem::path rel =
-        std::filesystem::relative(std::filesystem::path(fullPath), std::filesystem::path(base_path_), ec);
-    if (!ec && !rel.empty()) {
-      if (SDL_IOStream *io = asset_pak_->OpenIO(rel.generic_string()); io != nullptr) {
+  if (asset_pak_ != nullptr && asset_pak_->IsOpen()) {
+    if (asset_pak_->Contains(fullPath)) {
+      if (SDL_IOStream *io = asset_pak_->OpenIO(fullPath); io != nullptr) {
         return io;
+      }
+    }
+    if (!base_path_.empty()) {
+      std::error_code ec;
+      const std::filesystem::path rel =
+          std::filesystem::relative(std::filesystem::path(fullPath), std::filesystem::path(base_path_), ec);
+      if (!ec && !rel.empty()) {
+        const std::string relStr = rel.generic_string();
+        if (asset_pak_->Contains(relStr)) {
+          if (SDL_IOStream *io = asset_pak_->OpenIO(relStr); io != nullptr) {
+            return io;
+          }
+        }
       }
     }
   }
@@ -283,7 +294,8 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
     Logger::Error("Failed to open font file " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;
   }
-  font_store_.Add(assetId, io, fontSize, base_path_);
+  font_store_.Add(assetId, io, fontSize, base_path_,
+                  [this](const std::string &relPath) { return OpenAssetIO(GetFullPath(relPath)); });
 }
 
 void AssetManager::AddFontFromMemory(const std::string &assetId, const unsigned char *data, const std::size_t len,

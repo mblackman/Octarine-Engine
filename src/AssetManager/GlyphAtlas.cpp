@@ -37,13 +37,20 @@ GlyphAtlas::~GlyphAtlas() {
   if (source_surface_ != nullptr) SDL_DestroySurface(source_surface_);
 }
 
-bool GlyphAtlas::Load(const std::string& pngFullPath, const std::string& luaFullPath) {
-  // PNG -> raw RGBA8. SDL_LoadFile routes through SDL_IOFromFile (which handles the APK asset
-  // root / shipped pak), giving us a single byte buffer for stbi_load_from_memory.
+bool GlyphAtlas::Load(SDL_IOStream* pngIo, SDL_IOStream* luaIo, const std::string& debugPngName,
+                      const std::string& debugLuaName) {
+  if (pngIo == nullptr || luaIo == nullptr) {
+    if (pngIo != nullptr) SDL_CloseIO(pngIo);
+    if (luaIo != nullptr) SDL_CloseIO(luaIo);
+    return false;
+  }
+
+  // PNG -> raw RGBA8.
   std::size_t pngBytes = 0;
-  void* raw = SDL_LoadFile(pngFullPath.c_str(), &pngBytes);
+  void* raw = SDL_LoadFile_IO(pngIo, &pngBytes, true);
   if (raw == nullptr) {
-    Logger::Error("GlyphAtlas::Load: SDL_LoadFile failed for " + pngFullPath + ": " + std::string(SDL_GetError()));
+    SDL_CloseIO(luaIo);
+    Logger::Error("GlyphAtlas::Load: SDL_LoadFile_IO failed for " + debugPngName + ": " + std::string(SDL_GetError()));
     return false;
   }
   int w = 0, h = 0, channels = 0;
@@ -51,7 +58,8 @@ bool GlyphAtlas::Load(const std::string& pngFullPath, const std::string& luaFull
       stbi_load_from_memory(static_cast<const stbi_uc*>(raw), static_cast<int>(pngBytes), &w, &h, &channels, 4);
   SDL_free(raw);
   if (decoded == nullptr) {
-    Logger::Error("GlyphAtlas::Load: stbi_load_from_memory failed for " + pngFullPath);
+    SDL_CloseIO(luaIo);
+    Logger::Error("GlyphAtlas::Load: stbi_load_from_memory failed for " + debugPngName);
     return false;
   }
   pixels_.assign(decoded, decoded + static_cast<std::size_t>(w) * h * 4);
@@ -61,6 +69,7 @@ bool GlyphAtlas::Load(const std::string& pngFullPath, const std::string& luaFull
 
   source_surface_ = SDL_CreateSurfaceFrom(w, h, SDL_PIXELFORMAT_RGBA32, pixels_.data(), w * 4);
   if (source_surface_ == nullptr) {
+    SDL_CloseIO(luaIo);
     Logger::Error("GlyphAtlas::Load: SDL_CreateSurfaceFrom failed: " + std::string(SDL_GetError()));
     return false;
   }
@@ -68,9 +77,9 @@ bool GlyphAtlas::Load(const std::string& pngFullPath, const std::string& luaFull
   sol::state lua;
   lua.open_libraries(sol::lib::base);
   std::size_t luaBytes = 0;
-  void* luaRaw = SDL_LoadFile(luaFullPath.c_str(), &luaBytes);
+  void* luaRaw = SDL_LoadFile_IO(luaIo, &luaBytes, true);
   if (luaRaw == nullptr) {
-    Logger::Error("GlyphAtlas::Load: SDL_LoadFile failed for " + luaFullPath + ": " + std::string(SDL_GetError()));
+    Logger::Error("GlyphAtlas::Load: SDL_LoadFile_IO failed for " + debugLuaName + ": " + std::string(SDL_GetError()));
     SDL_DestroySurface(source_surface_);
     source_surface_ = nullptr;
     return false;
@@ -78,10 +87,10 @@ bool GlyphAtlas::Load(const std::string& pngFullPath, const std::string& luaFull
   std::string luaChunk(static_cast<const char*>(luaRaw), luaBytes);
   SDL_free(luaRaw);
   DecryptLuaBytes(luaChunk);
-  sol::protected_function_result rc = lua.safe_script(luaChunk, sol::script_pass_on_error, "@" + luaFullPath);
+  sol::protected_function_result rc = lua.safe_script(luaChunk, sol::script_pass_on_error, "@" + debugLuaName);
   if (!rc.valid()) {
     const sol::error err = rc;
-    Logger::Error("GlyphAtlas::Load: dofile failed for " + luaFullPath + ": " + err.what());
+    Logger::Error("GlyphAtlas::Load: dofile failed for " + debugLuaName + ": " + err.what());
     SDL_DestroySurface(source_surface_);
     source_surface_ = nullptr;
     return false;
@@ -92,7 +101,7 @@ bool GlyphAtlas::Load(const std::string& pngFullPath, const std::string& luaFull
   glyphs_.clear();
   const sol::optional<sol::table> g = table["glyphs"];
   if (!g.has_value()) {
-    Logger::Error("GlyphAtlas::Load: " + luaFullPath + " missing `glyphs` table");
+    Logger::Error("GlyphAtlas::Load: " + debugLuaName + " missing `glyphs` table");
     SDL_DestroySurface(source_surface_);
     source_surface_ = nullptr;
     return false;
@@ -110,8 +119,23 @@ bool GlyphAtlas::Load(const std::string& pngFullPath, const std::string& luaFull
     out.miny = entry.get_or("miny", 0.0F);
     glyphs_.emplace(cp, out);
   }
-  Logger::Info("GlyphAtlas: loaded " + std::to_string(glyphs_.size()) + " glyphs from " + pngFullPath);
+  Logger::Info("GlyphAtlas: loaded " + std::to_string(glyphs_.size()) + " glyphs from " + debugPngName);
   return true;
+}
+
+bool GlyphAtlas::Load(const std::string& pngFullPath, const std::string& luaFullPath) {
+  SDL_IOStream* pngIo = SDL_IOFromFile(pngFullPath.c_str(), "rb");
+  if (pngIo == nullptr) {
+    Logger::Error("GlyphAtlas::Load: SDL_IOFromFile failed for " + pngFullPath + ": " + std::string(SDL_GetError()));
+    return false;
+  }
+  SDL_IOStream* luaIo = SDL_IOFromFile(luaFullPath.c_str(), "rb");
+  if (luaIo == nullptr) {
+    SDL_CloseIO(pngIo);
+    Logger::Error("GlyphAtlas::Load: SDL_IOFromFile failed for " + luaFullPath + ": " + std::string(SDL_GetError()));
+    return false;
+  }
+  return Load(pngIo, luaIo, pngFullPath, luaFullPath);
 }
 
 const GlyphAtlas::Glyph* GlyphAtlas::Find(std::uint32_t codepoint) const {

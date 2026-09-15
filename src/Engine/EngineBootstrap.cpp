@@ -29,33 +29,19 @@
 #include "Editor/Inspectors/RegisterAllInspectors.h"
 #endif
 
-namespace {
-// Read a file's bytes through SDL_IO so the same path resolves on desktop, inside an APK asset
-// root, or inside a .app bundle. Mirrors the helper in Game.cpp; duplicated here so Bootstrap
-// doesn't pull Game.cpp internals.
-std::optional<std::string> ReadFileViaSDL(const std::string& path) {
-  SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
-  if (!io) {
-    Logger::Error("SDL_IOFromFile failed for '" + path + "': " + std::string(SDL_GetError()));
-    return std::nullopt;
-  }
-  std::size_t size = 0;
-  void* data = SDL_LoadFile_IO(io, &size, true);
-  if (!data) {
-    Logger::Error("SDL_LoadFile_IO failed for '" + path + "': " + std::string(SDL_GetError()));
-    return std::nullopt;
-  }
-  std::string out(static_cast<const char*>(data), size);
-  SDL_free(data);
-  return out;
-}
+#include "Engine/SdlFileReader.h"
 
+namespace {
 int LuaDofileViaSDL(lua_State* L) {
   std::size_t plen = 0;
   const char* p = luaL_checklstring(L, 1, &plen);
   const std::string path(p, plen);
 
-  auto bytes = ReadFileViaSDL(path);
+  lua_getfield(L, LUA_REGISTRYINDEX, "octarine_assets");
+  const auto* assets = static_cast<const AssetManager*>(lua_touserdata(L, -1));
+  lua_pop(L, 1);
+
+  auto bytes = ReadFileViaSDL(path, assets);
   if (!bytes) {
     return luaL_error(L, "dofile: cannot open '%s'", path.c_str());
   }
@@ -86,12 +72,12 @@ void InstallLuaLibraries(sol::state& lua) {
 }
 
 void InstallCoreSingletons(Registry& registry, EngineContext& context, const int windowWidth, const int windowHeight,
-                           const bool withFramePathCaches) {
+                           const bool withFramePathCaches, sol::state* lua) {
   const octarine::Rect camera{0, 0, static_cast<float>(windowWidth), static_cast<float>(windowHeight)};
 
   registry.Set<RenderQueue>(RenderQueue());
   registry.Set<CameraComponent>(CameraComponent{camera});
-  registry.Set<AssetManager>(AssetManager());
+  auto& assetManager = registry.Set<AssetManager>(AssetManager());
   registry.Set<ViewportInfo>(ViewportInfo{0, 0, static_cast<float>(windowWidth), static_cast<float>(windowHeight)});
   if (withFramePathCaches) {
     // Entity-keyed backend-handle caches, each replacing a handle that used to live on a POD
@@ -105,7 +91,15 @@ void InstallCoreSingletons(Registry& registry, EngineContext& context, const int
   // Publish the now-live AssetManager onto the context so consumers reach it without a
   // separate Registry::Get<AssetManager>() round-trip. Caller is responsible for the other
   // context fields (sdlRenderer/sdlWindow/eventBus/mixer/config).
-  context.assets = &registry.Get<AssetManager>();
+  context.assets = &assetManager;
+
+  // Store AssetManager in the Lua registry so C-functions (like LuaDofileViaSDL) can access it
+  // and resolve scripts transparently from asset_bundle.pak.
+  if (lua != nullptr) {
+    lua_State* L = lua->lua_state();
+    lua_pushlightuserdata(L, &assetManager);
+    lua_setfield(L, LUA_REGISTRYINDEX, "octarine_assets");
+  }
 }
 
 ProjectileEmitSystem& InstallPoolAndProjectile(Registry& registry) {

@@ -11,6 +11,7 @@
 #include <sol/sol.hpp>
 #include <string>
 
+#include "AssetManager/AssetPak.h"
 #include "AssetManager/AssetReference.h"
 #include "AssetManager/SceneAssetScanner.h"
 #include "ECS/Registry.h"
@@ -146,6 +147,12 @@ int main() {
     const bool ok = Game::Bake(fixtureDir.string());
     Check(ok, "Game::Bake returns true on a clean fixture project");
     Check(std::filesystem::exists(manifestPath), "Game::Bake wrote asset_manifest.lua next to the project");
+    Check(std::filesystem::exists(fixtureDir / "asset_bundle.pak"),
+          "Game::Bake wrote asset_bundle.pak next to the project");
+
+    AssetPak pak;
+    Check(pak.Open((fixtureDir / "asset_bundle.pak").string()), "AssetPak::Open succeeds on baked asset_bundle.pak");
+    Check(pak.Contains("main.lua"), "asset_bundle.pak contains main.lua script");
 
     CleanBakeOutputs();
   }
