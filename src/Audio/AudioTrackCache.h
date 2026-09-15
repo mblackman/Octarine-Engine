@@ -8,15 +8,12 @@
 #include "ECS/ECS.h"
 #include "ECS/Entity.h"
 
-// Audio-side cache mapping Entity -> the MIX_Track* AudioSystem assigned that emitter's
-// AudioSinkComponent, plus the track-pool generation issued for the acquisition. Mirrors
-// Renderer/SpriteRenderCache: it keeps AudioSinkComponent POD-no-SDL while SpatialAudioSystem /
-// DopplerSystem / AudioCullingSystem resolve the live track here each frame.
+// Cache mapping Entity to its assigned MIX_Track* and track-pool generation.
+// Decouples backend audio handles from AudioSinkComponent data while allowing
+// SpatialAudioSystem, DopplerSystem, and AudioCullingSystem to resolve active tracks each frame.
 //
-// A Registry singleton, Set on the live-frame path only (bake runs no audio systems) and Clear()ed
-// on scene unload. Single-threaded: every audio system runs serially (RegisterSystem, not the
-// parallel path), so unsynchronized map writes are safe — std::unordered_map cannot tolerate
-// concurrent insertion.
+// Stored as a Registry singleton and cleared on scene unload. Single-threaded access:
+// audio systems execute sequentially.
 class AudioTrackCache {
  public:
   struct Entry {

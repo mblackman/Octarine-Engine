@@ -9,9 +9,8 @@
 // Registry singleton with a state machine (Idle -> Building -> Succeeded/Failed), a ring-capped log
 // of subprocess stdout/stderr, and a per-frame Pump() drained on the main thread.
 //
-// Deferred follow-ups: in-editor signing-credential storage (DPAPI/keychain), SHA256 of artifact,
-// "Reveal in Explorer" / clipboard install hint. AndroidRelease signing creds flow via the editor
-// process's existing env vars (OCTARINE_ANDROID_KEYSTORE_PATH, etc.).
+// AndroidRelease signing credentials flow via SecretStore or the editor process's
+// environment variables (e.g. OCTARINE_ANDROID_KEYSTORE_PATH).
 
 #include <cstddef>
 #include <deque>

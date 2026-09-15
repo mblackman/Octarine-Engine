@@ -198,7 +198,7 @@ class CollisionSystem {
   std::unique_ptr<ComponentQuery<GlobalTransformComponent, BoxColliderComponent, EntityMaskComponent>> query_;
 
   // Diff this frame's overlaps against the previous frame and emit the enter/exit batches.
-  //   - enter (W2.2): pairs overlapping now but not last frame — first-contact only, so persistent
+  //   - enter: pairs overlapping now but not last frame — first-contact only, so persistent
   //     overlaps (enemy pinned against a wall, stacked entities) don't re-fire every frame.
   //   - exit: pairs that overlapped last frame but no longer do.
   void EmitCollisionEvents(EventBus* eventBus, const std::vector<std::pair<Entity, Entity>>& intersectingPairs) {
@@ -310,8 +310,6 @@ class CollisionSystem {
     }
   }
 
-  // Cognitive complexity is inherent to the two mirrored per-axis sweep branches; pre-existing and
-  // unchanged by the rename.
   // NOLINTNEXTLINE(misc-no-recursion,readability-function-cognitive-complexity)
   void FindIntersectionsSweepBipartite(std::vector<Box>& boxes, const int begin1, const int end1, const int begin2,
                                        const int end2, const int dimension,

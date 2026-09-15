@@ -9,15 +9,13 @@
 
 class Registry;
 
-// Owns the off-screen scene target the game renders into each frame, plus the SDL_RenderTarget
-// switches + present. Game::Render orchestrates the phases (BeginScene / DrawQueue / EndScene /
-// CompositeSceneToWindow / Present) instead of calling SDL_Set*RenderTarget itself; the engine
-// keeps `SDL_SetRenderTarget` contained to this TU.
+// Owns the off-screen scene target the game renders into each frame, plus SDL_RenderTarget
+// switching and presentation. Game::Render orchestrates the frame sequence (BeginScene, DrawQueue,
+// EndScene, CompositeSceneToWindow, Present).
 //
 // The scene texture is sized to the window at creation time. Lifetime tracks the SDL renderer:
-// Game::Initialize calls CreateScene after the renderer exists; Game::Destroy calls DestroyScene
-// before SDL_DestroyRenderer. Re-creation on window resize is a follow-up — the existing
-// behavior keeps the original window-size target and lets SDL letterbox it.
+// CreateScene is called after the renderer is initialized, and DestroyScene before destruction.
+// Window resizing preserves the original render target size and relies on SDL letterboxing.
 class Renderer {
  public:
   Renderer() = default;

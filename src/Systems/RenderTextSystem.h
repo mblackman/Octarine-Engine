@@ -171,12 +171,10 @@ class RenderTextSystem {
         .first;
   }
 
-  // Rasterize `text` to a freshly created SDL_Texture, writing its size into outW/outH. text.color
-  // is octarine::Color (Stage 2 POD-no-SDL); convert to SDL_Color once here at the render seam. The
-  // atlas fast path composes the surface by blitting resident glyphs from the font's GlyphAtlas and
-  // falls back to TTF_RenderText_Blended when no atlas is baked or the string hits an uncovered
-  // glyph (extended Latin, emoji, etc.). Returns nullptr (and logs) on failure; the caller owns the
-  // returned texture.
+  // Rasterize `text` to a freshly created SDL_Texture, writing its size into outW/outH.
+  // The atlas fast path composes the surface by blitting resident glyphs from the font's GlyphAtlas
+  // and falls back to TTF_RenderText_Blended when no atlas is baked or the string hits an uncovered
+  // glyph. Returns nullptr on failure; caller owns the returned texture.
   static SDL_Texture* RasterizeLabel(const AssetManager& assetManager, SDL_Renderer* sdlRenderer, TTF_Font* font,
                                      const TextLabelComponent& text, float& outW, float& outH) {
     const SDL_Color sdlColor{text.color.r, text.color.g, text.color.b, text.color.a};

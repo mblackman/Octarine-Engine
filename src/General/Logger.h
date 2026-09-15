@@ -11,9 +11,7 @@
 
 class Logger {
  public:
-  // One captured Lua script error for the editor's on-screen toast. `sequence` increases
-  // monotonically across the run so consumers can tell new errors from re-reads; `when` lets
-  // the toast expire entries by age.
+  // Captured Lua script error for editor toast notifications.
   struct ScriptError {
     std::uint64_t sequence{};
     std::string message;
@@ -27,16 +25,12 @@ class Logger {
   static std::vector<ScriptError> script_errors_;
   static std::uint64_t script_error_sequence_;
 
-  // Appends to history_ under history_mutex_ and trims to the cap. Every log path must go
-  // through this: instrumented builds emit per-frame TIMER/ACCUM lines, and an uncapped
-  // history grows without bound over a session.
+  // Appends entry and enforces bounded capacity under history_mutex_.
   static void PushHistory(std::string entry);
 
  public:
   static void Init();
-  // Apply a runtime log level override (trace|debug|info|warn|error|critical|off). Case-insensitive;
-  // unknown values log a warning and leave the current level intact. Typically called once from
-  // Game::Setup after config.ini's `LogLevel=` is parsed, on top of the compile-time default.
+  // Sets runtime log level (trace|debug|info|warn|error|critical|off).
   static void SetLevel(const std::string& level);
   static void Error(const std::string& message);
   static void Warn(const std::string& message);
@@ -50,8 +44,6 @@ class Logger {
   static void ForEachHistory(const std::function<void(const std::string&)>& callback);
   static void ClearHistory();
 
-  // Snapshot of the most recent script errors (newest last), capped to a small ring. Fed by
-  // ErrorLua — i.e. every runtime Lua failure that log-and-continues — and consumed by the
-  // editor-build error toast so script failures stay visible when the console is hidden.
+  // Returns snapshot of recent script errors for editor UI.
   static std::vector<ScriptError> RecentScriptErrors();
 };

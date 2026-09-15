@@ -11,9 +11,7 @@
 #include "Event.h"  // Assuming Event is a base class or relevant type
 #include "General/Logger.h"
 
-// Each subscription is tagged with a process-unique id so a SubscriptionHandle can later find and
-// drop exactly the one callback it owns. Replaces the old `void* owner` identity, which forced
-// callers to re-find their callbacks by raw pointer in a destructor.
+// Type-erased event callback interface with unique subscription ID.
 class IEventCallback {
   virtual void CallEvent(Event& e) = 0;
 
@@ -71,9 +69,7 @@ class EventCallback final : public IEventCallback {
 typedef std::list<std::unique_ptr<IEventCallback>> HandlerList;
 
 class EventBus {
-  // The dispatch table is held behind a shared_ptr so SubscriptionHandles can hold a weak_ptr to
-  // it. A handle that outlives the bus then finds the table expired and unsubscribes to nothing —
-  // shutdown order between the bus and its subscribers no longer matters.
+  // Dispatch table shared with SubscriptionHandles to safely decouple lifetimes.
   struct Dispatcher {
     std::map<std::type_index, HandlerList> subscribers;
 
@@ -88,10 +84,7 @@ class EventBus {
   std::uint64_t next_id_ = 1;
 
  public:
-  // RAII handle for a single subscription. Its destructor removes the callback from the bus, so a
-  // subscriber just keeps the handle (or a vector of them) as a member and never has to unsubscribe
-  // by hand. Move-only; a default-constructed or moved-from handle owns nothing. Resetting after the
-  // bus has been destroyed is a safe no-op.
+  // RAII handle that unsubscribes on destruction. Safe to outlive EventBus.
   class [[nodiscard]] SubscriptionHandle {
    public:
     SubscriptionHandle() = default;
@@ -120,7 +113,6 @@ class EventBus {
 
     ~SubscriptionHandle() { Reset(); }
 
-    // Unsubscribe now instead of waiting for the destructor. Idempotent.
     void Reset() {
       if (const auto dispatcher = dispatcher_.lock()) {
         dispatcher->Remove(event_type_id_, id_);
@@ -128,7 +120,6 @@ class EventBus {
       dispatcher_.reset();
     }
 
-    // True while the subscription is still live on a surviving bus.
     [[nodiscard]] bool Active() const { return !dispatcher_.expired(); }
 
    private:

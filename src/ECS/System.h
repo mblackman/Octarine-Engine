@@ -7,13 +7,10 @@
 
 class Registry;
 
-// Stable identity of a registered system — its index into Registry::systems_. Systems are never
-// removed, so the id stays valid for the registry's lifetime.
+// Index of a registered system in Registry.
 using SystemId = std::size_t;
 
-// Returned by Registry::Register*System. Carries the SystemId that Registry::Order uses to
-// declare execution-order constraints, plus access to the stored functor for the existing
-// wire-up pattern (handle.Func().SubscribeToEvents(bus)).
+// Handle to a registered system providing system ID and functor access.
 template <typename StoredFunc>
 class SystemHandle {
  public:
@@ -37,8 +34,7 @@ class ISystem {
  protected:
   explicit ISystem(std::string name) : name_(std::move(name)) {}
 
-  // Trim MSVC's "class " / "struct " prefix from typeid::name() so profiler output reads
-  // as e.g. `MovementSystem` rather than `class MovementSystem`.
+  // Strips compiler typeid prefixes and mangling for profiler labels.
   static std::string PrettifyTypeName(const char* raw) {
     std::string_view sv(raw);
     constexpr std::string_view kClass = "class ";

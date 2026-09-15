@@ -105,9 +105,8 @@ namespace {
 // Dense cluster: every box overlaps every other (all within a 16px span, boxes are 32px), so the
 // detection pass yields O(n^2) *sustained* pairs. After the first cycle no pairs enter or exit, but
 // the per-frame event-emission bookkeeping still runs over the full pair set every cycle:
-// currentSet construction, the entering-pair scan, and (under test) the exiting-pair scan +
-// CollisionExitBatchEvent emit. This isolates that bookkeeping at a realistic high pair count —
-// the broadphase/narrowphase cost is identical across builds, so any delta is the new exit path.
+// currentSet construction, the entering-pair scan, and the exiting-pair scan +
+// CollisionExitBatchEvent emit. This isolates that bookkeeping at a realistic high pair count.
 void BuildDenseCluster(Registry& registry, int n) {
   EntityMask mask;
   mask.set(0);

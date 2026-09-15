@@ -168,7 +168,7 @@ int main() {
     Check(!serial.targetAlive, "damage death: target despawned (serial)");
     Check(!parallel.targetAlive, "damage death: target despawned (parallel)");
     CheckEq(parallel.projectilesAlive, 0, "damage death: every projectile despawned (parallel)");
-    // No crash here implies the target was queued/blammed exactly once despite 3000 hits.
+    // No crash here implies the target was queued for destruction exactly once despite 3000 hits.
   }
 
   // --- Part 2: real systems, fixed threshold, vs analytic truth.

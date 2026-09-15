@@ -68,8 +68,7 @@ class ArchetypeQuery {
     using Pointer = void;
     using DifferenceType = std::ptrdiff_t;
 
-    // Holds a pointer to the owning ArchetypeQuery's type_ — copying the vector here would
-    // heap-allocate on every begin()/end() construction, which sits on the per-frame hot path.
+    // Points to owning ArchetypeQuery's type to avoid per-iterator heap allocation.
     Iterator(const ArchetypeType& type, std::vector<Archetype*>::iterator archetype_it,
              std::vector<Archetype*>::iterator archetype_end_it, bool include_inactive = false)
         : type_(&type),
@@ -181,15 +180,8 @@ class ArchetypeQuery {
   }
   Iterator end() { return Iterator(type_, matching_archetypes_.end(), matching_archetypes_.end(), include_inactive_); }
 
-  // Process all matching entities in parallel across chunks. Each chunk is an independent
-  // memory region, so concurrent processing is safe for per-entity writes.
-  // Func signature: void (Entity, TComponents&...) or void (TComponents&...).
-  // IMPORTANT: Func must not access a shared mutable state (e.g. no pushing to shared vectors).
-  //
-  // serialBelowEntities: when the matched entity count is below this, run on the calling thread
-  // instead of dispatching to the pool. Dispatch costs ~13.5 us regardless of N; for a trivial
-  // per-entity body serial wins below ~16k entities, while heavy bodies cross over at a few
-  // hundred — so the cutoff is per call site. Default 0 keeps the current always-parallel path.
+  // Process matching entities in parallel across chunks.
+  // serialBelowEntities: threshold below which execution runs serially on the calling thread.
   template <typename Func>
   void ParallelForEach(Func&& func, const size_t serialBelowEntities = 0) {
     const auto work = CollectChunkWork();
@@ -216,8 +208,7 @@ class ArchetypeQuery {
     }
 
     const size_t items_per_batch = (work.size() + num_batches - 1) / num_batches;
-    // Dispatch (num_batches - 1) batches to the pool; caller runs the last batch inline
-    // so the calling thread doesn't sit idle waiting on a worker.
+    // Dispatch batches to pool; caller runs the remaining batch inline.
     BatchBarrier barrier(num_batches - 1);
     for (size_t t = 0; t < num_batches - 1; ++t) {
       const size_t begin = t * items_per_batch;
@@ -241,11 +232,7 @@ class ArchetypeQuery {
     size_t entityCount;
   };
 
-  // Counts down N expected completions and lets one waiter block on Wait().
-  // Decrement and notify happen under the mutex so Wait() cannot return — and
-  // therefore the BatchBarrier cannot be destroyed — until the last Signal()
-  // has fully released the lock. Signaling outside the lock would race the
-  // waiter's stack-destruction of the mutex.
+  // Synchronizes batch completion before unwinding stack.
   struct BatchBarrier {
     size_t remaining;
     std::mutex mutex;

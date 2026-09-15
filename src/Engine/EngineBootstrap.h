@@ -23,9 +23,8 @@ struct EngineContext;
 // Each fn takes exactly the inputs it needs, returning a reference where one is useful
 // downstream (InstallInputSystem → InputSystem& for LuaSystemRegistry registration, etc.).
 //
-// Before this module existed, Game::Setup and Game::RunBakeValidation duplicated ~50 lines
-// of singleton-set + Lua-binding sequence — drift was a matter of when, not if. Centralizing
-// the shared spine here means a binding/module added in one place reaches both paths.
+// Centralizes the common setup sequence across interactive engine runs and
+// headless asset baking to keep bindings and singletons consistent.
 namespace engine_bootstrap {
 // Open the Lua libs every startup script + module install assumes (base, math, io, string,
 // table) and override `dofile` so it loads through SDL_IOFromFile — required for chunks

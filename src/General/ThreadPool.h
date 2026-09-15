@@ -10,9 +10,7 @@
 #include <utility>
 #include <vector>
 
-// Persistent worker pool. Replaces per-frame std::async(launch::async) calls so
-// hot per-frame parallel sections (e.g. ArchetypeQuery::ParallelForEach) skip
-// thread startup. Process-wide singleton sized to hardware_concurrency().
+// Persistent worker pool sized to hardware concurrency.
 class ThreadPool {
  public:
   static ThreadPool& Instance() {
@@ -22,19 +20,8 @@ class ThreadPool {
 
   [[nodiscard]] size_t Size() const { return workers_.size(); }
 
-  // Run `fn(batchIndex, begin, end)` over contiguous sub-ranges that together cover [0, count), in
-  // parallel across the pool. The range is split into numBatches = min(count, Size()) batches indexed
-  // 0..numBatches-1; all but one are dispatched to workers and the last runs inline on the calling
-  // thread, which then blocks until the rest finish (mirrors ArchetypeQuery::ParallelForEach's
-  // chunk/barrier structure). batchIndex lets callers write to a disjoint per-batch output slot.
-  //
-  // CONTRACT:
-  //  - `fn` must be safe to call concurrently from multiple threads: read shared state only, or
-  //    write to storage that is disjoint per batchIndex. It must not mutate shared structures.
-  //  - `fn` must not throw — an escaping exception terminates, same as the existing pool path.
-  //  - Must NOT be called from a pool worker thread: it submits to the pool and blocks on it, which
-  //    could starve. All current callers run on the main thread.
-  //  - count == 0 is a no-op; a single batch (Size() <= 1 or count == 1) runs fn(0, 0, count) inline.
+  // Runs fn(batchIndex, begin, end) over contiguous sub-ranges in parallel across the pool.
+  // fn must be thread-safe for disjoint writes and must not be called from a worker thread.
   template <typename Fn>
   static void ParallelChunks(size_t count, Fn&& fn) {
     if (count == 0) return;
@@ -45,9 +32,7 @@ class ThreadPool {
       return;
     }
 
-    // Counts down the (numBatches - 1) dispatched completions. Decrement + notify happen under the
-    // mutex so Wait() — and therefore the Barrier's destruction — cannot occur before the final
-    // Signal() has released the lock (the same correctness argument as ArchetypeQuery::BatchBarrier).
+    // Synchronizes batch completion before destroying barrier.
     struct Barrier {
       size_t remaining;
       std::mutex mutex;

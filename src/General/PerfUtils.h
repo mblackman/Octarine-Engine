@@ -139,13 +139,10 @@ class AggregateProfilingSession {
   std::string m_name;
 };
 
-// Frame-scoped integer counters. Separate from ProfilingAccumulator (which is durations) so
-// the profiler UI / bench output can distinguish "how long did X take" from "how many X were
-// there." Two flavors: Add (accumulates across the frame from multiple threads — fetch_add on
-// an atomic, mutex only on first registration) and Set (single-writer snapshot, e.g. queue
-// size at end of frame). Game::Update calls ResetValues() per frame to zero the slots without
-// destroying them — keeping the atomic addresses stable lets RenderSpriteSystem cache pointers
-// across frames.
+// Frame-scoped integer counters, separate from duration-based profiling.
+// Counters support atomic accumulation (Add) or single-writer snapshots (Set).
+// ResetValues() clears values per frame while preserving allocations, allowing
+// callers to cache counter pointers across frames.
 class PerfCounters {
  public:
   static std::atomic<long long>* GetOrCreate(const std::string& name) {

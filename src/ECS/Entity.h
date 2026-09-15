@@ -8,7 +8,6 @@ constexpr unsigned int kMaxEntityMasks = 32;
 constexpr unsigned int kStartingEntityPoolSize = 1000;
 constexpr unsigned int kEntityGenerationOffset = 32;
 
-// Used to determine which
 typedef std::bitset<kMaxEntityMasks> EntityMask;
 typedef std::uint32_t EntityGeneration;
 
@@ -39,10 +38,7 @@ struct Entity {
   explicit operator EntityID() const { return id; }
 };
 
-// Recycled slots are disambiguated by a per-slot generation counter packed into the high bits of
-// the EntityID: BlamEntity bumps it on free, IsValid compares it, so a stale handle to a reused
-// slot fails validation. The generation is 32-bit, so a single slot would have to be recycled
-// 2^32 times before the counter wraps and could alias a live handle.
+// Manages entity slot allocation and generation tracking to invalidate stale handles.
 class EntityManager {
  public:
   EntityManager() : living_entity_count_(kStartingEntityPoolSize) {

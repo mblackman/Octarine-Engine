@@ -30,8 +30,8 @@ bool MaybeDumpFromEnv(sol::state& lua, const std::unordered_set<std::string>& be
 bool WriteProjectStub(sol::state& lua, const std::unordered_set<std::string>& before, const std::string& assetPath);
 
 // Emit a machine-readable JSON index of every component registered with LuaComponentRegistry:
-// lua_key, usertype name, and accessor function names exposed on the `registry` table. Agents
-// grep this instead of crawling src/Lua/Bindings/. Returns false if the file cannot be opened.
+// lua_key, usertype name, and accessor function names exposed on the `registry` table.
+// Returns false if the file cannot be opened.
 bool WriteComponentsJson(const std::string& outPath);
 
 // Emit a machine-readable JSON index of every Lua free-function module registered with

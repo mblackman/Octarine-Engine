@@ -100,15 +100,11 @@ void Registry::FlushPendingDestruction() {
   pending_despawn_ids_.clear();
 
   for (const Entity entity : pending) {
-    // A queued parent's cascade may have already destroyed a queued child; that's not a
-    // stale-handle bug, so skip silently instead of letting BlamEntity warn.
     if (!IsAlive(entity)) continue;
     BlamEntity(entity);
   }
 
-  // PoolableTag-bearing entities are routed straight into the pool's free list — Deactivate
-  // collapses them into the chunk's inactive tail without crossing archetypes. Non-pooled
-  // entities are blammed outright.
+  // Route pooled entities into free list; blam non-pooled entities.
   if (!despawns.empty()) {
     FlushDespawns(despawns);
   }
@@ -161,8 +157,7 @@ void Registry::BlamEntity(const Entity entity) {
 
   bool hierarchyMutated = false;
 
-  // Cascade-destroy children first. Take a copy so the recursive BlamEntity calls can mutate
-  // parent_to_children_ without invalidating our iteration.
+  // Cascade-destroy children first.
   if (const auto childIt = parent_to_children_.find(entity.id); childIt != parent_to_children_.end()) {
     const auto childIds = childIt->second;
     parent_to_children_.erase(childIt);
@@ -211,8 +206,6 @@ void Registry::BlamEntity(const Entity entity) {
 
   const auto targetId = entity.GetId();
   if (const auto revIt = target_to_pair_authors_.find(targetId); revIt != target_to_pair_authors_.end()) {
-    // Copy the authors set because we'll be removing entries from the pairs map, which
-    // would otherwise require complex iterator management if we stayed in-place.
     const auto authors = revIt->second;
     for (const EntityID authorId : authors) {
       if (const auto pIt = pairs_.find(authorId); pIt != pairs_.end()) {
@@ -243,11 +236,7 @@ std::vector<Entity> Registry::GetUserEntities() const {
   entities.reserve(user_entity_count_);
   for (std::uint32_t id = 0; id < entity_locations_.size(); ++id) {
     if (entity_locations_[id].archetype != nullptr && !internal_entity_ids_.contains(id)) {
-      // We need the full Entity from the archetype.
-      // But archetype stores a packed chunk array of Entity IDs.
-      // Let's just create an entity with the correct generation by asking entity_manager_... wait.
-      // EntityManager doesn't expose getting a generation by ID easily.
-      // Let's get the Entity directly from the archetype.
+      // Retrieve full entity with generation from archetype.
       const auto location = entity_locations_[id];
       const Entity entity = location.archetype->GetEntity(location.chunkIndex, location.indexInChunk);
       entities.push_back(entity);
@@ -446,14 +435,12 @@ bool Registry::IsActive(const Entity entity) const {
 }
 
 Archetype* Registry::FindExactArchetype(const std::vector<ComponentID>& componentIDs) const {
-  // Scan the candidate list of the rarest component: an exact match must appear in every
-  // component's index list, and rare components (fresh tags especially) keep this list near
-  // zero where a common component's list holds every archetype in the world.
+  // Narrow search using the least frequent component in the set.
   const ArchetypeList* smallest = nullptr;
   for (const ComponentID id : componentIDs) {
     const auto it = component_index_.find(id);
     if (it == component_index_.end()) {
-      return nullptr;  // Component never seen in any archetype — no exact match possible.
+      return nullptr;
     }
     if (smallest == nullptr || it->second.size() < smallest->size()) {
       smallest = &it->second;
@@ -480,12 +467,10 @@ Archetype* Registry::RegisterNewArchetype(const std::vector<ComponentID>& compon
   Archetype* newArchetypePtr = newArchetype.get();
   const auto newArchetypeId = newArchetype->GetID();
   archetypes_.emplace(newArchetypeId, std::move(newArchetype));
-  // Generation bump and log append stay in lockstep: archetype_log_[G] is the archetype whose
-  // creation moved the generation from G to G+1, which is what incremental query matching relies on.
+  // Keep generation and log in lockstep for incremental query matching.
   ++archetype_generation_;
   archetype_log_.push_back(newArchetypePtr);
 
-  // Centralized component_index_ population — every archetype is registered here.
   for (const ComponentID id : newArchetypePtr->type()) {
     auto& list = component_index_[id];
     if (std::ranges::find(list, newArchetypeId) == list.end()) {
@@ -562,7 +547,7 @@ void Registry::SetParent(const Entity child, const Entity parent) {
   parent_to_children_[parent.id].insert(child.id);
   ++hierarchy_generation_;
 
-  // Maintain the legacy pair entry too so HasPair / generic relationship queries keep working.
+  // Also insert relationship pair for generic pair queries.
   const Entity childOf = ChildOfEntity();
   AddPair(child, childOf, parent);
 }

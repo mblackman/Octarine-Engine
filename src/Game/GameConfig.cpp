@@ -1,7 +1,3 @@
-//
-// Created by mblackman on 5/30/25.
-//
-
 #include "GameConfig.h"
 
 #include <SDL3/SDL_filesystem.h>

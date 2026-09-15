@@ -21,8 +21,6 @@ class AtlasBaker {
   static bool Bake(TTF_Font* font, float fontSize, const std::vector<std::uint32_t>& codepoints,
                    const std::string& outPngPath, const std::string& outLuaPath);
 
-  // Default ASCII printable set (codepoints 32..126). Suitable for most western UIs; projects with
-  // accented Latin or non-Latin scripts will eventually want an explicit list via meta.glyphs (not
-  // yet plumbed).
+  // Default ASCII printable set (codepoints 32..126).
   static std::vector<std::uint32_t> DefaultAsciiPrintable();
 };

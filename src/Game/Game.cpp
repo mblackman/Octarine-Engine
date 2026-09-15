@@ -444,7 +444,7 @@ bool Game::RunBakeValidation(const std::string& assetPath, const std::string& sc
     Logger::Info("Bake: wrote " + std::to_string(assetManager.GetCatalog().Size()) + " entries to " + manifestPath);
   }
 
-  // Glyph atlas pass (Stage 14 B3): for every Font catalog entry, rasterize ASCII printable
+  // Glyph atlas pass: for every Font catalog entry, rasterize ASCII printable
   // into a packed PNG + Lua metrics sidecar under `<basePath>/atlases/<asset_id>.atlas.{png,lua}`.
   // Runtime probes for those alongside the .ttf and renders from the atlas when present, falling
   // back to TTF_RenderText_Blended when missing. TTF needs explicit init in bake (Bake() opens
@@ -474,7 +474,7 @@ bool Game::RunBakeValidation(const std::string& assetPath, const std::string& sc
     TTF_Quit();
   }
 
-  // Audio normalize pass (Stage 14 B2): for every Audio catalog entry with `meta.normalize=true`,
+  // Audio normalize pass: for every Audio catalog entry with `meta.normalize=true`,
   // run BS.1770 integrated loudness measurement + apply the gain to land at -16 LUFS, writing
   // the normalized WAV to `<basePath>/normalized/<rel>.wav`. The pak override map then routes
   // the catalog's original relPath to read bytes from the normalized variant — so shipped
@@ -703,7 +703,7 @@ void Game::Setup() {
   // registry's lifetime (the wrapper is owned by registry_->systems_).
   registry_->Set<CollisionSystem*>(&collision.Func());
 
-  // Lifetime system for blamming entities based on conditions.
+  // Lifetime system for expiring and despawning entities.
   registry_->RegisterBulkSystem<LifetimeComponent>(LifetimeSystem());
 
   // Spatial audio: snapshot the listener entity (UpdateListenerTransformSystem) then mutate
@@ -712,7 +712,7 @@ void Game::Setup() {
   // these resolve per entity.
   registry_->Set<AudioListenerCache>(AudioListenerCache{});
   auto listenerTransform = registry_->RegisterBulkSystem<GlobalTransformComponent>(UpdateListenerTransformSystem());
-  // Phase 5 culling: pre-register the AudioActiveTag so its component entity exists
+  // Pre-register the AudioActiveTag so its tag entity exists
   // before any HasTag query fires (Tag<T>() is lazy otherwise). CullingSystem then gates
   // SpatialAudioSystem / DopplerSystem implicitly — culled emitters lose their sink, and
   // both downstream systems short-circuit on the missing sink.

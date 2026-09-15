@@ -88,7 +88,7 @@ int LastSocketError() {
 }
 
 // Reads exactly `n` bytes from `s` into `out`. Returns false if the peer closed early or
-// the socket errored. Tiny loop is fine — frames are small in PR-A (<= 12 bytes).
+// the socket encountered an error.
 bool ReadAll(socket_t s, void* out, std::size_t n) {
   auto* p = static_cast<char*>(out);
   while (n > 0) {

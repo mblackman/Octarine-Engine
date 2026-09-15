@@ -32,7 +32,7 @@ TTF_Font* FontStore::Add(const std::string& id, SDL_IOStream* io, const float fo
 
   Logger::Info("Added font: " + id);
 
-  // Probe for a glyph-atlas sidecar pair (Stage 14 B3). The bake step writes them under
+  // Probe for a glyph-atlas sidecar pair. The bake step writes them under
   // atlases/<asset_id>.atlas.{png,lua}; presence is the opt-in. When openIO is provided
   // (e.g. via AssetManager), streams resolve through asset_bundle.pak or loose files alike.
   const std::string relPng = "atlases/" + id + ".atlas.png";

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # One-command change validator. Runs the same gates CI runs, in dependency order, and prints an
-# unambiguous final verdict. An agent (or human) runs this after any change to know nothing broke.
+# unambiguous final verdict. Run this after any change to ensure nothing broke.
 #
 # Usage: scripts/octarine-verify.sh [--fast|--full] [options]
 #   --fast        (default) configure-if-needed -> build test targets -> ctest -> clang-format check

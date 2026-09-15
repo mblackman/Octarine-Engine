@@ -1,6 +1,6 @@
-// Unit checks for AssetRefcounter — the pure acquire-count bookkeeping split out of AssetManager
-// in Stage 10. The point of the split is that this policy needs neither SDL nor a renderer, so the
-// test links nothing but the standard library. gtest-free; exit code = failed-check count.
+// Unit checks for AssetRefcounter — the pure acquire-count bookkeeping split out of AssetManager.
+// This policy needs neither SDL nor a renderer, so the test links nothing but the standard library.
+// gtest-free; exit code = failed-check count.
 // Registered with ctest as AssetRefcounterTest.
 
 #include "AssetManager/AssetRefcounter.h"

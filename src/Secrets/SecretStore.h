@@ -1,28 +1,21 @@
 #pragma once
 
-// SecretStore — Stage 5 PR-C of ai/EditorBuildAndDeployPlan.md.
-//
-// Per-platform credential storage for editor-side build tooling. v1 holds the Android signing
-// keystore credentials (path + passwords + alias) so a dev can ship a release AAB from the
-// Export Build modal without exporting OCTARINE_ANDROID_* in their shell.
+// Per-platform credential storage for editor-side build tooling (e.g. Android signing
+// keystore credentials).
 //
 // Backends:
 //   Windows — DPAPI (CryptProtectData) writing per-key .dat files under SDL_GetPrefPath/secrets/.
 //   macOS   — Keychain Services (SecKeychainAddGenericPassword) under service "OctarineEngine".
-//   Linux   — Not available. Set/Get/Clear return false; IsAvailable() returns false. Editor UI
-//             falls back to surfacing the env-var contract instead of offering a save UI.
+//   Linux   — Unsupported; Set/Get/Clear return false and IsAvailable() returns false.
 //
-// API stays narrow on purpose: arbitrary string keys -> arbitrary string values. The caller picks
-// the namespacing convention (current users prefix with "octarine.android." to avoid collisions
-// with whatever else lands in the store later).
+// Keys and values are arbitrary strings. Callers typically namespace keys (e.g. "octarine.android.").
 
 #include <optional>
 #include <string>
 #include <string_view>
 
 namespace octarine::secrets {
-// True when the host platform has a real secret-storage backend wired up. False on Linux v1
-// (and on Windows / macOS when the backend reports a runtime error during a probe).
+// True when the host platform has an active credential storage backend available.
 bool IsAvailable();
 
 // Stores `value` keyed by `key`, overwriting any existing entry. Returns true on success.

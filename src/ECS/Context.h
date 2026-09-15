@@ -33,10 +33,7 @@ class ContextFacade {
   [[nodiscard]] Registry* GetRegistry() const { return impl_->GetRegistry(); }
   [[nodiscard]] float GetDeltaTime() const { return impl_->GetDeltaTime(); }
 
-  // Per-entity component access. Only valid inside a per-entity (RegisterSystem) callback.
-  // RegisterBulkSystem callbacks receive a sentinel context — they must iterate the Iterable
-  // and read components off the inner ContextFacade. Calling Component<T>() on a bulk
-  // sentinel returns nullptr and trips an assertion in BulkContextImpl::GetComponentPtr.
+  // Per-entity component access. Valid in per-entity callbacks; bulk systems must iterate the Iterable.
   template <typename T>
   T& Component() const;
 
