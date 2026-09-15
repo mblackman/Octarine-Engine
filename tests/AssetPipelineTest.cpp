@@ -354,6 +354,15 @@ int main() {
     const GlyphAtlas::Glyph* gA = atlas.Find(static_cast<std::uint32_t>('A'));
     Check(gA != nullptr && gA->advance == 5.0F, "'A' glyph advance round-trips");
 
+    // Stream-based load test (verifies AssetPak in-memory resolution)
+    GlyphAtlas atlasFromStream;
+    SDL_IOStream* pngIo = SDL_IOFromFile(pngPath.c_str(), "rb");
+    SDL_IOStream* luaIo = SDL_IOFromFile(luaPath.c_str(), "rb");
+    Check(atlasFromStream.Load(pngIo, luaIo, "synthetic.png", "synthetic.lua"),
+          "GlyphAtlas::Load accepts SDL_IOStream pairs (asset_bundle.pak compatibility)");
+    Check(atlasFromStream.IsLoaded() && atlasFromStream.Size() == 1,
+          "stream-loaded atlas is loaded with 1 glyph");
+
     // AtlasBaker's DefaultAsciiPrintable helper is independent of TTF availability.
     const auto cps = AtlasBaker::DefaultAsciiPrintable();
     Check(cps.size() == 95, "DefaultAsciiPrintable returns 95 codepoints (0x20..0x7E)");

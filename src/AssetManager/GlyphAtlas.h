@@ -29,9 +29,11 @@ class GlyphAtlas {
   GlyphAtlas& operator=(GlyphAtlas&&) noexcept;
   ~GlyphAtlas();
 
-  // Load PNG + Lua sidecar from disk paths. Both routed through SDL_IOFromFile so a packed APK
-  // / shipped pak resolves identically to the loose tree. Returns true on success; false leaves
-  // the instance empty + safe to destroy.
+  // Load PNG + Lua sidecar from IO streams (consumed and closed on success or failure).
+  bool Load(SDL_IOStream* pngIo, SDL_IOStream* luaIo, const std::string& debugPngName = "",
+            const std::string& debugLuaName = "");
+
+  // Load PNG + Lua sidecar from disk paths.
   bool Load(const std::string& pngFullPath, const std::string& luaFullPath);
 
   [[nodiscard]] bool IsLoaded() const { return source_surface_ != nullptr; }

@@ -283,7 +283,9 @@ void AssetManager::AddFont(const std::string &assetId, const std::string &path, 
     Logger::Error("Failed to open font file " + assetId + " from " + fullPath + ": " + std::string(SDL_GetError()));
     return;
   }
-  font_store_.Add(assetId, io, fontSize, base_path_);
+  font_store_.Add(assetId, io, fontSize, base_path_, [this](const std::string &relPath) {
+    return OpenAssetIO(GetFullPath(relPath));
+  });
 }
 
 void AssetManager::AddFontFromMemory(const std::string &assetId, const unsigned char *data, const std::size_t len,
