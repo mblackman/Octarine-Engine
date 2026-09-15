@@ -109,7 +109,7 @@
       "subscribe_sites": [
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 60,
+          "line": 55,
           "owner": "InputSystem"
         },
         {
@@ -151,7 +151,7 @@
         },
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 56,
+          "line": 51,
           "owner": "InputSystem"
         },
         {
@@ -180,7 +180,7 @@
       "subscribe_sites": [
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 57,
+          "line": 52,
           "owner": "InputSystem"
         },
         {
@@ -213,7 +213,7 @@
       "subscribe_sites": [
         {
           "file": "src/Systems/InputSystem.h",
-          "line": 58,
+          "line": 53,
           "owner": "InputSystem"
         }
       ]
