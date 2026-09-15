@@ -360,8 +360,7 @@ int main() {
     SDL_IOStream* luaIo = SDL_IOFromFile(luaPath.c_str(), "rb");
     Check(atlasFromStream.Load(pngIo, luaIo, "synthetic.png", "synthetic.lua"),
           "GlyphAtlas::Load accepts SDL_IOStream pairs (asset_bundle.pak compatibility)");
-    Check(atlasFromStream.IsLoaded() && atlasFromStream.Size() == 1,
-          "stream-loaded atlas is loaded with 1 glyph");
+    Check(atlasFromStream.IsLoaded() && atlasFromStream.Size() == 1, "stream-loaded atlas is loaded with 1 glyph");
 
     // AtlasBaker's DefaultAsciiPrintable helper is independent of TTF availability.
     const auto cps = AtlasBaker::DefaultAsciiPrintable();
