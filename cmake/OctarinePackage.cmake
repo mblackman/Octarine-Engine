@@ -90,6 +90,7 @@ set(OCTARINE_PACKAGE_FULLSCREEN   "" CACHE STRING "Override project.ini: fullscr
 set(OCTARINE_PACKAGE_PERMISSIONS  "" CACHE STRING "Override project.ini: permissions (comma list: internet,recording,camera,location,photos)")
 set(OCTARINE_PACKAGE_CATEGORY     "" CACHE STRING "Override project.ini: category (reserved for Android category surfaces; currently informational)")
 set(OCTARINE_PACKAGE_EXCLUDE      "" CACHE STRING "Override project.ini: package_exclude (comma list of file/dir patterns to exclude)")
+set(OCTARINE_PACKAGE_INCLUDE      "" CACHE STRING "Override project.ini: package_include (comma list of file/dir patterns to include)")
 
 # Parse a flat key=value INI (no sections; Java Properties compatible) into ${PREFIX}_<key> vars in
 # the caller's scope. Skips blank lines and `#`-prefixed comments. Unknown keys are still set —
@@ -194,7 +195,7 @@ endfunction()
 #   - install(DIRECTORY) stages the project (now including the baked manifest) next to the binary.
 function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DEST)
     set(oneValueArgs "")
-    set(multiValueArgs EXTRA_EXCLUDES)
+    set(multiValueArgs EXTRA_EXCLUDES EXTRA_INCLUDES)
     cmake_parse_arguments(_INST "" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
     install(TARGETS ${TARGET}
@@ -223,7 +224,7 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
         install(FILES "${_engine_license}" DESTINATION "${RUNTIME_DEST}")
     endif ()
 
-    # install() steps run in order, so the bake CODE precedes the DIRECTORY copy below.
+    # install() steps run in order, so the bake CODE precedes file staging below.
     install(CODE "
         message(STATUS \"Octarine: baking asset manifest for package...\")
         execute_process(
@@ -234,37 +235,74 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
         endif ()
     ")
 
-    # Stage the project dir beside the binary. Exclude editor/runtime scratch and dev-only tooling.
-    # asset_manifest.lua is produced by the bake above and lives in PROJECT_DIR, so it rides along here.
-    set(_install_excludes
-            PATTERN ".git" EXCLUDE
-            PATTERN ".gitignore" EXCLUDE
-            PATTERN ".gitattributes" EXCLUDE
-            PATTERN ".github" EXCLUDE
-            PATTERN ".vscode" EXCLUDE
-            PATTERN ".idea" EXCLUDE
-            PATTERN ".env*" EXCLUDE
-            PATTERN ".engine" EXCLUDE
-            PATTERN "*.meta" EXCLUDE
-            PATTERN "editor_prefs.ini" EXCLUDE
-            PATTERN "preferences.ini" EXCLUDE
-            PATTERN "imgui.ini" EXCLUDE
-            PATTERN "*.bak" EXCLUDE
-            PATTERN "*.sh" EXCLUDE
-            PATTERN "*.ps1" EXCLUDE
-            PATTERN "types" EXCLUDE
+    # Stage expected runtime game files and data (allowlist model).
+    # 1. Configuration & Project metadata
+    if (EXISTS "${PROJECT_DIR}/config.ini")
+        install(FILES "${PROJECT_DIR}/config.ini" DESTINATION "${DATA_DEST}")
+    endif ()
+    if (EXISTS "${PROJECT_DIR}/project.ini")
+        install(FILES "${PROJECT_DIR}/project.ini" DESTINATION "${DATA_DEST}")
+    endif ()
+
+    # 2. Project licenses
+    file(GLOB _project_licenses
+         LIST_DIRECTORIES false
+         "${PROJECT_DIR}/LICENSE*"
     )
-    foreach (_ex IN LISTS _INST_EXTRA_EXCLUDES)
-        string(STRIP "${_ex}" _ex_clean)
-        if (_ex_clean)
-            list(APPEND _install_excludes PATTERN "${_ex_clean}" EXCLUDE)
+    if (_project_licenses)
+        install(FILES ${_project_licenses} DESTINATION "${DATA_DEST}")
+    endif ()
+
+    # 3. Baked manifest & asset pak (emitted by bake step into PROJECT_DIR)
+    install(FILES "${PROJECT_DIR}/asset_manifest.lua"
+            DESTINATION "${DATA_DEST}"
+            OPTIONAL)
+    install(FILES "${PROJECT_DIR}/asset_bundle.pak"
+            DESTINATION "${DATA_DEST}"
+            OPTIONAL)
+
+    # 4. Root Lua scripts (e.g. game.lua, main.lua)
+    file(GLOB _root_scripts
+         LIST_DIRECTORIES false
+         "${PROJECT_DIR}/*.lua"
+    )
+    if (_root_scripts)
+        list(FILTER _root_scripts EXCLUDE REGEX "asset_manifest\\.lua$")
+        if (_root_scripts)
+            install(FILES ${_root_scripts} DESTINATION "${DATA_DEST}")
+        endif ()
+    endif ()
+
+    # 5. scripts/ directory (if present in project)
+    if (IS_DIRECTORY "${PROJECT_DIR}/scripts")
+        set(_scripts_excludes "")
+        foreach (_ex IN LISTS _INST_EXTRA_EXCLUDES)
+            string(STRIP "${_ex}" _ex_clean)
+            if (_ex_clean)
+                list(APPEND _scripts_excludes PATTERN "${_ex_clean}" EXCLUDE)
+            endif ()
+        endforeach ()
+        install(DIRECTORY "${PROJECT_DIR}/scripts/"
+                DESTINATION "${DATA_DEST}/scripts"
+                ${_scripts_excludes}
+        )
+    endif ()
+
+    # 6. Custom extra project includes (package_include in project.ini)
+    foreach (_inc IN LISTS _INST_EXTRA_INCLUDES)
+        string(STRIP "${_inc}" _inc_clean)
+        if (_inc_clean AND EXISTS "${PROJECT_DIR}/${_inc_clean}")
+            if (IS_DIRECTORY "${PROJECT_DIR}/${_inc_clean}")
+                install(DIRECTORY "${PROJECT_DIR}/${_inc_clean}/"
+                        DESTINATION "${DATA_DEST}/${_inc_clean}"
+                )
+            else ()
+                install(FILES "${PROJECT_DIR}/${_inc_clean}"
+                        DESTINATION "${DATA_DEST}"
+                )
+            endif ()
         endif ()
     endforeach ()
-
-    install(DIRECTORY "${PROJECT_DIR}/"
-            DESTINATION "${DATA_DEST}"
-            ${_install_excludes}
-    )
 
     # Compile installed Lua scripts to stripped bytecode. Runs after install(DIRECTORY) so it
     # operates on the installed copy without touching PROJECT_DIR source files. lua.safe_script() /
@@ -511,6 +549,11 @@ function(octarine_package TARGET)
     if (_pkg_exclude)
         string(REPLACE "," ";" _extra_excludes "${_pkg_exclude}")
     endif ()
+    _octarine_resolve_identity(_pkg_include     "${OCTARINE_PACKAGE_INCLUDE}"      "${_pi_package_include}" "")
+    set(_extra_includes "")
+    if (_pkg_include)
+        string(REPLACE "," ";" _extra_includes "${_pkg_include}")
+    endif ()
 
     # ---- Desktop ------------------------------------------------------------------------------
     # macOS: a .app bundle; binary in Contents/MacOS, project files in Contents/Resources.
@@ -528,7 +571,15 @@ function(octarine_package TARGET)
             _desktop_ico _desktop_icns _desktop_png)
 
     if (APPLE)
-        set_target_properties(${TARGET} PROPERTIES MACOSX_BUNDLE ON)
+        set_target_properties(${TARGET} PROPERTIES
+                MACOSX_BUNDLE ON
+                MACOSX_BUNDLE_GUI_IDENTIFIER "${_pkg_id}"
+                MACOSX_BUNDLE_BUNDLE_NAME "${_pkg_name}"
+                MACOSX_BUNDLE_SHORT_VERSION_STRING "${_pkg_version}"
+                MACOSX_BUNDLE_BUNDLE_VERSION "${_pkg_version_code}"
+                MACOSX_BUNDLE_COPYRIGHT "${_pkg_vendor}"
+                MACOSX_BUNDLE_INFO_STRING "${_pkg_description}"
+        )
         set(_runtime_dest ".")
         set(_data_dest "${_pkg_name}.app/Contents/Resources")
         set(_framework_dest "${_pkg_name}.app/Contents/Frameworks")
@@ -552,7 +603,9 @@ function(octarine_package TARGET)
         endif ()
     endif ()
 
-    _octarine_setup_desktop_install(${TARGET} "${OP_PROJECT}" "${_runtime_dest}" "${_data_dest}" EXTRA_EXCLUDES ${_extra_excludes})
+    _octarine_setup_desktop_install(${TARGET} "${OP_PROJECT}" "${_runtime_dest}" "${_data_dest}"
+            EXTRA_EXCLUDES ${_extra_excludes}
+            EXTRA_INCLUDES ${_extra_includes})
     _octarine_bundle_runtime_libs(${TARGET} "${_runtime_dest}" "${_framework_dest}")
     _octarine_setup_cpack("${_pkg_name}" "${_pkg_version}" "${_pkg_description}" "${_pkg_vendor}" "${_desktop_ico}")
 endfunction()
