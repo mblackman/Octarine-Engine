@@ -6,14 +6,10 @@
 
 class Registry;
 
-// Owns the scene lifecycle Game used to inline: parse a scene script (table / function / side-
-// effect forms), acquire-before-release of the scene's assets, load its entities, and track the
-// acquired ids so the next swap or StopScene releases them. Reads the live SDL renderer + mixer
-// off the registry's EngineContext, so it needs only the Registry + the shared sol::state.
+// Manages the scene lifecycle: parsing scene scripts (table, function, and side-effect forms),
+// acquire-before-release lifecycle for scene assets, entity loading, and scene swapping.
 //
-// Game delegates its LuaBindingContext scene-op overrides (LoadScene/ReloadScene/StopScene/
-// TrackSceneAssets) straight through to this; the `scene.*` Lua module binds against the same
-// LuaBindingContext surface, so scripts reach these via Game.
+// Exposed to scripts via LuaBindingContext and the scene.* Lua module.
 class SceneLoader {
  public:
   SceneLoader(Registry* registry, sol::state& lua) : registry_(registry), lua_(lua) {}

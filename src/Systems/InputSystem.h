@@ -25,11 +25,6 @@
 // / OnMouseWheel; the Lua `input.*` surface (is_key_*, on_key_*, bind, etc.) lives in
 // `Lua/Bindings/InputSystemLuaBinding.cpp` — InputSystem just exposes the public accessors +
 // mutators that binding's lambdas call into.
-//
-// FOLLOW-UP: the sol::protected_function callback vectors still force this header to pull in
-// <sol/sol.hpp>. Closing that out cleanly needs a PImpl-style InputSystemLuaCallbacks struct
-// (declared here, defined in InputSystem.cpp) which is more surgery than this stage is scoped
-// for. Tracked alongside ArchitectureImprovementsPlan's broader header-sol cleanup.
 class InputSystem {
  public:
   InputSystem() : registry_(nullptr) {

@@ -1,4 +1,4 @@
-// Smoke checks for the DevListenServer (Stage 6 PR-A). gtest-free; failed-check count is the
+// Smoke checks for DevListenServer. gtest-free; failed-check count is the
 // exit code. Mirrors the style of ProcessTest / ProjectIniTest.
 //
 // Server is OCTARINE_SHIPPED-gated; this test target builds only when the engine target also

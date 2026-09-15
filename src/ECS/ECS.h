@@ -27,6 +27,5 @@ struct Pair {
   }
 };
 
-// Routing marker for the despawn-playback loop: entities tagged with this are sent to the
-// EntityPoolManager (Park into the inactive partition of their chunk) instead of being blammed.
+// Tag indicating entity should be parked in EntityPoolManager on despawn.
 struct PoolableTag {};

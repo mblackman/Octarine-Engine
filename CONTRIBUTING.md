@@ -9,6 +9,7 @@ on hygiene. If anything here is unclear or out of date, open an issue.
 - New to the codebase? Start with [`docs/QUICKSTART.md`](docs/QUICKSTART.md).
 - Architectural background: [`docs/ecs-architecture.md`](docs/ecs-architecture.md),
   [`docs/lua-scripting.md`](docs/lua-scripting.md).
+- Commenting standards: [`docs/commenting-guide.md`](docs/commenting-guide.md).
 - Shipping artifacts: [`docs/device-builds.md`](docs/device-builds.md).
 
 ## Workflow
@@ -157,6 +158,15 @@ Match the surrounding code:
 and nothing enforces that key — follow the code.) If you find a genuine stylistic disagreement, raise
 it in a separate PR rather than reformatting on the side of a feature.
 
+### Comments
+
+Code should be self-documenting first. Write comments to explain *why*, non-obvious invariants,
+domain math, or thread safety — never merely restate what the code already expresses. Keep comments
+concise and pragmatic; avoid multi-paragraph essays and never reference pull requests, sprint milestones,
+or temporary documents.
+
+See [`docs/commenting-guide.md`](docs/commenting-guide.md) for full principles and examples.
+
 ### Registering a new `.cpp`
 
 The engine is split into per-layer static libraries, so every new `.cpp` under
@@ -199,22 +209,19 @@ Avoid:
 
 - `feat: add atlas packing` — no conventional-commit prefix.
 - `Implement atlas packing logic for textures` — verbose subject, no body.
-- `Co-Authored-By: <AI tool>` trailers — **never** add these. No `Co-Authored-By` /
-  `Co-authored-by` line crediting Claude or any AI tool, and no AI listed as commit author.
-  This holds even if a tool's default behavior is to append one.
+- `Co-Authored-By:` trailers — do not add co-authorship trailers to commit messages.
 
 ## Documentation
 
 Tracked docs live under `docs/` (plus `README.md` and this file at the repo
-root, and `android/README.md` for the Android host app). Two hard rules for
-tracked docs and tracked source comments:
+root, and `android/README.md` for the Android host app). Core rules for
+tracked docs and source comments:
 
-- **No references to `ai/` design plans.** That directory is local-only
-  scratchpad (gitignored). Plans rot, get renamed, get archived — links to
-  them go stale immediately. Inline the rationale instead ("parked on
-  defer/ios pending an Apple Developer account", not "see ai/iOSDeferralPlan.md").
-- **No references to local-only agent files** such as `CLAUDE.md`,
-  `GEMINI.md`, or `.agent/`. Same reasoning.
+- **No references to untracked design plans or external ticket paths.** Plans rot,
+  get renamed, or get archived — links to them go stale immediately. Inline the
+  rationale instead ("parked on defer/ios pending an Apple Developer account").
+- **No references to local-only scratchpads or configuration files.** Keep documentation
+  focused strictly on the engine source, architecture, and runtime.
 
 If you add a doc, cross-link it from
 [`docs/QUICKSTART.md`](docs/QUICKSTART.md) § Deeper reading so it isn't

@@ -7,28 +7,18 @@
 
 #ifndef OCTARINE_SHIPPED
 
-// Mtime-polling file watcher. Single-threaded, called from the main loop. Track files we care
-// about, ask Poll() periodically for the subset whose last_write_time advanced since the last
-// call. Atomic-save editors (temp + rename) are handled because we resolve the canonical path
-// at Track() time and re-stat it each Poll.
-//
-// Generic infrastructure shared by every hot-reload path: Lua script reload (ScriptHotReload)
-// and asset reload (AssetHotReload) both own one of these. It knows nothing about scripts,
-// assets, sol, or SDL — just paths and mtimes.
+// Polls file modification timestamps on the main loop for hot reloading.
 class FileWatcher {
  public:
   FileWatcher() = default;
 
-  // Add a file to the watch set. Path is canonicalized; duplicates and unknown files are
-  // silently ignored (the second case logs and stays untracked — caller bug, not user error).
+  // Adds canonical file path to watch set.
   void Track(const std::string& absPath);
 
-  // Drop a file from the watch set. No-op if untracked.
+  // Removes file from watch set.
   void Untrack(const std::string& absPath);
 
-  // Returns canonical paths whose mtime has advanced since the last Poll. Order is unspecified.
-  // Files that disappeared between Track and Poll are skipped (no error) and re-armed on next
-  // call.
+  // Returns paths whose last write time advanced since the last poll.
   std::vector<std::string> Poll();
 
   [[nodiscard]] bool Empty() const { return mtimes_.empty(); }
@@ -42,8 +32,7 @@ class FileWatcher {
 
 #else
 
-// Shipped builds: zero-cost stub so callers compile without #ifdef sprinkling. Track/Untrack
-// drop their args, Poll always returns empty.
+// Stub implementation for shipped builds.
 class FileWatcher {
  public:
   void Track(const std::string&) {}

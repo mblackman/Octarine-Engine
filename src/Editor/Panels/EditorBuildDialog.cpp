@@ -92,7 +92,7 @@ void DrawBuildDialogs(Game* game, bool openSaveLayoutModal, bool openExportBuild
       ImGui::BulletText("OCTARINE_ANDROID_STORE_PASSWORD");
       ImGui::BulletText("OCTARINE_ANDROID_KEY_ALIAS");
       ImGui::BulletText("OCTARINE_ANDROID_KEY_PASSWORD");
-      ImGui::TextDisabled("Unset = falls back to the Gradle debug key. In-editor secret storage lands in PR-C.");
+      ImGui::TextDisabled("Unset = falls back to the Gradle debug key.");
     }
 
     if (!validationErrors.empty()) {

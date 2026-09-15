@@ -1012,6 +1012,3 @@ imgui.ini
 
 # Ignore auto-cloned game repo for benchmarking
 .benchmark_game/
-
-# Local agent/LLM scratchpad — agent-facing docs, notes, indexes (not part of the project)
-.agent/

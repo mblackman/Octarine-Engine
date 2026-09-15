@@ -8,7 +8,7 @@ struct AudioListenerComponent {
   float maxDistance = 1000.0f;
   float rolloff = 1.0f;
 
-  // Phase 4 Doppler. Factor 0 disables the shift, 1 is physical, >1 exaggerates.
+  // Doppler shift scaling: factor 0 disables the shift, 1 is physical, >1 exaggerates.
   // speedOfSound is in world units / second; tune per project (default 343 ≈ m/s if
   // 1 world unit ≈ 1 m).
   float dopplerFactor = 1.0f;

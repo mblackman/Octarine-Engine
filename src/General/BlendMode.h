@@ -5,10 +5,7 @@
 
 namespace octarine {
 
-// Blend modes for sprite / primitive rendering. Values are a compact 0..N enum (3 bits —
-// RenderKey packs them into the sort key) rather than SDL's sparse bitmask constants, so
-// component data doesn't depend on SDL headers. Mapping to SDL_BlendMode happens at the
-// renderer boundary.
+// Blend modes for sprite and primitive rendering. Decoupled from SDL_BlendMode constants.
 enum class BlendMode : std::uint8_t {
   None = 0,  // No blending: dst = src
   Blend,     // Alpha blending: dst = src*srcA + dst*(1-srcA)

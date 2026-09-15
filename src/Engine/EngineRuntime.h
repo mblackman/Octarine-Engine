@@ -7,12 +7,9 @@
 class GameConfig;
 class Renderer;
 
-// Owns the platform/runtime lifecycle that Game::Initialize and Game::Destroy used to inline:
-// SDL + TTF subsystem init, the window/renderer pair, the ImGui backend, and orderly teardown.
-// It deliberately knows nothing about GameConfig loading, project resolution, or editor
-// persistence — Game still drives those and feeds this the window title/size it derived. The
-// off-screen scene render target stays owned by Renderer (Stage 7); Game sequences DestroyScene
-// around Shutdown so the SDL renderer is still live when the scene target is freed.
+// Manages the platform and runtime lifecycle: SDL and TTF subsystem initialization,
+// the main window and SDL renderer, ImGui backend setup, and orderly teardown.
+// Keeps low-level platform handles separate from game configuration and editor state.
 class EngineRuntime {
  public:
   EngineRuntime() = default;

@@ -13,6 +13,7 @@ struct ClientResult {
   std::string message;
 };
 
+// Client helper for sending dev commands (script/asset hot-reload, eval) to a running engine instance.
 class DevListenClient {
  public:
   static ClientResult Ping(const std::string& host_port);

@@ -37,13 +37,11 @@ class FontStore {
   // Resident glyph atlas for `id`, or nullptr when none was loaded.
   [[nodiscard]] const GlyphAtlas* GetGlyphAtlas(const std::string& id) const;
 
-  // Close and erase the font under `id`; returns whether one was removed. Mirrors the prior
-  // behavior of leaving any glyph atlas for `id` resident (atlases outlive their font handle and
-  // are refreshed on the next Add).
+  // Close and erase the font under `id`; returns whether one was removed.
+  // Any associated glyph atlas remains resident until Store destruction or replacement.
   bool Remove(const std::string& id);
 
-  // Close every font. Glyph atlases are intentionally left resident (matching the pre-split
-  // ClearAssets, which only cleared the font handles); they are freed when the store is destroyed.
+  // Close every font. Loaded glyph atlases remain cached until the store is destroyed.
   void Clear();
 
   [[nodiscard]] const std::map<std::string, TTF_Font*>& All() const { return fonts_; }

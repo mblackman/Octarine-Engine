@@ -21,9 +21,7 @@ std::uint64_t Logger::script_error_sequence_ = 0;
 
 namespace {
 
-// Hand-mapped level parse: spdlog::level::from_str silently returns `off` for unknown strings,
-// which would erase the level instead of warning. We want a sentinel for "unknown" so callers
-// can keep the current level and complain. Returns spdlog::level::n_levels on no match.
+// Parses log level string, returning spdlog::level::n_levels on invalid input.
 spdlog::level::level_enum ParseLevelName(std::string name) {
   std::transform(name.begin(), name.end(), name.begin(),
                  [](const unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
@@ -40,18 +38,13 @@ spdlog::level::level_enum ParseLevelName(std::string name) {
 }  // namespace
 
 void Logger::Init() {
-  // Replace spdlog's auto-default with a named logger we own, so platform sink + pattern + level
-  // are applied consistently regardless of which spdlog default would have been picked.
 #if defined(__ANDROID__)
-  // android_sink routes through __android_log_write under a logcat tag. Engine messages land under
-  // tag "Octarine", Lua messages under "OctarineLua" — both visible via `adb logcat -s Octarine
-  // OctarineLua` and trivially filtered apart.
+  // Android logcat sinks for engine and Lua messages.
   auto main_logger = spdlog::android_logger_mt("octarine", "Octarine");
   spdlog::set_default_logger(main_logger);
   lua_logger_ = spdlog::android_logger_mt("octarine-lua", "OctarineLua");
 #else
-  // Desktop (incl. macOS): keep the historical stdout-color sinks so the dev terminal experience is
-  // unchanged.
+  // Colored stdout sinks for desktop platforms.
   auto main_logger = spdlog::stdout_color_mt("octarine");
   spdlog::set_default_logger(main_logger);
   lua_logger_ = spdlog::stdout_color_mt("lua");
@@ -61,9 +54,6 @@ void Logger::Init() {
   lua_logger_->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] [lua] %v");
 
 #ifdef OCTARINE_LOG_LEVEL_NAME
-  // Compile-time default: shipping builds default to `warn` (errors + warnings only), Debug builds
-  // to `debug`, other configs to `info` (see CMakeLists.txt for the policy). A runtime
-  // `LogLevel=` in config.ini overrides this via SetLevel() during Game::Setup.
   SetLevel(OCTARINE_LOG_LEVEL_NAME);
 #endif
 }
@@ -82,8 +72,7 @@ void Logger::SetLevel(const std::string& level) {
 }
 
 void Logger::PushHistory(std::string entry) {
-  // Capped, not unbounded: instrumented builds log per-frame TIMER/ACCUM lines, so an uncapped
-  // history grows by gigabytes over a long run. The console only ever shows the tail.
+  // Cap history to prevent unbounded growth from per-frame logging.
   constexpr size_t kMaxHistory = 1000;
   std::lock_guard<std::mutex> lock(history_mutex_);
   history_.push_back(std::move(entry));
@@ -115,8 +104,7 @@ void Logger::LogLua(const std::string& message) {
 void Logger::ErrorLua(const std::string& message) {
   lua_logger_->error(message);
   PushHistory("[Error] [Lua] " + message);
-  // Small ring, not full history: the toast only ever shows the tail, and capping here keeps a
-  // misbehaving per-frame error loop from growing memory.
+  // Cap toast history ring buffer.
   constexpr size_t kMaxScriptErrors = 8;
   std::lock_guard<std::mutex> lock(history_mutex_);
   script_errors_.push_back({++script_error_sequence_, message, std::chrono::steady_clock::now()});

@@ -211,8 +211,6 @@ void FrameLoop::Update(const float deltaTime) {
   if (!options.isPaused || options.stepFrame) {
     registry_->Update(deltaTime * options.timeScale);
     options.stepFrame = false;
-  } else {
-    // If paused, we might still want to clear some per-frame signals so they don't get stuck.
   }
 
   // Pressed/released keys and wheel deltas are per-frame edge signals — clear after every
@@ -349,7 +347,6 @@ float FrameLoop::WaitTime() {
     }
   }
 
-  // Calculate delta time
   const Uint64 now = SDL_GetTicksNS();
   const auto intermediate =
       static_cast<double>(now - nanoseconds_previous_frame_) / static_cast<double>(SDL_NS_PER_SECOND);

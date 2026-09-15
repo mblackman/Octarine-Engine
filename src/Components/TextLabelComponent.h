@@ -9,8 +9,7 @@
 #include "General/Constants.h"
 
 // Alignment of the rasterized text within its layout rectangle (UIRectComponent). Only consulted on
-// the UI path; world-space labels (positioned by transform) have no box to align within. Start is
-// the historical behavior: the texture's top-left sits at the rect's top-left.
+// the UI path; world-space labels (positioned by transform) have no bounding box to align within.
 enum class TextAlign : std::uint8_t { Start, Center, End };
 
 struct TextLabelComponent {

@@ -2,18 +2,16 @@
 
 #include <string>
 
-// Bake-time audio loudness normalizer for `meta.normalize = true` (Stage 14 B2).
+// Bake-time audio loudness normalizer for assets configured with `meta.normalize = true`.
 //
 // Implements ITU-R BS.1770-4 integrated loudness measurement: a K-weighting filter chain
 // (pre-filter high-shelf + RLB high-pass) feeds 400 ms gated mean-square blocks at 75% overlap;
-// the integrated loudness uses both the absolute (-70 LUFS) + relative (-10 LU below ungated
+// the integrated loudness uses both the absolute (-70 LUFS) and relative (-10 LU below ungated
 // mean) gates per spec. Gain is applied uniformly to reach the target loudness; samples that
 // would clip int16 are hard-clamped.
 //
-// Format support is minimal on purpose: PCM 16-bit WAV in / out, mono or stereo, arbitrary
-// sample rate (filter coefficients derived per-rate via bilinear transform of the BS.1770 analog
-// prototypes). Compressed sources (.ogg / .mp3) are skipped — they need a decoder this engine
-// doesn't yet vendor. A future PR can add stb_vorbis + minimp3 to widen the matrix.
+// Supports PCM 16-bit WAV (mono or stereo, arbitrary sample rate). Filter coefficients
+// are derived per sample rate via bilinear transform of BS.1770 analog prototypes.
 class AudioNormalizer {
  public:
   // Read `srcPath`, measure integrated loudness, apply the gain needed to land at

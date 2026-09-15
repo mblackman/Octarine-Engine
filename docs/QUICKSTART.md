@@ -121,4 +121,5 @@ CI (`.github/workflows/build.yml`) runs both on the Linux editor-release leg on 
 - [`docs/asset-pipeline.md`](asset-pipeline.md) — `.meta` sidecars, bake step, atlases, audio normalize
 - [`docs/profiling.md`](profiling.md) — profiling build, PerfUtils, benchmarks, the perf dashboard
 - [`docs/device-builds.md`](device-builds.md) — shipping artifacts for desktop and Android
+- [`docs/commenting-guide.md`](commenting-guide.md) — code commenting philosophy and guidelines
 - `lua_api.smoke.lua` — generated, exhaustive reference for the live Lua surface

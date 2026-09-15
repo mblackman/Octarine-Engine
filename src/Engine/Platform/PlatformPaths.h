@@ -2,9 +2,7 @@
 
 #include <string>
 
-// Platform-specific asset base-path resolution. Concentrates the __ANDROID__ vs desktop forks that
-// used to sit inline in Game::Initialize so Game.cpp carries none: the selection happens on
-// __ANDROID__ inside the .cpp.
+// Platform-specific asset base-path resolution across desktop and Android.
 namespace engine_bootstrap::platform {
 
 // When `effectivePath` is empty, fill it with the platform default and log the choice; no-op when

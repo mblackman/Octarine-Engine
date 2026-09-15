@@ -21,12 +21,10 @@ class AssetPak;
 class GameConfig;
 class GlyphAtlas;
 
-// Composes the asset subsystem: the AssetCatalog (what exists + how to load it), three typed handle
-// stores (TextureStore / FontStore / AudioClipStore — the resident SDL/TTF/MIX handles), and an
-// AssetRefcounter (acquire counts). AssetManager itself owns only the cross-cutting concerns the
-// pieces can't: the project base path, the optional shipped-bundle pak, IO resolution, and the
-// Acquire/Release orchestration that ties refcounts to catalog-driven loads. Public API is
-// unchanged from the pre-split monolith — consumers see the same surface.
+// Composes the asset subsystem: AssetCatalog (catalog of assets and metadata),
+// three typed handle stores (TextureStore, FontStore, AudioClipStore), and
+// AssetRefcounter for reference tracking. Coordinates base paths, packaged asset bundles,
+// and reference-counted loading/unloading.
 class AssetManager {
   std::string base_path_;
   // Index of every discoverable asset (id -> file + metadata). Loads nothing on its own; Acquire
@@ -39,9 +37,8 @@ class AssetManager {
   // unloads it. Assets loaded via the legacy load_asset path are adopted at refcount 1 on first
   // Acquire.
   AssetRefcounter refcounter_;
-  // Optional shipped-bundle archive (Stage 14 / B4). When set, AssetManager prefers reading each
-  // asset's bytes from the pak over the loose file at `fullPath`. Non-owning — the Registry owns
-  // the AssetPak instance.
+  // Optional packaged asset bundle. When set, AssetManager prefers reading each
+  // asset's bytes from the pak over the loose file at `fullPath`. Non-owning pointer.
   const AssetPak* asset_pak_{nullptr};
 
  public:
@@ -92,10 +89,8 @@ class AssetManager {
   // resident id; ids with no catalog entry (or no on-disk source) are skipped. Dev-only use.
   [[nodiscard]] std::vector<std::string> ResidentSourcePaths() const;
 
-  // Validate scene references against the catalog: an id missing from the catalog, or present but
-  // whose backing file no longer exists on disk, is logged once with the referencing context.
-  // Returns the number of failures (0 == clean). This is the authoritative miss check, replacing
-  // the per-frame warnings the Get* accessors used to emit at draw time.
+  // Validate scene references against the catalog: logs any id missing from the catalog
+  // or whose backing file no longer exists on disk. Returns the failure count (0 == clean).
   [[nodiscard]] int Validate(const std::vector<AssetReference>& refs) const;
 
   void AddTexture(SDL_Renderer* renderer, const std::string& assetId, const std::string& path);

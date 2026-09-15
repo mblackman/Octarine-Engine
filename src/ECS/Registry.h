@@ -54,8 +54,7 @@ class ComponentRegistry {
     }
   }
 
-  // Zero-size component used as a tag/label. Move/destroy/swap are no-ops so RemoveEntity,
-  // CopyComponents, and Chunk::Swap can call them unconditionally.
+  // Registers a zero-sized tag component.
   void RegisterTag(const ComponentID id, std::string name) {
     ComponentInfo info{id, name, 0, 1};
     info.move_construct = [](void*, void*) {};
@@ -87,16 +86,12 @@ class Registry {
 
   void Update(float deltaTime);
 
-  // Entity management
   Entity CreateEntity();
 
-  // Create an entity already populated with a fixed bundle of components, landing in the
-  // destination archetype in a single transition. Avoids the per-component archetype churn
-  // that AddComponent does. Tags / pairs still need to be added separately.
+  // Creates an entity populated with components in a single archetype transition.
   template <typename... TComponents>
   Entity CreateEntityWithBundle(TComponents... components) {
     static_assert(sizeof...(TComponents) > 0, "CreateEntityWithBundle requires at least one component");
-    // Resolve component-type entities up front so each T is registered before archetype lookup.
     std::array<Entity, sizeof...(TComponents)> componentEntities{Component<std::decay_t<TComponents>>()...};
     std::vector<ComponentID> ids;
     ids.reserve(sizeof...(TComponents));
@@ -113,30 +108,24 @@ class Registry {
     entity_locations_[id] = location;
     ++user_entity_count_;
 
-    // Place each component in its archetype slot. Order in `componentEntities` mirrors the
-    // template parameter pack — Archetype::AddComponent looks up the in-archetype index by id.
     PlaceBundle(archetype, location, componentEntities, std::forward_as_tuple(components...),
                 std::index_sequence_for<TComponents...>{});
-    // New entities land active. Promote the slot we just filled into the active prefix; if
-    // the chunk had an inactive tail, this swaps the new entity past it.
     PromoteToActive(location);
     return entity;
   }
 
   void BlamEntity(Entity entity);
 
-  // Count of user-visible entities (excludes internal component-type / tag entities).
   [[nodiscard]] std::uint64_t GetUserEntityCount() const { return user_entity_count_; }
 
-  // Defer destroy until end of Registry::Update — safe to call during system iteration.
-  // Deduplicates within a frame: same projectile hitting two targets only blams once.
+  // Defers destruction until the end of Update; safe to call during system iteration.
   void QueueBlamEntity(const Entity entity) {
     if (pending_blam_ids_.insert(entity.id).second) {
       pending_blams_.push_back(entity);
     }
   }
 
-  // Defer despawn until end of Registry::Update
+  // Defers despawn until the end of Update.
   void QueueDespawnEntity(const Entity entity) {
     if (pending_despawn_ids_.insert(entity.id).second) {
       pending_despawns_.push_back(entity);
@@ -149,24 +138,20 @@ class Registry {
     return entity_locations_[id].archetype != nullptr;
   }
 
-  // Resolve an entity to its (archetype, chunk, index) slot. Returns a null-archetype location
-  // when the entity is out of range or has no archetype assigned. Used by systems that need
-  // direct chunk access (e.g. tree walks that can't piggyback on a query's per-chunk caching).
+  // Resolves an entity to its chunk slot. Returns null archetype if invalid.
   [[nodiscard]] EntityLocation GetEntityLocation(const Entity entity) const {
     const std::uint32_t id = entity.GetId();
     if (id >= entity_locations_.size()) return EntityLocation{nullptr, 0, 0};
     return entity_locations_[id];
   }
 
-  // Blams all user-visible entities (those not marked as internal).
   void ClearUserEntities();
 
   [[nodiscard]] std::uint64_t GetEntityCount() const { return entity_locations_.size(); }
 
   [[nodiscard]] std::vector<Entity> GetUserEntities() const;
 
-  // Returns the entity's current archetype id, including any tags currently on it. Used by the
-  // pool to bucket parked entities by shape so that Spawn pulls back like-shaped entities.
+  // Returns the entity's current archetype ID, including active tags.
   [[nodiscard]] ArchetypeID GetArchetypeID(const Entity entity) const {
     const std::uint32_t id = entity.GetId();
     if (id >= entity_locations_.size() || !entity_manager_->IsValid(entity) || !entity_locations_[id].archetype) {
@@ -175,14 +160,10 @@ class Registry {
     return entity_locations_[id].archetype->GetID();
   }
 
-  // Activate / Deactivate move an entity across the active/inactive partition of its archetype's
-  // chunk without ever crossing archetypes. Default queries see only the active prefix, so a
-  // deactivated entity becomes invisible to gameplay systems while its components stay in place
-  // and ready to reuse. Used by EntityPoolManager for park/unpark.
+  // Moves an entity between the active and inactive partitions of its chunk.
   void Activate(Entity entity);
   void Deactivate(Entity entity);
 
-  // True iff the entity is alive AND in the active prefix of its chunk.
   [[nodiscard]] bool IsActive(Entity entity) const;
 
   // Component management
@@ -324,15 +305,8 @@ class Registry {
     return SystemHandle<StoredFunc>(id, &ref);
   }
 
-  // Parallel per-entity system. Same shape as RegisterSystem but the per-entity callback runs
-  // across chunks on the ThreadPool. Func signature: void (Entity, TComponents&...), void (Entity, float,
-  // TComponents&...), void (TComponents&...) or void (float, TComponents&...) — the ContextFacade signatures supported
-  // by RegisterSystem are not available here because the parallel path does not build a ContextImpl. Caller is
-  // responsible for thread-safety: expose an EntityCommandBuffer on your system to handle requests for registry state
-  // changes so they resolve on the calling thread all at once.
+  // Registers a system running per-entity callbacks in parallel across chunks on ThreadPool.
   template <typename... TArgs, typename Func>
-  // Complexity is pre-existing: the wrapper's if-constexpr dispatch over the four supported
-  // callback shapes reads linearly; splitting it would obscure the signature table.
   // NOLINTNEXTLINE(readability-function-cognitive-complexity)
   SystemHandle<std::decay_t<Func>> RegisterParallelSystem(Func&& func) {
     using StoredFunc = std::decay_t<Func>;
@@ -413,10 +387,7 @@ class Registry {
     return SystemHandle<StoredFunc>(id, &ref);
   }
 
-  // Bulk system: wrapper invokes Func once per Update with the matching Iterable.
-  // Func signature: void(const ContextFacade&, const Iterable&). The ContextFacade
-  // exposes Registry/DeltaTime and a sentinel Entity (Entity{}); per-entity component
-  // access goes through iterating the Iterable.
+  // Registers a system invoked once per Update with matching Iterable.
   template <typename... TArgs, typename Func>
   SystemHandle<std::decay_t<Func>> RegisterBulkSystem(Func&& func) {
     using StoredFunc = std::decay_t<Func>;
@@ -452,12 +423,9 @@ class Registry {
     return SystemHandle<StoredFunc>(id, &ref);
   }
 
-  // Execution-order constraints between registered systems, declared after registration:
+  // Builds execution-order constraints between registered systems:
   //   registry.Order(collision).After(transform);
   //   registry.Order(producer).Before(consumer);
-  // Update topo-sorts (Kahn's algorithm) with registration order breaking ties, so systems
-  // without constraints keep exact registration order. A constraint cycle throws
-  // std::runtime_error naming the systems involved.
   class OrderBuilder {
    public:
     OrderBuilder(Registry* registry, const SystemId id) : registry_(registry), id_(id) {}
@@ -484,9 +452,7 @@ class Registry {
     return OrderBuilder(this, handle.Id());
   }
 
-  // Singleton components. Stored as std::shared_ptr<T> inside std::any so that
-  // move-only resource owners (e.g. AssetManager) can be stashed — std::any itself
-  // requires CopyConstructible.
+  // Stores singleton service wrapped in shared_ptr to support move-only types.
   template <typename T>
   T& Set(T value) {
     auto ptr = std::make_shared<T>(std::move(value));
@@ -513,7 +479,7 @@ class Registry {
     return const_cast<T&>(static_cast<const std::decay_t<decltype(*this)>&>(*this).Get<T>());
   }
 
-  // Non-throwing singleton lookup. Returns nullptr if T has never been Set.
+  // Returns nullptr if T has never been Set.
   template <typename T>
   [[nodiscard]] T* TryGet() {
     const auto it = singleton_components_.find(typeid(T).name());
@@ -522,9 +488,7 @@ class Registry {
     return nullptr;
   }
 
-  // Tags / labels — zero-size component-entities. Each unique name maps to one Entity registered
-  // as a zero-size component, so AddTag/HasTag/RemoveTag are archetype transitions / membership
-  // checks. Lazy: TagId creates the Entity on first call.
+  // Resolves or creates a named zero-size tag component.
   Entity TagId(const std::string& name) {
     if (const auto it = tag_to_entity_.find(name); it != tag_to_entity_.end()) {
       return it->second;
@@ -535,9 +499,7 @@ class Registry {
     return tagEntity;
   }
 
-  // Typed tag — empty struct routed through fast_component_to_entity_, so resolution is one array
-  // lookup instead of a hash-table find on a string. Storage is zero bytes per entity (registered
-  // via RegisterTag). Use this for engine-internal tags; reserve string tags for data-driven ones.
+  // Resolves or creates a compile-time typed tag component.
   template <typename T>
   Entity Tag() {
     static_assert(std::is_empty_v<T>, "Tag<T>() requires an empty struct type");
@@ -640,66 +602,40 @@ class Registry {
 
   [[nodiscard]] float DeltaTime() const { return delta_time_; }
 
-  // Returns true if any entity has relationship pairs (e.g. ChildOf hierarchy).
-  // Used by TransformSystem to skip hierarchy resolution when no parents exist.
   [[nodiscard]] bool HasAnyPairs() const { return !pairs_.empty(); }
 
-  // True iff at least one ChildOf relationship is live. Distinct from HasAnyPairs so the
-  // TransformSystem fast path stays enabled when unrelated relationships exist.
   [[nodiscard]] bool HasAnyChildPairs() const { return !child_to_parent_.empty(); }
 
-  // Bumped whenever the ChildOf hierarchy mutates (SetParent / detach / BlamEntity).
-  // Lets TransformSystem cache root sets and rebuild only when membership changes.
+  // Incremented on hierarchy mutation to invalidate cached root sets.
   [[nodiscard]] uint64_t HierarchyGeneration() const { return hierarchy_generation_; }
 
-  // Incremented when a new archetype is created. Queries use this to skip re-matching
-  // when the archetype set hasn't changed since their last Update.
+  // Incremented when a new archetype is registered.
   [[nodiscard]] uint64_t ArchetypeGeneration() const { return archetype_generation_; }
 
-  // Insertion-ordered log of every archetype ever created. Invariant:
-  // archetype_log_.size() == archetype_generation_, so a query that last matched at
-  // generation G only needs to test archetype_log_[G..current) to stay current.
-  // Archetypes are never destroyed, so the pointers stay valid for the Registry's lifetime.
+  // Creation-ordered log of archetypes for incremental query matching.
   [[nodiscard]] const std::vector<Archetype*>& ArchetypeLog() const { return archetype_log_; }
 
-  // Sorted-ascending two-pointer superset check: true iff the archetype's type contains every
-  // id in `type`. Shared by the full GetMatchingArchetypes scan and incremental query matching.
+  // True if archetype contains every component ID in type.
   [[nodiscard]] static bool MatchesType(const Archetype& archetype, const ArchetypeType& type);
 
  private:
-  // Internal entities back component-type and tag registrations. They live in
-  // entity_locations_ but should not show up in GetUserEntityCount.
   Entity CreateInternalEntity();
 
   EntityLocation TransitionAddComponent(Entity entity, ComponentID componentId);
   EntityLocation TransitionRemoveComponent(Entity entity, ComponentID componentId);
-  // Move a freshly-added entity (whose components are placed but is sitting at entity_count - 1
-  // in its chunk's inactive tail) into the active prefix. Idempotent for archetypes that have
-  // no inactive tail — just bumps active_count.
   void PromoteToActive(const EntityLocation& location);
   Archetype* GetOrCreateArchetype(std::vector<ComponentID> componentIDs, ComponentID newComponentId);
   Archetype* GetOrCreateArchetypeRemove(std::vector<ComponentID> componentIDs, ComponentID removeComponentId);
   Archetype* GetOrCreateArchetypeFromSet(std::vector<ComponentID> componentIDs);
-  // Exact-match lookup over the component_index_ list of componentIDs.front(). Expects
-  // componentIDs sorted ascending and non-empty. Returns nullptr when no archetype has
-  // exactly this signature.
   [[nodiscard]] Archetype* FindExactArchetype(const std::vector<ComponentID>& componentIDs) const;
-  // Create + register a new archetype for the given sorted signature: archetypes_ map,
-  // generation bump, component_index_ entries, and the archetype_log_ append all happen here.
   Archetype* RegisterNewArchetype(const std::vector<ComponentID>& componentIDs);
 
-  // System-ordering graph (fed by Order().After()/.Before()). RebuildExecutionOrder runs Kahn's
-  // algorithm over the edges; the ready set is kept ordered by SystemId so unconstrained systems
-  // execute in registration order.
   void AddOrderEdge(SystemId before, SystemId after);
   void RebuildExecutionOrder();
 
-  // Deferred blam/despawn processing at the end of Update, once all systems have run.
   void FlushPendingDestruction();
   void FlushDespawns(const std::vector<Entity>& despawns);
 
-  // Helper for CreateEntityWithBundle: index-pack expansion to dispatch each component to
-  // Archetype::AddComponent at its corresponding location slot.
   template <typename Tuple, size_t N, size_t... Is>
   void PlaceBundle(Archetype* archetype, const EntityLocation& location, const std::array<Entity, N>& componentEntities,
                    Tuple&& comps, std::index_sequence<Is...>) {
@@ -710,30 +646,19 @@ class Registry {
   std::unique_ptr<ComponentRegistry> component_registry_;
   std::vector<EntityLocation> entity_locations_;
   std::unordered_map<ArchetypeID, std::unique_ptr<Archetype>> archetypes_;
-  std::unique_ptr<Archetype> root_archetype_;  // The root of the archetype graph. Empty signature.
+  std::unique_ptr<Archetype> root_archetype_;
   std::vector<std::unique_ptr<ISystem>> systems_;
-  // Ordering edges (before, after) between systems_ indices; consumed by RebuildExecutionOrder.
   std::vector<std::pair<SystemId, SystemId>> system_order_edges_;
   std::vector<SystemId> system_execution_order_;
   bool system_order_dirty_ = false;
-  // Singleton storage keyed by typeid(T).name() (string_view into static storage). Was
-  // ComponentID-keyed via Component<T>(), but on Android NDK with -fvisibility=hidden, opaque-type
-  // pointers like MIX_Mixer* get TU-local typeinfo; std::type_index in type_to_entity_ produces
-  // different keys per TU and Set/TryGet mismatch silently. typeid(T).name() returns the mangled
-  // name, whose CONTENTS are identical across TUs even when the pointer addresses differ — so
-  // a string_view comparison hashes/compares by contents and matches across TUs.
+  // Keyed by type name rather than type_index to safely compare across translation units with hidden visibility.
   std::unordered_map<std::string_view, std::any> singleton_components_;
   std::unordered_map<std::type_index, Entity> type_to_entity_;
   std::unordered_map<std::string, Entity> tag_to_entity_;
-  // Per-component-id list of archetypes containing it. Authoritative source for query lookup.
   std::unordered_map<ComponentID, ArchetypeList> component_index_;
-  // Creation-ordered archetype pointers; see ArchetypeLog().
   std::vector<Archetype*> archetype_log_;
   std::unordered_map<EntityID, std::unordered_set<EcsId>> pairs_;
-  // Reverse index for pairs: maps a target ID (32-bit) to all author EntityIDs (64-bit) pointing to it.
   std::unordered_map<std::uint32_t, std::unordered_set<EntityID>> target_to_pair_authors_;
-  // Hierarchy authoritative storage. Keys/values are full EntityIDs (generation in high 32),
-  // so recycled ids cannot alias old children — the legacy `pairs_` map drops generation.
   std::unordered_map<EntityID, std::unordered_set<EntityID>> parent_to_children_;
   std::unordered_map<EntityID, Entity> child_to_parent_;
   std::vector<Entity> pending_blams_;

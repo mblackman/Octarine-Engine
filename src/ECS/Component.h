@@ -16,15 +16,11 @@ class Archetype;
 
 struct ChunkHeader {
   uint32_t entity_count;
-  // Active prefix of the chunk: slots [0, active_count) are visible to default queries; slots
-  // [active_count, entity_count) hold parked/inactive entities that share storage with the active
-  // ones. Invariant: active_count <= entity_count.
+  // Active entities occupy [0, active_count); inactive occupy [active_count, entity_count).
   uint32_t active_count;
 };
 
-// Outcome of Chunk::RemoveEntity: up to two entities may have been moved into different slots
-// (one when crossing the active/inactive boundary, one for the standard swap-with-end). The
-// caller patches entity_locations_ for each.
+// Tracks entity relocation indices during Chunk::RemoveEntity.
 struct ChunkRemoveSwap {
   Entity entity;
   size_t indexInChunk;
@@ -35,11 +31,10 @@ struct ComponentInfo {
   std::string name;
   size_t size{};
   size_t alignment{};
-  // Lifecycle ops — needed so non-trivially-copyable components survive archetype transitions.
+  // Type-erased lifecycle operations for non-trivial components.
   void (*move_construct)(void* dst, void* src) = nullptr;
   void (*destroy)(void* ptr) = nullptr;
-  // In-chunk swap of two slots. Used by Archetype::Activate/Deactivate to shuffle entities across
-  // the active/inactive partition without crossing chunks. Tags (size 0) leave this as a no-op.
+  // In-chunk slot swap for partition shuffling.
   void (*swap)(void* a, void* b) = nullptr;
 };
 
@@ -63,10 +58,7 @@ inline ArchetypeID GetNextArchetypeID() {
 
 constexpr size_t kUsableSpace = kChunkSize;
 
-// Over-align chunk storage to a cache line. The default operator new[] only guarantees 16-byte
-// alignment on x64, but with /arch:AVX2 the auto-vectorizer emits 32-byte aligned moves (vmovdqa)
-// over the SoA component arrays — a 16-aligned buffer base faults (#GP -> 0xC0000005) at runtime in
-// optimized builds. 64 covers AVX/AVX2/AVX-512 and keeps each chunk on its own cache line.
+// Align chunk storage to a 64-byte cache line to prevent faults on AVX/AVX2 vectorized SoA moves.
 constexpr size_t kChunkAlignment = 64;
 
 class Chunk {
@@ -118,9 +110,7 @@ class Chunk {
     ::new (buffer_ + offset + index * sizeof(T)) T(component);
   }
 
-  // Append the entity record. Components are not yet placed; the caller does that next, and
-  // then must call Archetype::Activate (or Archetype::FinalizeAdd, same thing) to move the new
-  // entity into the active region.
+  // Appends entity record prior to component initialization.
   void AddEntity(const Entity entity, [[maybe_unused]] const size_t capacity) {
     assert(header_.entity_count < capacity);
     auto* entity_array = reinterpret_cast<Entity*>(buffer_);
@@ -138,8 +128,7 @@ class Chunk {
     --header_.active_count;
   }
 
-  // Swap two slots (entity record + every component array). Both slots must be constructed.
-  // Caller is responsible for patching entity_locations_ for the two swapped entities.
+  // Swaps entity and component data between two slots in the chunk.
   void Swap(const size_t i, const size_t j, const std::vector<size_t>& componentOffsets,
             const std::vector<ComponentInfo>& componentInfos) {
     assert(componentOffsets.size() == componentInfos.size());
@@ -156,10 +145,7 @@ class Chunk {
     }
   }
 
-  // Remove the entity at `index`. Handles entries in either the active region [0, active_count)
-  // or the inactive tail [active_count, entity_count). Returns up to two relocations: the first
-  // for the active-boundary collapse (if the removed entity was active and not at the boundary),
-  // the second for the standard swap-with-last fill. Caller patches entity_locations_ for each.
+  // Removes entity and relocates boundary entities to preserve dense storage.
   std::vector<ChunkRemoveSwap> RemoveEntity(const size_t index, const std::vector<size_t>& componentOffsets,
                                             const std::vector<ComponentInfo>& componentInfos) {
     assert(componentOffsets.size() == componentInfos.size());
@@ -274,8 +260,7 @@ class Archetype {
     return {this, chunks_.size() - 1, 0};
   }
 
-  // Returns up to two relocations (active-boundary collapse + swap-with-end). Caller patches
-  // entity_locations_ for each returned entity using the recorded slot.
+  // Returns relocations from removal (boundary collapse and swap-with-end).
   std::vector<ChunkRemoveSwap> RemoveEntity(const EntityLocation& location) {
     AssertLocation(location);
     auto swaps = chunks_[location.chunkIndex].RemoveEntity(location.indexInChunk, component_offsets_, component_infos_);
@@ -285,17 +270,13 @@ class Archetype {
     return swaps;
   }
 
-  // Result of a partition transition: the entity that was being toggled is now at `newSlot` in
-  // the same chunk; if a swap happened, `displaced` is the entity that previously occupied
-  // `newSlot` and now sits at the caller's original slot.
+  // Outcome of partition transition, including any displaced entity.
   struct PartitionResult {
     size_t newSlot;
     std::optional<Entity> displaced;
   };
 
-  // Move an entity from the inactive tail into the active prefix. The entity must currently sit
-  // at or beyond `active_count`. After this call, it occupies the slot at the previous active
-  // boundary and `active_count` has grown by one.
+  // Moves entity from inactive tail into active prefix.
   PartitionResult Activate(const EntityLocation& location) {
     AssertLocation(location);
     auto& chunk = chunks_[location.chunkIndex];
@@ -310,9 +291,7 @@ class Archetype {
     return result;
   }
 
-  // Move an entity from the active prefix into the inactive tail. The entity must currently be
-  // active. After this call, it occupies the slot at the new active boundary (active_count - 1
-  // post-decrement, which is the first inactive slot).
+  // Moves entity from active prefix into inactive tail.
   PartitionResult Deactivate(const EntityLocation& location) {
     AssertLocation(location);
     auto& chunk = chunks_[location.chunkIndex];
@@ -347,10 +326,7 @@ class Archetype {
     return static_cast<T*>(chunks_[chunkIndex].GetComponentArray(component_offsets_[index]));
   }
 
-  // Move-constructs each shared component from source slot into the (uninitialized) destination
-  // slot. Source components are left in moved-from state; the caller is expected to RemoveEntity
-  // the source slot afterwards, which will destroy them. Components present in source but not
-  // destination are skipped — supports both add (dest is superset) and remove (dest is subset).
+  // Move-constructs shared components between source and destination archetype slots.
   void CopyComponents(const EntityLocation& sourceLocation, const EntityLocation& destinationLocation) const {
     assert(sourceLocation.archetype != this);
     assert(destinationLocation.archetype == this);

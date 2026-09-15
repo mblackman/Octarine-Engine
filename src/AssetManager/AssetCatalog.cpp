@@ -348,11 +348,8 @@ bool AssetCatalog::LoadManifest(const std::string& manifestPath, sol::state& lua
   }
 
   from_manifest_ = true;
-  // Warn-level on purpose: this is the single bootstrap signal that a shipped build is loading
-  // its baked catalog (vs scanning). Shipped builds default to warn-level logging (per
-  // BuildConfigUnificationPlan phase 3), so an Info log here would be suppressed and the
-  // android-emulator gate's manifest-load assertion would never match. Keep as a single line
-  // per launch — it's a startup confirmation, not noise.
+  // Logged at Warn level so it remains visible in shipped builds (which default to
+  // warn-level logging) as confirmation that the baked catalog is in use.
   Logger::Warn("AssetCatalog: loaded " + std::to_string(entries_.size()) + " entries from manifest " + manifestPath +
                (ok ? "" : " (with malformed entries skipped)"));
   return ok;

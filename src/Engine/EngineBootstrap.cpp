@@ -80,10 +80,8 @@ void InstallCoreSingletons(Registry& registry, EngineContext& context, const int
   auto& assetManager = registry.Set<AssetManager>(AssetManager());
   registry.Set<ViewportInfo>(ViewportInfo{0, 0, static_cast<float>(windowWidth), static_cast<float>(windowHeight)});
   if (withFramePathCaches) {
-    // Entity-keyed backend-handle caches, each replacing a handle that used to live on a POD
-    // component: SpriteRenderCache ← SpriteComponent.cachedTexture (SDL_Texture*), AudioTrackCache
-    // ← AudioSinkComponent.track (MIX_Track*). Bake runs no frames and no audio systems, so it
-    // skips both slots.
+    // Entity-keyed backend-handle caches (SpriteRenderCache for SDL_Texture*,
+    // AudioTrackCache for MIX_Track*). Skipped during asset baking.
     registry.Set<SpriteRenderCache>(SpriteRenderCache());
     registry.Set<AudioTrackCache>(AudioTrackCache());
   }

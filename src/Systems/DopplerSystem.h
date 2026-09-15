@@ -22,9 +22,7 @@
 // gain + pan, this governs frequency ratio. Toggling `source.doppler` false at runtime
 // resets the ratio to 1.0 on the next frame.
 //
-// SDL3_mixer's MIX_Track exposes a built-in per-track frequency ratio (added in the
-// MIX_Track API revision). The original plan called for a Mix_RegisterEffect / postmix
-// resampler or an SDL_AudioStream rewrite — both unnecessary against this surface.
+// SDL3_mixer's MIX_Track exposes a built-in per-track frequency ratio.
 //
 // Cache pointer is hoisted to a member (mirrors SpatialAudioSystem) so the per-emitter
 // callback avoids a Registry::Get<AudioListenerCache>() hashmap lookup per call.

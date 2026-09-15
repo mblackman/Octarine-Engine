@@ -171,9 +171,9 @@ if (OCTARINE_WITH_IMGUI OR OCTARINE_WITH_EDITOR)
                 Editor/ExportBuilder.cpp
                 Editor/PlayerLauncher.cpp
                 Editor/Inspectors/RegisterAllInspectors.cpp
-                # Editor UI panels (Stage 9 split of RenderDebugGUISystem). Each owns one window /
-                # service; RenderDebugGUISystem keeps only the IMGUI-shared frame begin/end + game
-                # overlays and delegates the editor chrome to EditorPanelHost.
+                # Editor UI panels. Each owns one window or service; RenderDebugGUISystem keeps
+                # only the IMGUI-shared frame begin/end and game overlays, delegating the editor
+                # chrome to EditorPanelHost.
                 Editor/Panels/EditorAssetBrowserPanel.cpp
                 Editor/Panels/EditorBuildDialog.cpp
                 Editor/Panels/EditorConsolePanel.cpp
@@ -242,7 +242,7 @@ set(OCTARINE_ENGINE_SOURCES
         Engine/SceneLoader.cpp
         Game/Game.cpp
 )
-# DevListenServer (Stage 6): TCP listener for the dev iterate loop. Available in editor + player
+# DevListenServer: TCP listener for the dev iterate loop. Available in editor + player
 # presets; compile-stripped from ship-release (OCTARINE_SHIPPED).
 if (NOT OCTARINE_SHIPPED)
     list(APPEND OCTARINE_ENGINE_SOURCES Dev/DevListenServer.cpp Dev/DevListenDispatch.cpp)

@@ -3,13 +3,8 @@
 #include <map>
 #include <string>
 
-// Per-asset acquire counts. Pure bookkeeping — no SDL, no catalog, no I/O — so the refcount policy
-// can be unit-tested on its own. AssetManager owns the side effects: it drives the 0 -> 1 load and
-// the N -> 0 unload transitions; this class only tracks the integer behind each id.
-//
-// Scene-reference handling (which ids a scene pulls in, and on-disk validation of them) lives in
-// AssetManager::AcquireAll / Validate against the AssetCatalog, not here — those need the catalog,
-// whereas the count itself does not.
+// Tracks per-asset acquire counts, decoupled from SDL and I/O.
+// AssetManager uses these counts to drive loading (0 -> 1) and unloading (N -> 0).
 class AssetRefcounter {
  public:
   [[nodiscard]] int Count(const std::string& id) const {

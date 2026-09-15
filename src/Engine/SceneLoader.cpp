@@ -30,11 +30,9 @@ void SceneLoader::RequestLoadScene(const std::string& scenePath) {
     Logger::Warn("RequestLoadScene called with empty path.");
     return;
   }
-  // Deferred path: a UIButton on_click (or any in-frame caller) only queues the swap; the frame loop
-  // flushes it before systems run (FlushPendingSceneLoad). Last request within a frame wins. Before
-  // deferral is armed (bake + the initial startup load) the swap runs immediately. Kept separate from
-  // LoadScene so that function's body stays byte-identical to its prior form (it carries pre-existing
-  // cognitive-complexity debt the changed-lines clang-tidy gate would otherwise surface).
+  // Deferred path: in-frame callers (e.g. UIButton on_click) queue the swap so the frame loop
+  // flushes it before systems run (FlushPendingSceneLoad). Last request within a frame wins.
+  // Before deferral is armed (bake and initial startup), the swap runs immediately.
   if (deferred_swaps_) {
     pending_scene_path_ = scenePath;
     has_pending_scene_ = true;
@@ -238,13 +236,13 @@ void SceneLoader::clearSceneEntities() {
   if (auto* inputSystem = registry_->TryGet<InputSystem>()) {
     inputSystem->ResetLuaState();
   }
-  // Drop cached SDL_Texture* lookups for entities that just got blammed; the next sprite-emit
-  // pass repopulates as those entities are recreated by the new scene's load.
+  // Drop cached SDL_Texture* lookups for entities that were just cleared; the next sprite-emit
+  // pass repopulates as entities are recreated.
   if (auto* spriteCache = registry_->TryGet<SpriteRenderCache>()) {
     spriteCache->Clear();
   }
-  // Same for cached MIX_Track* handles — the just-blammed emitters' sinks are gone; AudioSystem
-  // re-acquires + re-caches tracks for the new scene's emitters as they play.
+  // Same for cached MIX_Track* handles — emitters were cleared; AudioSystem
+  // re-acquires and caches tracks for newly spawned emitters.
   if (auto* trackCache = registry_->TryGet<AudioTrackCache>()) {
     trackCache->Clear();
   }
