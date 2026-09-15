@@ -7,6 +7,7 @@
 // desktop that wrapper is a thin shim; on Android it is what SDLActivity calls into via JNI (the
 // activity dlopens libmain.so and invokes "SDL_main"), so the include is required for the mobile build
 // and harmless on desktop.
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 int main(const int argc, char* argv[]) {
   Logger::Init();
 

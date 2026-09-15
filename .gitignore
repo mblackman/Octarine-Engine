@@ -1015,3 +1015,6 @@ imgui.ini
 
 # Local agent/LLM scratchpad — agent-facing docs, notes, indexes (not part of the project)
 .agent/
+
+# Do not ignore documentation markdown files matching loose build-* globs
+!*.md

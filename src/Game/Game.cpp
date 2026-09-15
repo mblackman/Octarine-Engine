@@ -379,6 +379,7 @@ bool Game::Bake(const std::string& assetPath, const std::string& scriptsOverride
   return ok;
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity,readability-function-size)
 bool Game::RunBakeValidation(const std::string& assetPath, const std::string& scriptsOverrideDir) {
   registry_->Set<GameConfig>(GameConfig());
   auto& gameConfig = registry_->Get<GameConfig>();

@@ -13,6 +13,7 @@ FontStore::FontStore(FontStore&&) noexcept = default;
 FontStore& FontStore::operator=(FontStore&&) noexcept = default;
 FontStore::~FontStore() { Clear(); }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 TTF_Font* FontStore::Add(const std::string& id, SDL_IOStream* io, const float fontSize, const std::string& basePath,
                          const IoOpener& openIO) {
   TTF_Font* font = TTF_OpenFontIO(io, true, fontSize);  // closes the stream

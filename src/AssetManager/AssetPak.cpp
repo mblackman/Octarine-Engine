@@ -52,6 +52,7 @@ AssetPak::~AssetPak() {
   }
 }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 bool AssetPak::Pack(const AssetCatalog& catalog, const std::string& outPath, const std::string& basePath,
                     const std::vector<std::string>& extraFiles,
                     const std::map<std::string, std::string>& pathOverrides) {

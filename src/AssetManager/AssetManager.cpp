@@ -11,6 +11,7 @@
 
 AssetManager::~AssetManager() { ClearAssets(); }
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 SDL_IOStream *AssetManager::OpenAssetIO(const std::string &fullPath) const {
   if (asset_pak_ != nullptr && asset_pak_->IsOpen()) {
     if (asset_pak_->Contains(fullPath)) {

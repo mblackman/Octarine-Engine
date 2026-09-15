@@ -85,6 +85,8 @@ jobs:
       # Puts cmdline-tools (sdkmanager) on PATH, exports ANDROID_SDK_ROOT/ANDROID_HOME, accepts licenses.
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - name: Install Android SDK packages (pinned NDK + cmake)
         run: |
@@ -307,6 +309,8 @@ jobs:
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
 
       - name: Install Android SDK packages (pinned NDK + cmake)
         run: |
