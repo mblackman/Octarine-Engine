@@ -144,12 +144,12 @@ class AssetManager {
   [[nodiscard]] const std::map<std::string, TTF_Font*>& GetFonts() const { return font_store_.All(); }
   [[nodiscard]] const std::map<std::string, MIX_Audio*>& GetAudioClips() const { return audio_store_.All(); }
 
- private:
   // Open a read-only SDL_IOStream over `fullPath`. Tries the wired AssetPak first (lookup by
   // project-relative key) and falls back to SDL_IOFromFile for dev builds + bootstrap projects
   // where no pak has been baked yet.
   [[nodiscard]] SDL_IOStream* OpenAssetIO(const std::string& fullPath) const;
 
+ private:
   // Perform the actual SDL/MIX load for a catalog entry (no refcount bookkeeping). Returns whether
   // the handle is resident afterwards.
   bool LoadFromCatalog(const CatalogEntry& entry, const std::string& assetId, SDL_Renderer* renderer, MIX_Mixer* mixer);

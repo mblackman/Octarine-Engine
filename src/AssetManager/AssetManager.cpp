@@ -12,13 +12,23 @@
 AssetManager::~AssetManager() { ClearAssets(); }
 
 SDL_IOStream *AssetManager::OpenAssetIO(const std::string &fullPath) const {
-  if (asset_pak_ != nullptr && asset_pak_->IsOpen() && !base_path_.empty()) {
-    std::error_code ec;
-    const std::filesystem::path rel =
-        std::filesystem::relative(std::filesystem::path(fullPath), std::filesystem::path(base_path_), ec);
-    if (!ec && !rel.empty()) {
-      if (SDL_IOStream *io = asset_pak_->OpenIO(rel.generic_string()); io != nullptr) {
+  if (asset_pak_ != nullptr && asset_pak_->IsOpen()) {
+    if (asset_pak_->Contains(fullPath)) {
+      if (SDL_IOStream *io = asset_pak_->OpenIO(fullPath); io != nullptr) {
         return io;
+      }
+    }
+    if (!base_path_.empty()) {
+      std::error_code ec;
+      const std::filesystem::path rel =
+          std::filesystem::relative(std::filesystem::path(fullPath), std::filesystem::path(base_path_), ec);
+      if (!ec && !rel.empty()) {
+        const std::string relStr = rel.generic_string();
+        if (asset_pak_->Contains(relStr)) {
+          if (SDL_IOStream *io = asset_pak_->OpenIO(relStr); io != nullptr) {
+            return io;
+          }
+        }
       }
     }
   }

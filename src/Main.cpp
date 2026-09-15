@@ -12,6 +12,7 @@ int main(const int argc, char* argv[]) {
 
   std::string gamePath;
   std::string startupMode;
+  std::string scriptsDir;
   bool useManifest = false;
   int devListenPort = 0;  // 0 = disabled; >0 = bind on that TCP port
 
@@ -25,6 +26,14 @@ int main(const int argc, char* argv[]) {
         Logger::Info("Startup mode set to: " + startupMode);
       } else {
         Logger::Error("Error: " + currentArg + " flag requires a mode argument.");
+        return 1;
+      }
+    } else if (currentArg == "--scripts-dir") {
+      if (i + 1 < argc) {
+        scriptsDir = argv[++i];
+        Logger::Info("Scripts override dir set to: " + scriptsDir);
+      } else {
+        Logger::Error("Error: --scripts-dir flag requires a directory argument.");
         return 1;
       }
     } else if (currentArg == "--use-manifest") {
@@ -65,7 +74,7 @@ int main(const int argc, char* argv[]) {
   // Bake is headless and needs no Game instance, window, or loop — run it and exit with a status
   // a CI gate can read (0 = manifest written, 1 = config/catalog/write failure).
   if (startupMode == "bake") {
-    return Game::Bake(gamePath) ? 0 : 1;
+    return Game::Bake(gamePath, scriptsDir) ? 0 : 1;
   }
 
   Game game{};

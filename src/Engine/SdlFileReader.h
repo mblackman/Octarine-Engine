@@ -5,18 +5,17 @@
 #include <optional>
 #include <string>
 
+#include "AssetManager/AssetManager.h"
 #include "General/Logger.h"
 
 // Read a file's bytes through SDL_IO so the same path resolves on desktop, inside an APK asset
-// root, or inside a .app bundle. Lua's stock fopen-based loader only sees a real filesystem and
-// misses AAssetManager-backed entries on Android. Shared by Game::LoadGame and SceneLoader (the
-// dofile override that exposes the same behavior to scripts lives in
-// engine_bootstrap::InstallLuaLibraries). Header-only inline so both engine-layer TUs share one
-// definition without a separate object.
-inline std::optional<std::string> ReadFileViaSDL(const std::string& path) {
-  SDL_IOStream* io = SDL_IOFromFile(path.c_str(), "rb");
+// root, inside a .app bundle, or out of an in-memory AssetPak. Shared by Game::LoadGame and SceneLoader
+// (and the dofile override in engine_bootstrap::InstallLuaLibraries). Header-only inline so both
+// engine-layer TUs share one definition without a separate object.
+inline std::optional<std::string> ReadFileViaSDL(const std::string& path, const AssetManager* assetManager = nullptr) {
+  SDL_IOStream* io = assetManager != nullptr ? assetManager->OpenAssetIO(path) : SDL_IOFromFile(path.c_str(), "rb");
   if (!io) {
-    Logger::Error("SDL_IOFromFile failed for '" + path + "': " + std::string(SDL_GetError()));
+    Logger::Error("Failed to open '" + path + "': " + std::string(SDL_GetError()));
     return std::nullopt;
   }
   std::size_t size = 0;

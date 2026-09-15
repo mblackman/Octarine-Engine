@@ -224,11 +224,79 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
         install(FILES "${_engine_license}" DESTINATION "${RUNTIME_DEST}")
     endif ()
 
+    set(_staged_scripts_dir "${CMAKE_BINARY_DIR}/_octarine_staged_scripts")
+    if (OCTARINE_PROTECT_SCRIPTS)
+        set(_bake_args_str "\"--scripts-dir\" \"${_staged_scripts_dir}\"")
+        set(_script_prep_code "
+        message(STATUS \"Octarine: staging and compiling Lua scripts for asset bake...\")
+        file(REMOVE_RECURSE \"${_staged_scripts_dir}\")
+        file(MAKE_DIRECTORY \"${_staged_scripts_dir}\")
+
+        # Copy root Lua scripts
+        file(GLOB _root_lua LIST_DIRECTORIES false \"${PROJECT_DIR}/*.lua\")
+        if (_root_lua)
+            list(FILTER _root_lua EXCLUDE REGEX \"asset_manifest\\\\.lua$\")
+            if (_root_lua)
+                file(COPY \${_root_lua} DESTINATION \"${_staged_scripts_dir}\")
+            endif ()
+        endif ()
+
+        # Copy scripts/ directory if present
+        if (IS_DIRECTORY \"${PROJECT_DIR}/scripts\")
+            file(COPY \"${PROJECT_DIR}/scripts/\" DESTINATION \"${_staged_scripts_dir}/scripts\")
+        endif ()
+
+        file(GLOB_RECURSE _lua_sources LIST_DIRECTORIES false \"${_staged_scripts_dir}/*.lua\")
+        foreach (_src IN LISTS _lua_sources)
+            execute_process(
+                COMMAND \"${LUAC_EXECUTABLE}\" -s -o \"\${_src}.tmp\" \"\${_src}\"
+                RESULT_VARIABLE _rc)
+            if (NOT _rc EQUAL 0)
+                file(REMOVE \"\${_src}.tmp\")
+                message(FATAL_ERROR \"Octarine: luac failed on \${_src} (rc=\${_rc})\")
+            endif ()
+            file(RENAME \"\${_src}.tmp\" \"\${_src}\")
+        endforeach ()
+        message(STATUS \"Octarine: Lua bytecode compilation done.\")
+        ")
+
+        if (OCTARINE_LUA_XOR_KEY)
+            string(APPEND _script_prep_code "
+        message(STATUS \"Octarine: XOR-encrypting staged Lua bytecode...\")
+        file(GLOB_RECURSE _lua_enc_sources LIST_DIRECTORIES false \"${_staged_scripts_dir}/*.lua\")
+        set(_enc_py \"${CMAKE_BINARY_DIR}/_octarine_enc.py\")
+        file(WRITE \"\${_enc_py}\"
+            \"import sys, os\\n\"
+            \"k = ${OCTARINE_LUA_XOR_KEY}\\n\"
+            \"magic = bytes([27]) + b'OCT'\\n\"
+            \"for f in sys.argv[1:]:\\n\"
+            \"    d = open(f, 'rb').read()\\n\"
+            \"    enc = bytes((b ^ ((k + i) & 0xFF)) for i, b in enumerate(d))\\n\"
+            \"    tmp = f + '.tmp'\\n\"
+            \"    open(tmp, 'wb').write(magic + enc)\\n\"
+            \"    os.replace(tmp, f)\\n\"
+        )
+        execute_process(
+            COMMAND \"${Python3_EXECUTABLE}\" \"\${_enc_py}\" \${_lua_enc_sources}
+            RESULT_VARIABLE _rc)
+        file(REMOVE \"\${_enc_py}\")
+        if (NOT _rc EQUAL 0)
+            message(FATAL_ERROR \"Octarine: Lua XOR encryption failed (rc=\${_rc})\")
+        endif ()
+        message(STATUS \"Octarine: Staged Lua encryption done.\")
+            ")
+        endif ()
+    else ()
+        set(_bake_args_str "")
+        set(_script_prep_code "")
+    endif ()
+
     # install() steps run in order, so the bake CODE precedes file staging below.
     install(CODE "
-        message(STATUS \"Octarine: baking asset manifest for package...\")
+        ${_script_prep_code}
+        message(STATUS \"Octarine: baking asset manifest and asset_bundle.pak for package...\")
         execute_process(
-            COMMAND \"$<TARGET_FILE:${TARGET}>\" \"${PROJECT_DIR}\" -m bake
+            COMMAND \"$<TARGET_FILE:${TARGET}>\" \"${PROJECT_DIR}\" -m bake ${_bake_args_str}
             RESULT_VARIABLE _bake_rc)
         if (NOT _bake_rc EQUAL 0)
             message(FATAL_ERROR \"Octarine: asset bake failed (rc=\${_bake_rc}); aborting package\")
@@ -236,6 +304,8 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
     ")
 
     # Stage expected runtime game files and data (allowlist model).
+    # All game assets and Lua scripts are bundled into asset_bundle.pak; only runtime metadata,
+    # licenses, the baked manifest, and explicit custom includes are staged loose.
     # 1. Configuration & Project metadata
     if (EXISTS "${PROJECT_DIR}/config.ini")
         install(FILES "${PROJECT_DIR}/config.ini" DESTINATION "${DATA_DEST}")
@@ -261,34 +331,7 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
             DESTINATION "${DATA_DEST}"
             OPTIONAL)
 
-    # 4. Root Lua scripts (e.g. game.lua, main.lua)
-    file(GLOB _root_scripts
-         LIST_DIRECTORIES false
-         "${PROJECT_DIR}/*.lua"
-    )
-    if (_root_scripts)
-        list(FILTER _root_scripts EXCLUDE REGEX "asset_manifest\\.lua$")
-        if (_root_scripts)
-            install(FILES ${_root_scripts} DESTINATION "${DATA_DEST}")
-        endif ()
-    endif ()
-
-    # 5. scripts/ directory (if present in project)
-    if (IS_DIRECTORY "${PROJECT_DIR}/scripts")
-        set(_scripts_excludes "")
-        foreach (_ex IN LISTS _INST_EXTRA_EXCLUDES)
-            string(STRIP "${_ex}" _ex_clean)
-            if (_ex_clean)
-                list(APPEND _scripts_excludes PATTERN "${_ex_clean}" EXCLUDE)
-            endif ()
-        endforeach ()
-        install(DIRECTORY "${PROJECT_DIR}/scripts/"
-                DESTINATION "${DATA_DEST}/scripts"
-                ${_scripts_excludes}
-        )
-    endif ()
-
-    # 6. Custom extra project includes (package_include in project.ini)
+    # 4. Custom extra project includes (package_include in project.ini)
     foreach (_inc IN LISTS _INST_EXTRA_INCLUDES)
         string(STRIP "${_inc}" _inc_clean)
         if (_inc_clean AND EXISTS "${PROJECT_DIR}/${_inc_clean}")
@@ -303,68 +346,6 @@ function(_octarine_setup_desktop_install TARGET PROJECT_DIR RUNTIME_DEST DATA_DE
             endif ()
         endif ()
     endforeach ()
-
-    # Compile installed Lua scripts to stripped bytecode. Runs after install(DIRECTORY) so it
-    # operates on the installed copy without touching PROJECT_DIR source files. lua.safe_script() /
-    # luaL_loadbuffer detects the \x1bLua magic header transparently, so no C++ changes are required
-    # for bytecode-only payloads.
-    if (OCTARINE_PROTECT_SCRIPTS)
-        install(CODE "
-            message(STATUS \"Octarine: compiling Lua scripts to stripped bytecode...\")
-            file(GLOB_RECURSE _lua_sources
-                 LIST_DIRECTORIES false
-                 \"\${CMAKE_INSTALL_PREFIX}/${DATA_DEST}/*.lua\")
-            foreach (_src IN LISTS _lua_sources)
-                execute_process(
-                    COMMAND \"${LUAC_EXECUTABLE}\" -s -o \"\${_src}.tmp\" \"\${_src}\"
-                    RESULT_VARIABLE _rc)
-                if (NOT _rc EQUAL 0)
-                    file(REMOVE \"\${_src}.tmp\")
-                    message(FATAL_ERROR \"Octarine: luac failed on \${_src} (rc=\${_rc})\")
-                endif ()
-                file(RENAME \"\${_src}.tmp\" \"\${_src}\")
-            endforeach ()
-            message(STATUS \"Octarine: Lua bytecode compilation done.\")
-        ")
-    endif ()
-
-    # XOR-encrypt the compiled bytecode so that automated extract-and-decompile pipelines require an
-    # extra step to recover the key. Each encrypted file is prefixed with a 4-byte magic sentinel
-    # (0x1B 'O' 'C' 'T') and the rolling-XOR key is compiled into the engine binary
-    # (OCTARINE_LUA_XOR_KEY compile definition). At runtime DecryptLuaBytes() only transforms files
-    # carrying the sentinel, so any future un-encrypted payload (e.g. user mods) passes through
-    # untouched.
-    if (OCTARINE_PROTECT_SCRIPTS AND OCTARINE_LUA_XOR_KEY)
-        install(CODE "
-            message(STATUS \"Octarine: XOR-encrypting Lua bytecode...\")
-            file(GLOB_RECURSE _lua_enc_sources
-                 LIST_DIRECTORIES false
-                 \"\${CMAKE_INSTALL_PREFIX}/${DATA_DEST}/*.lua\")
-            # Write the encryption helper to a temp file to avoid quoting the Python code inline.
-            # Prefixes each payload with the magic sentinel and uses os.replace() for atomic writes
-            # so an interrupted install cannot leave a partially-encrypted file.
-            set(_enc_py \"\${CMAKE_INSTALL_PREFIX}/_octarine_enc.py\")
-            file(WRITE \"\${_enc_py}\"
-                \"import sys, os\\n\"
-                \"k = ${OCTARINE_LUA_XOR_KEY}\\n\"
-                \"magic = bytes([27]) + b'OCT'\\n\"
-                \"for f in sys.argv[1:]:\\n\"
-                \"    d = open(f, 'rb').read()\\n\"
-                \"    enc = bytes((b ^ ((k + i) & 0xFF)) for i, b in enumerate(d))\\n\"
-                \"    tmp = f + '.tmp'\\n\"
-                \"    open(tmp, 'wb').write(magic + enc)\\n\"
-                \"    os.replace(tmp, f)\\n\"
-            )
-            execute_process(
-                COMMAND \"${Python3_EXECUTABLE}\" \"\${_enc_py}\" \${_lua_enc_sources}
-                RESULT_VARIABLE _rc)
-            file(REMOVE \"\${_enc_py}\")
-            if (NOT _rc EQUAL 0)
-                message(FATAL_ERROR \"Octarine: Lua XOR encryption failed (rc=\${_rc})\")
-            endif ()
-            message(STATUS \"Octarine: Lua XOR encryption done.\")
-        ")
-    endif ()
 endfunction()
 
 # Bundle vcpkg runtime libs + C/C++ runtime beside the binary.

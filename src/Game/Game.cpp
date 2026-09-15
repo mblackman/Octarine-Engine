@@ -109,7 +109,7 @@ inline void LoadGame(sol::state& lua, const AssetManager& assetManager, const Ga
   const auto filePath = assetManager.GetFullPath(gameConfig.GetStartupScript());
 
   Logger::Info("Loading entry script: " + filePath);
-  auto bytes = ReadFileViaSDL(filePath);
+  auto bytes = ReadFileViaSDL(filePath, &assetManager);
   if (!bytes) {
     Logger::Error("Failed to read entry script: " + filePath);
     return;
@@ -353,7 +353,7 @@ void Game::Destroy() {
   runtime_.Shutdown();
 }
 
-bool Game::Bake(const std::string& assetPath) {
+bool Game::Bake(const std::string& assetPath, const std::string& scriptsOverrideDir) {
   if (assetPath.empty()) {
     Logger::Error("Bake: no project path provided.");
     return false;
@@ -372,14 +372,14 @@ bool Game::Bake(const std::string& assetPath) {
     Game game;  // SDL-free constructor — allocates Registry/EventBus/Renderer, opens no window.
     game.bake_mode_ = true;
     game.startup_mode_ = "bake";
-    ok = game.RunBakeValidation(assetPath);
+    ok = game.RunBakeValidation(assetPath, scriptsOverrideDir);
   }
 
   SDL_Quit();
   return ok;
 }
 
-bool Game::RunBakeValidation(const std::string& assetPath) {
+bool Game::RunBakeValidation(const std::string& assetPath, const std::string& scriptsOverrideDir) {
   registry_->Set<GameConfig>(GameConfig());
   auto& gameConfig = registry_->Get<GameConfig>();
   if (!gameConfig.LoadConfigFromFile(assetPath)) {
@@ -397,7 +397,7 @@ bool Game::RunBakeValidation(const std::string& assetPath) {
   // Shared bootstrap spine. withFramePathCaches=false — bake runs no frames and no audio systems,
   // so the SpriteRenderCache / AudioTrackCache slots are unused.
   engine_bootstrap::InstallCoreSingletons(*registry_, registry_->Get<EngineContext>(), gameConfig.windowWidth,
-                                          gameConfig.windowHeight, /*withFramePathCaches=*/false);
+                                          gameConfig.windowHeight, /*withFramePathCaches=*/false, &lua);
   engine_bootstrap::InstallPoolAndProjectile(*registry_);
   auto& inputSystem = engine_bootstrap::InstallInputSystem(*registry_, event_bus_);
   engine_bootstrap::RegisterAllComponentBindings();
@@ -494,14 +494,52 @@ bool Game::RunBakeValidation(const std::string& assetPath) {
     }
   }
 
-  // Pack every cataloged asset (+ any derived atlas files, w/ optional normalized-audio
-  // overrides) into a single asset_bundle.pak alongside the manifest. Shipped builds
+  // Pack every cataloged asset (+ any derived atlas files, Lua scripts, w/ optional normalized-audio
+  // and script overrides) into a single asset_bundle.pak alongside the manifest. Shipped builds
   // (OCTARINE_SHIPPED) open this in place of the loose asset tree; dev builds ignore it.
   // Manifest write is the source-of-truth gate — if that failed, skip the pak so a stale
   // archive doesn't ship.
   if (wrote) {
+    std::vector<std::string> extraFiles = atlasFiles;
+    std::map<std::string, std::string> pakOverrides = audioOverrides;
+
+    // Collect Lua scripts: root *.lua (excluding asset_manifest.lua) and scripts/**/*.lua.
+    std::error_code ec;
+    for (const auto& entry : std::filesystem::directory_iterator(assetPath, ec)) {
+      if (entry.is_regular_file(ec) && entry.path().extension() == ".lua") {
+        if (entry.path().filename() != "asset_manifest.lua") {
+          extraFiles.push_back(entry.path().lexically_normal().string());
+        }
+      }
+    }
+    const std::filesystem::path scriptsDir = std::filesystem::path(assetPath) / "scripts";
+    if (std::filesystem::is_directory(scriptsDir, ec)) {
+      for (const auto& entry : std::filesystem::recursive_directory_iterator(scriptsDir, ec)) {
+        if (entry.is_regular_file(ec) && entry.path().extension() == ".lua") {
+          extraFiles.push_back(entry.path().lexically_normal().string());
+        }
+      }
+    }
+
+    // If an external scripts directory is provided (e.g. pre-compiled bytecode staged by CMake),
+    // map the project-relative script paths to their compiled override locations.
+    if (!scriptsOverrideDir.empty()) {
+      const std::filesystem::path overrideRoot(scriptsOverrideDir);
+      for (const auto& file : extraFiles) {
+        if (std::filesystem::path(file).extension() == ".lua") {
+          const std::filesystem::path rel = std::filesystem::relative(file, assetPath, ec);
+          if (!ec && !rel.empty()) {
+            const std::filesystem::path staged = overrideRoot / rel;
+            if (std::filesystem::exists(staged, ec)) {
+              pakOverrides[rel.generic_string()] = staged.string();
+            }
+          }
+        }
+      }
+    }
+
     const std::string pakPath = (std::filesystem::path(assetPath) / "asset_bundle.pak").string();
-    if (!AssetPak::Pack(assetManager.GetCatalog(), pakPath, assetPath, atlasFiles, audioOverrides)) {
+    if (!AssetPak::Pack(assetManager.GetCatalog(), pakPath, assetPath, extraFiles, pakOverrides)) {
       Logger::Error("Bake: AssetPak::Pack failed for " + pakPath);
       return false;
     }
@@ -536,7 +574,7 @@ void Game::Setup() {
   // the live game loop reads SpriteRenderCache from the sprite-render pass and AudioTrackCache
   // from the spatial/Doppler/culling audio systems.
   engine_bootstrap::InstallCoreSingletons(*registry_, registry_->Get<EngineContext>(), gameConfig.windowWidth,
-                                          gameConfig.windowHeight, /*withFramePathCaches=*/true);
+                                          gameConfig.windowHeight, /*withFramePathCaches=*/true, &lua);
 
   // ScriptSystem is registered as a per-frame system (vs. Bake's stack instance) so its
   // operator() runs each tick. CreateLuaBindings still happens below in the bootstrap spine.
